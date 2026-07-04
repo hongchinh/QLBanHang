@@ -324,6 +324,91 @@ public class QuotationListFilterTests : QuotationTestBase
         listRes!.Data!.Aggregates.AdvancePayment.Should().Be(500_000m);
     }
 
+    [Fact]
+    public async Task List_item_includes_delivery_date_and_revenue_date()
+    {
+        var req = BuildRequest();
+        req.DeliveryDate = new DateOnly(2026, 6, 15);
+        var res = await _client.PostAsJsonAsync("/api/quotations", req);
+        res.EnsureSuccessStatusCode();
+        var created = await res.Content.ReadFromJsonAsync<ApiResponse<QuotationDto>>(TestJson.Options);
+        var id = created!.Data!.Id;
+
+        var listRes = await _client.GetFromJsonAsync<ApiResponse<QuotationListResult>>(
+            "/api/quotations?pageSize=100", TestJson.Options);
+
+        var item = listRes!.Data!.Items.Single(x => x.Id == id);
+        item.DeliveryDate.Should().Be(new DateOnly(2026, 6, 15));
+        item.RevenueDate.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task List_filter_by_delivery_date_range_returns_matching_quotations()
+    {
+        var req1 = BuildRequest();
+        req1.DeliveryDate = new DateOnly(2026, 6, 10);
+        var r1 = await _client.PostAsJsonAsync("/api/quotations", req1);
+        r1.EnsureSuccessStatusCode();
+        var id1 = (await r1.Content.ReadFromJsonAsync<ApiResponse<QuotationDto>>(TestJson.Options))!.Data!.Id;
+
+        var req2 = BuildRequest();
+        req2.DeliveryDate = new DateOnly(2026, 8, 20);
+        var r2 = await _client.PostAsJsonAsync("/api/quotations", req2);
+        r2.EnsureSuccessStatusCode();
+        var id2 = (await r2.Content.ReadFromJsonAsync<ApiResponse<QuotationDto>>(TestJson.Options))!.Data!.Id;
+
+        var res = await _client.GetFromJsonAsync<ApiResponse<QuotationListResult>>(
+            "/api/quotations?deliveryDateFrom=2026-06-01&deliveryDateTo=2026-06-30&pageSize=100",
+            TestJson.Options);
+
+        res!.Data!.Items.Should().Contain(x => x.Id == id1);
+        res.Data.Items.Should().NotContain(x => x.Id == id2);
+    }
+
+    [Fact]
+    public async Task List_filter_by_revenue_date_range_uses_system_date_mode()
+    {
+        var req1 = BuildRequest();
+        req1.QuotationDate = new DateOnly(2025, 3, 15);
+        var r1 = await _client.PostAsJsonAsync("/api/quotations", req1);
+        r1.EnsureSuccessStatusCode();
+        var id1 = (await r1.Content.ReadFromJsonAsync<ApiResponse<QuotationDto>>(TestJson.Options))!.Data!.Id;
+
+        var req2 = BuildRequest();
+        req2.QuotationDate = new DateOnly(2025, 5, 10);
+        var r2 = await _client.PostAsJsonAsync("/api/quotations", req2);
+        r2.EnsureSuccessStatusCode();
+        var id2 = (await r2.Content.ReadFromJsonAsync<ApiResponse<QuotationDto>>(TestJson.Options))!.Data!.Id;
+
+        var res = await _client.GetFromJsonAsync<ApiResponse<QuotationListResult>>(
+            "/api/quotations?revenueDateFrom=2025-03-01&revenueDateTo=2025-03-31&pageSize=100",
+            TestJson.Options);
+
+        res!.Data!.Items.Should().Contain(x => x.Id == id1);
+        res.Data.Items.Should().NotContain(x => x.Id == id2);
+    }
+
+    [Fact]
+    public async Task List_filter_by_revenue_date_excludes_cancelled_quotations()
+    {
+        var req = BuildRequest();
+        req.QuotationDate = new DateOnly(2025, 4, 10);
+        var r = await _client.PostAsJsonAsync("/api/quotations", req);
+        r.EnsureSuccessStatusCode();
+        var id = (await r.Content.ReadFromJsonAsync<ApiResponse<QuotationDto>>(TestJson.Options))!.Data!.Id;
+
+        var cancelRes = await _client.PostAsJsonAsync(
+            $"/api/quotations/{id}/transition",
+            new TransitionQuotationRequest { Action = QuotationAction.Cancel });
+        cancelRes.EnsureSuccessStatusCode();
+
+        var res = await _client.GetFromJsonAsync<ApiResponse<QuotationListResult>>(
+            "/api/quotations?revenueDateFrom=2025-04-01&revenueDateTo=2025-04-30&pageSize=100",
+            TestJson.Options);
+
+        res!.Data!.Items.Should().NotContain(x => x.Id == id);
+    }
+
     private async Task<Guid> GetUserIdAsync(string username)
     {
         using var scope = _factory.Services.CreateScope();

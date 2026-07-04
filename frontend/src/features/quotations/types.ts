@@ -108,6 +108,8 @@ export interface QuotationListItem {
   canClone: boolean;
   createdByName?: string;
   createdAt: string;
+  deliveryDate?: string;
+  revenueDate?: string;
 }
 
 export interface QuotationListAggregates {
@@ -196,6 +198,10 @@ export interface QuotationListParams {
   sortBy?: string;
   sortDirection?: 'asc' | 'desc';
   ownerUserIds?: string[];
+  revenueDateFrom?: string;
+  revenueDateTo?: string;
+  deliveryDateFrom?: string;
+  deliveryDateTo?: string;
 }
 
 export type { PagedResult };

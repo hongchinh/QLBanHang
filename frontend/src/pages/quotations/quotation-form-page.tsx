@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useForm, useWatch, type Resolver } from 'react-hook-form';
+import { useForm, useWatch, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -368,7 +368,7 @@ function QuotationFormInner({
     if (e.defaultPrevented) return;
     if (e.key !== 'Enter' || e.ctrlKey || e.altKey) return;
     const target = e.target as HTMLInputElement;
-    if (target.type === 'date') return;
+    if (target.id === 'quotationDate' || target.id === 'deliveryDate') return;
     const currentId = target.id;
     const order = GENERAL_INFO_FIELD_ORDER;
     const idx = order.indexOf(currentId as typeof order[number]);
@@ -770,11 +770,18 @@ function QuotationFormInner({
                 <CardContent className="space-y-[6px] px-4 pt-2 pb-3" onKeyDown={handleGeneralInfoKeyDown}>
               <div className="form-inline-grid form-cols-3">
                 <Label htmlFor="quotationDate" className="field-label required">Ngày báo giá</Label>
-                <Input
-                  id="quotationDate"
-                  type="date"
-                  {...form.register('quotationDate')}
-                  className="h-7 max-w-[200px]"
+                <Controller
+                  control={form.control}
+                  name="quotationDate"
+                  render={({ field }) => (
+                    <DateTextInput
+                      id="quotationDate"
+                      value={field.value}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      className="h-7 max-w-[200px]"
+                    />
+                  )}
                 />
                 <Label htmlFor="revenueDate" className="field-label">Ngày doanh thu</Label>
                 <div>
@@ -793,11 +800,18 @@ function QuotationFormInner({
                   )}
                 </div>
                 <Label htmlFor="deliveryDate" className="field-label">Ngày giao</Label>
-                <Input
-                  id="deliveryDate"
-                  type="date"
-                  {...form.register('deliveryDate')}
-                  className="h-7 max-w-[200px]"
+                <Controller
+                  control={form.control}
+                  name="deliveryDate"
+                  render={({ field }) => (
+                    <DateTextInput
+                      id="deliveryDate"
+                      value={field.value ?? ''}
+                      onChange={field.onChange}
+                      onBlur={field.onBlur}
+                      className="h-7 max-w-[200px]"
+                    />
+                  )}
                 />
                 {form.formState.errors.quotationDate && (
                   <p className="field-message field-message-code text-destructive">
@@ -1025,6 +1039,75 @@ function QuotationActivityHistory({
       ))}
     </ul>
   );
+}
+
+interface DateTextInputProps {
+  id?: string;
+  name?: string;
+  value: string;
+  onChange: (value: string) => void;
+  onBlur?: () => void;
+  className?: string;
+}
+
+function DateTextInput({ id, name, value, onChange, onBlur, className }: DateTextInputProps) {
+  const [display, setDisplay] = useState(() => isoToDisplay(value));
+
+  useEffect(() => {
+    setDisplay(isoToDisplay(value));
+  }, [value]);
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setDisplay(e.target.value);
+  }
+
+  function handleBlur() {
+    const iso = displayToIso(display);
+    if (iso !== null) {
+      onChange(iso);
+      setDisplay(isoToDisplay(iso));
+    } else if (display === '') {
+      onChange('');
+    }
+    onBlur?.();
+  }
+
+  return (
+    <Input
+      id={id}
+      name={name}
+      type="text"
+      value={display}
+      placeholder="dd/MM/yyyy"
+      onChange={handleChange}
+      onBlur={handleBlur}
+      className={className}
+    />
+  );
+}
+
+function isoToDisplay(iso: string): string {
+  if (!iso) return '';
+  const parts = iso.split('-');
+  if (parts.length !== 3) return iso;
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+}
+
+function displayToIso(s: string): string | null {
+  const match = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!match) return null;
+  const d = parseInt(match[1], 10);
+  const m = parseInt(match[2], 10);
+  const y = parseInt(match[3], 10);
+  const date = new Date(y, m - 1, d);
+  if (
+    isNaN(date.getTime()) ||
+    date.getFullYear() !== y ||
+    date.getMonth() !== m - 1 ||
+    date.getDate() !== d
+  ) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 function activityIcon(action: QuotationActivityAction) {

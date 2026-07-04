@@ -293,6 +293,10 @@ export function QuotationListPage() {
   const [toDate] = useSearchParamString('to');
   const [, setDateRangeParams] = useSearchParams();
   const [ownerIdsParam, setOwnerIdsParam] = useSearchParamString('ownerUserIds');
+  const [revDateFrom] = useSearchParamString('revDateFrom');
+  const [revDateTo] = useSearchParamString('revDateTo');
+  const [dlvDateFrom] = useSearchParamString('dlvDateFrom');
+  const [dlvDateTo] = useSearchParamString('dlvDateTo');
   const debouncedSearch = useDebouncedValue(search, 300);
   const hasViewAll = useAuthStore((s) => s.hasPermission('quotations.view_all'));
   const canViewCost = useAuthStore((s) => s.hasPermission('quotations.view_cost'));
@@ -338,6 +342,10 @@ export function QuotationListPage() {
     ownerUserIds: ownerIds.length > 0 ? ownerIds : undefined,
     from: fromDate || undefined,
     to: toDate || undefined,
+    revenueDateFrom: revDateFrom || undefined,
+    revenueDateTo: revDateTo || undefined,
+    deliveryDateFrom: dlvDateFrom || undefined,
+    deliveryDateTo: dlvDateTo || undefined,
   });
   const transition = useTransitionQuotation();
   const clone = useCloneQuotation();
@@ -370,6 +378,16 @@ export function QuotationListPage() {
         header: 'Ngày',
         accessorKey: 'quotationDate',
         cell: ({ row }) => formatDate(row.original.quotationDate),
+      },
+      {
+        header: 'N. Doanh thu',
+        accessorKey: 'revenueDate',
+        cell: ({ row }) => formatDate(row.original.revenueDate),
+      },
+      {
+        header: 'Ngày Giao',
+        accessorKey: 'deliveryDate',
+        cell: ({ row }) => formatDate(row.original.deliveryDate),
       },
       { header: 'Khách hàng', accessorKey: 'customerName' },
       { header: 'SĐT', accessorKey: 'contactPhone' },
@@ -554,19 +572,56 @@ export function QuotationListPage() {
               />
             )}
 
-            <QuotationDateFilter
-              from={fromDate}
-              to={toDate}
-              onChange={(f, t) => {
-                setDateRangeParams((prev) => {
-                  const out = new URLSearchParams(prev);
-                  if (!f) out.delete('from'); else out.set('from', f);
-                  if (!t) out.delete('to'); else out.set('to', t);
-                  out.delete('page');
-                  return out;
-                }, { replace: true });
-              }}
-            />
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-muted-foreground leading-none">Ngày báo giá</span>
+              <QuotationDateFilter
+                from={fromDate}
+                to={toDate}
+                onChange={(f, t) => {
+                  setDateRangeParams((prev) => {
+                    const out = new URLSearchParams(prev);
+                    if (!f) out.delete('from'); else out.set('from', f);
+                    if (!t) out.delete('to'); else out.set('to', t);
+                    out.delete('page');
+                    return out;
+                  }, { replace: true });
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-muted-foreground leading-none">N. Doanh thu</span>
+              <QuotationDateFilter
+                from={revDateFrom}
+                to={revDateTo}
+                onChange={(f, t) => {
+                  setDateRangeParams((prev) => {
+                    const out = new URLSearchParams(prev);
+                    if (!f) out.delete('revDateFrom'); else out.set('revDateFrom', f);
+                    if (!t) out.delete('revDateTo'); else out.set('revDateTo', t);
+                    out.delete('page');
+                    return out;
+                  }, { replace: true });
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-muted-foreground leading-none">Ngày Giao</span>
+              <QuotationDateFilter
+                from={dlvDateFrom}
+                to={dlvDateTo}
+                onChange={(f, t) => {
+                  setDateRangeParams((prev) => {
+                    const out = new URLSearchParams(prev);
+                    if (!f) out.delete('dlvDateFrom'); else out.set('dlvDateFrom', f);
+                    if (!t) out.delete('dlvDateTo'); else out.set('dlvDateTo', t);
+                    out.delete('page');
+                    return out;
+                  }, { replace: true });
+                }}
+              />
+            </div>
           </div>
 
           {isError && (
@@ -588,12 +643,17 @@ export function QuotationListPage() {
                 </div>
               </div>
             )}
-            <Table containerClassName="h-full">
+            <Table containerClassName="h-full" className="min-w-max">
               <TableHeader className="sticky top-0 z-10">
                 {table.getHeaderGroups().map((hg) => (
                   <TableRow key={hg.id}>
                     {hg.headers.map((h) => (
-                      <TableHead key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</TableHead>
+                      <TableHead
+                        key={h.id}
+                        className={h.column.id === 'actions' ? 'sticky right-0 z-20 bg-background shadow-[-2px_0_4px_-1px_rgba(0,0,0,0.1)]' : ''}
+                      >
+                        {flexRender(h.column.columnDef.header, h.getContext())}
+                      </TableHead>
                     ))}
                   </TableRow>
                 ))}
@@ -615,7 +675,12 @@ export function QuotationListPage() {
                   table.getRowModel().rows.map((row) => (
                     <TableRow key={row.id} className="even:bg-muted/50">
                       {row.getVisibleCells().map((c) => (
-                        <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>
+                        <TableCell
+                          key={c.id}
+                          className={c.column.id === 'actions' ? 'sticky right-0 bg-background shadow-[-2px_0_4px_-1px_rgba(0,0,0,0.1)]' : ''}
+                        >
+                          {flexRender(c.column.columnDef.cell, c.getContext())}
+                        </TableCell>
                       ))}
                     </TableRow>
                   ))

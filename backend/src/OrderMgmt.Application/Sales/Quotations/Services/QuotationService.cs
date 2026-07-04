@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Reports.Common;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Common.Options;
 using OrderMgmt.Application.Notifications.Interfaces;
@@ -161,6 +162,7 @@ public class QuotationService : IQuotationService
     public async Task<QuotationListResult> ListAsync(QuotationListRequest request, CancellationToken ct = default)
     {
         var canViewCost = CanViewCost();
+        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
         var query = ApplyOwnerScope(_db.Quotations
             .AsNoTracking()
             .Where(q => !q.IsDeleted));
@@ -184,6 +186,14 @@ public class QuotationService : IQuotationService
             if (ownerIds.Count > 0)
                 query = query.Where(q => ownerIds.Contains(q.OwnerUserId));
         }
+
+        query = RevenueFilterHelper.ApplyRevenueDateRangeFilter(
+            query, dateMode, request.RevenueDateFrom, request.RevenueDateTo);
+
+        if (request.DeliveryDateFrom.HasValue)
+            query = query.Where(q => q.DeliveryDate >= request.DeliveryDateFrom.Value);
+        if (request.DeliveryDateTo.HasValue)
+            query = query.Where(q => q.DeliveryDate <= request.DeliveryDateTo.Value);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -264,8 +274,23 @@ public class QuotationService : IQuotationService
                         .FirstOrDefault()
                     : null,
                 CreatedAt = q.CreatedAt,
+                DeliveryDate = q.DeliveryDate,
             })
             .ToListAsync(ct);
+
+        foreach (var item in items)
+        {
+            item.RevenueDate = dateMode switch
+            {
+                RevenueDateField.ConfirmedAt => item.ConfirmedAt.HasValue
+                    ? DateOnly.FromDateTime(item.ConfirmedAt.Value)
+                    : null,
+                RevenueDateField.AccountingConfirmedAt => item.AccountingConfirmedAt.HasValue
+                    ? DateOnly.FromDateTime(item.AccountingConfirmedAt.Value)
+                    : null,
+                _ => item.QuotationDate,
+            };
+        }
 
         return new QuotationListResult
         {

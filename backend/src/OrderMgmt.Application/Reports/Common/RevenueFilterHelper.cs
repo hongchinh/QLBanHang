@@ -18,6 +18,39 @@ public static class RevenueFilterHelper
         return mode ?? RevenueDateField.QuotationDate;
     }
 
+    public static IQueryable<Quotation> ApplyRevenueDateRangeFilter(
+        IQueryable<Quotation> q, string dateMode, DateOnly? from, DateOnly? to)
+    {
+        if (!from.HasValue && !to.HasValue) return q;
+
+        switch (dateMode)
+        {
+            case RevenueDateField.ConfirmedAt:
+            {
+                var fromDt = from?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+                var toDt   = to?.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+                return q.Where(x =>
+                    x.ConfirmedAt != null && x.CancelledAt == null
+                    && (!fromDt.HasValue || x.ConfirmedAt >= fromDt.Value)
+                    && (!toDt.HasValue   || x.ConfirmedAt < toDt.Value));
+            }
+            case RevenueDateField.AccountingConfirmedAt:
+            {
+                var fromDt = from?.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+                var toDt   = to?.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+                return q.Where(x =>
+                    x.AccountingConfirmedAt != null && x.CancelledAt == null
+                    && (!fromDt.HasValue || x.AccountingConfirmedAt >= fromDt.Value)
+                    && (!toDt.HasValue   || x.AccountingConfirmedAt < toDt.Value));
+            }
+            default:
+                return q.Where(x =>
+                    x.CancelledAt == null
+                    && (!from.HasValue || x.QuotationDate >= from.Value)
+                    && (!to.HasValue   || x.QuotationDate <= to.Value));
+        }
+    }
+
     public static IQueryable<Quotation> ApplyRevenueFilter(
         IQueryable<Quotation> q, string dateMode, DateOnly from, DateOnly to)
     {

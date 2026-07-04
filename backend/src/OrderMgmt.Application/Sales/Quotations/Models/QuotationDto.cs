@@ -135,6 +135,8 @@ public class QuotationListItemDto
     public bool CanClone { get; set; }
     public string? CreatedByName { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+    public DateOnly? DeliveryDate { get; set; }
+    public DateOnly? RevenueDate { get; set; }
 }
 
 public class QuotationListAggregates
@@ -208,6 +210,10 @@ public class QuotationListRequest : PageRequest
     public DateOnly? To { get; set; }
     // CSV "guid1,guid2"; honored only when caller has quotations.view_all (silently ignored otherwise).
     public string? OwnerUserIds { get; set; }
+    public DateOnly? RevenueDateFrom { get; set; }
+    public DateOnly? RevenueDateTo { get; set; }
+    public DateOnly? DeliveryDateFrom { get; set; }
+    public DateOnly? DeliveryDateTo { get; set; }
 }
 
 public class TransitionQuotationRequest

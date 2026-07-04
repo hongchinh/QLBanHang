@@ -1,6 +1,11 @@
 import * as React from 'react';
 import { cn } from '@/lib/utils';
 
+export interface TableHeadResizableProps {
+  onResizeStart: (e: React.MouseEvent | React.TouchEvent) => void;
+  isResizing: boolean;
+}
+
 interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
   containerClassName?: string;
 }
@@ -51,16 +56,34 @@ const TableRow = React.forwardRef<HTMLTableRowElement, React.HTMLAttributes<HTML
 );
 TableRow.displayName = 'TableRow';
 
-const TableHead = React.forwardRef<HTMLTableCellElement, React.ThHTMLAttributes<HTMLTableCellElement>>(
-  ({ className, ...props }, ref) => (
+interface TableHeadProps extends React.ThHTMLAttributes<HTMLTableCellElement> {
+  resizable?: TableHeadResizableProps;
+}
+
+const TableHead = React.forwardRef<HTMLTableCellElement, TableHeadProps>(
+  ({ className, resizable, children, ...props }, ref) => (
     <th
       ref={ref}
       className={cn(
-        'qldh-table-head text-left align-middle font-semibold text-white [&:has([role=checkbox])]:pr-0',
+        'qldh-table-head relative text-left align-middle font-semibold text-white [&:has([role=checkbox])]:pr-0',
         className,
       )}
       {...props}
-    />
+    >
+      {children}
+      {resizable && (
+        <div
+          data-testid="column-resize-handle"
+          onMouseDown={resizable.onResizeStart}
+          onTouchStart={resizable.onResizeStart}
+          className={cn(
+            'absolute right-0 top-0 h-full w-2 cursor-col-resize touch-none select-none',
+            'hover:bg-white/30',
+            resizable.isResizing && 'bg-primary',
+          )}
+        />
+      )}
+    </th>
   ),
 );
 TableHead.displayName = 'TableHead';
@@ -72,4 +95,14 @@ const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<
 );
 TableCell.displayName = 'TableCell';
 
-export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell };
+function TableColGroup({ widths }: { widths: number[] }) {
+  return (
+    <colgroup>
+      {widths.map((w, i) => (
+        <col key={i} style={{ width: `${w}px` }} />
+      ))}
+    </colgroup>
+  );
+}
+
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableColGroup };

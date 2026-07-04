@@ -170,7 +170,17 @@
       "Bash(Set-Location d:\\\\Projects\\\\QLDonHang\\\\frontend)",
       "Bash(Select-Object -Last 20)",
       "PowerShell(Get-ExecutionPolicy -List)",
-      "Bash(dotnet build *)"
+      "Bash(dotnet build *)",
+      "Bash(npx tsc *)",
+      "Bash(npx vitest *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(npm run *)",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(npx --no-install playwright --version)",
+      "Bash(mkdir -p docs/plans/archived)",
+      "Bash(mv docs/plans/260704-1500-resizable-table-columns docs/plans/archived/)"
     ],
     "deny": [
       "Bash(rm -rf /:*)",

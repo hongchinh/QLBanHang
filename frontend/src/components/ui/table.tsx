@@ -65,7 +65,7 @@ const TableHead = React.forwardRef<HTMLTableCellElement, TableHeadProps>(
     <th
       ref={ref}
       className={cn(
-        'qldh-table-head relative text-left align-middle font-semibold text-white [&:has([role=checkbox])]:pr-0',
+        'qldh-table-head relative text-left align-middle font-semibold text-white border-r border-white/40 last:border-r-0 [&:has([role=checkbox])]:pr-0',
         className,
       )}
       {...props}
@@ -90,7 +90,7 @@ TableHead.displayName = 'TableHead';
 
 const TableCell = React.forwardRef<HTMLTableCellElement, React.TdHTMLAttributes<HTMLTableCellElement>>(
   ({ className, ...props }, ref) => (
-    <td ref={ref} className={cn('qldh-table-cell align-middle [&:has([role=checkbox])]:pr-0', className)} {...props} />
+    <td ref={ref} className={cn('qldh-table-cell align-middle border-r border-border/60 last:border-r-0 [&:has([role=checkbox])]:pr-0', className)} {...props} />
   ),
 );
 TableCell.displayName = 'TableCell';

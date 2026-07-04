@@ -417,10 +417,7 @@ export function QuotationListPage() {
         size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.customerName,
         minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => (
-          <span
-            className="block max-w-[160px] truncate"
-            title={row.original.customerName}
-          >
+          <span className="block truncate" title={row.original.customerName}>
             {row.original.customerName}
           </span>
         ),

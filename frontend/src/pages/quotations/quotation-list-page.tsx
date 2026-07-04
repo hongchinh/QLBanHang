@@ -30,18 +30,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableColGroup } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Can } from '@/components/auth/can';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useSearchParamNumber, useSearchParamString } from '@/lib/use-search-param-state';
+import { useColumnSizingPersist } from '@/lib/use-column-sizing-persist';
 import { toast } from '@/lib/use-toast';
 import { getErrorMessage } from '@/lib/api-client';
 import { StatusPill } from './components/status-pill';
 import { ListFooter } from './components/list-footer';
 import { QuotationDateFilter } from './components/quotation-date-filter';
 import { parseOwnerIds } from './utils/owner-ids';
+import {
+  QUOTATION_LIST_STORAGE_KEY,
+  QUOTATION_LIST_COLUMN_SIZING_DEFAULTS,
+  COLUMN_MIN_SIZE,
+} from './column-sizing-defaults';
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 20;
@@ -334,6 +340,11 @@ export function QuotationListPage() {
     action: QuotationAction;
   } | null>(null);
 
+  const [columnSizing, setColumnSizing] = useColumnSizingPersist(
+    QUOTATION_LIST_STORAGE_KEY,
+    QUOTATION_LIST_COLUMN_SIZING_DEFAULTS,
+  );
+
   const { data, isLoading, isFetching, isError, error } = useQuotations({
     page,
     pageSize,
@@ -373,42 +384,73 @@ export function QuotationListPage() {
 
   const columns = useMemo<ColumnDef<QuotationListItem>[]>(
     () => [
-      { header: 'Số báo giá', accessorKey: 'code' },
+      {
+        header: 'Số báo giá',
+        accessorKey: 'code',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.code,
+        minSize: COLUMN_MIN_SIZE,
+      },
       {
         header: 'Ngày',
         accessorKey: 'quotationDate',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.quotationDate,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => formatDate(row.original.quotationDate),
       },
       {
         header: 'N. Doanh thu',
         accessorKey: 'revenueDate',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.revenueDate,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => formatDate(row.original.revenueDate),
       },
       {
         header: 'Ngày Giao',
         accessorKey: 'deliveryDate',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.deliveryDate,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => formatDate(row.original.deliveryDate),
       },
-      { header: 'Khách hàng', accessorKey: 'customerName' },
-      { header: 'SĐT', accessorKey: 'contactPhone' },
+      {
+        header: 'Khách hàng',
+        accessorKey: 'customerName',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.customerName,
+        minSize: COLUMN_MIN_SIZE,
+        cell: ({ row }) => (
+          <span
+            className="block max-w-[160px] truncate"
+            title={row.original.customerName}
+          >
+            {row.original.customerName}
+          </span>
+        ),
+      },
       {
         header: () => moneyHeader('Tổng tiền hàng'),
         accessorKey: 'subtotal',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.subtotal,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => moneyCell(row.original.subtotal),
       },
       {
         header: () => moneyHeader('Chiết khấu'),
         accessorKey: 'discount',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.discount,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => moneyCell(row.original.discount),
       },
       {
         header: () => moneyHeader('Vận chuyển'),
         accessorKey: 'freight',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.freight,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => moneyCell(row.original.freight),
       },
       {
         header: () => <div className="text-right">% VAT</div>,
         accessorKey: 'taxRate',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.taxRate,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => (
           <span className="block text-right tabular-nums">
             {row.original.taxRate > 0 ? `${row.original.taxRate}%` : '—'}
@@ -418,16 +460,22 @@ export function QuotationListPage() {
       {
         header: () => moneyHeader('Tiền thuế'),
         accessorKey: 'taxAmount',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.taxAmount,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => moneyCell(row.original.taxAmount > 0 ? row.original.taxAmount : null),
       },
       {
         header: () => moneyHeader('Tổng cộng'),
         accessorKey: 'total',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.total,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => moneyCell(row.original.total),
       },
       {
         header: () => moneyHeader('Tạm ứng'),
         accessorKey: 'advancePayment',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.advancePayment,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => moneyCell(row.original.advancePayment),
       },
       ...(canViewCost
@@ -435,11 +483,15 @@ export function QuotationListPage() {
             {
               header: () => moneyHeader('Tổng nhập'),
               accessorKey: 'totalCost',
+              size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.totalCost,
+              minSize: COLUMN_MIN_SIZE,
               cell: ({ row }: { row: { original: QuotationListItem } }) => moneyCell(row.original.totalCost),
             } as ColumnDef<QuotationListItem>,
             {
               header: () => moneyHeader('Tổng LN'),
               accessorKey: 'grossProfit',
+              size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.grossProfit,
+              minSize: COLUMN_MIN_SIZE,
               cell: ({ row }: { row: { original: QuotationListItem } }) => moneyCell(row.original.grossProfit),
             } as ColumnDef<QuotationListItem>,
           ]
@@ -447,12 +499,16 @@ export function QuotationListPage() {
       {
         header: 'Trạng thái',
         accessorKey: 'status',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.status,
+        minSize: COLUMN_MIN_SIZE,
         cell: ({ row }) => <StatusPill status={row.original.status} />,
       },
       ...(hasViewAll
         ? [{
             header: 'Chủ sở hữu',
             id: 'owner',
+            size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.owner,
+            minSize: COLUMN_MIN_SIZE,
             cell: ({ row }: { row: { original: QuotationListItem } }) => (
               <span>
                 {row.original.ownerFullName ?? '—'}
@@ -465,10 +521,24 @@ export function QuotationListPage() {
             ),
           } as ColumnDef<QuotationListItem>]
         : []),
-      { header: 'Người lập', accessorKey: 'createdByName' },
+      {
+        header: 'Người lập',
+        accessorKey: 'createdByName',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.createdByName,
+        minSize: COLUMN_MIN_SIZE,
+      },
+      {
+        header: 'SĐT',
+        accessorKey: 'contactPhone',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.contactPhone,
+        minSize: COLUMN_MIN_SIZE,
+      },
       {
         id: 'actions',
         header: '',
+        size: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.actions,
+        minSize: QUOTATION_LIST_COLUMN_SIZING_DEFAULTS.actions,
+        enableResizing: false,
         cell: ({ row }) => (
           <QuotationActionsCell
             q={row.original}
@@ -493,6 +563,10 @@ export function QuotationListPage() {
   const table = useReactTable({
     data: data?.items ?? [],
     columns,
+    state: { columnSizing },
+    onColumnSizingChange: setColumnSizing,
+    columnResizeMode: 'onChange',
+    enableColumnResizing: true,
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -643,7 +717,12 @@ export function QuotationListPage() {
                 </div>
               </div>
             )}
-            <Table containerClassName="h-full" className="min-w-max">
+            <Table
+              containerClassName="h-full"
+              className="min-w-max table-fixed"
+              style={{ width: table.getTotalSize() }}
+            >
+              <TableColGroup widths={table.getHeaderGroups()[0].headers.map((h) => h.getSize())} />
               <TableHeader className="sticky top-0 z-10">
                 {table.getHeaderGroups().map((hg) => (
                   <TableRow key={hg.id}>
@@ -651,6 +730,11 @@ export function QuotationListPage() {
                       <TableHead
                         key={h.id}
                         className={h.column.id === 'actions' ? 'sticky right-0 z-20 bg-background shadow-[-2px_0_4px_-1px_rgba(0,0,0,0.1)]' : ''}
+                        resizable={
+                          h.column.getCanResize()
+                            ? { onResizeStart: h.getResizeHandler(), isResizing: h.column.getIsResizing() }
+                            : undefined
+                        }
                       >
                         {flexRender(h.column.columnDef.header, h.getContext())}
                       </TableHead>

@@ -61,6 +61,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { ButtonLoader } from '@/components/ui/button-loader';
 import { Can } from '@/components/auth/can';
+import { cn } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
@@ -774,12 +775,12 @@ function QuotationFormInner({
                   control={form.control}
                   name="quotationDate"
                   render={({ field }) => (
-                    <DateTextInput
+                    <DatePickerInput
                       id="quotationDate"
                       value={field.value}
                       onChange={field.onChange}
                       onBlur={field.onBlur}
-                      className="h-7 max-w-[200px]"
+                      className="h-7 max-w-[150px]"
                     />
                   )}
                 />
@@ -804,7 +805,7 @@ function QuotationFormInner({
                   control={form.control}
                   name="deliveryDate"
                   render={({ field }) => (
-                    <DateTextInput
+                    <DatePickerInput
                       id="deliveryDate"
                       value={field.value ?? ''}
                       onChange={field.onChange}
@@ -1041,7 +1042,7 @@ function QuotationActivityHistory({
   );
 }
 
-interface DateTextInputProps {
+interface DatePickerInputProps {
   id?: string;
   name?: string;
   value: string;
@@ -1050,39 +1051,25 @@ interface DateTextInputProps {
   className?: string;
 }
 
-function DateTextInput({ id, name, value, onChange, onBlur, className }: DateTextInputProps) {
-  const [display, setDisplay] = useState(() => isoToDisplay(value));
-
-  useEffect(() => {
-    setDisplay(isoToDisplay(value));
-  }, [value]);
-
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setDisplay(e.target.value);
-  }
-
-  function handleBlur() {
-    const iso = displayToIso(display);
-    if (iso !== null) {
-      onChange(iso);
-      setDisplay(isoToDisplay(iso));
-    } else if (display === '') {
-      onChange('');
-    }
-    onBlur?.();
-  }
-
+function DatePickerInput({ id, name, value, onChange, onBlur, className }: DatePickerInputProps) {
   return (
-    <Input
-      id={id}
-      name={name}
-      type="text"
-      value={display}
-      placeholder="dd/MM/yyyy"
-      onChange={handleChange}
-      onBlur={handleBlur}
-      className={className}
-    />
+    <div className="relative">
+      <div className="pointer-events-none absolute inset-0 z-[1] flex items-center px-3 text-sm">
+        {value
+          ? isoToDisplay(value)
+          : <span className="text-xs text-muted-foreground">dd/MM/yyyy</span>
+        }
+      </div>
+      <Input
+        id={id}
+        name={name}
+        type="date"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+        className={cn('text-transparent', className)}
+      />
+    </div>
   );
 }
 
@@ -1092,22 +1079,6 @@ function isoToDisplay(iso: string): string {
   if (parts.length !== 3) return iso;
   const [y, m, d] = parts;
   return `${d}/${m}/${y}`;
-}
-
-function displayToIso(s: string): string | null {
-  const match = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if (!match) return null;
-  const d = parseInt(match[1], 10);
-  const m = parseInt(match[2], 10);
-  const y = parseInt(match[3], 10);
-  const date = new Date(y, m - 1, d);
-  if (
-    isNaN(date.getTime()) ||
-    date.getFullYear() !== y ||
-    date.getMonth() !== m - 1 ||
-    date.getDate() !== d
-  ) return null;
-  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
 function activityIcon(action: QuotationActivityAction) {

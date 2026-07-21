@@ -7,6 +7,7 @@ using OrderMgmt.Application.Identity.Interfaces;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Infrastructure.Persistence.Seed;
@@ -252,6 +253,44 @@ public static class DbSeeder
                 new Unit { Code = "CAI", Name = "Cái" },
             };
             db.Units.AddRange(units);
+        }
+
+        if (!await db.Banks.AnyAsync(ct))
+        {
+            var banks = new[]
+            {
+                new Bank { Code = "VCB", Name = "Ngân hàng TMCP Ngoại thương Việt Nam", ShortName = "Vietcombank", Bin = "970436" },
+                new Bank { Code = "CTG", Name = "Ngân hàng TMCP Công thương Việt Nam", ShortName = "VietinBank", Bin = "970415" },
+                new Bank { Code = "BIDV", Name = "Ngân hàng TMCP Đầu tư và Phát triển Việt Nam", ShortName = "BIDV", Bin = "970418" },
+                new Bank { Code = "VBA", Name = "Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam", ShortName = "Agribank", Bin = "970405" },
+                new Bank { Code = "TCB", Name = "Ngân hàng TMCP Kỹ thương Việt Nam", ShortName = "Techcombank", Bin = "970407" },
+                new Bank { Code = "MB", Name = "Ngân hàng TMCP Quân đội", ShortName = "MB Bank", Bin = "970422" },
+                new Bank { Code = "ACB", Name = "Ngân hàng TMCP Á Châu", ShortName = "ACB", Bin = "970416" },
+                new Bank { Code = "VPB", Name = "Ngân hàng TMCP Việt Nam Thịnh Vượng", ShortName = "VPBank", Bin = "970432" },
+                new Bank { Code = "STB", Name = "Ngân hàng TMCP Sài Gòn Thương Tín", ShortName = "Sacombank", Bin = "970403" },
+                new Bank { Code = "TPB", Name = "Ngân hàng TMCP Tiên Phong", ShortName = "TPBank", Bin = "970423" },
+                new Bank { Code = "HDB", Name = "Ngân hàng TMCP Phát triển TP.HCM", ShortName = "HDBank", Bin = "970437" },
+                new Bank { Code = "VIB", Name = "Ngân hàng TMCP Quốc tế Việt Nam", ShortName = "VIB", Bin = "970441" },
+                new Bank { Code = "SHB", Name = "Ngân hàng TMCP Sài Gòn - Hà Nội", ShortName = "SHB", Bin = "970443" },
+                new Bank { Code = "EIB", Name = "Ngân hàng TMCP Xuất Nhập khẩu Việt Nam", ShortName = "Eximbank", Bin = "970431" },
+                new Bank { Code = "MSB", Name = "Ngân hàng TMCP Hàng hải Việt Nam", ShortName = "MSB", Bin = "970426" },
+                new Bank { Code = "SEAB", Name = "Ngân hàng TMCP Đông Nam Á", ShortName = "SeABank", Bin = "970440" },
+                new Bank { Code = "OCB", Name = "Ngân hàng TMCP Phương Đông", ShortName = "OCB", Bin = "970448" },
+                new Bank { Code = "SCB", Name = "Ngân hàng TMCP Sài Gòn", ShortName = "SCB", Bin = "970429" },
+                new Bank { Code = "NAB", Name = "Ngân hàng TMCP Nam Á", ShortName = "Nam A Bank", Bin = "970428" },
+                new Bank { Code = "BAB", Name = "Ngân hàng TMCP Bắc Á", ShortName = "Bac A Bank", Bin = "970409" },
+                new Bank { Code = "PVCB", Name = "Ngân hàng TMCP Đại Chúng Việt Nam", ShortName = "PVcomBank", Bin = "970412" },
+                new Bank { Code = "ABB", Name = "Ngân hàng TMCP An Bình", ShortName = "ABBANK", Bin = "970425" },
+                new Bank { Code = "VAB", Name = "Ngân hàng TMCP Việt Á", ShortName = "VietABank", Bin = "970427" },
+                new Bank { Code = "KLB", Name = "Ngân hàng TMCP Kiên Long", ShortName = "KienLongBank", Bin = "970452" },
+                new Bank { Code = "PGB", Name = "Ngân hàng TMCP Xăng dầu Petrolimex", ShortName = "PGBank", Bin = "970430" },
+                new Bank { Code = "SGB", Name = "Ngân hàng TMCP Sài Gòn Công Thương", ShortName = "Saigonbank", Bin = "970400" },
+                new Bank { Code = "LPB", Name = "Ngân hàng TMCP Bưu điện Liên Việt", ShortName = "LienVietPostBank", Bin = "970449" },
+                new Bank { Code = "NCB", Name = "Ngân hàng TMCP Quốc Dân", ShortName = "NCB", Bin = "970419" },
+                new Bank { Code = "DAB", Name = "Ngân hàng TMCP Đông Á", ShortName = "DongA Bank", Bin = "970406" },
+                new Bank { Code = "VCCB", Name = "Ngân hàng TMCP Bản Việt", ShortName = "VietCapital Bank", Bin = "970454" },
+            };
+            db.Banks.AddRange(banks);
         }
 
         await db.SaveChangesAsync(ct);

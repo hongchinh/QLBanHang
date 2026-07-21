@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Controller, useForm, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -13,15 +13,18 @@ import { toast } from '@/lib/use-toast';
 import { getErrorMessage } from '@/lib/api-client';
 import { formatCurrencyVnd } from '@/lib/utils';
 import { useBanks } from '@/features/banks/hooks';
+import { useMyBankAccounts } from '@/features/bank-accounts/hooks';
 import { useGenerateQr } from '@/features/payment-qr/hooks';
 import { paymentQrSchema, type PaymentQrFormParsed, type PaymentQrFormValues } from '@/features/payment-qr/schema';
 
 export function PaymentQrPage() {
   const [searchParams] = useSearchParams();
   const { data: banks } = useBanks();
+  const { data: savedAccounts } = useMyBankAccounts();
   const generateQr = useGenerateQr();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [payload, setPayload] = useState<string | null>(null);
+  const prefilledFromDefaultRef = useRef(false);
 
   const form = useForm<PaymentQrFormValues, unknown, PaymentQrFormParsed>({
     resolver: zodResolver(paymentQrSchema) as unknown as Resolver<PaymentQrFormValues, unknown, PaymentQrFormParsed>,
@@ -35,6 +38,22 @@ export function PaymentQrPage() {
   });
 
   const selectedBank = banks?.find((b) => b.id === form.watch('bankId'));
+
+  useEffect(() => {
+    if (prefilledFromDefaultRef.current) return;
+    if (!savedAccounts) return;
+    prefilledFromDefaultRef.current = true;
+
+    const defaultAccount = savedAccounts.find((a) => a.isDefault);
+    if (defaultAccount && !form.getValues('bankId')) {
+      form.reset({
+        ...form.getValues(),
+        bankId: defaultAccount.bankId,
+        accountNumber: defaultAccount.accountNumber,
+        accountName: defaultAccount.accountName,
+      });
+    }
+  }, [savedAccounts, form]);
 
   const onSubmit = form.handleSubmit(async (values) => {
     try {

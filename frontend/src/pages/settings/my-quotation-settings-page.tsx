@@ -8,6 +8,7 @@ import { useDeleteTemplate, useMySettings, useUploadTemplate, useUploadHandoverT
 import { meSettingsApi, HandoverTemplateType } from '@/features/me-settings/api';
 import { useAuthStore } from '@/stores/auth-store';
 import { BrandingTab } from '@/features/branding/branding-tab';
+import { BankAccountsTab } from '@/features/bank-accounts/bank-accounts-tab';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -384,22 +385,24 @@ export function MyQuotationSettingsPage() {
         </p>
       </div>
 
-      {canManageBranding ? (
-        <Tabs defaultValue="quotation" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="quotation">Cài đặt báo giá</TabsTrigger>
-            <TabsTrigger value="branding">Logo công ty</TabsTrigger>
-          </TabsList>
-          <TabsContent value="quotation">
-            <QuotationSettingsTabContent />
-          </TabsContent>
+      <Tabs defaultValue="quotation" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="quotation">Cài đặt báo giá</TabsTrigger>
+          <TabsTrigger value="bank-accounts">Tài khoản ngân hàng</TabsTrigger>
+          {canManageBranding && <TabsTrigger value="branding">Logo công ty</TabsTrigger>}
+        </TabsList>
+        <TabsContent value="quotation">
+          <QuotationSettingsTabContent />
+        </TabsContent>
+        <TabsContent value="bank-accounts">
+          <BankAccountsTab />
+        </TabsContent>
+        {canManageBranding && (
           <TabsContent value="branding">
             <BrandingTab />
           </TabsContent>
-        </Tabs>
-      ) : (
-        <QuotationSettingsTabContent />
-      )}
+        )}
+      </Tabs>
     </div>
   );
 }

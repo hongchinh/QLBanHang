@@ -67,6 +67,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IBankLookupService, BankLookupService>();
         services.AddScoped<IPaymentQrService, PaymentQrService>();
+        services.AddScoped<IUserBankAccountService, UserBankAccountService>();
 
         return services;
     }

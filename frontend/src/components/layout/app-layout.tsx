@@ -11,6 +11,7 @@ import {
   Users2,
   ShieldCheck,
   Settings,
+  QrCode,
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
@@ -40,6 +41,7 @@ const navGroups: NavGroup[] = [
       { to: '/products', label: 'Hàng hóa', icon: Package, permission: 'products.view' },
       { to: '/product-groups', label: 'Nhóm hàng hóa', icon: Tag, permission: 'products.view' },
       { to: '/quotations', label: 'Báo giá', icon: FileText, permission: 'quotations.view' },
+      { to: '/qr-thanh-toan', label: 'Tạo mã QR thanh toán', icon: QrCode },
     ],
   },
   {

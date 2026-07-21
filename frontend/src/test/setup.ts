@@ -13,6 +13,21 @@ if (typeof globalThis.ResizeObserver === 'undefined') {
   } as unknown as typeof ResizeObserver;
 }
 
+// jsdom doesn't implement the Pointer Capture API; Radix UI's Select (and other
+// pointer-driven primitives) call these during interaction, so stub them as no-ops.
+if (typeof Element.prototype.hasPointerCapture === 'undefined') {
+  Element.prototype.hasPointerCapture = () => false;
+}
+if (typeof Element.prototype.setPointerCapture === 'undefined') {
+  Element.prototype.setPointerCapture = () => {};
+}
+if (typeof Element.prototype.releasePointerCapture === 'undefined') {
+  Element.prototype.releasePointerCapture = () => {};
+}
+if (typeof Element.prototype.scrollIntoView === 'undefined') {
+  Element.prototype.scrollIntoView = () => {};
+}
+
 // Recharts ResponsiveContainer relies on layout measurement, which jsdom does not provide.
 // Inject explicit width/height into the child chart so it renders during tests.
 vi.mock('recharts', async () => {

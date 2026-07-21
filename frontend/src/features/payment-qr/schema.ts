@@ -10,4 +10,5 @@ export const paymentQrSchema = z.object({
   content: z.string().max(255).optional(),
 });
 
-export type PaymentQrFormValues = z.infer<typeof paymentQrSchema>;
+export type PaymentQrFormValues = z.input<typeof paymentQrSchema>;
+export type PaymentQrFormParsed = z.output<typeof paymentQrSchema>;

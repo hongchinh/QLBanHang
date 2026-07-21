@@ -5,6 +5,7 @@ using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Entities.Sales;
 using OrderMgmt.Domain.Notifications;
 using OrderMgmt.Infrastructure.Persistence.Conventions;
@@ -43,6 +44,9 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<QuotationLine> QuotationLines => Set<QuotationLine>();
     public DbSet<QuotationOwnerHistory> QuotationOwnerHistory => Set<QuotationOwnerHistory>();
     public DbSet<QuotationActivity> QuotationActivities => Set<QuotationActivity>();
+
+    public DbSet<Bank> Banks => Set<Bank>();
+    public DbSet<UserBankAccount> UserBankAccounts => Set<UserBankAccount>();
 
     public DbSet<SystemBranding> SystemBranding => Set<SystemBranding>();
     public DbSet<QuotationSystemSettings> QuotationSystemSettings => Set<QuotationSystemSettings>();

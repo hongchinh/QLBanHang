@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Entities.Sales;
 using OrderMgmt.Domain.Notifications;
 
@@ -28,6 +29,9 @@ public interface IAppDbContext
     DbSet<QuotationLine> QuotationLines { get; }
     DbSet<QuotationOwnerHistory> QuotationOwnerHistory { get; }
     DbSet<QuotationActivity> QuotationActivities { get; }
+
+    DbSet<Bank> Banks { get; }
+    DbSet<UserBankAccount> UserBankAccounts { get; }
 
     DbSet<SystemBranding> SystemBranding { get; }
     DbSet<QuotationSystemSettings> QuotationSystemSettings { get; }

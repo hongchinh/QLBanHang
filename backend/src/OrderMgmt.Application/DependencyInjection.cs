@@ -24,6 +24,8 @@ using OrderMgmt.Application.Branding.Interfaces;
 using OrderMgmt.Application.Branding.Services;
 using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Notifications.Services;
+using OrderMgmt.Application.Payments.Interfaces;
+using OrderMgmt.Application.Payments.Services;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
 using OrderMgmt.Application.Sales.Quotations.Services;
 using OrderMgmt.Application.Search.Interfaces;
@@ -63,6 +65,8 @@ public static class DependencyInjection
         services.AddScoped<IBrandingService, BrandingService>();
         services.AddScoped<ISearchService, SearchService>();
         services.AddScoped<INotificationService, NotificationService>();
+        services.AddScoped<IBankLookupService, BankLookupService>();
+        services.AddScoped<IPaymentQrService, PaymentQrService>();
 
         return services;
     }

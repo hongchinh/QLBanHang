@@ -53,6 +53,7 @@ QLDonHang/
 | Search | `Application/Search`, `SearchController.cs` |
 | Branding | `Domain/Branding`, `Application/Branding`, `SettingsController.cs` |
 | Notifications | `Domain/Notifications`, `Application/Notifications`, `NotificationsController.cs` |
+| Payments / VietQR | `Domain/Entities/Payments`, `Application/Payments`, `BanksController.cs`, `PaymentQrController.cs`, `MeBankAccountsController.cs` |
 
 ## API Controllers
 
@@ -72,6 +73,9 @@ QLDonHang/
 | `NotificationsController` | `/api/notifications`, unread count, read actions |
 | `SearchController` | `/api/search/global` |
 | `LookupsController` | `/api/lookups/product-groups`, `/api/lookups/units` |
+| `BanksController` | `/api/banks` — seeded Vietnamese bank list |
+| `PaymentQrController` | `/api/payment-qr/generate` — builds a VietQR payload string |
+| `MeBankAccountsController` | `/api/me/bank-accounts` CRUD + `/default`, scoped to the current user |
 
 ## Frontend Structure
 
@@ -87,11 +91,14 @@ frontend/src/
 │   ├── admin-user-settings/
 │   ├── admin-users/
 │   ├── auth/
+│   ├── bank-accounts/           # saved receiving bank accounts (CRUD, current user)
+│   ├── banks/                   # read-only seeded bank list
 │   ├── branding/
 │   ├── customers/
 │   ├── dashboard/
 │   ├── me-settings/
 │   ├── notifications/
+│   ├── payment-qr/              # VietQR payload generation
 │   ├── products/
 │   ├── quotations/
 │   ├── reports/sales-revenue/
@@ -99,6 +106,7 @@ frontend/src/
 ├── pages/
 │   ├── admin/
 │   ├── customers/
+│   ├── payment-qr/              # /qr-thanh-toan standalone page
 │   ├── products/
 │   ├── quotations/
 │   ├── reports/

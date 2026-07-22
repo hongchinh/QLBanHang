@@ -24,6 +24,9 @@ QLDonHang is a quotation-first sales management system. The quotation is the pri
 - Dashboard summary, revenue series, top customers/products, recent activity and sales leaderboard.
 - Sales revenue report.
 - Global search, system branding and notifications.
+- VietQR payment-QR generation: pick/save a receiving bank account, enter an amount and transfer
+  content, get a scannable NAPAS/EMVCo QR code. A quotation's detail page can jump into this screen
+  with its total and code pre-filled.
 
 ## Core Business Rules
 
@@ -42,6 +45,8 @@ QLDonHang is a quotation-first sales management system. The quotation is the pri
 - No delivery, warehouse issue note or handover workflow.
 - No inventory tracking.
 - No multi-stage payment, debt or advance-payment tracking.
+- No payment confirmation, bank webhook, or reconciliation for generated VietQR codes — the app has
+  no way to know whether a transfer actually happened.
 - No direct email/Zalo sending from the app.
 - No full accounting module.
 

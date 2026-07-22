@@ -100,7 +100,7 @@ export function PaymentQrPage() {
                     </SelectTrigger>
                     <SelectContent>
                       {banks?.map((bank) => (
-                        <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
+                        <SelectItem key={bank.id} value={bank.id}>{bank.shortName} - {bank.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -129,7 +129,22 @@ export function PaymentQrPage() {
 
             <div className="space-y-2">
               <Label htmlFor="amount">Số tiền (VNĐ)</Label>
-              <Input id="amount" type="number" {...form.register('amount')} />
+              <Controller
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <Input
+                    id="amount"
+                    inputMode="numeric"
+                    value={field.value ? formatCurrencyVnd(field.value) : ''}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/[^0-9]/g, '');
+                      field.onChange(digits === '' ? 0 : Number(digits));
+                    }}
+                    onBlur={field.onBlur}
+                  />
+                )}
+              />
               {form.formState.errors.amount && (
                 <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>
               )}

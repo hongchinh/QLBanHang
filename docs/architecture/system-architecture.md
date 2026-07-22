@@ -76,6 +76,28 @@ Quotation status flow is `Draft -> Sent -> Confirmed -> Cancelled`.
 - Confirmed quotations store confirmation metadata and feed revenue reports.
 - Export supports Excel and PDF. Excel rendering uses ClosedXML; PDF conversion uses LibreOffice. Template paths in `QuotationExport` are resolved relative to `AppContext.BaseDirectory` unless configured as absolute paths. In local Debug runs this means `templates/...` points under `backend/src/OrderMgmt.WebApi/bin/Debug/net9.0/`. Per-user quotation templates are stored under `QuotationExport:UserTemplatesPath` (default `templates/users`) as `{userId}.xlsx`, with fallback to `QuotationExport:TemplatePath`. Per-user handover templates use `{userId}_handover_with_price.xlsx` or `{userId}_handover_no_price.xlsx`, with fallback to the corresponding system handover template path.
 
+### Payments / VietQR
+
+Generates a NAPAS 247 / EMVCo-compliant VietQR payload so any Vietnamese banking app can scan it to
+auto-fill a bank transfer. There is no third-party VietQR API call and no payment confirmation —
+the app has no way to know whether a transfer actually happened.
+
+- `Banks` is a seeded, code-maintained reference table (~30 major Vietnamese NAPAS-member banks with
+  their BIN codes). `GET /api/banks` lists active banks; there is no admin CRUD for it.
+- `VietQrPayloadBuilder` (`Application/Payments/Services`) builds the EMVCo TLV payload and its
+  CRC16-CCITT-FALSE checksum from scratch (tag/length/value encoding, Vietnamese-diacritic
+  stripping for the merchant name/content fields). `POST /api/payment-qr/generate` returns the
+  payload string; the frontend renders it into a QR image client-side (`qrcode.react`) and can
+  export it as PNG. The backend never generates a QR image itself.
+- `UserBankAccount` records a user's own saved receiving accounts, CRUD'd under
+  `/api/me/bank-accounts` and always scoped to `ICurrentUser.UserId`. The first saved account
+  becomes the default automatically; creating another as default (or `PUT .../default`) unsets the
+  previous default; deleting the current default promotes another remaining account.
+- All Payments endpoints only require `[Authorize]` — no dedicated permission constants.
+- The quotation detail page links into the QR page with the quotation's total/code pre-filled via
+  query params (`amount`, `content`); a user's default saved account pre-fills the bank/account
+  fields when one exists.
+
 ### Dashboard, Reports, Search, Branding And Notifications
 
 - Dashboard endpoints under `/api/dashboard` expose summary, revenue series, top customers, top products, recent activity and sales leaderboard.
@@ -124,7 +146,7 @@ Failures use the same envelope with `success=false` and an `error` object. `Glob
 
 Migrations currently live in two folders because early migrations were generated before the final `Persistence/Migrations` path:
 
-- `OrderMgmt.Infrastructure/Migrations`: initial permissions, filtered indexes, refresh tokens, snake_case, product pricing, quotations, unaccent and quotation confirmed/cancelled audit fields.
+- `OrderMgmt.Infrastructure/Migrations`: initial permissions, filtered indexes, refresh tokens, snake_case, product pricing, quotations, unaccent, quotation confirmed/cancelled audit fields, and (most recently) `banks`/`user_bank_accounts`. New migrations land wherever the EF tool's last-migration lookup points, which by default follows whichever of the two folders holds the most recent migration ID — not a fixed choice.
 - `OrderMgmt.Infrastructure/Persistence/Migrations`: quotation owner, owner history, user quotation settings, system branding and notifications.
 
 `Database:AutoMigrateAndSeed` is `true` in development and `false` in base production settings. Development seed creates roles, permissions, admin user, product groups and units. Production deployments should provide `Seed__AdminPassword` only when initial seeding is intended.

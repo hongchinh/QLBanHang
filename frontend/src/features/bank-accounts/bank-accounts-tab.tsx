@@ -162,7 +162,7 @@ export function BankAccountsTab() {
                     </SelectTrigger>
                     <SelectContent>
                       {banks?.map((bank) => (
-                        <SelectItem key={bank.id} value={bank.id}>{bank.name}</SelectItem>
+                        <SelectItem key={bank.id} value={bank.id}>{bank.shortName} - {bank.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

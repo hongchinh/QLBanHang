@@ -4,7 +4,7 @@ Hệ thống quản lý quy trình báo giá theo luồng:
 
 > Draft → Sent → Confirmed → Cancelled
 
-> **Scope hiện tại**: báo giá là chứng từ trung tâm. Hệ thống đã có auth/RBAC, khách hàng, hàng hóa, báo giá, export Excel/PDF, dashboard, báo cáo doanh thu, quản lý user/role, cấu hình mẫu báo giá theo user, branding, notification và global search.
+> **Scope hiện tại**: báo giá là chứng từ trung tâm. Hệ thống đã có auth/RBAC, khách hàng, hàng hóa, báo giá, export Excel/PDF, dashboard, báo cáo doanh thu, quản lý user/role, cấu hình mẫu báo giá theo user, branding, notification, global search và tạo mã QR thanh toán (VietQR).
 
 ---
 
@@ -324,5 +324,5 @@ Trong service Frontend → tab **Variables**, thêm:
 ## Lộ trình tiếp theo (theo BD §21 MVP)
 
 - **Giai đoạn 1**: Hàng hóa → Báo giá → In báo giá PDF → Đơn hàng → In đơn hàng → Biên bản bàn giao → Báo cáo doanh thu/lợi nhuận cơ bản.
-- **Giai đoạn 2**: Trạng thái giao hàng, ghi nhận thanh toán, công nợ, QR thanh toán, lịch sử chỉnh sửa, cấu hình mẫu in.
+- **Giai đoạn 2**: Trạng thái giao hàng, ghi nhận thanh toán, công nợ, lịch sử chỉnh sửa, cấu hình mẫu in. (QR thanh toán đã hoàn thành — xem phần Tài liệu.)
 - **Giai đoạn 3**: Dashboard tổng quan, báo cáo nâng cao theo khách hàng/sản phẩm/nhân viên, import Excel.

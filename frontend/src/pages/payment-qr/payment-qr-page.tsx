@@ -85,101 +85,110 @@ export function PaymentQrPage() {
         </p>
       </div>
 
-      <Card>
-        <CardContent className="space-y-4 pt-6">
-          <form className="space-y-4" onSubmit={onSubmit}>
-            <div className="space-y-2">
-              <Label htmlFor="bankId">Ngân hàng</Label>
-              <Controller
-                control={form.control}
-                name="bankId"
-                render={({ field }) => (
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger id="bankId" aria-label="Ngân hàng">
-                      <SelectValue placeholder="Chọn ngân hàng" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {banks?.map((bank) => (
-                        <SelectItem key={bank.id} value={bank.id}>{bank.shortName} - {bank.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              />
-              {form.formState.errors.bankId && (
-                <p className="text-sm text-destructive">{form.formState.errors.bankId.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="accountNumber">Số tài khoản</Label>
-              <Input id="accountNumber" {...form.register('accountNumber')} />
-              {form.formState.errors.accountNumber && (
-                <p className="text-sm text-destructive">{form.formState.errors.accountNumber.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="accountName">Chủ tài khoản</Label>
-              <Input id="accountName" {...form.register('accountName')} />
-              {form.formState.errors.accountName && (
-                <p className="text-sm text-destructive">{form.formState.errors.accountName.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amount">Số tiền (VNĐ)</Label>
-              <Controller
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <Input
-                    id="amount"
-                    inputMode="numeric"
-                    value={field.value ? formatCurrencyVnd(field.value) : ''}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/[^0-9]/g, '');
-                      field.onChange(digits === '' ? 0 : Number(digits));
-                    }}
-                    onBlur={field.onBlur}
-                  />
-                )}
-              />
-              {form.formState.errors.amount && (
-                <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="content">Nội dung chuyển khoản</Label>
-              <Input id="content" {...form.register('content')} />
-            </div>
-
-            <Button type="submit" disabled={generateQr.isPending}>
-              {generateQr.isPending && <ButtonLoader className="mr-2" />}
-              Tạo QR
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-
-      {payload && (
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:items-stretch">
         <Card>
-          <CardContent className="flex flex-col items-center gap-4 pt-6">
-            <QRCodeCanvas ref={canvasRef} value={payload} size={280} />
-            <div className="w-full max-w-sm space-y-1 text-sm">
-              <p><strong>Ngân hàng:</strong> {selectedBank?.name}</p>
-              <p><strong>Số tài khoản:</strong> {form.getValues('accountNumber')}</p>
-              <p><strong>Chủ tài khoản:</strong> {form.getValues('accountName')}</p>
-              <p><strong>Số tiền:</strong> {formatCurrencyVnd(form.getValues('amount'))} đ</p>
-              {form.getValues('content') && <p><strong>Nội dung:</strong> {form.getValues('content')}</p>}
-            </div>
-            <Button variant="outline" onClick={handleDownload}>
-              Tải ảnh QR
-            </Button>
+          <CardContent className="space-y-4 pt-6">
+            <form className="space-y-4" onSubmit={onSubmit}>
+              <div className="space-y-2">
+                <Label htmlFor="bankId">Ngân hàng</Label>
+                <Controller
+                  control={form.control}
+                  name="bankId"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger id="bankId" aria-label="Ngân hàng">
+                        <SelectValue placeholder="Chọn ngân hàng" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {banks?.map((bank) => (
+                          <SelectItem key={bank.id} value={bank.id}>{bank.shortName} - {bank.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {form.formState.errors.bankId && (
+                  <p className="text-sm text-destructive">{form.formState.errors.bankId.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accountNumber">Số tài khoản</Label>
+                <Input id="accountNumber" {...form.register('accountNumber')} />
+                {form.formState.errors.accountNumber && (
+                  <p className="text-sm text-destructive">{form.formState.errors.accountNumber.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="accountName">Chủ tài khoản</Label>
+                <Input id="accountName" {...form.register('accountName')} />
+                {form.formState.errors.accountName && (
+                  <p className="text-sm text-destructive">{form.formState.errors.accountName.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="amount">Số tiền (VNĐ)</Label>
+                <Controller
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <Input
+                      id="amount"
+                      inputMode="numeric"
+                      value={field.value ? formatCurrencyVnd(field.value) : ''}
+                      onChange={(e) => {
+                        const digits = e.target.value.replace(/[^0-9]/g, '');
+                        field.onChange(digits === '' ? 0 : Number(digits));
+                      }}
+                      onBlur={field.onBlur}
+                    />
+                  )}
+                />
+                {form.formState.errors.amount && (
+                  <p className="text-sm text-destructive">{form.formState.errors.amount.message}</p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="content">Nội dung chuyển khoản</Label>
+                <Input id="content" {...form.register('content')} />
+              </div>
+
+              <Button type="submit" disabled={generateQr.isPending}>
+                {generateQr.isPending && <ButtonLoader className="mr-2" />}
+                Tạo QR
+              </Button>
+            </form>
           </CardContent>
         </Card>
-      )}
+
+        <Card className="h-full">
+          <CardContent className="flex h-full flex-col items-center justify-center gap-4 pt-6">
+            {payload ? (
+              <>
+                <QRCodeCanvas ref={canvasRef} value={payload} size={280} />
+                <div className="w-full max-w-sm space-y-1 text-sm">
+                  <p><strong>Ngân hàng:</strong> {selectedBank?.name}</p>
+                  <p><strong>Số tài khoản:</strong> {form.getValues('accountNumber')}</p>
+                  <p><strong>Chủ tài khoản:</strong> {form.getValues('accountName')}</p>
+                  <p><strong>Số tiền:</strong> {formatCurrencyVnd(form.getValues('amount'))} đ</p>
+                  {form.getValues('content') && <p><strong>Nội dung:</strong> {form.getValues('content')}</p>}
+                </div>
+                <Button variant="outline" onClick={handleDownload}>
+                  Tải ảnh QR
+                </Button>
+              </>
+            ) : (
+              <div className="flex h-full min-h-[280px] w-full flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-center text-sm text-muted-foreground">
+                <div className="h-16 w-16 rounded border-2 border-dashed" />
+                <p>Điền thông tin bên trái và nhấn "Tạo QR" để xem mã tại đây.</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

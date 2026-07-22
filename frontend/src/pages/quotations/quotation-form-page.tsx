@@ -15,7 +15,6 @@ import {
   FileSpreadsheet,
   Loader2,
   Printer,
-  QrCode,
   Save,
   Send,
   X,
@@ -657,14 +656,6 @@ function QuotationFormInner({
                 {pendingButtonAction === 'clone' || clone.isPending ? 'Đang nhân bản...' : 'Nhân bản'}
               </Button>
             </Can>
-            {initial && (
-              <Button variant="outline" size="sm" asChild>
-                <Link to={buildPaymentQrHref(initial.total, initial.code)}>
-                  <QrCode className="mr-2 h-4 w-4 text-cyan-600" />
-                  Tạo QR thanh toán
-                </Link>
-              </Button>
-            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -901,7 +892,7 @@ function QuotationFormInner({
             </Tabs>
           </Card>
 
-          <TotalsPanel lines={lineLikes} header={header} onHeaderChange={onHeaderChange} />
+          <TotalsPanel lines={lineLikes} header={header} onHeaderChange={onHeaderChange} quotationCode={initial?.code} />
         </div>
 
           <Card>
@@ -1294,8 +1285,4 @@ function actionLabel(action: QuotationAction) {
     case 'AccountingConfirm': return 'Kế toán xác nhận';
     case 'Cancel': return 'Hủy';
   }
-}
-
-export function buildPaymentQrHref(total: number, code: string): string {
-  return `/qr-thanh-toan?amount=${Math.round(total)}&content=${encodeURIComponent(code)}`;
 }

@@ -24,6 +24,7 @@ export function PaymentQrPage() {
   const generateQr = useGenerateQr();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [payload, setPayload] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const prefilledFromDefaultRef = useRef(false);
 
   const form = useForm<PaymentQrFormValues, unknown, PaymentQrFormParsed>({
@@ -39,6 +40,21 @@ export function PaymentQrPage() {
 
   const selectedBank = banks?.find((b) => b.id === form.watch('bankId'));
 
+  const generate = async (values: PaymentQrFormParsed) => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    try {
+      const result = await generateQr.mutateAsync(values);
+      setPayload(result.payload);
+    } catch (err) {
+      toast({ title: 'Tạo QR thất bại', description: getErrorMessage(err), variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const onSubmit = form.handleSubmit(generate);
+
   useEffect(() => {
     if (prefilledFromDefaultRef.current) return;
     if (!savedAccounts) return;
@@ -52,17 +68,13 @@ export function PaymentQrPage() {
         accountNumber: defaultAccount.accountNumber,
         accountName: defaultAccount.accountName,
       });
-    }
-  }, [savedAccounts, form]);
 
-  const onSubmit = form.handleSubmit(async (values) => {
-    try {
-      const result = await generateQr.mutateAsync(values);
-      setPayload(result.payload);
-    } catch (err) {
-      toast({ title: 'Tạo QR thất bại', description: getErrorMessage(err), variant: 'destructive' });
+      if (form.getValues('amount')) {
+        void generate(form.getValues() as PaymentQrFormParsed);
+      }
     }
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedAccounts, form]);
 
   const handleDownload = () => {
     const canvas = canvasRef.current;
@@ -156,8 +168,8 @@ export function PaymentQrPage() {
                 <Input id="content" {...form.register('content')} />
               </div>
 
-              <Button type="submit" disabled={generateQr.isPending}>
-                {generateQr.isPending && <ButtonLoader className="mr-2" />}
+              <Button type="submit" disabled={isGenerating}>
+                {isGenerating && <ButtonLoader className="mr-2" />}
                 Tạo QR
               </Button>
             </form>

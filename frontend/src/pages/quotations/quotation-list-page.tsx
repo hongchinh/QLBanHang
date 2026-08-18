@@ -14,6 +14,7 @@ import {
   useQuotationOwners,
 } from '@/features/quotations/hooks';
 import { useAuthStore } from '@/stores/auth-store';
+import { useUiStore } from '@/stores/ui-store';
 import { quotationsApi } from '@/features/quotations/api';
 import type {
   QuotationAction,
@@ -63,6 +64,12 @@ const STATUS_OPTIONS: ReadonlyArray<{ value: QuotationStatus; label: string }> =
 ];
 const VALID_STATUSES: ReadonlySet<QuotationStatus> = new Set(STATUS_OPTIONS.map((o) => o.value));
 const DEFAULT_ACTIVE_STATUSES: ReadonlyArray<QuotationStatus> = ['Draft', 'Sent', 'Confirmed', 'AccountingConfirmed'];
+
+function parseStatuses(raw: string | readonly string[] | null | undefined): QuotationStatus[] {
+  if (!raw) return [];
+  const parts = typeof raw === 'string' ? raw.split(',') : raw;
+  return parts.filter((s): s is QuotationStatus => VALID_STATUSES.has(s as QuotationStatus));
+}
 
 function moneyHeader(label: string) {
   return <div className="text-right">{label}</div>;
@@ -308,6 +315,8 @@ export function QuotationListPage() {
   const canViewCost = useAuthStore((s) => s.hasPermission('quotations.view_cost'));
   const currentUser = useAuthStore((s) => s.user);
   const isAdmin = useAuthStore((s) => s.isInRole('ADMIN'));
+  const savedStatuses = useUiStore((s) => s.quotationStatusFilter);
+  const setSavedStatuses = useUiStore((s) => s.setQuotationStatusFilter);
 
   const ownerInitialized = useRef(false);
   useEffect(() => {
@@ -320,15 +329,13 @@ export function QuotationListPage() {
     ? sizeParam
     : DEFAULT_PAGE_SIZE;
 
-  const statuses = useMemo<QuotationStatus[]>(
-    () =>
-      statusParam
-        ? statusParam
-            .split(',')
-            .filter((s): s is QuotationStatus => VALID_STATUSES.has(s as QuotationStatus))
-        : [...DEFAULT_ACTIVE_STATUSES],
-    [statusParam],
-  );
+  const statuses = useMemo<QuotationStatus[]>(() => {
+    const fromUrl = parseStatuses(statusParam);
+    if (fromUrl.length > 0) return fromUrl;
+    const fromStore = parseStatuses(savedStatuses);
+    if (fromStore.length > 0) return fromStore;
+    return [...DEFAULT_ACTIVE_STATUSES];
+  }, [statusParam, savedStatuses]);
 
   const ownerIds = useMemo<string[]>(
     () => (hasViewAll ? parseOwnerIds(ownerIdsParam) : []),
@@ -622,6 +629,7 @@ export function QuotationListPage() {
               value={statuses}
               onChange={(next) => {
                 setStatusParam(next.join(','));
+                setSavedStatuses(next);
                 if (page !== 1) setPage(1);
               }}
               placeholder="Trạng thái"

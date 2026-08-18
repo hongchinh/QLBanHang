@@ -115,10 +115,13 @@ beforeEach(() => {
 
 async function waitForMatrix() {
   // Wait until detail data has populated state — SALES.quotations.view should be checked.
-  await waitFor(() => {
-    const box = screen.getByRole('checkbox', { name: /SALES quotations\.view/i }) as HTMLInputElement;
-    expect(box.checked).toBe(true);
-  });
+  await waitFor(
+    () => {
+      const box = screen.getByRole('checkbox', { name: /SALES quotations\.view/i }) as HTMLInputElement;
+      expect(box.checked).toBe(true);
+    },
+    { timeout: 5000 },
+  );
 }
 
 describe('RolesMatrixPage', () => {

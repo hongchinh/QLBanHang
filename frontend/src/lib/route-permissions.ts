@@ -21,6 +21,16 @@ const RULES: RouteRule[] = [
   { pattern: /^\/customers(\/[^/]+)?$/, permission: 'customers.view' },
   { pattern: /^\/products(\/[^/]+)?$/, permission: 'products.view' },
   { pattern: /^\/quotations(\/[^/]+)?$/, permission: 'quotations.view' },
+  { pattern: /^\/stock-in(\/[^/]+)?$/, permission: 'stock_in.view' },
+  { pattern: /^\/stock-out(\/[^/]+)?$/, permission: 'stock_out.view' },
+  { pattern: /^\/inventory\/opening-stock$/, permission: 'inventory.opening_stock' },
+  { pattern: /^\/inventory\/(stock-on-hand|stock-card)$/, permission: 'reports.inventory' },
+  { pattern: /^\/suppliers(\/[^/]+)?$/, permission: 'suppliers.view' },
+  { pattern: /^\/(warehouses|stock-reasons|payment-methods)$/, permission: 'inventory.catalogs.manage' },
+  { pattern: /^\/settings\/branches$/, permission: 'branches.manage' },
+  { pattern: /^\/settings\/period-lock$/, permission: 'period_lock.manage' },
+  { pattern: /^\/settings\/(inventory|numbering)$/, permission: 'inventory.settings' },
+  { pattern: /^\/settings\/recalc-cost$/, permission: 'inventory.recalc_cost' },
 ];
 
 export function canAccessRoute(

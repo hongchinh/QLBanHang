@@ -92,7 +92,7 @@ Deliver Round 1 of the legacy `PhieuNhapXuat` replacement: branches with a per-u
 ## Phases
 
 - [x] Phase 00 — Baseline commit and fast integration-test database (S) — `phase-00-fast-test-database.md`
-- [ ] Phase 01 — Permissions & branch foundation (L) — `phase-01-permissions-and-branches.md`
+- [x] Phase 01 — Permissions & branch foundation (L) — `phase-01-permissions-and-branches.md`
 - [ ] Phase 02 — Inventory catalogs, partner roles & settings (L) — `phase-02-catalogs-partners-settings.md`
 - [ ] Phase 03 — Pure calculators (M) — `phase-03-pure-calculators.md`
 - [ ] Phase 04 — Voucher & ledger schema, posting engine (XL) — `phase-04-ledger-and-posting-engine.md`

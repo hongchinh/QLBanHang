@@ -24,3 +24,17 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
             .OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public class StockReasonConfiguration : IEntityTypeConfiguration<StockReason>
+{
+    public void Configure(EntityTypeBuilder<StockReason> b)
+    {
+        b.ToTable("stock_reasons");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).IsRequired().HasMaxLength(50);
+        b.Property(x => x.Name).IsRequired().HasMaxLength(255);
+
+        b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}

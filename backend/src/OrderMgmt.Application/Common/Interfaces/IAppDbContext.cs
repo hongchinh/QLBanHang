@@ -23,6 +23,7 @@ public interface IAppDbContext
 
     DbSet<Branch> Branches { get; }
     DbSet<Warehouse> Warehouses { get; }
+    DbSet<StockReason> StockReasons { get; }
 
     DbSet<Customer> Customers { get; }
     DbSet<CustomerAddress> CustomerAddresses { get; }

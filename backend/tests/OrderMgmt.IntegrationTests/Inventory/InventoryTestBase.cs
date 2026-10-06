@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -9,6 +10,7 @@ using OrderMgmt.Application.Identity.Interfaces;
 using OrderMgmt.Application.Identity.Models;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Ledger;
+using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Application.Inventory.Warehouses.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Constants;
@@ -207,6 +209,37 @@ public abstract class InventoryTestBase : QuotationTestBase
                 }
             }
         });
+
+    protected Task<Guid> ReasonIdAsync(string code) =>
+        InDbAsync(db => db.StockReasons.Where(r => r.Code == code).Select(r => r.Id).SingleAsync());
+
+    /// A voucher on KHO01 with the given lines; VatRate, discounts, freight and order discount default to 0.
+    protected UpsertStockVoucherRequest VoucherRequest(StockDirection type, Guid reasonId, string at,
+        params UpsertStockVoucherLineRequest[] lines) => new()
+    {
+        Type = type,
+        VoucherAt = Vn(at),
+        WarehouseId = DefaultWarehouseId,
+        ReasonId = reasonId,
+        Lines = lines.Select((l, i) => { l.SortOrder = i; return l; }).ToList(),
+    };
+
+    protected static UpsertStockVoucherLineRequest LineRequest(Guid productId, decimal quantity, decimal unitPrice) =>
+        new() { ProductId = productId, Quantity = quantity, UnitPrice = unitPrice };
+
+    protected static async Task<(HttpStatusCode Status, StockVoucherDto? Voucher, ApiError? Error)> PostVoucherAsync(
+        HttpClient c, UpsertStockVoucherRequest r) =>
+        await ReadVoucherResponseAsync(await c.PostAsJsonAsync("/api/stock-vouchers", r));
+
+    protected static async Task<(HttpStatusCode Status, StockVoucherDto? Voucher, ApiError? Error)> ReadVoucherResponseAsync(
+        HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        var parsed = string.IsNullOrEmpty(body)
+            ? null
+            : System.Text.Json.JsonSerializer.Deserialize<ApiResponse<StockVoucherDto>>(body, TestJson.Options);
+        return (response.StatusCode, parsed?.Data, parsed?.Error);
+    }
 
     protected Task<Guid> CreatePartnerAsync(string code, bool isCustomer, bool isSupplier) =>
         InDbAsync(async db =>

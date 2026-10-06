@@ -27,6 +27,14 @@ public interface IAppDbContext
     DbSet<PaymentMethod> PaymentMethods { get; }
     DbSet<InventorySettings> InventorySettings { get; }
     DbSet<DocumentNumbering> DocumentNumberings { get; }
+    DbSet<StockVoucher> StockVouchers { get; }
+    DbSet<StockVoucherLine> StockVoucherLines { get; }
+    DbSet<StockVoucherActivity> StockVoucherActivities { get; }
+    DbSet<OpeningStock> OpeningStocks { get; }
+    DbSet<InventoryLedgerEntry> InventoryLedger { get; }
+    DbSet<InventoryCostPeriod> InventoryCostPeriods { get; }
+    DbSet<StockBalance> StockBalances { get; }
+    DbSet<DocumentCounter> DocumentCounters { get; }
 
     DbSet<Customer> Customers { get; }
     DbSet<CustomerAddress> CustomerAddresses { get; }

@@ -60,3 +60,26 @@ public enum NumberingResetPolicy
     Monthly = 1,
     Yearly = 2,
 }
+
+public enum StockVoucherStatus
+{
+    Active = 1,
+    Cancelled = 9,
+}
+
+/// Numeric order = posting order of rows with the same PostedAt.
+public enum LedgerSourceType
+{
+    Opening = 0,
+    StockIn = 1,
+    StockOut = 2,
+}
+
+public enum StockVoucherActivityAction
+{
+    Created = 1,
+    Updated = 2,
+    Cancelled = 3,
+    Restored = 4,
+    Deleted = 5,
+}

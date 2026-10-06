@@ -42,6 +42,14 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<InventorySettings> InventorySettings => Set<InventorySettings>();
     public DbSet<DocumentNumbering> DocumentNumberings => Set<DocumentNumbering>();
+    public DbSet<StockVoucher> StockVouchers => Set<StockVoucher>();
+    public DbSet<StockVoucherLine> StockVoucherLines => Set<StockVoucherLine>();
+    public DbSet<StockVoucherActivity> StockVoucherActivities => Set<StockVoucherActivity>();
+    public DbSet<OpeningStock> OpeningStocks => Set<OpeningStock>();
+    public DbSet<InventoryLedgerEntry> InventoryLedger => Set<InventoryLedgerEntry>();
+    public DbSet<InventoryCostPeriod> InventoryCostPeriods => Set<InventoryCostPeriod>();
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+    public DbSet<DocumentCounter> DocumentCounters => Set<DocumentCounter>();
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();

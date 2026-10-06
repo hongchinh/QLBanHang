@@ -44,6 +44,7 @@ public static class DependencyInjection
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ITransactionRunner, EfTransactionRunner>();
         services.AddScoped<IInventoryLock, PostgresInventoryLock>();
+        services.AddScoped<IDocumentCounter, PostgresDocumentCounter>();
 
         services.Configure<VapidOptions>(configuration.GetSection(VapidOptions.SectionName));
         services.AddScoped<IPushSender, PushSenderService>();

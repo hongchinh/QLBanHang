@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -6,10 +7,14 @@ using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Identity.Interfaces;
 using OrderMgmt.Application.Identity.Models;
+using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.Ledger;
 using OrderMgmt.Application.Inventory.Warehouses.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -120,6 +125,87 @@ public abstract class InventoryTestBase : QuotationTestBase
             var settings = await db.InventorySettings.SingleAsync(s => s.Id == 1);
             mutate(settings);
             await db.SaveChangesAsync();
+        });
+
+    /// "2026-10-02 08:00" read as Vietnam time, returned as the UTC instant (D27).
+    protected static DateTimeOffset Vn(string local) =>
+        new DateTimeOffset(DateTime.ParseExact(local, "yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture), VnTime.Offset)
+            .ToUniversalTime();
+
+    protected Task<Guid> CreateInventoryProductAsync(string code, PricingMode mode = PricingMode.PerUnit,
+        bool track = true, decimal? costPrice = null, decimal? defaultPrice = null, decimal taxRate = 0,
+        bool priceIncludesVat = false) =>
+        InDbAsync(async db =>
+        {
+            var product = new Product
+            {
+                Code = code,
+                Name = $"Hàng {code}",
+                ProductGroupId = await db.ProductGroups.Where(g => g.Code == "EPS").Select(g => g.Id).SingleAsync(),
+                UnitId = _unitId,
+                PricingMode = mode,
+                TrackInventory = track,
+                CostPrice = costPrice,
+                DefaultPrice = defaultPrice,
+                DefaultTaxRate = taxRate,
+                PriceIncludesVat = priceIncludesVat,
+                Status = ProductStatus.Active,
+            };
+            db.Products.Add(product);
+            await db.SaveChangesAsync();
+            return product.Id;
+        });
+
+    /// Engine invariants (review m17). Call at the end of every engine, voucher, opening-stock and recalculation scenario.
+    protected Task AssertInvariantsAsync() =>
+        InDbAsync(async db =>
+        {
+            // Posting order comes from the database so it matches the engine's ordering.
+            var rows = await db.InventoryLedger.AsNoTracking().InPostingOrder().ToListAsync();
+            var balances = await db.StockBalances.AsNoTracking().ToListAsync();
+
+            var pairs = rows.GroupBy(r => (r.ProductId, r.WarehouseId)).ToList();
+            balances.Select(b => (b.ProductId, b.WarehouseId)).Should().BeEquivalentTo(pairs.Select(p => p.Key),
+                "every pair with ledger rows has a balance and no other pair has one");
+            foreach (var pair in pairs)
+            {
+                var running = 0m;
+                foreach (var row in pair)
+                {
+                    running += row.QtyIn - row.QtyOut;
+                    row.RunningQty.Should().Be(running, $"RunningQty of {row.SourceCode} at {row.PostedAt:u}");
+                }
+                balances.Single(b => (b.ProductId, b.WarehouseId) == pair.Key).Quantity.Should().Be(running);
+            }
+
+            var branchScope = (await db.InventorySettings.AsNoTracking().SingleAsync()).CostingScope == CostingScope.Branch;
+            var periods = (await db.InventoryCostPeriods.AsNoTracking().ToListAsync())
+                .Where(p => (p.ScopeKey == p.BranchId) == branchScope)
+                .OrderBy(p => p.PeriodStart)
+                .GroupBy(p => (p.ProductId, p.ScopeKey));
+            foreach (var group in periods)
+            {
+                var inScope = rows.Where(r => r.ProductId == group.Key.ProductId
+                    && (branchScope ? r.BranchId : r.WarehouseId) == group.Key.ScopeKey).ToList();
+                InventoryCostPeriod? previous = null;
+                foreach (var period in group)
+                {
+                    if (previous is not null)
+                    {
+                        period.OpeningQty.Should().Be(previous.ClosingQty, $"opening qty of {period.PeriodStart}");
+                        period.OpeningValue.Should().Be(previous.ClosingValue, $"opening value of {period.PeriodStart}");
+                    }
+
+                    var end = VnTime.StartOfNextDay(period.PeriodEnd);
+                    var upToEnd = inScope.Where(r => r.PostedAt < end).ToList();
+                    period.ClosingQty.Should().Be(upToEnd.Sum(r => r.QtyIn - r.QtyOut), $"closing qty of {period.PeriodStart}");
+                    period.ClosingValue.Should().Be(upToEnd.Sum(r => r.InValue - (r.CostAmount ?? 0)), $"closing value of {period.PeriodStart}");
+                    period.OutValue.Should().Be(upToEnd
+                        .Where(r => r.QtyOut > 0 && r.PostedAt >= VnTime.StartOfDay(period.PeriodStart))
+                        .Sum(r => r.CostAmount ?? 0), $"out value of {period.PeriodStart}");
+                    previous = period;
+                }
+            }
         });
 
     protected Task<Guid> CreatePartnerAsync(string code, bool isCustomer, bool isSupplier) =>

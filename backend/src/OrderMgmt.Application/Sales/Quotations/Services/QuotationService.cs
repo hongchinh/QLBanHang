@@ -1010,21 +1010,8 @@ public class QuotationService : IQuotationService
         q.GrossProfit = subtotal - totalCost - q.Discount;
     }
 
-    private static decimal EffectiveQuantity(QuotationLine line)
-    {
-        var length = line.Length ?? 0m;
-        var width = line.Width ?? 0m;
-        var thickness = line.Thickness ?? 0m;
-        var sheetCount = line.SheetCount ?? 0m;
-
-        return line.PricingMode switch
-        {
-            PricingMode.PerLinearMeter => length * sheetCount / 1000m,
-            PricingMode.PerSquareMeter => length * width * sheetCount / 1_000_000m,
-            PricingMode.PerCubicMeter => length * width * thickness * sheetCount / 1_000_000_000m,
-            _ => line.Quantity,
-        };
-    }
+    private static decimal EffectiveQuantity(QuotationLine line) =>
+        PricingQuantity.Compute(line.PricingMode, line.SheetCount, line.Length, line.Width, line.Thickness, line.Quantity);
 
     private async Task<string> GenerateCodeAsync(CancellationToken ct)
     {

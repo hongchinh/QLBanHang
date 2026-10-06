@@ -31,7 +31,7 @@ public class NotificationsControllerTests : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        _factory = new WebAppFactory(_pg.ConnectionString);
+        _factory = new WebAppFactory(_pg);
         await ((IAsyncLifetime)_factory).InitializeAsync();
         _client = _factory.CreateClient();
 

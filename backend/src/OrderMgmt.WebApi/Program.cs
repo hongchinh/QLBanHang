@@ -125,9 +125,12 @@ builder.Services.AddRateLimiter(o =>
     o.AddPolicy(RateLimitPolicies.Login, httpContext =>
     {
         var key = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        // Read at request time so WebApplicationFactory overrides take effect (integration tests log in many users).
+        var permitLimit = httpContext.RequestServices.GetRequiredService<IConfiguration>()
+            .GetValue("RateLimiting:LoginPermitLimit", 5);
         return RateLimitPartition.GetFixedWindowLimiter(key, _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 5,
+            PermitLimit = permitLimit,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
             QueueProcessingOrder = QueueProcessingOrder.OldestFirst,

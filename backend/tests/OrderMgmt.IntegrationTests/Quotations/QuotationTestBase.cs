@@ -29,7 +29,7 @@ public abstract class QuotationTestBase : IAsyncLifetime
 
     public virtual async Task InitializeAsync()
     {
-        _factory = new WebAppFactory(_pg.ConnectionString);
+        _factory = new WebAppFactory(_pg);
         await ((IAsyncLifetime)_factory).InitializeAsync();
         _client = _factory.CreateClient();
         await AuthenticateAsync("admin", "Admin@123");

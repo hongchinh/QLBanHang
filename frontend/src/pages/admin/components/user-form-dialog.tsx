@@ -31,6 +31,7 @@ import type {
   UpdateUserPayload,
   UserStatus,
 } from '@/features/admin-users/types';
+import { useBranches } from '@/features/branches/hooks';
 
 const ROLE_OPTIONS = ['ADMIN', 'SALES', 'MANAGER', 'ACCOUNTANT', 'WAREHOUSE'] as const;
 const STATUS_OPTIONS: { value: UserStatus; label: string }[] = [
@@ -58,9 +59,14 @@ const createSchema = z.object({
     .string()
     .min(8, 'Mật khẩu tối thiểu 8 ký tự.')
     .regex(/(?=.*[A-Za-z])(?=.*\d)/, 'Phải có cả chữ và số.'),
+  // Optional: the dialog mounts before branches load; omitted → main branch (backend).
+  defaultBranchId: z.string().uuid().optional(),
 });
 
-const updateSchema = z.object(baseShape);
+const updateSchema = z.object({
+  ...baseShape,
+  defaultBranchId: z.string().uuid('Chọn chi nhánh mặc định.'),
+});
 
 type CreateValues = z.infer<typeof createSchema>;
 type UpdateValues = z.infer<typeof updateSchema>;
@@ -109,6 +115,7 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
       roleCode: values.roleCode,
       password: values.password,
       status: values.status,
+      ...(values.defaultBranchId ? { defaultBranchId: values.defaultBranchId } : {}),
     };
     try {
       await create.mutateAsync(payload);
@@ -175,6 +182,19 @@ function CreateUserDialog({ open, onOpenChange }: { open: boolean; onOpenChange:
               )}
             />
           </Field>
+          <Field label="Chi nhánh mặc định" error={form.formState.errors.defaultBranchId?.message}>
+            <Controller
+              control={form.control}
+              name="defaultBranchId"
+              render={({ field }) => (
+                <BranchSelect
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Chi nhánh chính (mặc định)"
+                />
+              )}
+            />
+          </Field>
           <Field label="Mật khẩu" error={form.formState.errors.password?.message}>
             <Input type="password" {...form.register('password')} />
           </Field>
@@ -213,6 +233,7 @@ function EditUserDialog({
       phoneNumber: '',
       roleCode: 'SALES',
       status: 'Active',
+      defaultBranchId: '',
     },
   });
 
@@ -227,6 +248,7 @@ function EditUserDialog({
         phoneNumber: detail.phoneNumber ?? '',
         roleCode: role,
         status: detail.status,
+        defaultBranchId: detail.defaultBranchId,
       });
     }
   }, [detail, form]);
@@ -238,6 +260,7 @@ function EditUserDialog({
       phoneNumber: values.phoneNumber ? values.phoneNumber : null,
       roleCode: values.roleCode,
       status: values.status,
+      defaultBranchId: values.defaultBranchId,
     };
     try {
       await update.mutateAsync(payload);
@@ -307,6 +330,15 @@ function EditUserDialog({
                 )}
               />
             </Field>
+            <Field label="Chi nhánh mặc định" error={form.formState.errors.defaultBranchId?.message}>
+              <Controller
+                control={form.control}
+                name="defaultBranchId"
+                render={({ field }) => (
+                  <BranchSelect value={field.value} onChange={field.onChange} />
+                )}
+              />
+            </Field>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
@@ -320,6 +352,33 @@ function EditUserDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function BranchSelect({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string | undefined;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) {
+  const { data: branches } = useBranches();
+  return (
+    // '' keeps the Select controlled and shows the placeholder.
+    <Select value={value ?? ''} onValueChange={onChange}>
+      <SelectTrigger aria-label="Chi nhánh mặc định">
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {(branches ?? []).map((b) => (
+          <SelectItem key={b.id} value={b.id}>
+            {b.code} — {b.name}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 

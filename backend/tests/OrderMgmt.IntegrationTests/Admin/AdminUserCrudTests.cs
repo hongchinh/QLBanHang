@@ -293,6 +293,68 @@ public class AdminUserCrudTests : QuotationTestBase
         token.RevokedAt.Should().NotBeNull();
     }
 
+    [Fact]
+    public async Task Create_assigns_main_branch_by_default_or_the_given_branch()
+    {
+        var withDefault = await CreateUserViaApiAsync("ut_branch_default", RoleCodes.Sales);
+        withDefault.DefaultBranchId.Should().Be(BranchDefaults.MainBranchId);
+        withDefault.DefaultBranchName.Should().Be("Chi nhánh chính");
+
+        var b = await CreateBranchAsync("CN05");
+        var withBranch = await _client.PostAsJsonAsync("/api/admin/users", NewUser("ut_branch_b", b));
+        withBranch.StatusCode.Should().Be(HttpStatusCode.OK);
+        (await withBranch.Content.ReadFromJsonAsync<ApiResponse<AdminUserDetailDto>>(TestJson.Options))!
+            .Data!.DefaultBranchId.Should().Be(b);
+
+        var unknown = await _client.PostAsJsonAsync("/api/admin/users", NewUser("ut_branch_unknown", Guid.NewGuid()));
+        unknown.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await unknown.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!
+            .Error!.Code.Should().Be("BRANCH_NOT_FOUND");
+    }
+
+    [Fact]
+    public async Task Update_changes_default_branch_only_when_given()
+    {
+        var created = await CreateUserViaApiAsync("ut_branch_upd", RoleCodes.Sales);
+        var b = await CreateBranchAsync("CN06");
+
+        var withBranch = await _client.PutAsJsonAsync($"/api/admin/users/{created.Id}", new UpdateUserRequest
+        {
+            FullName = "Branch Update", Email = "ut_branch_upd@test.local", RoleCode = RoleCodes.Sales,
+            Status = UserStatus.Active, DefaultBranchId = b,
+        });
+        (await withBranch.Content.ReadFromJsonAsync<ApiResponse<AdminUserDetailDto>>(TestJson.Options))!
+            .Data!.DefaultBranchId.Should().Be(b);
+
+        var withoutBranch = await _client.PutAsJsonAsync($"/api/admin/users/{created.Id}", new UpdateUserRequest
+        {
+            FullName = "Branch Update 2", Email = "ut_branch_upd@test.local", RoleCode = RoleCodes.Sales,
+            Status = UserStatus.Active,
+        });
+        (await withoutBranch.Content.ReadFromJsonAsync<ApiResponse<AdminUserDetailDto>>(TestJson.Options))!
+            .Data!.DefaultBranchId.Should().Be(b);
+    }
+
+    private static CreateUserRequest NewUser(string username, Guid? defaultBranchId) => new()
+    {
+        Username = username,
+        Email = $"{username}@test.local",
+        FullName = username,
+        RoleCode = RoleCodes.Sales,
+        Password = "Pass@123",
+        Status = UserStatus.Active,
+        DefaultBranchId = defaultBranchId,
+    };
+
+    private async Task<Guid> CreateBranchAsync(string code)
+    {
+        var res = await _client.PostAsJsonAsync("/api/branches",
+            new OrderMgmt.Application.Organization.Branches.Models.CreateBranchRequest { Code = code, Name = code });
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await res.Content.ReadFromJsonAsync<ApiResponse<OrderMgmt.Application.Organization.Branches.Models.BranchDto>>(TestJson.Options);
+        return body!.Data!.Id;
+    }
+
     private async Task<AdminUserDetailDto> CreateUserViaApiAsync(
         string username, string roleCode, string password = "Pass@123")
     {

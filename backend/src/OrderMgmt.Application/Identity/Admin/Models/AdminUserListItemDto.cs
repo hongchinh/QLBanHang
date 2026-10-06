@@ -8,4 +8,6 @@ public class AdminUserListItemDto
     public string? RoleCode { get; set; }
     public bool IsActive { get; set; }
     public DateTimeOffset? LastLoginAt { get; set; }
+    public Guid DefaultBranchId { get; set; }
+    public string? DefaultBranchName { get; set; }
 }

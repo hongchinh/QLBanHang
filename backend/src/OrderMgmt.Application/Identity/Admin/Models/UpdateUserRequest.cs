@@ -9,4 +9,7 @@ public class UpdateUserRequest
     public string? PhoneNumber { get; set; }
     public string RoleCode { get; set; } = default!;
     public UserStatus Status { get; set; }
+
+    /// Null → unchanged.
+    public Guid? DefaultBranchId { get; set; }
 }

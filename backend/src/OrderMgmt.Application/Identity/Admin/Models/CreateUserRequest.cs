@@ -14,4 +14,7 @@ public class CreateUserRequest
     // Explicit default: UserStatus.Disabled = 0, Active = 1. Without this, a JSON body missing
     // the `status` field would deserialize to Disabled.
     public UserStatus Status { get; set; } = UserStatus.Active;
+
+    /// Null → the main branch.
+    public Guid? DefaultBranchId { get; set; }
 }

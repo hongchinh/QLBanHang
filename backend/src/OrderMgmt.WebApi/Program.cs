@@ -49,6 +49,7 @@ builder.Services.Configure<OrderMgmt.Application.Identity.UserSettings.Models.Te
 // HTTP context & current user
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
+builder.Services.AddScoped<ICurrentBranch, CurrentBranch>();
 builder.Services.AddScoped<IRealtimeNotifier, SignalRNotifier>();
 builder.Services.Configure<AuthCookieOptions>(builder.Configuration.GetSection(AuthCookieOptions.SectionName));
 

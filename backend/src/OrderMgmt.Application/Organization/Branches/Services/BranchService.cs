@@ -13,12 +13,38 @@ public class BranchService : IBranchService
     private readonly IAppDbContext _db;
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
+    private readonly ICurrentBranch _currentBranch;
 
-    public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser)
+    public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
+        _currentBranch = currentBranch;
+    }
+
+    public async Task<MyBranchesDto> GetMyBranchesAsync(CancellationToken ct = default)
+    {
+        var workingBranchId = await _currentBranch.GetIdAsync(ct);
+        var userId = _currentUser.UserId ?? throw new UnauthorizedAccessException();
+        var defaultBranchId = await _db.Users.Where(u => u.Id == userId)
+            .Select(u => u.DefaultBranchId)
+            .SingleAsync(ct);
+        var canSwitch = _currentUser.HasPermission(Permissions.Branches.AccessAll);
+
+        var branches = await _db.Branches.AsNoTracking()
+            .Where(b => canSwitch || b.Id == defaultBranchId)
+            .OrderBy(b => b.Code)
+            .Select(b => ToDto(b))
+            .ToListAsync(ct);
+
+        return new MyBranchesDto
+        {
+            DefaultBranchId = defaultBranchId,
+            WorkingBranchId = workingBranchId,
+            CanSwitch = canSwitch,
+            Branches = branches,
+        };
     }
 
     public async Task<IReadOnlyList<BranchDto>> ListAsync(CancellationToken ct = default)

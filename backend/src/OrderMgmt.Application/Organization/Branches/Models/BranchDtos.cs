@@ -26,3 +26,12 @@ public class SetPeriodLockRequest
 {
     public DateOnly? LockedUntil { get; set; }
 }
+
+public class MyBranchesDto
+{
+    public Guid DefaultBranchId { get; set; }
+    public Guid WorkingBranchId { get; set; }
+    public bool CanSwitch { get; set; }
+    /// All branches when CanSwitch, otherwise only the default branch.
+    public IReadOnlyList<BranchDto> Branches { get; set; } = Array.Empty<BranchDto>();
+}

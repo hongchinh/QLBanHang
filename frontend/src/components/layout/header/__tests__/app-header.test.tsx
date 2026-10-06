@@ -1,11 +1,13 @@
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, fireEvent, act } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppHeader } from '../app-header';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useAuthStore, type CurrentUser } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
+
+vi.mock('@/features/branches/hooks', () => ({ useMyBranches: () => ({ data: undefined }) }));
 
 const sampleUser: CurrentUser = {
   id: 'u1',

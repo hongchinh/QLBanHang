@@ -16,8 +16,10 @@ import {
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import { useNotificationHub } from '@/hooks/useNotificationHub';
+import { useBranchContext } from '@/features/branches/use-branch-context';
 import type { Permission, Role } from '@/lib/permissions';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { PageLoaderOverlay } from '@/components/ui/page-loader-overlay';
 import { cn } from '@/lib/utils';
 import { AppHeader } from './header/app-header';
 import { Sidebar, type SidebarNavGroup, type SidebarNavItem } from './sidebar/sidebar';
@@ -74,6 +76,9 @@ export function AppLayout() {
   const closeMobileDrawer = useUiStore((s) => s.closeMobileDrawer);
 
   useNotificationHub();
+  // Pages render only once the working branch is in the store, so their first
+  // request already carries X-Branch-Id.
+  const { ready: branchReady } = useBranchContext();
 
   useEffect(() => {
     closeMobileDrawer();
@@ -117,7 +122,7 @@ export function AppLayout() {
           id="main-content"
           className="overflow-y-auto p-4 md:p-3"
         >
-          <Outlet />
+          {branchReady ? <Outlet /> : <PageLoaderOverlay open title="Đang tải chi nhánh..." />}
         </main>
 
         {mobileDrawerOpen && (

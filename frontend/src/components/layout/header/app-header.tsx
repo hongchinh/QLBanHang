@@ -5,6 +5,7 @@ import { useLogout } from '@/features/auth/hooks';
 import { BrandBlock } from './brand-block';
 import { HeaderSearch } from './header-search';
 import { HeaderSearchMobileSheet } from './header-search-mobile-sheet';
+import { HeaderBranchSwitcher } from './header-branch-switcher';
 import { HeaderNotifications } from './header-notifications';
 import { HeaderUserMenu } from './header-user-menu';
 
@@ -35,6 +36,7 @@ export function AppHeader() {
         <HeaderSearch />
         <HeaderSearchMobileSheet />
         <div className="flex-1" />
+        <HeaderBranchSwitcher />
         <HeaderNotifications />
         <HeaderUserMenu user={user} onLogout={() => logout.mutate()} />
       </div>

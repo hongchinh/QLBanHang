@@ -98,6 +98,11 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(x => x.Thickness).HasColumnType("numeric(18,4)");
         b.Property(x => x.Density).HasColumnType("numeric(18,4)");
         b.Property(x => x.PricingMode).HasConversion<int>().HasDefaultValue(PricingMode.PerUnit);
+        // Existing products are tracked; the sentinel makes EF send false (D28).
+        b.Property(x => x.TrackInventory).HasDefaultValue(true).HasSentinel(true);
+        b.Property(x => x.PriceIncludesVat).HasDefaultValue(false);
+        b.Property(x => x.PurchaseDiscountRate).HasColumnType("numeric(5,2)").HasDefaultValue(0m);
+        b.Property(x => x.SalesDiscountRate).HasColumnType("numeric(5,2)").HasDefaultValue(0m);
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.HasOne(x => x.ProductGroup).WithMany().HasForeignKey(x => x.ProductGroupId).OnDelete(DeleteBehavior.SetNull);
         b.HasOne(x => x.Unit).WithMany().HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.SetNull);

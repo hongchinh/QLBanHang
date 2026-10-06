@@ -80,6 +80,14 @@ public class ProductService : IProductService
                 CostPrice = p.CostPrice,
                 Status = p.Status,
                 PricingMode = p.PricingMode,
+                TrackInventory = p.TrackInventory,
+                DefaultTaxRate = p.DefaultTaxRate,
+                Length = p.Length,
+                Width = p.Width,
+                Thickness = p.Thickness,
+                PurchaseDiscountRate = p.PurchaseDiscountRate,
+                SalesDiscountRate = p.SalesDiscountRate,
+                PriceIncludesVat = p.PriceIncludesVat,
             })
             .ToListAsync(ct);
 
@@ -138,6 +146,10 @@ public class ProductService : IProductService
                 Note = request.Note,
                 Status = ProductStatus.Active,
                 PricingMode = request.PricingMode,
+                TrackInventory = request.TrackInventory,
+                PurchaseDiscountRate = request.PurchaseDiscountRate,
+                SalesDiscountRate = request.SalesDiscountRate,
+                PriceIncludesVat = request.PriceIncludesVat,
             };
 
             _db.Products.Add(product);
@@ -177,6 +189,10 @@ public class ProductService : IProductService
         product.Note = request.Note;
         product.Status = request.Status;
         product.PricingMode = request.PricingMode;
+        product.TrackInventory = request.TrackInventory ?? product.TrackInventory;
+        product.PurchaseDiscountRate = request.PurchaseDiscountRate ?? product.PurchaseDiscountRate;
+        product.SalesDiscountRate = request.SalesDiscountRate ?? product.SalesDiscountRate;
+        product.PriceIncludesVat = request.PriceIncludesVat ?? product.PriceIncludesVat;
 
         await _db.SaveChangesAsync(ct);
         return await GetAsync(product.Id, ct);
@@ -213,6 +229,14 @@ public class ProductService : IProductService
                 PricingMode = p.PricingMode,
                 DefaultPrice = p.DefaultPrice,
                 CostPrice = p.CostPrice,
+                DefaultTaxRate = p.DefaultTaxRate,
+                Length = p.Length,
+                Width = p.Width,
+                Thickness = p.Thickness,
+                TrackInventory = p.TrackInventory,
+                PurchaseDiscountRate = p.PurchaseDiscountRate,
+                SalesDiscountRate = p.SalesDiscountRate,
+                PriceIncludesVat = p.PriceIncludesVat,
             })
             .ToListAsync(ct);
     }
@@ -277,6 +301,10 @@ public class ProductService : IProductService
         Note = p.Note,
         Status = p.Status,
         PricingMode = p.PricingMode,
+        TrackInventory = p.TrackInventory,
+        PurchaseDiscountRate = p.PurchaseDiscountRate,
+        SalesDiscountRate = p.SalesDiscountRate,
+        PriceIncludesVat = p.PriceIncludesVat,
         CreatedAt = p.CreatedAt,
     };
 }

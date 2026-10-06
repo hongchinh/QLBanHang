@@ -25,6 +25,7 @@ public interface IAppDbContext
     DbSet<Warehouse> Warehouses { get; }
     DbSet<StockReason> StockReasons { get; }
     DbSet<PaymentMethod> PaymentMethods { get; }
+    DbSet<InventorySettings> InventorySettings { get; }
 
     DbSet<Customer> Customers { get; }
     DbSet<CustomerAddress> CustomerAddresses { get; }

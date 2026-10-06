@@ -104,6 +104,15 @@ public abstract class InventoryTestBase : QuotationTestBase
         return (await ReadDataAsync<WarehouseDto>(response)).Id;
     }
 
+    /// Direct DB update of the singleton (bypasses the API and its recalculation).
+    protected Task UpdateInventorySettingsAsync(Action<OrderMgmt.Domain.Entities.Inventory.InventorySettings> mutate) =>
+        InDbAsync(async db =>
+        {
+            var settings = await db.InventorySettings.SingleAsync(s => s.Id == 1);
+            mutate(settings);
+            await db.SaveChangesAsync();
+        });
+
     protected Task<Guid> CreatePartnerAsync(string code, bool isCustomer, bool isSupplier) =>
         InDbAsync(async db =>
         {

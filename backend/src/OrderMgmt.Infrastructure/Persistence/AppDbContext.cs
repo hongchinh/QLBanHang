@@ -40,6 +40,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<StockReason> StockReasons => Set<StockReason>();
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
+    public DbSet<InventorySettings> InventorySettings => Set<InventorySettings>();
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();

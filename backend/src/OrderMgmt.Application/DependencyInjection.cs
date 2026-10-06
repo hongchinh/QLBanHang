@@ -25,6 +25,8 @@ using OrderMgmt.Application.Branding.Services;
 using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Notifications.Services;
 using OrderMgmt.Application.Inventory.PaymentMethods.Interfaces;
+using OrderMgmt.Application.Inventory.Settings.Interfaces;
+using OrderMgmt.Application.Inventory.Settings.Services;
 using OrderMgmt.Application.Inventory.PaymentMethods.Services;
 using OrderMgmt.Application.Inventory.StockReasons.Interfaces;
 using OrderMgmt.Application.Inventory.StockReasons.Services;
@@ -80,6 +82,7 @@ public static class DependencyInjection
         services.AddScoped<IWarehouseService, WarehouseService>();
         services.AddScoped<IStockReasonService, StockReasonService>();
         services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+        services.AddScoped<IInventorySettingsService, InventorySettingsService>();
 
         return services;
     }

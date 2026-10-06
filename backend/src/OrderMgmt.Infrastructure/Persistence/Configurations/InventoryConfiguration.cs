@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using OrderMgmt.Domain.Entities.Inventory;
+using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Infrastructure.Persistence.Configurations;
 
@@ -22,6 +23,29 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
             .WithMany()
             .HasForeignKey(x => x.BranchId)
             .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class InventorySettingsConfiguration : IEntityTypeConfiguration<InventorySettings>
+{
+    public void Configure(EntityTypeBuilder<InventorySettings> b)
+    {
+        b.ToTable("inventory_settings");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).ValueGeneratedNever();
+
+        b.HasData(new InventorySettings
+        {
+            Id = 1,
+            CostingMethod = CostingMethod.PeriodicAverage,
+            CostingPeriod = CostingPeriod.Month,
+            CostingScope = CostingScope.Branch,
+            PurchaseCostIncludesVat = true,
+            NegativeStockPolicy = NegativeStockPolicy.Warn,
+            NetExcludesVat = false,
+            DefaultDateMode = DefaultDateMode.Now,
+            UpdatedAt = DateTimeOffset.UnixEpoch,
+        });
     }
 }
 

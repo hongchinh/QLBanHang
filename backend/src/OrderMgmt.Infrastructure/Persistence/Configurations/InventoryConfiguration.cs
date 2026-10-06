@@ -25,6 +25,20 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
     }
 }
 
+public class PaymentMethodConfiguration : IEntityTypeConfiguration<PaymentMethod>
+{
+    public void Configure(EntityTypeBuilder<PaymentMethod> b)
+    {
+        b.ToTable("payment_methods");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).IsRequired().HasMaxLength(50);
+        b.Property(x => x.Name).IsRequired().HasMaxLength(255);
+
+        b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
 public class StockReasonConfiguration : IEntityTypeConfiguration<StockReason>
 {
     public void Configure(EntityTypeBuilder<StockReason> b)

@@ -39,6 +39,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<Branch> Branches => Set<Branch>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<StockReason> StockReasons => Set<StockReason>();
+    public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();

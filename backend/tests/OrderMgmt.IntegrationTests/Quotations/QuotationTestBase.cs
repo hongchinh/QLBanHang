@@ -92,7 +92,7 @@ public abstract class QuotationTestBase : IAsyncLifetime
         _productId = product.Id;
     }
 
-    protected async Task CreateTestUserAsync(string username, string password, string roleCode)
+    protected async Task CreateTestUserAsync(string username, string password, string roleCode, Guid? defaultBranchId = null)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -106,6 +106,7 @@ public abstract class QuotationTestBase : IAsyncLifetime
             FullName = $"Test {roleCode}",
             PasswordHash = hasher.Hash(password),
             Status = UserStatus.Active,
+            DefaultBranchId = defaultBranchId ?? BranchDefaults.MainBranchId,
             UserRoles = new List<UserRole> { new() { RoleId = role.Id } },
         };
         db.Users.Add(user);

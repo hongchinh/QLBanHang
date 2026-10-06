@@ -4,12 +4,14 @@ using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Branding.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Identity.Interfaces;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Reports.SalesRevenue.Interfaces;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
 using OrderMgmt.Infrastructure.Branding;
 using OrderMgmt.Infrastructure.Excel;
 using OrderMgmt.Infrastructure.Identity;
+using OrderMgmt.Infrastructure.Inventory;
 using OrderMgmt.Infrastructure.Notifications;
 using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.Infrastructure.Persistence.Seed;
@@ -41,6 +43,7 @@ public static class DependencyInjection
 
         services.AddScoped<IAppDbContext>(sp => sp.GetRequiredService<AppDbContext>());
         services.AddScoped<ITransactionRunner, EfTransactionRunner>();
+        services.AddScoped<IInventoryLock, PostgresInventoryLock>();
 
         services.Configure<VapidOptions>(configuration.GetSection(VapidOptions.SectionName));
         services.AddScoped<IPushSender, PushSenderService>();

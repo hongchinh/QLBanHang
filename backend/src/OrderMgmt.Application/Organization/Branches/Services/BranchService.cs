@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Common;
@@ -75,6 +76,9 @@ public class BranchService : IBranchService
             Address = request.Address?.Trim(),
         };
         _db.Branches.Add(branch);
+        // A new branch starts with the default document numbering (D13), so vouchers can be numbered at once.
+        foreach (var docType in DocumentNumberingDefaults.AllTypes)
+            _db.DocumentNumberings.Add(DocumentNumberingDefaults.Create(docType, branch.Id, _clock.UtcNow));
         await _db.SaveChangesAsync(ct);
         return ToDto(branch);
     }

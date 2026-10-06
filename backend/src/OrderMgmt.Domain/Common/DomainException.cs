@@ -41,4 +41,11 @@ public sealed class ValidationDomainException : DomainException
     {
         Errors = errors;
     }
+
+    /// The message defaults to the first detail message, so a toast shows the actual (Vietnamese) reason.
+    public ValidationDomainException(IDictionary<string, string[]> errors, string? message)
+        : base("VALIDATION", message ?? errors.Values.SelectMany(v => v).FirstOrDefault() ?? "Dữ liệu không hợp lệ.")
+    {
+        Errors = errors;
+    }
 }

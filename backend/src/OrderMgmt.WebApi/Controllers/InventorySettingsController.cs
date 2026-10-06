@@ -5,6 +5,7 @@ using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Inventory.Settings.Interfaces;
 using OrderMgmt.Application.Inventory.Settings.Models;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Enums;
 using OrderMgmt.WebApi.Authorization;
 
 namespace OrderMgmt.WebApi.Controllers;
@@ -36,4 +37,15 @@ public class InventorySettingsController : ApiControllerBase
         await _settingsValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _settings.UpdateAsync(request, ct));
     }
+
+    [HttpGet("numbering")]
+    [HasPermission(Permissions.Inventory.Settings)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<DocumentNumberingDto>>>> ListNumbering(CancellationToken ct)
+        => Success(await _settings.ListNumberingAsync(ct));
+
+    [HttpPut("numbering/{docType}")]
+    [HasPermission(Permissions.Inventory.Settings)]
+    public async Task<ActionResult<ApiResponse<DocumentNumberingDto>>> UpdateNumbering(
+        DocumentType docType, [FromBody] UpdateNumberingRequest request, CancellationToken ct)
+        => Success(await _settings.UpdateNumberingAsync(docType, request, ct));
 }

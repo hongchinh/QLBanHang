@@ -41,6 +41,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<StockReason> StockReasons => Set<StockReason>();
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<InventorySettings> InventorySettings => Set<InventorySettings>();
+    public DbSet<DocumentNumbering> DocumentNumberings => Set<DocumentNumbering>();
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();

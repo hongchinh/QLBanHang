@@ -49,6 +49,22 @@ public class InventorySettingsConfiguration : IEntityTypeConfiguration<Inventory
     }
 }
 
+public class DocumentNumberingConfiguration : IEntityTypeConfiguration<DocumentNumbering>
+{
+    public void Configure(EntityTypeBuilder<DocumentNumbering> b)
+    {
+        b.ToTable("document_numberings");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Prefix).IsRequired().HasMaxLength(20);
+        b.Property(x => x.Pattern).IsRequired().HasMaxLength(100);
+        b.HasIndex(x => new { x.DocType, x.BranchId }).IsUnique();
+        b.HasOne<OrderMgmt.Domain.Entities.Organization.Branch>()
+            .WithMany()
+            .HasForeignKey(x => x.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public class PaymentMethodConfiguration : IEntityTypeConfiguration<PaymentMethod>
 {
     public void Configure(EntityTypeBuilder<PaymentMethod> b)

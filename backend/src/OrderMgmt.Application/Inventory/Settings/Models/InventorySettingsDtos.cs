@@ -14,6 +14,23 @@ public class InventorySettingsDto
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
+public class DocumentNumberingDto
+{
+    public DocumentType DocType { get; set; }
+    public string Prefix { get; set; } = default!;
+    public int Length { get; set; }
+    public NumberingResetPolicy ResetPolicy { get; set; }
+    public string Pattern { get; set; } = default!;
+}
+
+public class UpdateNumberingRequest
+{
+    public string Prefix { get; set; } = default!;
+    public int Length { get; set; }
+    public NumberingResetPolicy ResetPolicy { get; set; }
+    public string Pattern { get; set; } = default!;
+}
+
 public class UpdateInventorySettingsRequest
 {
     public CostingMethod CostingMethod { get; set; }

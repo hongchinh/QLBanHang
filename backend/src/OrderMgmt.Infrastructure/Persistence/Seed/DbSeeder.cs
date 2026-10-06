@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OrderMgmt.Application.Identity.Interfaces;
+using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
@@ -46,6 +47,7 @@ public static class DbSeeder
                 }
                 await SeedAdminUserAsync(db, hasher, seedOptions, logger, ct);
                 await SeedReferenceDataAsync(db, ct);
+                await SeedInventoryReferenceDataAsync(db, ct);
 
                 await db.SaveChangesAsync(ct);
                 logger.LogInformation("Database seeding completed.");
@@ -263,6 +265,22 @@ public static class DbSeeder
             UserRoles = new List<UserRole> { new() { RoleId = adminRole.Id } },
         };
         db.Users.Add(admin);
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// Inventory reference data (Round 1). Every block only adds what is missing, so it is safe to re-run.
+    private static async Task SeedInventoryReferenceDataAsync(AppDbContext db, CancellationToken ct)
+    {
+        // Default document numbering for every branch that lacks it (D13).
+        var branchIds = await db.Branches.Select(b => b.Id).ToListAsync(ct);
+        var existing = await db.DocumentNumberings.Select(n => new { n.BranchId, n.DocType }).ToListAsync(ct);
+        foreach (var branchId in branchIds)
+        foreach (var docType in DocumentNumberingDefaults.AllTypes)
+        {
+            if (existing.Any(e => e.BranchId == branchId && e.DocType == docType)) continue;
+            db.DocumentNumberings.Add(DocumentNumberingDefaults.Create(docType, branchId, DateTimeOffset.UtcNow));
+        }
+
         await db.SaveChangesAsync(ct);
     }
 

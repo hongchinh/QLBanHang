@@ -46,3 +46,17 @@ public enum DefaultDateMode
     Now = 0,
     PreviousVoucher = 1,
 }
+
+/// Documents that get a number from DocumentNumbering (extended by Round 2 cash vouchers).
+public enum DocumentType
+{
+    StockIn = 1,
+    StockOut = 2,
+}
+
+public enum NumberingResetPolicy
+{
+    None = 0,
+    Monthly = 1,
+    Yearly = 2,
+}

@@ -32,6 +32,9 @@
 ## Tests And Verification
 
 - Backend integration tests live in `backend/tests/OrderMgmt.IntegrationTests`.
+- Integration tests run against a local PostgreSQL through `TEST_DB_CONNECTION`, e.g. `Host=localhost;Port=5432;Database=qldonhang_integtest;Username=postgres;Password=1` (bash: `export TEST_DB_CONNECTION="..."`; PowerShell: `$env:TEST_DB_CONNECTION = "..."`). Without it, Testcontainers starts PostgreSQL in Docker.
+- `PostgresFixture` migrates and seeds a template database `<base>_tpl` once per run; every `WebAppFactory` gets its own clone `<base>_<guid>`, dropped on dispose (clones a failing test did not dispose are dropped at the end of the run). The fixture never touches the base database named in `TEST_DB_CONNECTION`, refuses the dev databases `qldonhang_test` / `qldonhang`, and the factory overrides both `ConnectionStrings:Default` and `ConnectionStrings:DefaultConnection` (the app prefers `DefaultConnection`).
+- New integration tests construct `new WebAppFactory(_pg)` (or inherit `QuotationTestBase`); derived factories take `PostgresFixture` (`: base(pg)`). The login rate limit is raised for tests via `RateLimiting:LoginPermitLimit`.
 - Frontend tests use Vitest and Testing Library. Test files sit next to the behavior they cover, usually as `*.test.ts` or `*.test.tsx`.
 - Run backend build/tests from `backend`; run frontend `npm run typecheck`, `npm run test` or `npm run build` from `frontend`.
 

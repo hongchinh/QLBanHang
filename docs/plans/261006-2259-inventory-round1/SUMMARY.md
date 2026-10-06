@@ -91,7 +91,7 @@ Deliver Round 1 of the legacy `PhieuNhapXuat` replacement: branches with a per-u
 
 ## Phases
 
-- [-] Phase 00 — Baseline commit and fast integration-test database (S) — `phase-00-fast-test-database.md`
+- [x] Phase 00 — Baseline commit and fast integration-test database (S) — `phase-00-fast-test-database.md`
 - [ ] Phase 01 — Permissions & branch foundation (L) — `phase-01-permissions-and-branches.md`
 - [ ] Phase 02 — Inventory catalogs, partner roles & settings (L) — `phase-02-catalogs-partners-settings.md`
 - [ ] Phase 03 — Pure calculators (M) — `phase-03-pure-calculators.md`
@@ -122,7 +122,7 @@ Phases run in order. Phase 00 runs first because every later backend test relies
   - Full suite: `dotnet test OrderMgmt.sln`
   - Migration: `dotnet ef migrations add <Name> --project src/OrderMgmt.Infrastructure --startup-project src/OrderMgmt.WebApi -o Persistence/Migrations`
 - **Frontend commands** (run from `frontend/`): `npx vitest run <path>`, `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build`. Until Phase 07 Task 7.1 fixes the script, `npm run typecheck` (`tsc --noEmit` on a solution-style `tsconfig.json` with `"files": []`) checks nothing; after it, the script is `tsc -p tsconfig.app.json --noEmit`. Every frontend phase ends with `npm run build` as well, because only `tsc -b` type-checks everything.
-- **Known baseline failures** (2026-10-07, before any change; do not count them as regressions): backend 19 failing tests (AdminRolesCrudTests ×6, AuthTests.Refresh_rotates_token_and_revokes_old_one, HandoverExportTests ×2, QuotationExportTests ×2, QuotationStateMachineTests ×5, RevenueLineItemsExportTests ×2, SalesRevenueReportTests.Report_FiltersByConfirmedAt_NotQuotationDate); the four PDF/export factory tests are expected to pass after Phase 00. Frontend 3 failing tests (bank-accounts-tab "adds a new account via the form", useNotificationHub "invalidates unread-count query on NewNotification", payment-qr-page "generates and displays a QR after submitting valid data").
+- **Known baseline failures** (2026-10-07, before any change; do not count them as regressions): backend 19 failing tests (AdminRolesCrudTests ×6, AuthTests.Refresh_rotates_token_and_revokes_old_one, HandoverExportTests ×2, QuotationExportTests ×2, QuotationStateMachineTests ×5, RevenueLineItemsExportTests ×2, SalesRevenueReportTests.Report_FiltersByConfirmedAt_NotQuotationDate); they are unrelated to inventory (quotation payload/state-machine/export changes) and stay out of scope. Frontend 3 failing tests (bank-accounts-tab "adds a new account via the form", useNotificationHub "invalidates unread-count query on NewNotification", payment-qr-page "generates and displays a QR after submitting valid data").
 - **Test locations**
   - Integration tests: `backend/tests/OrderMgmt.IntegrationTests/{Organization,Inventory,Catalog,Admin}/`. Annotate with `[Collection(nameof(PostgresCollection))]`.
   - Pure unit tests: `backend/tests/OrderMgmt.IntegrationTests/Inventory/Unit/` (no collection attribute, no DB).

@@ -1,6 +1,6 @@
 # Phase 00 — Baseline commit and fast integration-test database
 
-**Status:** [-] in progress
+**Status:** [x] complete
 **Complexity:** S
 
 ## Objective
@@ -27,7 +27,7 @@ The fixture never touches the database named in the connection string. It connec
 - `backend/tests/OrderMgmt.IntegrationTests/Fixtures/WebAppFactory.cs` (modify)
 - `backend/tests/OrderMgmt.IntegrationTests/Fixtures/TemplateDatabaseTests.cs` (new)
 - The 12 files that call `new WebAppFactory(_pg.ConnectionString)` (modify → `new WebAppFactory(_pg)`): `AuthTests.cs`, `CustomerCrudTests.cs`, `CustomerSearchTests.cs`, `Notifications/NotificationsControllerTests.cs`, `Payments/BankSeedTests.cs`, `Payments/MeBankAccountsCrudTests.cs`, `Payments/PaymentQrEndpointsTests.cs`, `ProductCrudTests.cs`, `ProductGroupCrudTests.cs`, `Push/PushSubscriptionTests.cs`, `Quotations/QuotationTestBase.cs`, `Settings/BrandingIconTests.cs`
-- The two files with **derived** factories (modify): `Quotations/HandoverExportTests.cs` (`WebAppFactoryWithFakeHandoverPdfConverter`, constructed in two tests) and `Quotations/QuotationExportTests.cs` (`WebAppFactoryWithFakePdfConverter`, one test). Their PDF tests fail in the baseline because the second factory drops the database the first one still uses; after this phase they get their own clone.
+- The two files with **derived** factories (modify): `Quotations/HandoverExportTests.cs` (`WebAppFactoryWithFakeHandoverPdfConverter`, constructed in two tests) and `Quotations/QuotationExportTests.cs` (`WebAppFactoryWithFakePdfConverter`, one test). After this phase they get their own clone instead of re-creating the base database. (Their PDF tests fail in the baseline for an unrelated, pre-existing reason — the quotation create in the test payload returns an error — and still fail after this phase.)
 - `backend/src/OrderMgmt.WebApi/Program.cs` (modify — login rate limit read from configuration)
 - `docs/code-standard/conventions.md` (modify — "Tests And Verification")
 
@@ -76,7 +76,7 @@ Derived factories get a matching constructor: `public WebAppFactoryWithFakePdfCo
 3. `await using var f = new WebAppFactory(tplConnectionString)`; resolve `AppDbContext` → `MigrateAsync()`; `DbSeeder.SeedAsync(f.Services)`.
 4. Dispose the factory and call `NpgsqlConnection.ClearAllPools()`. A template with open connections cannot be cloned.
 
-`DisposeAsync` drops the template (then the container, if any). Clones are created one at a time because every test class is in `PostgresCollection` (xUnit runs a collection sequentially); pure unit tests have no collection and never touch the database.
+`DisposeAsync` drops any clone a factory did not drop (a test that fails before disposing its factory would otherwise leak a database — the fixture tracks every clone it creates), then the template, then the container, if any. Clones are created one at a time because every test class is in `PostgresCollection` (xUnit runs a collection sequentially); pure unit tests have no collection and never touch the database.
 
 `WebAppFactory(PostgresFixture)`: `InitializeAsync` sets the connection string to `await _pg.CreateDatabaseAsync()` **before** `Services` is first touched. `DisposeAsync` disposes the host, then `_pg.DropDatabaseAsync(ConnectionString)`.
 
@@ -87,7 +87,7 @@ Derived factories get a matching constructor: `public WebAppFactoryWithFakePdfCo
    - `DefaultConnection_cannot_override_the_clone`: create a factory, resolve `IConfiguration` → `GetConnectionString("DefaultConnection")` equals the clone's connection string.
 2. **Run the test to verify it fails:** `cd backend && dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~TemplateDatabaseTests"` (with `TEST_DB_CONNECTION` set). Expected: FAIL (compile: `WebAppFactory(PostgresFixture)`, `ConnectionString` and `EnsureNotDevDatabase` missing).
 3. **Write the minimal implementation:** the fixture and factory changes above, the configurable login limit in `Program.cs`, switch the 12 call sites to `new WebAppFactory(_pg)`, and switch both derived factories (and their three constructions) to `PostgresFixture`.
-4. **Run tests to verify they pass:** first `--filter "FullyQualifiedName~TemplateDatabaseTests"`, then the full suite `dotnet test OrderMgmt.sln`. Expected: PASS for the new tests; the full suite has no new failures compared with the baseline list in SUMMARY.md, and the four PDF/export factory tests now pass. Record the full-suite duration before (7 min 02 s on 2026-10-07) and after this task in the commit body.
+4. **Run tests to verify they pass:** first `--filter "FullyQualifiedName~TemplateDatabaseTests"`, then the full suite `dotnet test OrderMgmt.sln`. Expected: PASS for the new tests; the full suite has no new failures compared with the baseline list in SUMMARY.md. Record the full-suite duration before (7 min 02 s on 2026-10-07) and after this task in the commit body.
 5. **Commit:** `git commit -m "test(infra): clone a migrated template database per integration test"`
 
 ### Task 0.2 — Document the test database setup

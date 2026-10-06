@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentValidation;
 using Mapster;
 using MapsterMapper;
@@ -61,6 +62,9 @@ public static class DependencyInjection
         services.AddScoped<IMapper, ServiceMapper>();
 
         services.AddValidatorsFromAssembly(assembly);
+        // Error keys use the JSON (camelCase) member names, like the service-built ValidationDomainException keys.
+        ValidatorOptions.Global.PropertyNameResolver = (_, member, _) =>
+            member is null ? null : JsonNamingPolicy.CamelCase.ConvertName(member.Name);
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICustomerService, CustomerService>();

@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Interfaces;
@@ -86,6 +87,9 @@ public class StockVoucherService : IStockVoucherService
 
         var id = await _transaction.RunAsync(async c =>
         {
+            await EnsureNotLockedAsync(branchId, new[] { voucherAt }, c);
+            await ValidateAsync(request, branchId, null, c);
+
             var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
             await _posting.AcquireLocksAsync(branchId, productIds, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
@@ -123,6 +127,156 @@ public class StockVoucherService : IStockVoucherService
 
     public Task DeleteAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default) =>
         throw new NotImplementedException();
+
+    // ---- Save rules 2 and 3 -------------------------------------------------------------------
+
+    private async Task EnsureNotLockedAsync(Guid branchId, IEnumerable<DateTimeOffset> instants, CancellationToken ct)
+    {
+        var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(ct);
+        if (lockedUntil is { } locked && instants.Any(at => VnTime.ToVnDate(at) <= locked))
+            throw new DomainException("PERIOD_LOCKED",
+                string.Create(CultureInfo.InvariantCulture, $"Ngày chứng từ đã khóa sổ (đến {locked:dd/MM/yyyy})."));
+    }
+
+    /// Reference and amount rules (save rule 3), collected into one 400. `existing` is null on create.
+    private async Task ValidateAsync(UpsertStockVoucherRequest request, Guid branchId, StockVoucher? existing, CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>();
+        void Add(string key, string message) => errors.TryAdd(key, new[] { message });
+
+        var reason = await _db.StockReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == request.ReasonId, ct);
+        if (reason is null)
+            Add("reasonId", "Lý do không tồn tại.");
+        else if (reason.Direction != request.Type)
+            Add("reasonId", "Lý do không đúng loại phiếu.");
+
+        Customer? partner = null;
+        if (request.PartnerId.HasValue)
+        {
+            partner = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == request.PartnerId.Value, ct);
+            if (partner is null)
+                Add("partnerId", "Đối tượng không tồn tại.");
+        }
+        switch (reason?.PartnerType)
+        {
+            case PartnerType.None when request.PartnerId.HasValue:
+                Add("partnerId", "Lý do này không dùng đối tượng.");
+                break;
+            case PartnerType.Customer when request.PartnerId is null:
+                Add("partnerId", "Lý do này yêu cầu chọn khách hàng.");
+                break;
+            case PartnerType.Customer when partner is { IsCustomer: false }:
+                Add("partnerId", "Đối tượng không phải khách hàng.");
+                break;
+            case PartnerType.Supplier when request.PartnerId is null:
+                Add("partnerId", "Lý do này yêu cầu chọn nhà cung cấp.");
+                break;
+            case PartnerType.Supplier when partner is { IsSupplier: false }:
+                Add("partnerId", "Đối tượng không phải nhà cung cấp.");
+                break;
+        }
+
+        var warehouseIds = request.Lines.Select(l => l.WarehouseId ?? request.WarehouseId)
+            .Append(request.WarehouseId).Distinct().ToList();
+        var warehouses = await _db.Warehouses.AsNoTracking()
+            .Where(w => warehouseIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, ct);
+        string? WarehouseError(Guid warehouseId, bool requireActive) =>
+            !warehouses.TryGetValue(warehouseId, out var w) || w.BranchId != branchId
+                ? "Kho không thuộc chi nhánh đang làm việc."
+                : requireActive && !w.IsActive ? "Kho đã ngừng sử dụng." : null;
+
+        // "Active" is required only for new or changed references (review m15).
+        if (WarehouseError(request.WarehouseId, existing is null || existing.WarehouseId != request.WarehouseId) is { } headerError)
+            Add("warehouseId", headerError);
+
+        if (request.PaymentMethodId.HasValue
+            && !await _db.PaymentMethods.AnyAsync(m => m.Id == request.PaymentMethodId.Value, ct))
+            Add("paymentMethodId", "Phương thức thanh toán không tồn tại.");
+
+        if (request.Lines.Count == 0)
+            Add("lines", "Phiếu phải có ít nhất 1 dòng hàng.");
+
+        var products = await LoadProductsAsync(request.Lines.Select(l => l.ProductId), ct);
+        var storedLines = existing?.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id)
+            ?? new Dictionary<Guid, StockVoucherLine>();
+        var priced = new List<(int Index, UpsertStockVoucherLineRequest Line, Product Product)>();
+        for (var i = 0; i < request.Lines.Count; i++)
+        {
+            var line = request.Lines[i];
+            var key = $"lines[{i}]";
+            var stored = line.Id is { } lineId && storedLines.TryGetValue(lineId, out var s) ? s : null;
+            var productChanged = stored is null || stored.ProductId != line.ProductId;
+            var warehouseChanged = stored is null || productChanged || stored.WarehouseId != (line.WarehouseId ?? request.WarehouseId);
+
+            if (WarehouseError(line.WarehouseId ?? request.WarehouseId, warehouseChanged) is { } lineWarehouseError)
+                Add($"{key}.warehouseId", lineWarehouseError);
+
+            if (!products.TryGetValue(line.ProductId, out var product))
+            {
+                Add($"{key}.productId", "Hàng hóa không tồn tại.");
+                continue;
+            }
+            if (productChanged && product.Status != ProductStatus.Active)
+                Add($"{key}.productId", "Hàng hóa đã ngừng kinh doanh.");
+
+            var dimensionsValid = true;
+            void RequirePositive(decimal? value, string field, string label)
+            {
+                if (value is null or <= 0)
+                {
+                    Add($"{key}.{field}", $"{label} phải lớn hơn 0.");
+                    dimensionsValid = false;
+                }
+            }
+            if (product.PricingMode == PricingMode.PerUnit)
+            {
+                RequirePositive(line.Quantity, "quantity", "Số lượng");
+            }
+            else
+            {
+                RequirePositive(line.SheetCount, "sheetCount", "Số tấm");
+                RequirePositive(line.Length, "length", "Chiều dài");
+                if (product.PricingMode is PricingMode.PerSquareMeter or PricingMode.PerCubicMeter)
+                    RequirePositive(line.Width, "width", "Chiều rộng");
+                if (product.PricingMode == PricingMode.PerCubicMeter)
+                    RequirePositive(line.Thickness, "thickness", "Chiều dày");
+            }
+
+            if (line.UnitPrice < 0)
+                Add($"{key}.unitPrice", "Đơn giá không được âm.");
+            if (line.DiscountRate is < 0 or > 100)
+                Add($"{key}.discountRate", "Tỷ lệ chiết khấu phải từ 0 đến 100.");
+            if (line.VatRate is < 0 or > 100)
+                Add($"{key}.vatRate", "Thuế suất phải từ 0 đến 100.");
+            if (dimensionsValid)
+                priced.Add((i, line, product));
+        }
+
+        // Amount-based rules use the calculator's line amounts (allocations do not matter here).
+        var computed = StockVoucherCalculator.Compute(new StockHeaderInput(request.Type, 0m, 0m, false),
+            priced.Select(x => ToCalculatorInput(x.Line, x.Product)).ToList()).Lines;
+        var netSum = 0m;
+        for (var j = 0; j < priced.Count; j++)
+        {
+            var (index, line, _) = priced[j];
+            var result = computed[j];
+            if (result.Quantity <= 0)
+                Add($"lines[{index}].quantity", "Số lượng phải lớn hơn 0.");
+            if (line.DiscountManual && line.DiscountAmount is { } amount && (amount < 0 || amount > result.Amount))
+                Add($"lines[{index}].discountAmount", "Tiền chiết khấu phải từ 0 đến thành tiền.");
+            netSum += result.Amount - result.DiscountAmount;
+        }
+        if (request.OrderDiscount < 0 || request.OrderDiscount > netSum)
+            Add("orderDiscount", "Chiết khấu phiếu phải từ 0 đến tổng tiền sau chiết khấu dòng.");
+        if (request.Freight < 0)
+            Add("freight", "Phí vận chuyển không được âm.");
+        if (request.PaidAmount < 0)
+            Add("paidAmount", "Số tiền thanh toán không được âm.");
+
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+    }
 
     // ---- Writes -----------------------------------------------------------------------------
 

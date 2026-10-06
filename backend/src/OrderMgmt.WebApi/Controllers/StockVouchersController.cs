@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.Common.Models;
@@ -12,10 +13,12 @@ namespace OrderMgmt.WebApi.Controllers;
 public class StockVouchersController : ApiControllerBase
 {
     private readonly IStockVoucherService _service;
+    private readonly IValidator<UpsertStockVoucherRequest> _upsertValidator;
 
-    public StockVouchersController(IStockVoucherService service)
+    public StockVouchersController(IStockVoucherService service, IValidator<UpsertStockVoucherRequest> upsertValidator)
     {
         _service = service;
+        _upsertValidator = upsertValidator;
     }
 
     [HttpGet("{id:guid}")]
@@ -25,5 +28,8 @@ public class StockVouchersController : ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Create(
         [FromBody] UpsertStockVoucherRequest request, CancellationToken ct)
-        => Success(await _service.CreateAsync(request, ct));
+    {
+        await _upsertValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.CreateAsync(request, ct));
+    }
 }

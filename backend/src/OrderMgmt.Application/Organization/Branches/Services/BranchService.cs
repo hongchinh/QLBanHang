@@ -96,6 +96,8 @@ public class BranchService : IBranchService
             throw new ConflictException("Không thể xóa chi nhánh chính.");
         if (await _db.Users.AnyAsync(u => u.DefaultBranchId == id, ct))
             throw new ConflictException("Chi nhánh đang là chi nhánh mặc định của người dùng, không thể xóa.");
+        if (await _db.Warehouses.AnyAsync(w => w.BranchId == id, ct))
+            throw new ConflictException("Chi nhánh đang có kho, không thể xóa.");
 
         branch.IsDeleted = true;
         branch.DeletedAt = _clock.UtcNow;

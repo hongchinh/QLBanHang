@@ -5,6 +5,7 @@ using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Entities.Sales;
@@ -36,6 +37,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<UserQuotationSettings> UserQuotationSettings => Set<UserQuotationSettings>();
 
     public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();

@@ -8,6 +8,7 @@ using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Enums;
 
@@ -279,6 +280,26 @@ public static class DbSeeder
         {
             if (existing.Any(e => e.BranchId == branchId && e.DocType == docType)) continue;
             db.DocumentNumberings.Add(DocumentNumberingDefaults.Create(docType, branchId, DateTimeOffset.UtcNow));
+        }
+
+        // The blocks below run only on an empty table (soft-deleted rows count, so deleted defaults stay deleted).
+        if (!await db.Warehouses.IgnoreQueryFilters().AnyAsync(ct))
+            db.Warehouses.Add(new Warehouse { Code = "KHO01", Name = "Kho chính", BranchId = BranchDefaults.MainBranchId });
+
+        if (!await db.StockReasons.IgnoreQueryFilters().AnyAsync(ct))
+        {
+            db.StockReasons.AddRange(
+                new StockReason { Code = "NMH", Name = "Nhập mua hàng", Direction = StockDirection.In, PartnerType = PartnerType.Supplier, IsSystem = true },
+                new StockReason { Code = "NKH", Name = "Nhập khác", Direction = StockDirection.In, PartnerType = PartnerType.Any, IsSystem = true },
+                new StockReason { Code = "XBH", Name = "Xuất bán hàng", Direction = StockDirection.Out, PartnerType = PartnerType.Customer, IsSystem = true },
+                new StockReason { Code = "XKH", Name = "Xuất khác", Direction = StockDirection.Out, PartnerType = PartnerType.Any, IsSystem = true });
+        }
+
+        if (!await db.PaymentMethods.IgnoreQueryFilters().AnyAsync(ct))
+        {
+            db.PaymentMethods.AddRange(
+                new PaymentMethod { Code = "TM", Name = "Tiền mặt", IsCash = true },
+                new PaymentMethod { Code = "CK", Name = "Chuyển khoản", IsCash = false });
         }
 
         await db.SaveChangesAsync(ct);

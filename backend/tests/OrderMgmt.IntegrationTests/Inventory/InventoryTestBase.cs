@@ -21,7 +21,16 @@ public abstract class InventoryTestBase : QuotationTestBase
 {
     protected static readonly Guid MainBranchId = BranchDefaults.MainBranchId;
 
+    /// The seeded main warehouse KHO01.
+    protected Guid DefaultWarehouseId { get; private set; }
+
     protected InventoryTestBase(PostgresFixture pg) : base(pg) { }
+
+    public override async Task InitializeAsync()
+    {
+        await base.InitializeAsync();
+        DefaultWarehouseId = await InDbAsync(db => db.Warehouses.Where(w => w.Code == "KHO01").Select(w => w.Id).SingleAsync());
+    }
 
     protected async Task InDbAsync(Func<AppDbContext, Task> work)
     {

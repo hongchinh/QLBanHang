@@ -109,7 +109,9 @@ public class ProductService : IProductService
             .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Product), id);
 
-        return MapToDto(product);
+        var dto = MapToDto(product);
+        dto.HasInventoryActivity = await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, ct);
+        return dto;
     }
 
     public async Task<ProductDto> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
@@ -174,6 +176,13 @@ public class ProductService : IProductService
 
         var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Product), id);
+
+        var stockFieldsChanged = product.PricingMode != request.PricingMode
+            || product.UnitId != request.UnitId
+            || (request.TrackInventory.HasValue && request.TrackInventory.Value != product.TrackInventory)
+            || (request.PriceIncludesVat.HasValue && request.PriceIncludesVat.Value != product.PriceIncludesVat);
+        if (stockFieldsChanged && await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, ct))
+            throw new ConflictException("Hàng hóa đã phát sinh kho: không được đổi cách tính, ĐVT, theo dõi tồn, giá gồm VAT.");
 
         product.Name = request.Name.Trim();
         product.ProductGroupId = request.ProductGroupId;
@@ -245,6 +254,10 @@ public class ProductService : IProductService
     {
         var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Product), id);
+
+        if (await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, ct)
+            || await _db.StockVoucherLines.AnyAsync(l => l.ProductId == id, ct))
+            throw new ConflictException("Hàng hóa đã phát sinh kho, không thể xóa.");
 
         product.IsDeleted = true;
         product.DeletedAt = _clock.UtcNow;

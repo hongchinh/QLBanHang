@@ -72,6 +72,8 @@ public class StockReasonService : IStockReasonService
         var reason = await FindAsync(id, ct);
         if (reason.IsSystem)
             throw new ConflictException("Không thể xóa lý do hệ thống.");
+        if (await _db.StockVouchers.AnyAsync(v => v.ReasonId == id, ct))
+            throw new ConflictException("Lý do đã được dùng trên phiếu kho, không thể xóa.");
 
         reason.IsDeleted = true;
         reason.DeletedAt = _clock.UtcNow;

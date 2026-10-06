@@ -86,7 +86,11 @@ public class WarehouseService : IWarehouseService
         var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.Id == id, ct)
             ?? throw new NotFoundException(nameof(Warehouse), id);
 
-        warehouse.BranchId = await ResolveTargetBranchAsync(request.BranchId, ct);
+        var branchId = await ResolveTargetBranchAsync(request.BranchId, ct);
+        if (branchId != warehouse.BranchId && await _db.InventoryLedger.AnyAsync(e => e.WarehouseId == id, ct))
+            throw new ConflictException("Kho đã phát sinh nhập xuất, không được chuyển sang chi nhánh khác.");
+
+        warehouse.BranchId = branchId;
         warehouse.Name = request.Name.Trim();
         warehouse.IsActive = request.IsActive;
 
@@ -98,6 +102,12 @@ public class WarehouseService : IWarehouseService
     {
         var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.Id == id, ct)
             ?? throw new NotFoundException(nameof(Warehouse), id);
+
+        if (await _db.InventoryLedger.AnyAsync(e => e.WarehouseId == id, ct)
+            || await _db.StockVouchers.AnyAsync(v => v.WarehouseId == id, ct)
+            || await _db.StockVoucherLines.AnyAsync(l => l.WarehouseId == id, ct)
+            || await _db.OpeningStocks.AnyAsync(o => o.WarehouseId == id, ct))
+            throw new ConflictException("Kho đã phát sinh dữ liệu kho, không thể xóa.");
 
         warehouse.IsDeleted = true;
         warehouse.DeletedAt = _clock.UtcNow;

@@ -34,6 +34,8 @@ public class ProductDto
     public decimal PurchaseDiscountRate { get; set; }
     public decimal SalesDiscountRate { get; set; }
     public bool PriceIncludesVat { get; set; }
+    /// Ledger rows exist: PricingMode, UnitId, TrackInventory and PriceIncludesVat are locked.
+    public bool HasInventoryActivity { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
 

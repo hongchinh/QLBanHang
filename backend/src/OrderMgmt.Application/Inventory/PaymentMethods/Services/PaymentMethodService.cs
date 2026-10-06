@@ -53,6 +53,9 @@ public class PaymentMethodService : IPaymentMethodService
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var method = await FindAsync(id, ct);
+        if (await _db.StockVouchers.AnyAsync(v => v.PaymentMethodId == id, ct))
+            throw new ConflictException("Phương thức thanh toán đã được dùng trên phiếu kho, không thể xóa.");
+
         method.IsDeleted = true;
         method.DeletedAt = _clock.UtcNow;
         method.DeletedBy = _currentUser.UserId;

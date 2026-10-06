@@ -224,6 +224,8 @@ public class CustomerService : ICustomerService
         var customer = await WithRole(_db.Customers, role).FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Customer), id);
         PartnerPermissionGuard.EnsureCanDelete(_currentUser, customer.IsCustomer, customer.IsSupplier);
+        if (await _db.StockVouchers.AnyAsync(v => v.PartnerId == id, ct))
+            throw new ConflictException("Đối tượng đã có phiếu nhập/xuất kho, không thể xóa.");
 
         customer.IsDeleted = true;
         customer.DeletedAt = _clock.UtcNow;

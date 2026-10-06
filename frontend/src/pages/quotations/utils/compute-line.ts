@@ -1,4 +1,5 @@
 import type { PricingMode } from '@/features/products/types';
+import { computePricingQuantity } from '@/lib/pricing-quantity';
 
 export interface LineLike {
   pricingMode: PricingMode;
@@ -28,21 +29,7 @@ export function round0(value: number): number {
 }
 
 export function computeLineQuantity(line: LineLike): number {
-  const L = line.length ?? 0;
-  const W = line.width ?? 0;
-  const T = line.thickness ?? 0;
-  const sheets = line.sheetCount ?? 0;
-  switch (line.pricingMode) {
-    case 'PerSquareMeter':
-      return (L * W * sheets) / 1_000_000;
-    case 'PerLinearMeter':
-      return (L * sheets) / 1000;
-    case 'PerCubicMeter':
-      return (L * W * T * sheets) / 1_000_000_000;
-    case 'PerUnit':
-    default:
-      return line.quantity;
-  }
+  return computePricingQuantity(line);
 }
 
 export function computeLineTotal(line: LineLike): number {

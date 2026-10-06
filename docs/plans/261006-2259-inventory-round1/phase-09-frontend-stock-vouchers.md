@@ -1,6 +1,6 @@
 # Phase 09 — Frontend stock voucher list & form
 
-**Status:** [ ] pending
+**Status:** [-] in progress (Tasks 9.1–9.2 started early, parallel agent)
 **Complexity:** XL
 
 ## Objective

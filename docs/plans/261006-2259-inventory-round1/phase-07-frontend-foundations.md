@@ -1,6 +1,6 @@
 # Phase 07 — Frontend foundations: permissions, working branch, navigation
 
-**Status:** [ ] pending
+**Status:** [-] in progress
 **Complexity:** M
 
 ## Objective

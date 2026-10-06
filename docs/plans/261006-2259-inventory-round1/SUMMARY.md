@@ -95,12 +95,12 @@ Deliver Round 1 of the legacy `PhieuNhapXuat` replacement: branches with a per-u
 - [x] Phase 01 — Permissions & branch foundation (L) — `phase-01-permissions-and-branches.md`
 - [x] Phase 02 — Inventory catalogs, partner roles & settings (L) — `phase-02-catalogs-partners-settings.md`
 - [x] Phase 03 — Pure calculators (M) — `phase-03-pure-calculators.md`
-- [ ] Phase 04 — Voucher & ledger schema, posting engine (XL) — `phase-04-ledger-and-posting-engine.md`
-- [ ] Phase 05 — Stock voucher API (XL) — `phase-05-stock-voucher-api.md`
+- [x] Phase 04 — Voucher & ledger schema, posting engine (XL) — `phase-04-ledger-and-posting-engine.md`
+- [-] Phase 05 — Stock voucher API (XL) — `phase-05-stock-voucher-api.md`
 - [ ] Phase 06 — Opening stock, cost recalculation & report APIs (L) — `phase-06-opening-recalc-reports-api.md`
-- [ ] Phase 07 — Frontend foundations: permissions, working branch, navigation (M) — `phase-07-frontend-foundations.md`
+- [-] Phase 07 — Frontend foundations: permissions, working branch, navigation (M) — `phase-07-frontend-foundations.md`
 - [ ] Phase 08 — Frontend catalog & settings screens (L) — `phase-08-frontend-catalogs-settings.md`
-- [ ] Phase 09 — Frontend stock voucher list & form (XL) — `phase-09-frontend-stock-vouchers.md`
+- [-] Phase 09 — Frontend stock voucher list & form (XL) — `phase-09-frontend-stock-vouchers.md`
 - [ ] Phase 10 — Frontend opening stock & inventory reports (M) — `phase-10-frontend-opening-and-reports.md`
 - [ ] Phase 11 — Documentation & final verification (S) — `phase-11-docs-and-verification.md`
 

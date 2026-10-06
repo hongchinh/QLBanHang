@@ -33,29 +33,10 @@ public class SearchService : ISearchService
         // parallel execution would require IDbContextFactory which isn't wired in
         // this codebase. Dataset is small enough that sequential latency is fine.
         if (_currentUser.HasPermission(Permissions.Customers.View))
-        {
-            result.Customers = await _db.Customers.AsNoTracking()
-                .Where(c => !c.IsDeleted
-                    && (EF.Functions.ILike(EF.Functions.Unaccent(c.Name), EF.Functions.Unaccent(pattern))
-                        || EF.Functions.ILike(c.Code, pattern)
-                        || (c.PhoneNumber != null && EF.Functions.ILike(c.PhoneNumber, pattern))
-                        || (c.TaxCode != null && EF.Functions.ILike(c.TaxCode, pattern))))
-                .OrderBy(c => c.Name)
-                .Take(MaxPerGroup)
-                .Select(c => new CustomerSearchItemDto
-                {
-                    Id = c.Id,
-                    Code = c.Code,
-                    Name = c.Name,
-                    TaxCode = c.TaxCode,
-                    CompanyAddress = c.CompanyAddress,
-                    DefaultShippingAddress = c.DefaultShippingAddress,
-                    ContactPerson = c.ContactPerson,
-                    PhoneNumber = c.PhoneNumber,
-                    Status = c.Status,
-                })
-                .ToListAsync(ct);
-        }
+            result.Customers = await SearchPartnersAsync(pattern, suppliers: false, ct);
+
+        if (_currentUser.HasPermission(Permissions.Suppliers.View))
+            result.Suppliers = await SearchPartnersAsync(pattern, suppliers: true, ct);
 
         if (_currentUser.HasPermission(Permissions.Quotations.View))
         {
@@ -85,6 +66,31 @@ public class SearchService : ISearchService
 
         return result;
     }
+
+    private Task<List<CustomerSearchItemDto>> SearchPartnersAsync(string pattern, bool suppliers, CancellationToken ct) =>
+        _db.Customers.AsNoTracking()
+            .Where(c => !c.IsDeleted && (suppliers ? c.IsSupplier : c.IsCustomer)
+                && (EF.Functions.ILike(EF.Functions.Unaccent(c.Name), EF.Functions.Unaccent(pattern))
+                    || EF.Functions.ILike(c.Code, pattern)
+                    || (c.PhoneNumber != null && EF.Functions.ILike(c.PhoneNumber, pattern))
+                    || (c.TaxCode != null && EF.Functions.ILike(c.TaxCode, pattern))))
+            .OrderBy(c => c.Name)
+            .Take(MaxPerGroup)
+            .Select(c => new CustomerSearchItemDto
+            {
+                Id = c.Id,
+                Code = c.Code,
+                Name = c.Name,
+                TaxCode = c.TaxCode,
+                CompanyAddress = c.CompanyAddress,
+                DefaultShippingAddress = c.DefaultShippingAddress,
+                ContactPerson = c.ContactPerson,
+                PhoneNumber = c.PhoneNumber,
+                Status = c.Status,
+                IsCustomer = c.IsCustomer,
+                IsSupplier = c.IsSupplier,
+            })
+            .ToListAsync(ct);
 
     private static string EscapeLike(string input) =>
         input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");

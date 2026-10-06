@@ -866,8 +866,12 @@ public class QuotationService : IQuotationService
 
     private async Task<Customer> EnsureCustomerAsync(Guid customerId, CancellationToken ct)
     {
-        return await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && !c.IsDeleted, ct)
+        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == customerId && !c.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Customer), customerId);
+        // Shared partner catalog (D38): a supplier-only partner cannot be quoted.
+        if (!customer.IsCustomer)
+            throw new DomainException("PARTNER_NOT_CUSTOMER", "Đối tượng không phải khách hàng.");
+        return customer;
     }
 
     private async Task PopulateLinesAsync(

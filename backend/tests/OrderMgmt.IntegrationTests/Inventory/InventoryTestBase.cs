@@ -104,6 +104,23 @@ public abstract class InventoryTestBase : QuotationTestBase
         return (await ReadDataAsync<WarehouseDto>(response)).Id;
     }
 
+    protected Task<Guid> CreatePartnerAsync(string code, bool isCustomer, bool isSupplier) =>
+        InDbAsync(async db =>
+        {
+            var partner = new OrderMgmt.Domain.Entities.Catalog.Customer
+            {
+                Code = code,
+                Name = $"Đối tượng {code}",
+                TaxCode = "0100000000",
+                CompanyAddress = "Hà Nội",
+                IsCustomer = isCustomer,
+                IsSupplier = isSupplier,
+            };
+            db.Customers.Add(partner);
+            await db.SaveChangesAsync();
+            return partner.Id;
+        });
+
     protected static async Task<T> ReadDataAsync<T>(HttpResponseMessage response)
     {
         var body = await response.Content.ReadAsStringAsync();

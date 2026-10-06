@@ -17,6 +17,8 @@ public class CustomerDto
     public CustomerGroup Group { get; set; }
     public string? Note { get; set; }
     public CustomerStatus Status { get; set; }
+    public bool IsCustomer { get; set; }
+    public bool IsSupplier { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
 
@@ -30,6 +32,8 @@ public class CustomerListItemDto
     public string? ContactPerson { get; set; }
     public CustomerGroup Group { get; set; }
     public CustomerStatus Status { get; set; }
+    public bool IsCustomer { get; set; }
+    public bool IsSupplier { get; set; }
 }
 
 public class CreateCustomerRequest
@@ -44,6 +48,9 @@ public class CreateCustomerRequest
     public string? Email { get; set; }
     public CustomerGroup Group { get; set; } = CustomerGroup.Company;
     public string? Note { get; set; }
+    /// The endpoint's own role is always set; the other flag defaults to false and needs that role's create permission.
+    public bool? IsCustomer { get; set; }
+    public bool? IsSupplier { get; set; }
 }
 
 public class UpdateCustomerRequest
@@ -58,6 +65,9 @@ public class UpdateCustomerRequest
     public CustomerGroup Group { get; set; }
     public string? Note { get; set; }
     public CustomerStatus Status { get; set; }
+    /// Null keeps the current value.
+    public bool? IsCustomer { get; set; }
+    public bool? IsSupplier { get; set; }
 }
 
 public class CustomerListRequest : PageRequest
@@ -77,6 +87,8 @@ public class CustomerSearchItemDto
     public string? ContactPerson { get; set; }
     public string? PhoneNumber { get; set; }
     public CustomerStatus Status { get; set; }
+    public bool IsCustomer { get; set; }
+    public bool IsSupplier { get; set; }
 }
 
 public class CustomerSearchRequest

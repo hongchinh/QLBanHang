@@ -20,6 +20,10 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.Property(x => x.CompanyAddress).HasMaxLength(1000);
         b.Property(x => x.DefaultShippingAddress).HasMaxLength(1000);
         b.Property(x => x.Note).HasMaxLength(2000);
+        // Existing rows become customers. The sentinel makes EF send `false` (D28): without it a
+        // supplier-only partner would be stored as a customer by the database default.
+        b.Property(x => x.IsCustomer).HasDefaultValue(true).HasSentinel(true);
+        b.Property(x => x.IsSupplier).HasDefaultValue(false);
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => x.PhoneNumber);

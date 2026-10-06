@@ -5,6 +5,7 @@ using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Entities.Sales;
 using OrderMgmt.Domain.Notifications;
@@ -33,6 +34,8 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<UserQuotationSettings> UserQuotationSettings => Set<UserQuotationSettings>();
+
+    public DbSet<Branch> Branches => Set<Branch>();
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();

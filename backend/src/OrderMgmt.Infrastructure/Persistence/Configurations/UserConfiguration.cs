@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Identity;
 
 namespace OrderMgmt.Infrastructure.Persistence.Configurations;
@@ -23,6 +24,12 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         b.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)
             .HasForeignKey(x => x.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        b.Property(x => x.DefaultBranchId).HasDefaultValue(BranchDefaults.MainBranchId);
+        b.HasOne(x => x.DefaultBranch)
+            .WithMany()
+            .HasForeignKey(x => x.DefaultBranchId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 }

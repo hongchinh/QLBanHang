@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Entities.Sales;
 using OrderMgmt.Domain.Notifications;
@@ -18,6 +19,8 @@ public interface IAppDbContext
     DbSet<RolePermission> RolePermissions { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<UserQuotationSettings> UserQuotationSettings { get; }
+
+    DbSet<Branch> Branches { get; }
 
     DbSet<Customer> Customers { get; }
     DbSet<CustomerAddress> CustomerAddresses { get; }

@@ -109,10 +109,10 @@ the app has no way to know whether a transfer actually happened.
 
 1. permission by voucher type, working branch, ownership or `edit_all`, `Version` (xmin) set as the original value;
 2. reference and amount validation (reasons, partner roles, warehouses of the branch, dimensions, discounts, dates);
-3. locks: the branch gate (shared), then one branch-independent key per product;
+3. locks: the branch gate (shared), then one branch-independent key per product; product and warehouse references are re-checked after the locks, because catalog deletes take the same locks;
 4. period lock check (read after the gate);
-5. on create, the document number from the atomic counter row;
-6. voucher header and lines with totals from `StockVoucherCalculator` (never from the client);
+5. on create, the document number from the atomic counter row; codes already issued (for example after a reset-policy change) are skipped by advancing the counter;
+6. voucher header and lines with totals from `StockVoucherCalculator` (never from the client); on update, a line with the same id and product keeps its stored product snapshot (stock tracking, pricing mode, unit, VAT-inclusive price);
 7. ledger replacement for the voucher (`IInventoryLedgerService`): rows rewritten, `RunningQty` and `StockBalance` recomputed from the earliest affected time;
 8. negative-stock policy (`Allow` / `Warn` / `Block`), counting only pairs the operation makes worse (D31);
 9. cost recalculation of the affected product scopes;
@@ -128,9 +128,11 @@ the app has no way to know whether a transfer actually happened.
 
 Opening stock (`/api/inventory/opening-stock`) follows the same flow with source type `Opening`, posted at 00:00 VN of the opening date; saves of one warehouse are serialized by an opening key.
 
-**Lock order (D30).** Branch gate → product keys → document counter row, always before the first `SaveChanges`. Each set of keys is taken in one round trip in ascending key order, one advisory lock per product, so a whole-catalog opening stock grid stays within `max_locks_per_transaction`. Settings changes and manual recalculation take the branch gate **exclusive** (every branch) and no product keys, so they wait for in-flight postings and postings wait for them. Setting a period lock also takes the exclusive gate.
+**Lock order (D30).** Branch gate → product keys → document counter row, always before the first `SaveChanges`. Each set of keys is taken in one round trip in ascending key order, one advisory lock per product, so a whole-catalog opening stock grid stays within `max_locks_per_transaction`. Settings changes and manual recalculation take the branch gate **exclusive** (every branch) and no product keys, so they wait for in-flight postings and postings wait for them. Setting a period lock also takes the exclusive gate. Deleting a product takes its product key and deleting a warehouse takes the exclusive branch gate before checking for stock activity.
 
-**Concurrency (D29).** `StockVoucher.Version` maps to PostgreSQL `xmin`. Update, cancel, restore and delete always mark the header modified, so a stale `Version` fails with 409 `CONCURRENCY` even when only lines change.
+**Concurrency (D29).** `StockVoucher.Version` maps to PostgreSQL `xmin`. Update, cancel, restore and delete always mark the header modified, so a stale `Version` fails with 409 `CONCURRENCY` even when only lines change. The voucher DTO's `CanEdit` / `CanCancel` / `CanDelete` flags are false inside the period lock.
+
+**Allocation (D10).** Order discount (capped at each line's net) and stock-in freight are split by line value; the rounding remainder goes to the last line with a positive base, and when that would leave a line negative or above its base the split falls back to largest remainder. The frontend preview (`compute-stock-line.ts`) implements the same rule.
 
 **Instants (D27).** Every `DateTimeOffset` written or used as a query parameter is UTC. VN-date rules (period lock, costing period, numbering period, report dates) are UTC ranges built with `VnTime.StartOfDay/StartOfNextDay`.
 
@@ -216,4 +218,4 @@ styles/      Shared CSS tokens and form/grid utilities
 
 Axios interceptors unwrap the backend API envelope, attach access tokens and use refresh flow for expired sessions. TanStack Query owns server-state caching and invalidation.
 
-The working branch lives in `stores/branch-store.ts` and is sent as `X-Branch-Id` on every request. `AppLayout` renders pages only after `useBranchContext` has resolved the branch, so no page fetches with the wrong branch. Switching branch resets the query cache. Inventory queries live under the `['inventory']` root key. The service worker never caches branch- or user-scoped API data (`lib/sw-routes.ts`), and logout or a failed refresh clears its API cache.
+The working branch lives in `stores/branch-store.ts` and is sent as `X-Branch-Id` on every request. `AppLayout` renders pages only after `useBranchContext` has resolved the branch, so no page fetches with the wrong branch. Switching branch (`useSwitchWorkingBranch`) clears the service-worker API cache and resets the query cache, and `AppLayout` keys the routed page by the working branch so page state from the previous branch is discarded. Inventory queries live under the `['inventory']` root key. The service worker never caches branch- or user-scoped API data (`lib/sw-routes.ts`), and logout or a failed refresh clears its API cache.

@@ -113,7 +113,7 @@ frontend/src/
 │   ├── auth/
 │   ├── bank-accounts/           # saved receiving bank accounts (CRUD, current user)
 │   ├── banks/                   # read-only seeded bank list
-│   ├── branches/                # branches, /me/branches, useBranchContext
+│   ├── branches/                # branches, /me/branches, useBranchContext, useSwitchWorkingBranch
 │   ├── branding/
 │   ├── customers/
 │   ├── dashboard/
@@ -131,7 +131,7 @@ frontend/src/
 │   ├── stock-reasons/
 │   ├── stock-vouchers/          # voucher module, schema, payload, draft store
 │   ├── suppliers/
-│   └── warehouses/
+│   └── warehouses/              # warehouse queries, selectableWarehouses
 ├── pages/
 │   ├── admin/
 │   ├── customers/

@@ -1,7 +1,7 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { useCreateCustomer, useCustomer, useUpdateCustomer } from '@/features/customers/hooks';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getErrorMessage } from '@/lib/api-client';
+import { formatApiErrorDetails, getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { CustomerFormFields } from './customer-form-fields';
 import { CustomerQuotationsSection } from './customer-quotations-section';
@@ -38,7 +38,7 @@ export function CustomerFormPage() {
           }
           navigate('/customers');
         } catch (err) {
-          toast({ variant: 'destructive', title: 'Không thể lưu', description: getErrorMessage(err) });
+          toast({ variant: 'destructive', title: 'Không thể lưu', description: formatApiErrorDetails(err) });
         }
       }}
     />

@@ -40,6 +40,19 @@ describe('customerSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('rejects both roles false', () => {
+    const result = customerSchema.safeParse({
+      name: 'ACME',
+      group: 'Company',
+      isCustomer: false,
+      isSupplier: false,
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues[0].message).toBe('Chọn ít nhất một vai trò');
+    }
+  });
+
   it('rejects unknown group', () => {
     const result = customerSchema.safeParse({
       name: 'ACME',

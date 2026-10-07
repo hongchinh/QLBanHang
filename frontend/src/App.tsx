@@ -12,6 +12,8 @@ import { LoginPage } from '@/pages/login-page';
 import { DashboardPage } from '@/pages/dashboard-page';
 import { CustomerListPage } from '@/pages/customers/customer-list-page';
 import { CustomerFormPage } from '@/pages/customers/customer-form-page';
+import { SupplierListPage } from '@/pages/suppliers/supplier-list-page';
+import { SupplierFormPage } from '@/pages/suppliers/supplier-form-page';
 import { ProductListPage } from '@/pages/products/product-list-page';
 import { ProductFormPage } from '@/pages/products/product-form-page';
 import { ProductGroupListPage } from '@/pages/product-groups/product-group-list-page';
@@ -111,6 +113,33 @@ export function App() {
                     element={
                       <ProtectedRoute permission="customers.update">
                         <CustomerFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+
+                <Route path="suppliers">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="suppliers.view">
+                        <SupplierListPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="suppliers.create">
+                        <SupplierFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="suppliers.update">
+                        <SupplierFormPage />
                       </ProtectedRoute>
                     }
                   />

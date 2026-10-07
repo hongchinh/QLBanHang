@@ -23,6 +23,8 @@ export interface QuotationSearchItem {
 
 export interface GlobalSearchResult {
   customers: CustomerSearchItem[];
+  // Supplier-role partners; filled only with suppliers.view (D38).
+  suppliers?: CustomerSearchItem[];
   quotations: QuotationSearchItem[];
 }
 

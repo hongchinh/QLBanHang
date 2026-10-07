@@ -31,6 +31,12 @@ export interface Product {
   note?: string;
   status: ProductStatus;
   pricingMode: PricingMode;
+  trackInventory: boolean;
+  purchaseDiscountRate: number;
+  salesDiscountRate: number;
+  priceIncludesVat: boolean;
+  /** Ledger rows exist: pricingMode, unitId, trackInventory and priceIncludesVat are locked. */
+  hasInventoryActivity: boolean;
   createdAt: string;
 }
 
@@ -45,6 +51,14 @@ export interface ProductListItem {
   costPrice?: number;
   status: ProductStatus;
   pricingMode: PricingMode;
+  trackInventory: boolean;
+  defaultTaxRate?: number;
+  length?: number;
+  width?: number;
+  thickness?: number;
+  purchaseDiscountRate: number;
+  salesDiscountRate: number;
+  priceIncludesVat: boolean;
 }
 
 export interface ProductListParams {
@@ -73,6 +87,10 @@ export interface CreateProductRequest {
   defaultTaxRate?: number;
   note?: string;
   pricingMode: PricingMode;
+  trackInventory: boolean;
+  purchaseDiscountRate: number;
+  salesDiscountRate: number;
+  priceIncludesVat: boolean;
 }
 
 export interface UpdateProductRequest extends Omit<CreateProductRequest, 'code'> {
@@ -88,6 +106,15 @@ export interface ProductSuggestion {
   pricingMode: PricingMode;
   defaultPrice?: number;
   costPrice?: number;
+  // Required (possibly undefined) so the compiler flags every place that builds a suggestion.
+  defaultTaxRate: number | undefined;
+  length: number | undefined;
+  width: number | undefined;
+  thickness: number | undefined;
+  trackInventory: boolean;
+  purchaseDiscountRate: number;
+  salesDiscountRate: number;
+  priceIncludesVat: boolean;
 }
 
 export type { PagedResult };

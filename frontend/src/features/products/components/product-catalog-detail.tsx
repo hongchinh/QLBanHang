@@ -2,6 +2,7 @@ import { useProduct } from '@/features/products/hooks';
 import { useAuthStore } from '@/stores/auth-store';
 import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import type { ProductSuggestion } from '@/features/products/types';
+import { toProductSuggestion } from '@/features/products/to-product-suggestion';
 import { Button } from '@/components/ui/button';
 
 interface Props {
@@ -40,16 +41,7 @@ export function ProductCatalogDetail({ productId, onSelect }: Props) {
 
   function handleSelect() {
     if (!product) return;
-    onSelect({
-      id: product.id,
-      code: product.code,
-      name: product.name,
-      specification: product.specification,
-      unitName: product.unitName,
-      pricingMode: product.pricingMode,
-      defaultPrice: product.defaultPrice,
-      costPrice: product.costPrice,
-    });
+    onSelect(toProductSuggestion(product));
   }
 
   if (productId === null) {

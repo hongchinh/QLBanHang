@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -75,5 +77,22 @@ public class StockVoucherReviewRound2Tests : InventoryTestBase
 
         (await GetVoucherAsync(_client, locked.Id)).Should().BeEquivalentTo(new { CanEdit = false, CanCancel = false, CanDelete = false });
         (await GetVoucherAsync(_client, open.Id)).Should().BeEquivalentTo(new { CanEdit = true, CanCancel = true, CanDelete = true });
+    }
+
+    [Fact]
+    public async Task Stale_version_on_cancel_returns_409_concurrency()
+    {
+        var p = await CreateInventoryProductAsync("LIM05");
+        var voucher = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 1, 1_000));
+        var edit = UpdateRequestFrom(voucher);
+        edit.Note = "Đổi phiên bản";
+        (await PutVoucherAsync(_client, voucher.Id, edit)).Status.Should().Be(HttpStatusCode.OK);
+
+        var (status, _, error) = await ReadVoucherResponseAsync(await _client.PostAsJsonAsync(
+            $"/api/stock-vouchers/{voucher.Id}/cancel", new StockVoucherActionRequest { Version = voucher.Version }));
+
+        status.Should().Be(HttpStatusCode.Conflict);
+        error!.Code.Should().Be("CONCURRENCY");
+        (await GetVoucherAsync(_client, voucher.Id)).Status.Should().Be(StockVoucherStatus.Active);
     }
 }

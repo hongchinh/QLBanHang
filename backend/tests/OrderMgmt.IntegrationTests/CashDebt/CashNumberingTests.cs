@@ -42,6 +42,8 @@ public class CashNumberingTests : CashDebtTestBase
     [Fact]
     public async Task Numbering_permission_depends_on_type()
     {
+        (await _client.PutAsJsonAsync("/api/inventory/numbering/99", Request("XX"))).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
         var cashOnly = await CreateClientWithPermissionsAsync("num_cash_only", null, Permissions.Cash.Settings);
         (await cashOnly.GetAsync("/api/inventory/numbering")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await cashOnly.PutAsJsonAsync("/api/inventory/numbering/Receipt", Request("PT"))).StatusCode.Should().Be(HttpStatusCode.OK);

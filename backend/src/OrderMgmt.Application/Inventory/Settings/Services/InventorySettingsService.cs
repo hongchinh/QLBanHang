@@ -83,6 +83,10 @@ public class InventorySettingsService : IInventorySettingsService
     public async Task<DocumentNumberingDto> UpdateNumberingAsync(
         DocumentType docType, UpdateNumberingRequest request, CancellationToken ct = default)
     {
+        if (!Enum.IsDefined(docType))
+            throw new ValidationDomainException(
+                new Dictionary<string, string[]> { ["docType"] = new[] { "Loại chứng từ không hợp lệ." } }, "Loại chứng từ không hợp lệ.");
+
         var required = docType is DocumentType.StockIn or DocumentType.StockOut
             ? Permissions.Inventory.Settings
             : Permissions.Cash.Settings;

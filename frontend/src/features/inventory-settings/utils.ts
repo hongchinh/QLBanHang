@@ -1,3 +1,5 @@
+import type { CostingPeriod } from './types';
+
 // TS port of the backend DocumentNumberFormatter.Format (D13), used for the live preview.
 // {STT} is zero-padded to `length` and never truncated. Replacer functions keep `$` in the prefix literal.
 export function formatDocumentNumber(
@@ -15,4 +17,17 @@ export function formatDocumentNumber(
     .replaceAll('{NAM}', () => year)
     .replaceAll('{THANG}', () => month)
     .replaceAll('{STT}', () => stt);
+}
+
+const MONTHS_PER_PERIOD: Record<CostingPeriod, number> = { Month: 1, Quarter: 3, Year: 12 };
+
+// The `count` most recent costing-period starts (`yyyy-MM-dd`, local date), newest first,
+// beginning with the period that contains `today`.
+export function listPeriodStarts(period: CostingPeriod, today: Date, count: number): string[] {
+  const step = MONTHS_PER_PERIOD[period];
+  const firstMonth = Math.floor(today.getMonth() / step) * step;
+  return Array.from({ length: count }, (_, i) => {
+    const d = new Date(today.getFullYear(), firstMonth - i * step, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  });
 }

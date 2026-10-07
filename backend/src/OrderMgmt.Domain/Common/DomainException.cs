@@ -52,17 +52,16 @@ public sealed class NegativeStockException : DomainException
 
 public sealed class ConfirmationRequiredException : DomainException
 {
-    public bool IsWarning { get; }
-
-    /// Key is the confirmation reason; values are confirmation details/warnings.
-    public IDictionary<string, string[]> Details { get; }
-
-    public ConfirmationRequiredException(string code, string message, bool isWarning, IDictionary<string, string[]> details)
+    public ConfirmationRequiredException(string code, string message, IDictionary<string, string[]> details, bool canConfirm)
         : base(code, message)
     {
-        IsWarning = isWarning;
         Details = details;
+        CanConfirm = canConfirm;
     }
+
+    public IDictionary<string, string[]> Details { get; }
+
+    public bool CanConfirm { get; }
 }
 
 public sealed class ValidationDomainException : DomainException

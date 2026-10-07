@@ -15,7 +15,8 @@ public sealed record PairChange(
     DateTimeOffset? FirstNegativeAt,    // AFTER: PostedAt of the first such row with RunningQty < 0
     decimal? OldMinRunningQty,          // BEFORE the change, same window (read before the old rows are deleted; D31)
     DateTimeOffset? OldFirstNegativeAt, // BEFORE: first negative point in the same window
-    decimal Balance);                   // StockBalance after the change
+    decimal Balance,                    // StockBalance after the change
+    decimal? BaseRunningQty);           // RunningQty of the last row before From (same before and after; null if none)
 
 public sealed record LedgerChangeResult(IReadOnlyList<PairChange> Pairs);
 

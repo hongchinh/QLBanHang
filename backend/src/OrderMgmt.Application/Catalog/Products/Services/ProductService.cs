@@ -4,6 +4,7 @@ using OrderMgmt.Application.Catalog.Products.Interfaces;
 using OrderMgmt.Application.Catalog.Products.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
@@ -19,11 +20,17 @@ public class ProductService : IProductService
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
 
-    public ProductService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser)
+    private readonly ITransactionRunner _transaction;
+    private readonly IInventoryLock _inventoryLock;
+
+    public ProductService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser,
+        ITransactionRunner transaction, IInventoryLock inventoryLock)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
+        _transaction = transaction;
+        _inventoryLock = inventoryLock;
     }
 
     public async Task<PagedResult<ProductListItemDto>> ListAsync(ProductListRequest request, CancellationToken ct = default)
@@ -173,7 +180,12 @@ public class ProductService : IProductService
     public async Task<ProductDto> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct = default)
     {
         await EnsureReferencesAsync(request.ProductGroupId, request.UnitId, ct);
+        await _transaction.RunAsync(c => ApplyUpdateAsync(id, request, c), ct);
+        return await GetAsync(id, ct);
+    }
 
+    private async Task ApplyUpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct)
+    {
         var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Product), id);
 
@@ -181,6 +193,9 @@ public class ProductService : IProductService
             || product.UnitId != request.UnitId
             || (request.TrackInventory.HasValue && request.TrackInventory.Value != product.TrackInventory)
             || (request.PriceIncludesVat.HasValue && request.PriceIncludesVat.Value != product.PriceIncludesVat);
+        // The product key serializes the check with postings, so a first posting cannot slip in between (review finding).
+        if (stockFieldsChanged)
+            await _inventoryLock.AcquireProductsAsync(new[] { id }, ct);
         if (stockFieldsChanged && await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, ct))
             throw new ConflictException("Hàng hóa đã phát sinh kho: không được đổi cách tính, ĐVT, theo dõi tồn, giá gồm VAT.");
 
@@ -204,7 +219,6 @@ public class ProductService : IProductService
         product.PriceIncludesVat = request.PriceIncludesVat ?? product.PriceIncludesVat;
 
         await _db.SaveChangesAsync(ct);
-        return await GetAsync(product.Id, ct);
     }
 
     public async Task<IReadOnlyList<ProductSuggestionDto>> SearchAsync(string? query, int take, CancellationToken ct = default)

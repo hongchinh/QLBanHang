@@ -11,4 +11,9 @@ public interface IInventoryLock
     // pg_advisory_xact_lock per distinct (ProductId, BranchId), ascending by ProductId then BranchId.
     // Taken after the branch gate. Throws InvalidOperationException when no transaction is open.
     Task AcquireAsync(IEnumerable<(Guid ProductId, Guid BranchId)> keys, CancellationToken ct = default);
+
+    // Branch-independent key per product, ascending, taken after the (product, branch) keys. Serializes writes that
+    // span branches: the D35 cost price and catalog changes guarded by inventory activity.
+    // Key: hashtextextended('inv-product:{productId:N}', 0). Throws InvalidOperationException without a transaction.
+    Task AcquireProductsAsync(IEnumerable<Guid> productIds, CancellationToken ct = default);
 }

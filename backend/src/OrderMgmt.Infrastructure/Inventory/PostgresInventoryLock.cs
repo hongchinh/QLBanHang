@@ -34,6 +34,16 @@ public sealed class PostgresInventoryLock : IInventoryLock
         }
     }
 
+    public async Task AcquireProductsAsync(IEnumerable<Guid> productIds, CancellationToken ct = default)
+    {
+        EnsureTransaction();
+        foreach (var productId in productIds.Distinct().OrderBy(id => id))
+        {
+            var key = $"inv-product:{productId:N}";
+            await _db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))", ct);
+        }
+    }
+
     private void EnsureTransaction()
     {
         if (_db.Database.CurrentTransaction is null)

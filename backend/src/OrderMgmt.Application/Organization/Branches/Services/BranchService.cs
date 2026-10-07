@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Models;
@@ -15,13 +16,18 @@ public class BranchService : IBranchService
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
     private readonly ICurrentBranch _currentBranch;
+    private readonly ITransactionRunner _transaction;
+    private readonly IInventoryLock _inventoryLock;
 
-    public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch)
+    public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
+        ITransactionRunner transaction, IInventoryLock inventoryLock)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
         _currentBranch = currentBranch;
+        _transaction = transaction;
+        _inventoryLock = inventoryLock;
     }
 
     public async Task<MyBranchesDto> GetMyBranchesAsync(CancellationToken ct = default)
@@ -111,10 +117,16 @@ public class BranchService : IBranchService
 
     public async Task<BranchDto> SetLockAsync(Guid id, SetPeriodLockRequest request, CancellationToken ct = default)
     {
-        var branch = await FindAsync(id, ct);
-        branch.LockedUntil = request.LockedUntil;
-        await _db.SaveChangesAsync(ct);
-        return ToDto(branch);
+        // The exclusive gate waits for in-flight postings of the branch, and postings read LockedUntil after
+        // taking the shared gate, so no voucher lands in a period that was just locked (D30, review finding).
+        return await _transaction.RunAsync(async c =>
+        {
+            await _inventoryLock.AcquireBranchGateAsync(new[] { id }, exclusive: true, c);
+            var branch = await FindAsync(id, c);
+            branch.LockedUntil = request.LockedUntil;
+            await _db.SaveChangesAsync(c);
+            return ToDto(branch);
+        }, ct);
     }
 
     private async Task<Branch> FindAsync(Guid id, CancellationToken ct) =>

@@ -265,7 +265,12 @@ public class StockVoucherService : IStockVoucherService
         }, partnerType, ct);
     }
 
-    public async Task<StockVoucherDto> GetAsync(Guid id, CancellationToken ct = default)
+    public Task<StockVoucherDto> GetAsync(Guid id, CancellationToken ct = default) =>
+        LoadDtoAsync(id, ct, checkAccess: true);
+
+    /// Write operations return the saved voucher with the permission they were authorized by (create / edit /
+    /// cancel), not view, so a create-only user never gets 403 for a voucher that was saved (review finding).
+    private async Task<StockVoucherDto> LoadDtoAsync(Guid id, CancellationToken ct, bool checkAccess = false)
     {
         var voucher = await _db.StockVouchers.AsNoTracking()
             .Include(v => v.Warehouse)
@@ -276,8 +281,11 @@ public class StockVoucherService : IStockVoucherService
             .FirstOrDefaultAsync(v => v.Id == id, ct)
             ?? throw new NotFoundException(nameof(StockVoucher), id);
 
-        EnsurePermission(StockVoucherPermissions.View(voucher.Type));
-        await EnsureWorkingBranchAsync(voucher.BranchId, ct);
+        if (checkAccess)
+        {
+            EnsurePermission(StockVoucherPermissions.View(voucher.Type));
+            await EnsureWorkingBranchAsync(voucher.BranchId, ct);
+        }
 
         var ownerName = await _db.Users.IgnoreQueryFilters()
             .Where(u => u.Id == voucher.OwnerUserId)
@@ -334,11 +342,12 @@ public class StockVoucherService : IStockVoucherService
 
         var id = await _transaction.RunAsync(async c =>
         {
-            await EnsureNotLockedAsync(branchId, new[] { voucherAt }, c);
             await ValidateAsync(request, branchId, null, c);
 
             var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
             await _posting.AcquireLocksAsync(branchId, productIds, c);
+            // Read after the shared branch gate, so a concurrent period lock change is serialized (review finding).
+            await EnsureNotLockedAsync(branchId, new[] { voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
 
             var voucher = new StockVoucher
@@ -360,7 +369,7 @@ public class StockVoucherService : IStockVoucherService
             return voucher.Id;
         }, ct);
 
-        return await GetAsync(id, ct);
+        return await LoadDtoAsync(id, ct);
     }
 
     public async Task<StockVoucherDto> UpdateAsync(Guid id, UpsertStockVoucherRequest request, CancellationToken ct = default)
@@ -370,12 +379,12 @@ public class StockVoucherService : IStockVoucherService
         await _transaction.RunAsync(async c =>
         {
             var voucher = await LoadForWriteAsync(id, StockVoucherPermissions.Edit, request.Version, cancelled: false, c);
-            await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt, voucherAt }, c);
             await ValidateAsync(request, voucher.BranchId, voucher, c);
 
             var productIds = voucher.Lines.Select(l => l.ProductId)
                 .Concat(request.Lines.Select(l => l.ProductId)).Distinct().ToList();
             await _posting.AcquireLocksAsync(voucher.BranchId, productIds, c);
+            await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt, voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
 
             await ApplyRequestAsync(voucher, request, voucherAt, settings, c);
@@ -388,7 +397,7 @@ public class StockVoucherService : IStockVoucherService
             await _db.SaveChangesAsync(c);
         }, ct);
 
-        return await GetAsync(id, ct);
+        return await LoadDtoAsync(id, ct);
     }
 
     public async Task<StockVoucherDto> CancelAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default)
@@ -400,7 +409,7 @@ public class StockVoucherService : IStockVoucherService
                 v.CancelledAt = _clock.UtcNow;
                 v.CancelledBy = _currentUser.UserId;
             }, ct);
-        return await GetAsync(id, ct);
+        return await LoadDtoAsync(id, ct);
     }
 
     public async Task<StockVoucherDto> RestoreAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default)
@@ -412,7 +421,7 @@ public class StockVoucherService : IStockVoucherService
                 v.CancelledAt = null;
                 v.CancelledBy = null;
             }, ct);
-        return await GetAsync(id, ct);
+        return await LoadDtoAsync(id, ct);
     }
 
     // Soft delete; AppDbContext cascades IsDeleted to the lines and activities.
@@ -428,10 +437,11 @@ public class StockVoucherService : IStockVoucherService
         {
             var restore = action == StockVoucherActivityAction.Restored;
             var voucher = await LoadForWriteAsync(id, permission, request.Version, cancelled: restore, c);
-            await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt }, c);
-
             var productIds = voucher.Lines.Select(l => l.ProductId).Distinct().ToList();
             await _posting.AcquireLocksAsync(voucher.BranchId, productIds, c);
+            await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt }, c);
+            if (restore)
+                await EnsureRestorableAsync(voucher, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
 
             apply(voucher);
@@ -471,6 +481,31 @@ public class StockVoucherService : IStockVoucherService
         voucher.UpdatedAt = _clock.UtcNow;
         voucher.UpdatedBy = _currentUser.UserId;
         return voucher;
+    }
+
+    private static readonly DateTimeOffset MinVoucherAt = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+    /// Restore reposts the stored lines unchanged, so their snapshot must still describe the stock: the warehouse is
+    /// still in the voucher's branch and the product's stock fields have not changed since the cancel (review finding).
+    private async Task EnsureRestorableAsync(StockVoucher voucher, CancellationToken ct)
+    {
+        var lines = voucher.Lines.Where(l => !l.IsDeleted).ToList();
+        var products = await LoadProductsAsync(lines.Select(l => l.ProductId), ct);
+        var warehouseIds = lines.Select(l => l.WarehouseId).Distinct().ToList();
+        var warehouseBranches = await _db.Warehouses.AsNoTracking()
+            .Where(w => warehouseIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, w => w.BranchId, ct);
+
+        foreach (var line in lines)
+        {
+            if (!warehouseBranches.TryGetValue(line.WarehouseId, out var branchId) || branchId != voucher.BranchId)
+                throw new ConflictException($"Không thể khôi phục: kho của dòng {line.ProductCode} không còn thuộc chi nhánh của phiếu.");
+            if (!products.TryGetValue(line.ProductId, out var product)
+                || product.TrackInventory != line.TrackInventory
+                || product.PricingMode != line.PricingMode
+                || StockUnit.NameFor(product.PricingMode, product.Unit?.Name) != line.UnitName)
+                throw new ConflictException($"Không thể khôi phục: hàng hóa {line.ProductCode} đã đổi cách tính, ĐVT hoặc theo dõi tồn.");
+        }
     }
 
     private async Task EnsureNotLockedAsync(Guid branchId, IEnumerable<DateTimeOffset> instants, CancellationToken ct)
@@ -543,6 +578,10 @@ public class StockVoucherService : IStockVoucherService
         if (request.Lines.Count == 0)
             Add("lines", "Phiếu phải có ít nhất 1 dòng hàng.");
 
+        var voucherAt = VnTime.ToUtc(request.VoucherAt);
+        if (voucherAt < MinVoucherAt || voucherAt > _clock.UtcNow.AddYears(1))
+            Add("voucherAt", "Ngày chứng từ không hợp lệ.");
+
         var products = await LoadProductsAsync(request.Lines.Select(l => l.ProductId), ct);
         var storedLines = existing?.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id)
             ?? new Dictionary<Guid, StockVoucherLine>();
@@ -551,6 +590,8 @@ public class StockVoucherService : IStockVoucherService
         {
             var line = request.Lines[i];
             var key = $"lines[{i}]";
+            if (line.Id is { } repeatedId && request.Lines.Take(i).Any(l => l.Id == repeatedId))
+                Add($"{key}.id", "Dòng hàng bị trùng.");
             var stored = line.Id is { } lineId && storedLines.TryGetValue(lineId, out var s) ? s : null;
             var productChanged = stored is null || stored.ProductId != line.ProductId;
             var warehouseChanged = stored is null || productChanged || stored.WarehouseId != (line.WarehouseId ?? request.WarehouseId);

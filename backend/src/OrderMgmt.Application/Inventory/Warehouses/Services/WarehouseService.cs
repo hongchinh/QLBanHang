@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Warehouses.Interfaces;
 using OrderMgmt.Application.Inventory.Warehouses.Models;
 using OrderMgmt.Domain.Common;
@@ -15,13 +16,18 @@ public class WarehouseService : IWarehouseService
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
     private readonly ICurrentBranch _currentBranch;
+    private readonly ITransactionRunner _transaction;
+    private readonly IInventoryLock _inventoryLock;
 
-    public WarehouseService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch)
+    public WarehouseService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
+        ITransactionRunner transaction, IInventoryLock inventoryLock)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
         _currentBranch = currentBranch;
+        _transaction = transaction;
+        _inventoryLock = inventoryLock;
     }
 
     public async Task<IReadOnlyList<WarehouseDto>> ListAsync(WarehouseListRequest request, CancellationToken ct = default)
@@ -58,6 +64,7 @@ public class WarehouseService : IWarehouseService
         var warehouse = await _db.Warehouses.AsNoTracking().Include(w => w.Branch)
             .FirstOrDefaultAsync(w => w.Id == id, ct)
             ?? throw new NotFoundException(nameof(Warehouse), id);
+        await EnsureAccessibleAsync(warehouse, ct);
         return ToDto(warehouse);
     }
 
@@ -83,18 +90,27 @@ public class WarehouseService : IWarehouseService
 
     public async Task<WarehouseDto> UpdateAsync(Guid id, UpdateWarehouseRequest request, CancellationToken ct = default)
     {
-        var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.Id == id, ct)
-            ?? throw new NotFoundException(nameof(Warehouse), id);
+        await _transaction.RunAsync(async c =>
+        {
+            var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.Id == id, c)
+                ?? throw new NotFoundException(nameof(Warehouse), id);
+            await EnsureAccessibleAsync(warehouse, c);
 
-        var branchId = await ResolveTargetBranchAsync(request.BranchId, ct);
-        if (branchId != warehouse.BranchId && await _db.InventoryLedger.AnyAsync(e => e.WarehouseId == id, ct))
-            throw new ConflictException("Kho đã phát sinh nhập xuất, không được chuyển sang chi nhánh khác.");
+            var branchId = await ResolveTargetBranchAsync(request.BranchId, c);
+            if (branchId != warehouse.BranchId)
+            {
+                // The exclusive gate of the current branch waits for in-flight postings, so the activity check
+                // cannot race a first posting into this warehouse (D30, review finding).
+                await _inventoryLock.AcquireBranchGateAsync(new[] { warehouse.BranchId }, exclusive: true, c);
+                if (await _db.InventoryLedger.AnyAsync(e => e.WarehouseId == id, c))
+                    throw new ConflictException("Kho đã phát sinh nhập xuất, không được chuyển sang chi nhánh khác.");
+            }
 
-        warehouse.BranchId = branchId;
-        warehouse.Name = request.Name.Trim();
-        warehouse.IsActive = request.IsActive;
-
-        await _db.SaveChangesAsync(ct);
+            warehouse.BranchId = branchId;
+            warehouse.Name = request.Name.Trim();
+            warehouse.IsActive = request.IsActive;
+            await _db.SaveChangesAsync(c);
+        }, ct);
         return await GetAsync(id, ct);
     }
 
@@ -102,6 +118,7 @@ public class WarehouseService : IWarehouseService
     {
         var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.Id == id, ct)
             ?? throw new NotFoundException(nameof(Warehouse), id);
+        await EnsureAccessibleAsync(warehouse, ct);
 
         if (await _db.InventoryLedger.AnyAsync(e => e.WarehouseId == id, ct)
             || await _db.StockVouchers.AnyAsync(v => v.WarehouseId == id, ct)
@@ -113,6 +130,14 @@ public class WarehouseService : IWarehouseService
         warehouse.DeletedAt = _clock.UtcNow;
         warehouse.DeletedBy = _currentUser.UserId;
         await _db.SaveChangesAsync(ct);
+    }
+
+    /// A warehouse of another branch is visible and editable only with branches.access_all (review finding).
+    private async Task EnsureAccessibleAsync(Warehouse warehouse, CancellationToken ct)
+    {
+        if (warehouse.BranchId != await _currentBranch.GetIdAsync(ct)
+            && !_currentUser.HasPermission(Permissions.Branches.AccessAll))
+            throw new ForbiddenException("Bạn không có quyền quản lý kho của chi nhánh khác.");
     }
 
     /// A branch other than the working branch requires branches.access_all.

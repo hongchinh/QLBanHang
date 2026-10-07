@@ -29,7 +29,10 @@ public class InventoryPostingService : IInventoryPostingService
     public async Task AcquireLocksAsync(Guid branchId, IEnumerable<Guid> productIds, CancellationToken ct = default)
     {
         await _lock.AcquireBranchGateAsync(new[] { branchId }, exclusive: false, ct);
-        await _lock.AcquireAsync(productIds.Select(productId => (productId, branchId)), ct);
+        var ids = productIds.ToList();
+        await _lock.AcquireAsync(ids.Select(productId => (productId, branchId)), ct);
+        // Branch-independent product keys serialize product-wide writes (D35 cost price, catalog guards).
+        await _lock.AcquireProductsAsync(ids, ct);
     }
 
     public async Task<LedgerChangeResult> PostAsync(LedgerSourceType sourceType, Guid sourceId,
@@ -51,11 +54,24 @@ public class InventoryPostingService : IInventoryPostingService
     }
 
     /// Only a change that makes the pair worse counts (D31): a new or deeper minimum, or an earlier first negative point.
-    private static bool IsShortage(PairChange p) =>
-        p.MinRunningQty < 0
-        && (p.OldMinRunningQty is null
-            || p.MinRunningQty < p.OldMinRunningQty
-            || (p.OldFirstNegativeAt is not null && p.FirstNegativeAt < p.OldFirstNegativeAt));
+    /// Both windows start from the quantity carried in from before From, so a receipt that only shrinks an existing
+    /// deficit never counts (review finding).
+    private static bool IsShortage(PairChange p)
+    {
+        var newMin = MinOf(p.MinRunningQty, p.BaseRunningQty);
+        if (newMin is not < 0)
+            return false;
+        var oldMin = MinOf(p.OldMinRunningQty, p.BaseRunningQty);
+        if (oldMin is null || newMin < oldMin)
+            return true;
+        // Already negative before the window: the first negative point lies before From and does not move.
+        if (p.BaseRunningQty < 0)
+            return false;
+        return p.OldFirstNegativeAt is not null && p.FirstNegativeAt < p.OldFirstNegativeAt;
+    }
+
+    private static decimal? MinOf(decimal? a, decimal? b) =>
+        a is null ? b : b is null ? a : Math.Min(a.Value, b.Value);
 
     private async Task<IDictionary<string, string[]>> DescribeAsync(IReadOnlyList<PairChange> shortages, CancellationToken ct)
     {

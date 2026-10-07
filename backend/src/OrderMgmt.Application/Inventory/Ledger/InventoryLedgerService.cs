@@ -109,7 +109,7 @@ public class InventoryLedgerService : IInventoryLedgerService
             }
 
             changes.Add(new PairChange(p.ProductId, p.WarehouseId, p.BranchId, p.From, min, firstNegativeAt,
-                before[i].Min, before[i].FirstNegativeAt, running));
+                before[i].Min, before[i].FirstNegativeAt, running, baseQty));
         }
 
         await _db.SaveChangesAsync(ct);

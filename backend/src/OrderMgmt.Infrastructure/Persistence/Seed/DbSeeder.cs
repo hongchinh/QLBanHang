@@ -267,26 +267,8 @@ public static class DbSeeder
             // removes such a code keeps it removed across restarts. It applies to every future code too.
             AssignPermissions(role, permCodes.Where(newCodes.Contains).ToArray(), allPermissions);
         }
-        // System cash reasons: each is inserted only when its code is missing (soft-deleted rows count).
-        var cashReasonCodes = await db.CashReasons.IgnoreQueryFilters().Select(r => r.Code).ToListAsync(ct);
-        var cashReasonSeeds = new[]
-        {
-            NewCashReason("TKH", "Thu tiền khách hàng", CashVoucherType.Receipt, PartnerType.Customer, DebtEffect.ReceivableDecrease, false),
-            NewCashReason("THNCC", "Thu hoàn tiền NCC", CashVoucherType.Receipt, PartnerType.Supplier, DebtEffect.PayableIncrease, false),
-            NewCashReason("TK", "Thu khác", CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None, false),
-            NewCashReason("TNCC", "Trả tiền nhà cung cấp", CashVoucherType.Payment, PartnerType.Supplier, DebtEffect.PayableDecrease, false),
-            NewCashReason("CHKH", "Chi hoàn tiền khách hàng", CashVoucherType.Payment, PartnerType.Customer, DebtEffect.ReceivableIncrease, false),
-            NewCashReason("CK", "Chi khác", CashVoucherType.Payment, PartnerType.Any, DebtEffect.None, false),
-            NewCashReason("TPX", "Thu tiền theo phiếu xuất", CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None, true),
-            NewCashReason("CPN", "Chi tiền theo phiếu nhập", CashVoucherType.Payment, PartnerType.Any, DebtEffect.None, true),
-        };
-        db.CashReasons.AddRange(cashReasonSeeds.Where(r => !cashReasonCodes.Contains(r.Code)));
-
         await db.SaveChangesAsync(ct);
     }
-
-    private static CashReason NewCashReason(string code, string name, CashVoucherType type, PartnerType partnerType, DebtEffect effect, bool isAuto)
-        => new() { Code = code, Name = name, Type = type, PartnerType = partnerType, DebtEffect = effect, IsSystem = true, IsAuto = isAuto };
 
     private static void AssignPermissions(Role role, string[] permCodes, List<Permission> allPermissions)
     {
@@ -364,8 +346,26 @@ public static class DbSeeder
                 new PaymentMethod { Code = "CK", Name = "Chuyển khoản", IsCash = false });
         }
 
+        // System cash reasons: each is inserted only when its code is missing (soft-deleted rows count).
+        var cashReasonCodes = await db.CashReasons.IgnoreQueryFilters().Select(r => r.Code).ToListAsync(ct);
+        var cashReasonSeeds = new[]
+        {
+            NewCashReason("TKH", "Thu tiền khách hàng", CashVoucherType.Receipt, PartnerType.Customer, DebtEffect.ReceivableDecrease, false),
+            NewCashReason("THNCC", "Thu hoàn tiền NCC", CashVoucherType.Receipt, PartnerType.Supplier, DebtEffect.PayableIncrease, false),
+            NewCashReason("TK", "Thu khác", CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None, false),
+            NewCashReason("TNCC", "Trả tiền nhà cung cấp", CashVoucherType.Payment, PartnerType.Supplier, DebtEffect.PayableDecrease, false),
+            NewCashReason("CHKH", "Chi hoàn tiền khách hàng", CashVoucherType.Payment, PartnerType.Customer, DebtEffect.ReceivableIncrease, false),
+            NewCashReason("CK", "Chi khác", CashVoucherType.Payment, PartnerType.Any, DebtEffect.None, false),
+            NewCashReason("TPX", "Thu tiền theo phiếu xuất", CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None, true),
+            NewCashReason("CPN", "Chi tiền theo phiếu nhập", CashVoucherType.Payment, PartnerType.Any, DebtEffect.None, true),
+        };
+        db.CashReasons.AddRange(cashReasonSeeds.Where(r => !cashReasonCodes.Contains(r.Code)));
+
         await db.SaveChangesAsync(ct);
     }
+
+    private static CashReason NewCashReason(string code, string name, CashVoucherType type, PartnerType partnerType, DebtEffect effect, bool isAuto)
+        => new() { Code = code, Name = name, Type = type, PartnerType = partnerType, DebtEffect = effect, IsSystem = true, IsAuto = isAuto };
 
     private static async Task SeedReferenceDataAsync(AppDbContext db, CancellationToken ct)
     {

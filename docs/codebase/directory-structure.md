@@ -54,6 +54,15 @@ QLDonHang/
 | Branding | `Domain/Branding`, `Application/Branding`, `SettingsController.cs` |
 | Notifications | `Domain/Notifications`, `Application/Notifications`, `NotificationsController.cs` |
 | Payments / VietQR | `Domain/Entities/Payments`, `Application/Payments`, `BanksController.cs`, `PaymentQrController.cs`, `MeBankAccountsController.cs` |
+| Branches and period lock | `Domain/Entities/Organization`, `Application/Organization/Branches`, `ICurrentBranch` (`WebApi/Services/CurrentBranch.cs`), `BranchesController.cs`, `MeBranchesController.cs` |
+| Suppliers (partner roles) | `Application/Catalog/Customers` (`PartnerRole`, `PartnerPermissionGuard`), `SuppliersController.cs` |
+| Inventory catalogs | `Domain/Entities/Inventory`, `Application/Inventory/{Warehouses,StockReasons,PaymentMethods}` |
+| Inventory settings and numbering | `Application/Inventory/{Settings,Numbering}`, `InventorySettingsController.cs` |
+| Stock vouchers | `Application/Inventory/StockVouchers`, `StockVouchersController.cs` |
+| Ledger, costing and posting engine | `Application/Inventory/{Common,Ledger,Costing,Posting,Interfaces}`, `Infrastructure/Inventory` (advisory locks, document counter), `Infrastructure/Persistence/EfTransactionRunner.cs` |
+| Opening stock | `Application/Inventory/OpeningStocks`, `OpeningStocksController.cs` |
+| Cost recalculation | `Application/Inventory/Costing` (`InventoryRecalcService`), `InventoryCostController.cs` |
+| Inventory reports | `Application/Inventory/Reports`, `InventoryReportsController.cs` |
 
 ## API Controllers
 
@@ -76,6 +85,17 @@ QLDonHang/
 | `BanksController` | `/api/banks` — seeded Vietnamese bank list |
 | `PaymentQrController` | `/api/payment-qr/generate` — builds a VietQR payload string |
 | `MeBankAccountsController` | `/api/me/bank-accounts` CRUD + `/default`, scoped to the current user |
+| `BranchesController` | `/api/branches` CRUD, `/api/branches/{id}/lock` (period lock) |
+| `MeBranchesController` | `/api/me/branches` — default/working branch and switchable branches |
+| `WarehousesController` | `/api/warehouses` CRUD, scoped to the working branch |
+| `StockReasonsController` | `/api/stock-reasons` CRUD |
+| `PaymentMethodsController` | `/api/payment-methods` CRUD |
+| `SuppliersController` | `/api/suppliers` CRUD and `/search` (partners with the supplier role) |
+| `InventorySettingsController` | `/api/inventory/settings`, `/api/inventory/numbering`, `/api/inventory/numbering/{docType}` |
+| `StockVouchersController` | `/api/stock-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/owners`, `/defaults`, `/stock-at`, `/partners` |
+| `OpeningStocksController` | `/api/inventory/opening-stock` (GET grid, PUT save) |
+| `InventoryCostController` | `/api/inventory/recalc-cost` |
+| `InventoryReportsController` | `/api/reports/stock-on-hand`, `/api/reports/stock-card` |
 
 ## Frontend Structure
 
@@ -93,24 +113,39 @@ frontend/src/
 │   ├── auth/
 │   ├── bank-accounts/           # saved receiving bank accounts (CRUD, current user)
 │   ├── banks/                   # read-only seeded bank list
+│   ├── branches/                # branches, /me/branches, useBranchContext
 │   ├── branding/
 │   ├── customers/
 │   ├── dashboard/
+│   ├── inventory-reports/       # stock-on-hand and stock-card queries
+│   ├── inventory-settings/      # costing settings, numbering, cost recalculation
 │   ├── me-settings/
 │   ├── notifications/
+│   ├── opening-stock/
+│   ├── payment-methods/
 │   ├── payment-qr/              # VietQR payload generation
 │   ├── products/
 │   ├── quotations/
 │   ├── reports/sales-revenue/
-│   └── search/
+│   ├── search/
+│   ├── stock-reasons/
+│   ├── stock-vouchers/          # voucher module, schema, payload, draft store
+│   ├── suppliers/
+│   └── warehouses/
 ├── pages/
 │   ├── admin/
 │   ├── customers/
+│   ├── inventory/               # opening stock, stock-on-hand, stock card
+│   ├── payment-methods/
 │   ├── payment-qr/              # /qr-thanh-toan standalone page
 │   ├── products/
 │   ├── quotations/
 │   ├── reports/
-│   └── settings/
+│   ├── settings/                # also branches, period lock, inventory settings, numbering, recalc
+│   ├── stock-reasons/
+│   ├── stock-vouchers/          # /stock-in and /stock-out list + form
+│   ├── suppliers/
+│   └── warehouses/
 ├── routes/
 ├── stores/
 ├── lib/

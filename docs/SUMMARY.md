@@ -52,4 +52,5 @@ Repository-specific docs outside the standard topic folders.
 | [plans/260517-0749-quotation-list-totals-footer/SUMMARY.md](plans/260517-0749-quotation-list-totals-footer/SUMMARY.md) | Active plan for quotation-list totals footer |
 | [plans/260517-0833-quotation-list-owner-filter/SUMMARY.md](plans/260517-0833-quotation-list-owner-filter/SUMMARY.md) | Active plan for quotation-list owner filter |
 | [plans/260523-1530-pwa-progressive-web-app/SUMMARY.md](plans/260523-1530-pwa-progressive-web-app/SUMMARY.md) | Implementation plan for PWA — 4 phases: installable, API cache, push backend, push frontend |
+| [plans/archived/261006-2259-inventory-round1/SUMMARY.md](plans/archived/261006-2259-inventory-round1/SUMMARY.md) | Implementation plan for inventory Round 1 — stock vouchers, ledger, costing, reports |
 | [plans/archived/](plans/archived/) | Archived implementation plans and execution reports |

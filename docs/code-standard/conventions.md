@@ -50,3 +50,21 @@
 - Backend and frontend each have a Dockerfile for Railway-style separate services.
 - `VITE_API_BASE_URL` is a frontend build-time variable; changing it requires rebuilding the frontend image.
 - For cross-domain auth, configure backend CORS and refresh cookie settings together.
+
+## Inventory Patterns (Round 1)
+
+- Type-dependent permissions (for example `stock_in.*` vs `stock_out.*`) are checked in the service when `[HasPermission]` cannot express them.
+- Derived data (`InventoryLedgerEntry`, `InventoryCostPeriod`, `StockBalance`, `DocumentCounter`) does not inherit `BaseEntity`; it is hard-deleted and rewritten.
+- Write use cases that touch stock run inside `ITransactionRunner` and call `IInventoryPostingService.AcquireLocksAsync` (shared branch gate, then product keys) before the first `SaveChangesAsync`. Read `InventorySettings` and `Branch.LockedUntil` after the locks.
+- Every `DateTimeOffset` reaching EF is UTC (D27). VN-date rules are UTC ranges built with `VnTime.StartOfDay/StartOfNextDay`; never compare `.Date` of an instant.
+- Never configure `HasDefaultValue(true)` on a non-nullable `bool` without `.HasSentinel(true)` (D28).
+- New child entities (lines, activities, opening-stock rows) are added through their `DbSet.Add`: `BaseEntity` pre-assigns ids, so adding only through a navigation collection sends an UPDATE.
+- Validation `details` keys are camelCase in both layers (`orderDiscount`, `lines[0].vatRate`); `ValidationDomainException` carries a Vietnamese summary message (its first detail by default).
+- Pure calculators (`PricingQuantity`, `StockVoucherCalculator`, `PeriodicAverageCalculator`, `CostingPeriodCalendar`, `DocumentNumberFormatter`) live next to their feature and are unit-tested in `tests/OrderMgmt.IntegrationTests/Inventory/Unit` without a database.
+- Frontend:
+  - `npm run typecheck` runs `tsc -p tsconfig.app.json`.
+  - Error handling uses `getApiError` / `formatApiErrorDetails` from `lib/api-client.ts`.
+  - Dates go through `lib/vn-datetime.ts`; never derive a local date with `toISOString().slice(0, 10)`.
+  - Money in previews uses `roundAwayFromZero` (`lib/round.ts`); stock quantities use `formatStockQuantity`.
+  - Branch-scoped queries live under the `['inventory']` root key.
+  - The service worker caches only non-scoped API paths; add any new branch- or user-scoped prefix to `NEVER_CACHE_PREFIXES` in `lib/sw-routes.ts`.

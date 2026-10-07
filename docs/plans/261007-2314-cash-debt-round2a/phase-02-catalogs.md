@@ -1,6 +1,6 @@
 # Phase 02 — Catalogs: cash reasons, funds, fund kind, reason debt effect, credit days & limits
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

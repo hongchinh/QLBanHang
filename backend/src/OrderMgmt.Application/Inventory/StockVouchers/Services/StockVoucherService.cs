@@ -9,6 +9,7 @@ using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.Posting;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
+using OrderMgmt.Application.Sales.Quotations.Helpers;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Inventory;
@@ -39,11 +40,125 @@ public class StockVoucherService : IStockVoucherService
         _counter = counter;
     }
 
-    public Task<StockVoucherListResult> ListAsync(StockVoucherListRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<StockVoucherListResult> ListAsync(StockVoucherListRequest request, CancellationToken ct = default)
+    {
+        EnsurePermission(StockVoucherPermissions.View(request.Type));
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var query = _db.StockVouchers.AsNoTracking()
+            .Where(v => v.BranchId == branchId && v.Type == request.Type);
 
-    public Task<IReadOnlyList<StockVoucherOwnerDto>> ListOwnersAsync(StockDirection type, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+        // VN dates as UTC ranges (D27).
+        if (request.From is { } from)
+        {
+            var start = VnTime.StartOfDay(from);
+            query = query.Where(v => v.VoucherAt >= start);
+        }
+        if (request.To is { } to)
+        {
+            var end = VnTime.StartOfNextDay(to);
+            query = query.Where(v => v.VoucherAt < end);
+        }
+        if (request.WarehouseId is { } warehouseId)
+            query = query.Where(v => v.WarehouseId == warehouseId || v.Lines.Any(l => l.WarehouseId == warehouseId));
+        if (request.PartnerId is { } partnerId)
+            query = query.Where(v => v.PartnerId == partnerId);
+        if (request.ReasonId is { } reasonId)
+            query = query.Where(v => v.ReasonId == reasonId);
+        if (request.Status is { } status)
+            query = query.Where(v => v.Status == status);
+
+        var ownerIds = OwnerIdListParser.Parse(request.OwnerUserIds);
+        if (ownerIds.Count > 0)
+            query = query.Where(v => ownerIds.Contains(v.OwnerUserId));
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var pattern = $"%{EscapeLike(request.Search.Trim())}%";
+            query = query.Where(v => EF.Functions.ILike(v.Code, pattern) || EF.Functions.ILike(v.PartnerName!, pattern));
+        }
+
+        // Cancelled vouchers are excluded from the totals unless a status is requested explicitly.
+        var aggregates = await (request.Status is null ? query.Where(v => v.Status != StockVoucherStatus.Cancelled) : query)
+            .GroupBy(_ => 1)
+            .Select(g => new StockVoucherListAggregates
+            {
+                GoodsAmount = g.Sum(v => v.GoodsAmount),
+                DiscountTotal = g.Sum(v => v.LineDiscountTotal + v.OrderDiscount),
+                VatTotal = g.Sum(v => v.VatTotal),
+                Freight = g.Sum(v => v.Freight),
+                Total = g.Sum(v => v.Total),
+                PaidAmount = g.Sum(v => v.PaidAmount),
+            })
+            .FirstOrDefaultAsync(ct) ?? new StockVoucherListAggregates();
+
+        query = (request.SortBy?.ToLowerInvariant(), request.SortDirection?.ToLowerInvariant()) switch
+        {
+            ("code", "desc") => query.OrderByDescending(v => v.Code),
+            ("code", _) => query.OrderBy(v => v.Code),
+            ("date", "desc") => query.OrderByDescending(v => v.VoucherAt),
+            ("date", _) => query.OrderBy(v => v.VoucherAt),
+            ("total", "desc") => query.OrderByDescending(v => v.Total),
+            ("total", _) => query.OrderBy(v => v.Total),
+            _ => query.OrderByDescending(v => v.VoucherAt),
+        };
+
+        var totalItems = await query.CountAsync(ct);
+        var items = await query
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(v => new StockVoucherListItemDto
+            {
+                Id = v.Id,
+                Type = v.Type,
+                Code = v.Code,
+                VoucherAt = v.VoucherAt,
+                WarehouseName = v.Warehouse!.Name,
+                PartnerName = v.PartnerName,
+                ReasonName = v.Reason!.Name,
+                PaymentMethodName = v.PaymentMethod != null ? v.PaymentMethod.Name : null,
+                GoodsAmount = v.GoodsAmount,
+                DiscountTotal = v.LineDiscountTotal + v.OrderDiscount,
+                VatTotal = v.VatTotal,
+                Freight = v.Freight,
+                Total = v.Total,
+                PaidAmount = v.PaidAmount,
+                Status = v.Status,
+                OwnerUserId = v.OwnerUserId,
+                OwnerName = _db.Users.IgnoreQueryFilters()
+                    .Where(u => u.Id == v.OwnerUserId)
+                    .Select(u => u.FullName)
+                    .FirstOrDefault(),
+                CreatedAt = v.CreatedAt,
+            })
+            .ToListAsync(ct);
+
+        return new StockVoucherListResult
+        {
+            Items = items,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalItems = totalItems,
+            Aggregates = aggregates,
+        };
+    }
+
+    /// Creators of the type's vouchers in the working branch (deleted users included, so old vouchers stay filterable).
+    public async Task<IReadOnlyList<StockVoucherOwnerDto>> ListOwnersAsync(StockDirection type, CancellationToken ct = default)
+    {
+        EnsurePermission(StockVoucherPermissions.View(type));
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var ownerIds = _db.StockVouchers
+            .Where(v => v.BranchId == branchId && v.Type == type)
+            .Select(v => v.OwnerUserId);
+
+        var owners = await _db.Users.IgnoreQueryFilters().AsNoTracking()
+            .Where(u => ownerIds.Contains(u.Id))
+            .Select(u => new StockVoucherOwnerDto { Id = u.Id, FullName = u.FullName })
+            .ToListAsync(ct);
+
+        var vietnameseComparer = StringComparer.Create(new CultureInfo("vi-VN"), ignoreCase: true);
+        return owners.OrderBy(o => o.FullName, vietnameseComparer).ToList();
+    }
 
     public Task<StockVoucherDefaultsDto> GetDefaultsAsync(StockDirection type, DateTimeOffset? voucherAt, CancellationToken ct = default) =>
         throw new NotImplementedException();
@@ -73,11 +188,48 @@ public class StockVoucherService : IStockVoucherService
             .Where(u => u.Id == voucher.OwnerUserId)
             .Select(u => u.FullName)
             .FirstOrDefaultAsync(ct);
-        return ToDto(voucher, ownerName);
+
+        var dto = ToDto(voucher, ownerName);
+        var mayAct = voucher.OwnerUserId == _currentUser.UserId
+            || _currentUser.HasPermission(StockVoucherPermissions.EditAll(voucher.Type));
+        var active = voucher.Status != StockVoucherStatus.Cancelled;
+        dto.CanEdit = mayAct && active && _currentUser.HasPermission(StockVoucherPermissions.Edit(voucher.Type));
+        dto.CanDelete = mayAct && active && _currentUser.HasPermission(StockVoucherPermissions.Delete(voucher.Type));
+        // Also true for a Cancelled voucher: restore uses the same permission.
+        dto.CanCancel = mayAct && _currentUser.HasPermission(StockVoucherPermissions.Cancel(voucher.Type));
+        return dto;
     }
 
-    public Task<IReadOnlyList<StockVoucherActivityDto>> ListActivitiesAsync(Guid id, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<IReadOnlyList<StockVoucherActivityDto>> ListActivitiesAsync(Guid id, CancellationToken ct = default)
+    {
+        var voucher = await _db.StockVouchers.AsNoTracking()
+            .Where(v => v.Id == id)
+            .Select(v => new { v.Type, v.BranchId })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException(nameof(StockVoucher), id);
+
+        EnsurePermission(StockVoucherPermissions.View(voucher.Type));
+        await EnsureWorkingBranchAsync(voucher.BranchId, ct);
+
+        return await _db.StockVoucherActivities.AsNoTracking()
+            .Where(a => a.StockVoucherId == id)
+            .OrderByDescending(a => a.OccurredAt)
+            .Select(a => new StockVoucherActivityDto
+            {
+                Id = a.Id,
+                Action = a.Action,
+                ActorUserId = a.ActorUserId,
+                ActorName = a.ActorUserId == null
+                    ? "Hệ thống"
+                    : _db.Users.IgnoreQueryFilters()
+                        .Where(u => u.Id == a.ActorUserId)
+                        .Select(u => u.FullName)
+                        .FirstOrDefault() ?? "Người dùng không xác định",
+                OccurredAt = a.OccurredAt,
+                Description = a.Description,
+            })
+            .ToListAsync(ct);
+    }
 
     public async Task<StockVoucherDto> CreateAsync(UpsertStockVoucherRequest request, CancellationToken ct = default)
     {
@@ -465,6 +617,9 @@ public class StockVoucherService : IStockVoucherService
         if (branchId != await _currentBranch.GetIdAsync(ct))
             throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
     }
+
+    private static string EscapeLike(string input) =>
+        input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
     private static DocumentType DocTypeOf(StockDirection type) =>
         type == StockDirection.In ? DocumentType.StockIn : DocumentType.StockOut;

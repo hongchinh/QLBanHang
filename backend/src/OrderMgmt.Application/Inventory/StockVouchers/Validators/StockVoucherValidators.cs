@@ -1,7 +1,21 @@
 using FluentValidation;
+using OrderMgmt.Application.Common.Validators;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
+using OrderMgmt.Application.Sales.Quotations.Helpers;
 
 namespace OrderMgmt.Application.Inventory.StockVouchers.Validators;
+
+public class StockVoucherListRequestValidator : PageRequestValidator<StockVoucherListRequest>
+{
+    public StockVoucherListRequestValidator()
+    {
+        RuleFor(x => x.Type).IsInEnum();
+        RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.OwnerUserIds)
+            .Must(OwnerIdListParser.IsValid)
+            .WithMessage("Danh sách người tạo chứa giá trị không phải Guid hợp lệ.");
+    }
+}
 
 /// Shape only. Business rules (reasons, partners, warehouses, dimensions, amounts) live in StockVoucherService.
 public class UpsertStockVoucherRequestValidator : AbstractValidator<UpsertStockVoucherRequest>

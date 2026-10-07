@@ -1,6 +1,6 @@
 # Phase 01 — Permissions, cash settings, numbering & branch opening date
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

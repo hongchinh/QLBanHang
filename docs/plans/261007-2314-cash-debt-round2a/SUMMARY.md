@@ -122,7 +122,7 @@ Round 1 rules still apply unchanged: D25 (test database), D26 (test depth), D27 
 ## Phases
 
 - [x] Phase 00 — Baseline commit, branch and failure baseline (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Permissions, cash settings, numbering & branch opening date (L) — `phase-01-permissions-settings-opening-date.md`
+- [x] Phase 01 — Permissions, cash settings, numbering & branch opening date (L) — `phase-01-permissions-settings-opening-date.md`
 - [ ] Phase 02 — Catalogs: cash reasons, funds, fund kind, reason debt effect, credit days & limits (L) — `phase-02-catalogs.md`
 - [ ] Phase 03 — Pure calculators (M) — `phase-03-pure-calculators.md`
 - [ ] Phase 04 — Debt ledger, locks, guards, opening debts & fund opening balance (XL) — `phase-04-debt-ledger-and-guards.md`

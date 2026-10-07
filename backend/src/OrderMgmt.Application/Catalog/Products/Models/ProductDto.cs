@@ -30,6 +30,12 @@ public class ProductDto
     public string? Note { get; set; }
     public ProductStatus Status { get; set; }
     public PricingMode PricingMode { get; set; }
+    public bool TrackInventory { get; set; }
+    public decimal PurchaseDiscountRate { get; set; }
+    public decimal SalesDiscountRate { get; set; }
+    public bool PriceIncludesVat { get; set; }
+    /// Ledger rows exist: PricingMode, UnitId, TrackInventory and PriceIncludesVat are locked.
+    public bool HasInventoryActivity { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
 
@@ -45,6 +51,14 @@ public class ProductListItemDto
     public decimal? CostPrice { get; set; }
     public ProductStatus Status { get; set; }
     public PricingMode PricingMode { get; set; }
+    public bool TrackInventory { get; set; }
+    public decimal? DefaultTaxRate { get; set; }
+    public decimal? Length { get; set; }
+    public decimal? Width { get; set; }
+    public decimal? Thickness { get; set; }
+    public decimal PurchaseDiscountRate { get; set; }
+    public decimal SalesDiscountRate { get; set; }
+    public bool PriceIncludesVat { get; set; }
 }
 
 public class CreateProductRequest
@@ -63,6 +77,10 @@ public class CreateProductRequest
     public decimal? DefaultTaxRate { get; set; }
     public string? Note { get; set; }
     public PricingMode PricingMode { get; set; } = PricingMode.PerUnit;
+    public bool TrackInventory { get; set; } = true;
+    public decimal PurchaseDiscountRate { get; set; }
+    public decimal SalesDiscountRate { get; set; }
+    public bool PriceIncludesVat { get; set; }
 }
 
 public class UpdateProductRequest
@@ -81,6 +99,11 @@ public class UpdateProductRequest
     public string? Note { get; set; }
     public ProductStatus Status { get; set; }
     public PricingMode PricingMode { get; set; } = PricingMode.PerUnit;
+    /// Null keeps the current value (older clients do not send the inventory fields).
+    public bool? TrackInventory { get; set; }
+    public decimal? PurchaseDiscountRate { get; set; }
+    public decimal? SalesDiscountRate { get; set; }
+    public bool? PriceIncludesVat { get; set; }
 }
 
 public class ProductListRequest : PageRequest
@@ -100,4 +123,12 @@ public class ProductSuggestionDto
     public PricingMode PricingMode { get; set; }
     public decimal? DefaultPrice { get; set; }
     public decimal? CostPrice { get; set; }
+    public decimal? DefaultTaxRate { get; set; }
+    public decimal? Length { get; set; }
+    public decimal? Width { get; set; }
+    public decimal? Thickness { get; set; }
+    public bool TrackInventory { get; set; }
+    public decimal PurchaseDiscountRate { get; set; }
+    public decimal SalesDiscountRate { get; set; }
+    public bool PriceIncludesVat { get; set; }
 }

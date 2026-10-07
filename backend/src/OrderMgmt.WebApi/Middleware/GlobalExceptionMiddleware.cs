@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.Json;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Domain.Common;
 
@@ -75,6 +77,24 @@ public class GlobalExceptionMiddleware
                 Code = ae.Code,
                 Message = ae.Message,
             }),
+            NegativeStockException nse => (StatusCodes.Status422UnprocessableEntity, new ApiError
+            {
+                Code = nse.Code,
+                Message = nse.Message,
+                Details = nse.Shortages,
+            }),
+            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, new ApiError
+            {
+                Code = "CONCURRENCY",
+                Message = "Dữ liệu đã được người khác cập nhật. Vui lòng tải lại.",
+            }),
+            // A unique index caught a race that the service checks missed (e.g. two saves of the same code).
+            DbUpdateException { InnerException: PostgresException { SqlState: PostgresErrorCodes.UniqueViolation } } =>
+                (StatusCodes.Status409Conflict, new ApiError
+                {
+                    Code = "DUPLICATE",
+                    Message = "Dữ liệu bị trùng với bản ghi đã có. Vui lòng tải lại và thử lại.",
+                }),
             DomainException de => (StatusCodes.Status400BadRequest, new ApiError
             {
                 Code = de.Code,

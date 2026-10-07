@@ -4,6 +4,7 @@ using OrderMgmt.Application.Catalog.Products.Interfaces;
 using OrderMgmt.Application.Catalog.Products.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
@@ -19,11 +20,17 @@ public class ProductService : IProductService
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
 
-    public ProductService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser)
+    private readonly ITransactionRunner _transaction;
+    private readonly IInventoryLock _inventoryLock;
+
+    public ProductService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser,
+        ITransactionRunner transaction, IInventoryLock inventoryLock)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
+        _transaction = transaction;
+        _inventoryLock = inventoryLock;
     }
 
     public async Task<PagedResult<ProductListItemDto>> ListAsync(ProductListRequest request, CancellationToken ct = default)
@@ -80,6 +87,14 @@ public class ProductService : IProductService
                 CostPrice = p.CostPrice,
                 Status = p.Status,
                 PricingMode = p.PricingMode,
+                TrackInventory = p.TrackInventory,
+                DefaultTaxRate = p.DefaultTaxRate,
+                Length = p.Length,
+                Width = p.Width,
+                Thickness = p.Thickness,
+                PurchaseDiscountRate = p.PurchaseDiscountRate,
+                SalesDiscountRate = p.SalesDiscountRate,
+                PriceIncludesVat = p.PriceIncludesVat,
             })
             .ToListAsync(ct);
 
@@ -101,7 +116,9 @@ public class ProductService : IProductService
             .FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Product), id);
 
-        return MapToDto(product);
+        var dto = MapToDto(product);
+        dto.HasInventoryActivity = await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, ct);
+        return dto;
     }
 
     public async Task<ProductDto> CreateAsync(CreateProductRequest request, CancellationToken ct = default)
@@ -138,6 +155,10 @@ public class ProductService : IProductService
                 Note = request.Note,
                 Status = ProductStatus.Active,
                 PricingMode = request.PricingMode,
+                TrackInventory = request.TrackInventory,
+                PurchaseDiscountRate = request.PurchaseDiscountRate,
+                SalesDiscountRate = request.SalesDiscountRate,
+                PriceIncludesVat = request.PriceIncludesVat,
             };
 
             _db.Products.Add(product);
@@ -159,9 +180,24 @@ public class ProductService : IProductService
     public async Task<ProductDto> UpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct = default)
     {
         await EnsureReferencesAsync(request.ProductGroupId, request.UnitId, ct);
+        await _transaction.RunAsync(c => ApplyUpdateAsync(id, request, c), ct);
+        return await GetAsync(id, ct);
+    }
 
+    private async Task ApplyUpdateAsync(Guid id, UpdateProductRequest request, CancellationToken ct)
+    {
         var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Product), id);
+
+        var stockFieldsChanged = product.PricingMode != request.PricingMode
+            || product.UnitId != request.UnitId
+            || (request.TrackInventory.HasValue && request.TrackInventory.Value != product.TrackInventory)
+            || (request.PriceIncludesVat.HasValue && request.PriceIncludesVat.Value != product.PriceIncludesVat);
+        // The product key serializes the check with postings, so a first posting cannot slip in between (review finding).
+        if (stockFieldsChanged)
+            await _inventoryLock.AcquireProductsAsync(new[] { id }, ct);
+        if (stockFieldsChanged && await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, ct))
+            throw new ConflictException("Hàng hóa đã phát sinh kho: không được đổi cách tính, ĐVT, theo dõi tồn, giá gồm VAT.");
 
         product.Name = request.Name.Trim();
         product.ProductGroupId = request.ProductGroupId;
@@ -177,9 +213,12 @@ public class ProductService : IProductService
         product.Note = request.Note;
         product.Status = request.Status;
         product.PricingMode = request.PricingMode;
+        product.TrackInventory = request.TrackInventory ?? product.TrackInventory;
+        product.PurchaseDiscountRate = request.PurchaseDiscountRate ?? product.PurchaseDiscountRate;
+        product.SalesDiscountRate = request.SalesDiscountRate ?? product.SalesDiscountRate;
+        product.PriceIncludesVat = request.PriceIncludesVat ?? product.PriceIncludesVat;
 
         await _db.SaveChangesAsync(ct);
-        return await GetAsync(product.Id, ct);
     }
 
     public async Task<IReadOnlyList<ProductSuggestionDto>> SearchAsync(string? query, int take, CancellationToken ct = default)
@@ -213,20 +252,38 @@ public class ProductService : IProductService
                 PricingMode = p.PricingMode,
                 DefaultPrice = p.DefaultPrice,
                 CostPrice = p.CostPrice,
+                DefaultTaxRate = p.DefaultTaxRate,
+                Length = p.Length,
+                Width = p.Width,
+                Thickness = p.Thickness,
+                TrackInventory = p.TrackInventory,
+                PurchaseDiscountRate = p.PurchaseDiscountRate,
+                SalesDiscountRate = p.SalesDiscountRate,
+                PriceIncludesVat = p.PriceIncludesVat,
             })
             .ToListAsync(ct);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
-            ?? throw new NotFoundException(nameof(Product), id);
+        await _transaction.RunAsync(async c =>
+        {
+            var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, c)
+                ?? throw new NotFoundException(nameof(Product), id);
 
-        product.IsDeleted = true;
-        product.DeletedAt = _clock.UtcNow;
-        product.DeletedBy = _currentUser.UserId;
+            // As in UpdateAsync: the product key serializes the check with postings and opening-stock saves
+            // (review finding).
+            await _inventoryLock.AcquireProductsAsync(new[] { id }, c);
+            if (await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, c)
+                || await _db.StockVoucherLines.AnyAsync(l => l.ProductId == id, c))
+                throw new ConflictException("Hàng hóa đã phát sinh kho, không thể xóa.");
 
-        await _db.SaveChangesAsync(ct);
+            product.IsDeleted = true;
+            product.DeletedAt = _clock.UtcNow;
+            product.DeletedBy = _currentUser.UserId;
+
+            await _db.SaveChangesAsync(c);
+        }, ct);
     }
 
     private async Task EnsureReferencesAsync(Guid productGroupId, Guid unitId, CancellationToken ct)
@@ -277,6 +334,10 @@ public class ProductService : IProductService
         Note = p.Note,
         Status = p.Status,
         PricingMode = p.PricingMode,
+        TrackInventory = p.TrackInventory,
+        PurchaseDiscountRate = p.PurchaseDiscountRate,
+        SalesDiscountRate = p.SalesDiscountRate,
+        PriceIncludesVat = p.PriceIncludesVat,
         CreatedAt = p.CreatedAt,
     };
 }

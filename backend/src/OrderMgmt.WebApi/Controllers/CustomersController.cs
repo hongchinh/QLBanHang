@@ -4,6 +4,7 @@ using OrderMgmt.Application.Catalog.Customers.Interfaces;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Enums;
 using OrderMgmt.WebApi.Authorization;
 
 namespace OrderMgmt.WebApi.Controllers;
@@ -33,7 +34,7 @@ public class CustomersController : ApiControllerBase
         [FromQuery] CustomerListRequest request, CancellationToken ct)
     {
         await _listValidator.ValidateAndThrowAsync(request, ct);
-        var result = await _customers.ListAsync(request, ct);
+        var result = await _customers.ListAsync(request, PartnerRole.Customer, ct);
         return Success(result);
     }
 
@@ -46,7 +47,7 @@ public class CustomersController : ApiControllerBase
         CancellationToken ct = default)
     {
         var result = await _customers.SearchAsync(
-            new CustomerSearchRequest { Keyword = keyword, ActiveOnly = activeOnly, Limit = limit }, ct);
+            new CustomerSearchRequest { Keyword = keyword, ActiveOnly = activeOnly, Limit = limit }, PartnerType.Customer, ct);
         return Success(result);
     }
 
@@ -54,7 +55,7 @@ public class CustomersController : ApiControllerBase
     [HasPermission(Permissions.Customers.View)]
     public async Task<ActionResult<ApiResponse<CustomerDto>>> Get(Guid id, CancellationToken ct)
     {
-        var result = await _customers.GetAsync(id, ct);
+        var result = await _customers.GetAsync(id, PartnerRole.Customer, ct);
         return Success(result);
     }
 
@@ -63,7 +64,7 @@ public class CustomersController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<CustomerDto>>> Create([FromBody] CreateCustomerRequest request, CancellationToken ct)
     {
         await _createValidator.ValidateAndThrowAsync(request, ct);
-        var result = await _customers.CreateAsync(request, ct);
+        var result = await _customers.CreateAsync(request, PartnerRole.Customer, ct);
         return Success(result);
     }
 
@@ -72,7 +73,7 @@ public class CustomersController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<CustomerDto>>> Update(Guid id, [FromBody] UpdateCustomerRequest request, CancellationToken ct)
     {
         await _updateValidator.ValidateAndThrowAsync(request, ct);
-        var result = await _customers.UpdateAsync(id, request, ct);
+        var result = await _customers.UpdateAsync(id, request, PartnerRole.Customer, ct);
         return Success(result);
     }
 
@@ -80,7 +81,7 @@ public class CustomersController : ApiControllerBase
     [HasPermission(Permissions.Customers.Delete)]
     public async Task<ActionResult<ApiResponse>> Delete(Guid id, CancellationToken ct)
     {
-        await _customers.DeleteAsync(id, ct);
+        await _customers.DeleteAsync(id, PartnerRole.Customer, ct);
         return Success();
     }
 }

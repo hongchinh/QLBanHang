@@ -6,6 +6,7 @@ public static class Permissions
     public const string CatalogModule = "catalog";
     public const string SalesModule = "sales";
     public const string ReportModule = "report";
+    public const string InventoryModule = "inventory";
 
     public static class Users
     {
@@ -71,6 +72,55 @@ public static class Permissions
         public const string Profit = "reports.profit";
         public const string Debt = "reports.debt";
         public const string Delivery = "reports.delivery";
+        public const string Inventory = "reports.inventory";
+    }
+
+    public static class Branches
+    {
+        public const string Manage = "branches.manage";
+        public const string AccessAll = "branches.access_all";
+    }
+
+    public static class PeriodLock
+    {
+        public const string Manage = "period_lock.manage";
+    }
+
+    public static class Suppliers
+    {
+        public const string View = "suppliers.view";
+        public const string Create = "suppliers.create";
+        public const string Update = "suppliers.update";
+        public const string Delete = "suppliers.delete";
+    }
+
+    public static class StockIn
+    {
+        public const string View = "stock_in.view";
+        public const string Create = "stock_in.create";
+        public const string Edit = "stock_in.edit";
+        public const string Delete = "stock_in.delete";
+        public const string Cancel = "stock_in.cancel";
+        public const string EditAll = "stock_in.edit_all";
+    }
+
+    public static class StockOut
+    {
+        public const string View = "stock_out.view";
+        public const string Create = "stock_out.create";
+        public const string Edit = "stock_out.edit";
+        public const string Delete = "stock_out.delete";
+        public const string Cancel = "stock_out.cancel";
+        public const string EditAll = "stock_out.edit_all";
+    }
+
+    public static class Inventory
+    {
+        public const string OpeningStock = "inventory.opening_stock";
+        public const string ViewCost = "inventory.view_cost";
+        public const string ManageCatalogs = "inventory.catalogs.manage";
+        public const string Settings = "inventory.settings";
+        public const string RecalcCost = "inventory.recalc_cost";
     }
 }
 

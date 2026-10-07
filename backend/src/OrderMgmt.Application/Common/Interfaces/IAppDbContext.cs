@@ -3,6 +3,8 @@ using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Inventory;
+using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Entities.Sales;
 using OrderMgmt.Domain.Notifications;
@@ -18,6 +20,21 @@ public interface IAppDbContext
     DbSet<RolePermission> RolePermissions { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<UserQuotationSettings> UserQuotationSettings { get; }
+
+    DbSet<Branch> Branches { get; }
+    DbSet<Warehouse> Warehouses { get; }
+    DbSet<StockReason> StockReasons { get; }
+    DbSet<PaymentMethod> PaymentMethods { get; }
+    DbSet<InventorySettings> InventorySettings { get; }
+    DbSet<DocumentNumbering> DocumentNumberings { get; }
+    DbSet<StockVoucher> StockVouchers { get; }
+    DbSet<StockVoucherLine> StockVoucherLines { get; }
+    DbSet<StockVoucherActivity> StockVoucherActivities { get; }
+    DbSet<OpeningStock> OpeningStocks { get; }
+    DbSet<InventoryLedgerEntry> InventoryLedger { get; }
+    DbSet<InventoryCostPeriod> InventoryCostPeriods { get; }
+    DbSet<StockBalance> StockBalances { get; }
+    DbSet<DocumentCounter> DocumentCounters { get; }
 
     DbSet<Customer> Customers { get; }
     DbSet<CustomerAddress> CustomerAddresses { get; }

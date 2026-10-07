@@ -5,6 +5,7 @@ import axios, {
   type InternalAxiosRequestConfig,
 } from 'axios';
 import { useAuthStore } from '@/stores/auth-store';
+import { useBranchStore } from '@/stores/branch-store';
 import { queryClient } from '@/lib/query-client';
 
 export interface ApiError {
@@ -48,6 +49,8 @@ api.interceptors.request.use((config) => {
     config.headers = config.headers ?? {};
     config.headers.Authorization = `Bearer ${token}`;
   }
+  const branchId = useBranchStore.getState().workingBranchId;
+  if (branchId) config.headers['X-Branch-Id'] = branchId;
   return config;
 });
 
@@ -103,7 +106,9 @@ api.interceptors.response.use(
       }
       // Refresh failed → session is dead. Clear state; ProtectedRoute redirects.
       useAuthStore.getState().logout();
+      useBranchStore.getState().clear();
       queryClient.clear();
+      if ('caches' in window) void caches.delete('api-cache');
     }
 
     return Promise.reject(error);
@@ -162,6 +167,84 @@ export function getErrorMessage(error: unknown): string {
   }
   if (error instanceof Error) return error.message;
   return 'Đã xảy ra lỗi không mong muốn.';
+}
+
+// The client gave up waiting (axios `timeout`); the server may still be processing the request.
+export function isRequestTimeout(error: unknown): boolean {
+  return axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT');
+}
+
+export interface ApiErrorShape {
+  code: string;
+  message: string;
+  details?: Record<string, string[]>;
+  status?: number;
+}
+
+interface ValidationProblemDetails {
+  title?: string;
+  status?: number;
+  errors: Record<string, string[]>;
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function isApiErrorBody(value: unknown): value is { error: ApiError } {
+  return isObject(value) && isObject(value.error) && typeof value.error.code === 'string';
+}
+
+function isValidationProblem(value: unknown): value is ValidationProblemDetails {
+  return isObject(value) && isObject(value.errors);
+}
+
+// 'Lines[0].Quantity' → 'lines[0].quantity'; '$.voucherAt' → 'voucherAt'.
+function toCamelPath(key: string): string {
+  return key
+    .replace(/^\$\.?/, '')
+    .split('.')
+    .map((segment) => segment.charAt(0).toLowerCase() + segment.slice(1))
+    .join('.');
+}
+
+// Reads ApiCallError (2xx with success:false), an AxiosError carrying
+// response.data.error (non-2xx ApiResponse) and ASP.NET ValidationProblemDetails
+// (400 binding errors: { title, errors }, keys normalized to camelCase paths).
+// Returns undefined for anything else.
+export function getApiError(error: unknown): ApiErrorShape | undefined {
+  if (error instanceof ApiCallError) {
+    return { code: error.code, message: error.message, details: error.details };
+  }
+  if (!axios.isAxiosError(error)) return undefined;
+
+  const status = error.response?.status;
+  const data: unknown = error.response?.data;
+  if (isApiErrorBody(data)) {
+    const { code, message, details } = data.error;
+    return { code, message, details, status };
+  }
+  if (isValidationProblem(data)) {
+    const details: Record<string, string[]> = {};
+    for (const [key, messages] of Object.entries(data.errors)) {
+      details[toCamelPath(key)] = messages;
+    }
+    return {
+      code: 'VALIDATION',
+      message: data.title ?? 'Dữ liệu không hợp lệ.',
+      details,
+      status: data.status ?? status,
+    };
+  }
+  return undefined;
+}
+
+// "message" plus the joined detail messages (duplicates dropped), for toasts.
+export function formatApiErrorDetails(error: unknown): string {
+  const apiError = getApiError(error);
+  if (!apiError) return getErrorMessage(error);
+  const messages = [apiError.message, ...Object.values(apiError.details ?? {}).flat()];
+  return [...new Set(messages)].join('; ');
 }
 
 export default api;

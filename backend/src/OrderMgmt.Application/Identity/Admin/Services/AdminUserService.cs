@@ -61,6 +61,8 @@ public class AdminUserService : IAdminUserService
                     .FirstOrDefault(),
                 IsActive = !u.IsDeleted && u.Status == UserStatus.Active,
                 LastLoginAt = u.LastLoginAt,
+                DefaultBranchId = u.DefaultBranchId,
+                DefaultBranchName = u.DefaultBranch != null ? u.DefaultBranch.Name : null,
             })
             .ToListAsync(ct);
     }
@@ -71,6 +73,7 @@ public class AdminUserService : IAdminUserService
             .IgnoreQueryFilters()
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
+            .Include(u => u.DefaultBranch)
             .FirstOrDefaultAsync(u => u.Id == id, ct)
             ?? throw new NotFoundException(nameof(User), id);
 
@@ -88,6 +91,9 @@ public class AdminUserService : IAdminUserService
         var role = await _db.Roles.FirstOrDefaultAsync(r => r.Code == req.RoleCode, ct)
             ?? throw new ConflictException($"Role '{req.RoleCode}' không tồn tại.");
 
+        if (req.DefaultBranchId.HasValue)
+            await EnsureBranchExistsAsync(req.DefaultBranchId.Value, ct);
+
         var user = new User
         {
             Username = req.Username,
@@ -96,6 +102,7 @@ public class AdminUserService : IAdminUserService
             PhoneNumber = string.IsNullOrWhiteSpace(req.PhoneNumber) ? null : req.PhoneNumber,
             PasswordHash = _hasher.Hash(req.Password),
             Status = req.Status,
+            DefaultBranchId = req.DefaultBranchId ?? BranchDefaults.MainBranchId,
             UserRoles = new List<UserRole> { new() { RoleId = role.Id } },
         };
         _db.Users.Add(user);
@@ -129,6 +136,12 @@ public class AdminUserService : IAdminUserService
         user.Email = req.Email;
         user.PhoneNumber = string.IsNullOrWhiteSpace(req.PhoneNumber) ? null : req.PhoneNumber;
         user.Status = req.Status;
+
+        if (req.DefaultBranchId.HasValue)
+        {
+            await EnsureBranchExistsAsync(req.DefaultBranchId.Value, ct);
+            user.DefaultBranchId = req.DefaultBranchId.Value;
+        }
 
         if (!string.Equals(currentRoleCode, req.RoleCode, StringComparison.Ordinal))
         {
@@ -248,7 +261,15 @@ public class AdminUserService : IAdminUserService
         LastLoginAt = u.LastLoginAt,
         CreatedAt = u.CreatedAt,
         UpdatedAt = u.UpdatedAt,
+        DefaultBranchId = u.DefaultBranchId,
+        DefaultBranchName = u.DefaultBranch?.Name,
     };
+
+    private async Task EnsureBranchExistsAsync(Guid branchId, CancellationToken ct)
+    {
+        if (!await _db.Branches.AnyAsync(b => b.Id == branchId, ct))
+            throw new DomainException("BRANCH_NOT_FOUND", "Chi nhánh không tồn tại.");
+    }
 
     private static string EscapeLike(string input) =>
         input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");

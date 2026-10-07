@@ -68,3 +68,90 @@ describe('canAccessRoute', () => {
     )).toBe(true);
   });
 });
+
+describe('inventory routes', () => {
+  function expectRule(path: string, permission: string) {
+    expect(canAccessRoute(path, [], [])).toBe(false);
+    expect(canAccessRoute(path, SALES_PERMS, ['SALES'])).toBe(false);
+    expect(canAccessRoute(path, [permission], [])).toBe(true);
+  }
+
+  it('/stock-in và /stock-in/:id cần stock_in.view, /stock-in/new cần stock_in.create', () => {
+    expectRule('/stock-in', 'stock_in.view');
+    expectRule('/stock-in/abc-123', 'stock_in.view');
+    expectRule('/stock-in/new', 'stock_in.create');
+    expect(canAccessRoute('/stock-in/new', ['stock_in.view'], [])).toBe(false);
+    expect(canAccessRoute('/stock-in', ['stock_out.view'], [])).toBe(false);
+  });
+
+  it('/stock-out và /stock-out/:id cần stock_out.view, /stock-out/new cần stock_out.create', () => {
+    expectRule('/stock-out', 'stock_out.view');
+    expectRule('/stock-out/abc-123', 'stock_out.view');
+    expectRule('/stock-out/new', 'stock_out.create');
+    expect(canAccessRoute('/stock-out/new', ['stock_out.view'], [])).toBe(false);
+    expect(canAccessRoute('/stock-out', ['stock_in.view'], [])).toBe(false);
+  });
+
+  it('/inventory/opening-stock cần inventory.opening_stock', () => {
+    expectRule('/inventory/opening-stock', 'inventory.opening_stock');
+  });
+
+  it('/inventory/stock-on-hand và /inventory/stock-card cần reports.inventory', () => {
+    expectRule('/inventory/stock-on-hand', 'reports.inventory');
+    expectRule('/inventory/stock-card', 'reports.inventory');
+  });
+
+  it('/suppliers cần suppliers.view; /suppliers/new cần create, /suppliers/:id cần update', () => {
+    expectRule('/suppliers', 'suppliers.view');
+    expectRule('/suppliers/new', 'suppliers.create');
+    expectRule('/suppliers/abc-123', 'suppliers.update');
+    // WAREHOUSE has only suppliers.view (D23).
+    expect(canAccessRoute('/suppliers/abc-123', ['suppliers.view'], ['WAREHOUSE'])).toBe(false);
+  });
+
+  it('/warehouses, /stock-reasons, /payment-methods cần inventory.catalogs.manage', () => {
+    expectRule('/warehouses', 'inventory.catalogs.manage');
+    expectRule('/stock-reasons', 'inventory.catalogs.manage');
+    expectRule('/payment-methods', 'inventory.catalogs.manage');
+  });
+
+  it('/settings/branches cần branches.manage', () => {
+    expectRule('/settings/branches', 'branches.manage');
+  });
+
+  it('/settings/period-lock cần period_lock.manage', () => {
+    expectRule('/settings/period-lock', 'period_lock.manage');
+  });
+
+  it('/settings/inventory và /settings/numbering cần inventory.settings', () => {
+    expectRule('/settings/inventory', 'inventory.settings');
+    expectRule('/settings/numbering', 'inventory.settings');
+  });
+
+  it('/settings/recalc-cost cần inventory.recalc_cost', () => {
+    expectRule('/settings/recalc-cost', 'inventory.recalc_cost');
+  });
+});
+
+describe('rules mirror App.tsx guards', () => {
+  it('customer, product and quotation forms need create / update', () => {
+    expect(canAccessRoute('/customers', ['customers.view'], [])).toBe(true);
+    expect(canAccessRoute('/customers/new', ['customers.view'], [])).toBe(false);
+    expect(canAccessRoute('/customers/new', ['customers.create'], [])).toBe(true);
+    expect(canAccessRoute('/customers/abc', ['customers.view'], [])).toBe(false);
+    expect(canAccessRoute('/customers/abc', ['customers.update'], [])).toBe(true);
+    expect(canAccessRoute('/products/abc', ['products.view'], [])).toBe(false);
+    expect(canAccessRoute('/products/new', ['products.create'], [])).toBe(true);
+    expect(canAccessRoute('/quotations/abc', ['quotations.view'], [])).toBe(false);
+    expect(canAccessRoute('/quotations/new', ['quotations.view'], [])).toBe(false);
+  });
+
+  it('/product-groups, /settings/quotation and /reports/sales-revenue/:id are guarded', () => {
+    expect(canAccessRoute('/product-groups', [], [])).toBe(false);
+    expect(canAccessRoute('/product-groups', ['products.view'], [])).toBe(true);
+    expect(canAccessRoute('/settings/quotation', [], [])).toBe(false);
+    expect(canAccessRoute('/settings/quotation', ['system.manage_settings'], [])).toBe(true);
+    expect(canAccessRoute('/reports/sales-revenue/u1', [], [])).toBe(false);
+    expect(canAccessRoute('/reports/sales-revenue/u1', ['reports.revenue'], [])).toBe(true);
+  });
+});

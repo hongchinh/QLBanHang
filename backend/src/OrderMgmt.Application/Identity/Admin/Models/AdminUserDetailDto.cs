@@ -15,4 +15,6 @@ public class AdminUserDetailDto
     public DateTimeOffset? LastLoginAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
+    public Guid DefaultBranchId { get; set; }
+    public string? DefaultBranchName { get; set; }
 }

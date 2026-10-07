@@ -23,9 +23,9 @@ public class CustomerService : ICustomerService
         _currentUser = currentUser;
     }
 
-    public async Task<PagedResult<CustomerListItemDto>> ListAsync(CustomerListRequest request, CancellationToken ct = default)
+    public async Task<PagedResult<CustomerListItemDto>> ListAsync(CustomerListRequest request, PartnerRole role, CancellationToken ct = default)
     {
-        var query = _db.Customers.AsNoTracking().Where(c => !c.IsDeleted);
+        var query = WithRole(_db.Customers.AsNoTracking().Where(c => !c.IsDeleted), role);
 
         if (request.Group.HasValue)
             query = query.Where(c => c.Group == request.Group.Value);
@@ -69,25 +69,29 @@ public class CustomerService : ICustomerService
         };
     }
 
-    public async Task<CustomerDto> GetAsync(Guid id, CancellationToken ct = default)
+    public async Task<CustomerDto> GetAsync(Guid id, PartnerRole role, CancellationToken ct = default)
     {
-        var customer = await _db.Customers.AsNoTracking()
+        var customer = await WithRole(_db.Customers.AsNoTracking(), role)
             .FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Customer), id);
 
         return customer.Adapt<CustomerDto>();
     }
 
-    public async Task<List<CustomerSearchItemDto>> SearchAsync(CustomerSearchRequest request, CancellationToken ct = default)
+    public async Task<List<CustomerSearchItemDto>> SearchAsync(CustomerSearchRequest request, PartnerType role, CancellationToken ct = default)
     {
         var keyword = request.Keyword?.Trim() ?? string.Empty;
-        if (keyword.Length == 0)
+        if (keyword.Length == 0 || role == PartnerType.None)
             return new List<CustomerSearchItemDto>();
 
         var limit = Math.Clamp(request.Limit, 1, 50);
         var pattern = $"%{EscapeLike(keyword)}%";
 
         var query = _db.Customers.AsNoTracking().Where(c => !c.IsDeleted);
+        if (role == PartnerType.Customer)
+            query = query.Where(c => c.IsCustomer);
+        else if (role == PartnerType.Supplier)
+            query = query.Where(c => c.IsSupplier);
 
         if (request.ActiveOnly)
             query = query.Where(c => c.Status == CustomerStatus.Active);
@@ -114,14 +118,21 @@ public class CustomerService : ICustomerService
                 ContactPerson = c.ContactPerson,
                 PhoneNumber = c.PhoneNumber,
                 Status = c.Status,
+                IsCustomer = c.IsCustomer,
+                IsSupplier = c.IsSupplier,
             })
             .ToListAsync(ct);
     }
 
     private const int MaxCreateAttempts = 5;
 
-    public async Task<CustomerDto> CreateAsync(CreateCustomerRequest request, CancellationToken ct = default)
+    public async Task<CustomerDto> CreateAsync(CreateCustomerRequest request, PartnerRole role, CancellationToken ct = default)
     {
+        // The endpoint's own role is forced on; the other flag needs that role's create permission (D2).
+        var isCustomer = role == PartnerRole.Customer || (request.IsCustomer ?? false);
+        var isSupplier = role == PartnerRole.Supplier || (request.IsSupplier ?? false);
+        PartnerPermissionGuard.EnsureCanCreate(_currentUser, isCustomer, isSupplier);
+
         var explicitCode = !string.IsNullOrWhiteSpace(request.Code);
 
         for (var attempt = 1; attempt <= MaxCreateAttempts; attempt++)
@@ -148,6 +159,8 @@ public class CustomerService : ICustomerService
                 Group = request.Group,
                 Note = request.Note,
                 Status = CustomerStatus.Active,
+                IsCustomer = isCustomer,
+                IsSupplier = isSupplier,
             };
 
             _db.Customers.Add(customer);
@@ -178,10 +191,16 @@ public class CustomerService : ICustomerService
     private static string EscapeLike(string input) =>
         input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
-    public async Task<CustomerDto> UpdateAsync(Guid id, UpdateCustomerRequest request, CancellationToken ct = default)
+    public async Task<CustomerDto> UpdateAsync(Guid id, UpdateCustomerRequest request, PartnerRole role, CancellationToken ct = default)
     {
-        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
+        var customer = await WithRole(_db.Customers, role).FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Customer), id);
+
+        var isCustomer = request.IsCustomer ?? customer.IsCustomer;
+        var isSupplier = request.IsSupplier ?? customer.IsSupplier;
+        if (!isCustomer && !isSupplier)
+            throw new DomainException("PARTNER_ROLE_REQUIRED", "Đối tượng phải là khách hàng hoặc nhà cung cấp.");
+        PartnerPermissionGuard.EnsureCanUpdate(_currentUser, customer.IsCustomer, customer.IsSupplier, isCustomer, isSupplier);
 
         customer.Name = request.Name.Trim();
         customer.TaxCode = request.TaxCode?.Trim();
@@ -193,15 +212,20 @@ public class CustomerService : ICustomerService
         customer.Group = request.Group;
         customer.Note = request.Note;
         customer.Status = request.Status;
+        customer.IsCustomer = isCustomer;
+        customer.IsSupplier = isSupplier;
 
         await _db.SaveChangesAsync(ct);
         return customer.Adapt<CustomerDto>();
     }
 
-    public async Task DeleteAsync(Guid id, CancellationToken ct = default)
+    public async Task DeleteAsync(Guid id, PartnerRole role, CancellationToken ct = default)
     {
-        var customer = await _db.Customers.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
+        var customer = await WithRole(_db.Customers, role).FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Customer), id);
+        PartnerPermissionGuard.EnsureCanDelete(_currentUser, customer.IsCustomer, customer.IsSupplier);
+        if (await _db.StockVouchers.AnyAsync(v => v.PartnerId == id, ct))
+            throw new ConflictException("Đối tượng đã có phiếu nhập/xuất kho, không thể xóa.");
 
         customer.IsDeleted = true;
         customer.DeletedAt = _clock.UtcNow;
@@ -209,6 +233,9 @@ public class CustomerService : ICustomerService
 
         await _db.SaveChangesAsync(ct);
     }
+
+    private static IQueryable<Customer> WithRole(IQueryable<Customer> query, PartnerRole role) =>
+        role == PartnerRole.Supplier ? query.Where(c => c.IsSupplier) : query.Where(c => c.IsCustomer);
 
     private async Task<string> GenerateCodeAsync(CancellationToken ct)
     {

@@ -30,7 +30,7 @@ public class AdminRolesPermissionsTests : QuotationTestBase
 
         // Module values are constrained.
         body.Data.Select(p => p.Module).Distinct()
-            .Should().BeSubsetOf(new[] { "system", "catalog", "sales", "report" });
+            .Should().BeSubsetOf(new[] { "system", "catalog", "sales", "inventory", "report" });
     }
 
     [Fact]

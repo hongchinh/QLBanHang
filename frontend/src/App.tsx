@@ -12,15 +12,30 @@ import { LoginPage } from '@/pages/login-page';
 import { DashboardPage } from '@/pages/dashboard-page';
 import { CustomerListPage } from '@/pages/customers/customer-list-page';
 import { CustomerFormPage } from '@/pages/customers/customer-form-page';
+import { SupplierListPage } from '@/pages/suppliers/supplier-list-page';
+import { SupplierFormPage } from '@/pages/suppliers/supplier-form-page';
 import { ProductListPage } from '@/pages/products/product-list-page';
 import { ProductFormPage } from '@/pages/products/product-form-page';
 import { ProductGroupListPage } from '@/pages/product-groups/product-group-list-page';
+import { WarehouseListPage } from '@/pages/warehouses/warehouse-list-page';
+import { StockReasonListPage } from '@/pages/stock-reasons/stock-reason-list-page';
+import { PaymentMethodListPage } from '@/pages/payment-methods/payment-method-list-page';
 import { QuotationListPage } from '@/pages/quotations/quotation-list-page';
 import { QuotationFormPage } from '@/pages/quotations/quotation-form-page';
+import { StockVoucherFormPage } from '@/pages/stock-vouchers/stock-voucher-form-page';
+import { StockVoucherListPage } from '@/pages/stock-vouchers/stock-voucher-list-page';
 import { MyQuotationSettingsPage } from '@/pages/settings/my-quotation-settings-page';
 import { PaymentQrPage } from '@/pages/payment-qr/payment-qr-page';
 import { QuotationSystemSettingsPage } from '@/pages/settings/quotation-system-settings-page';
 import { SettingsHubPage } from '@/pages/settings/settings-hub-page';
+import { BranchesPage } from '@/pages/settings/branches-page';
+import { PeriodLockPage } from '@/pages/settings/period-lock-page';
+import { InventorySettingsPage } from '@/pages/settings/inventory-settings-page';
+import { NumberingSettingsPage } from '@/pages/settings/numbering-settings-page';
+import { RecalcCostPage } from '@/pages/settings/recalc-cost-page';
+import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
+import { StockOnHandPage } from '@/pages/inventory/stock-on-hand-page';
+import { StockCardPage } from '@/pages/inventory/stock-card-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -113,6 +128,33 @@ export function App() {
                   />
                 </Route>
 
+                <Route path="suppliers">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="suppliers.view">
+                        <SupplierListPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="suppliers.create">
+                        <SupplierFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="suppliers.update">
+                        <SupplierFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+
                 <Route path="products">
                   <Route
                     index
@@ -149,6 +191,30 @@ export function App() {
                     }
                   />
                 </Route>
+                <Route
+                  path="warehouses"
+                  element={
+                    <ProtectedRoute permission="inventory.catalogs.manage">
+                      <WarehouseListPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="stock-reasons"
+                  element={
+                    <ProtectedRoute permission="inventory.catalogs.manage">
+                      <StockReasonListPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="payment-methods"
+                  element={
+                    <ProtectedRoute permission="inventory.catalogs.manage">
+                      <PaymentMethodListPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="quotations">
                   <Route
                     index
@@ -175,6 +241,82 @@ export function App() {
                     }
                   />
                 </Route>
+                <Route path="stock-in">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="stock_in.view">
+                        <StockVoucherListPage type="In" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="stock_in.create">
+                        <StockVoucherFormPage type="In" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="stock_in.view">
+                        <StockVoucherFormPage type="In" />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                <Route path="stock-out">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="stock_out.view">
+                        <StockVoucherListPage type="Out" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="stock_out.create">
+                        <StockVoucherFormPage type="Out" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="stock_out.view">
+                        <StockVoucherFormPage type="Out" />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                <Route
+                  path="inventory/opening-stock"
+                  element={
+                    <ProtectedRoute permission="inventory.opening_stock">
+                      <OpeningStockPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="inventory/stock-on-hand"
+                  element={
+                    <ProtectedRoute permission="reports.inventory">
+                      <StockOnHandPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="inventory/stock-card"
+                  element={
+                    <ProtectedRoute permission="reports.inventory">
+                      <StockCardPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="settings/my-quotation-settings"
                   element={<MyQuotationSettingsPage />}
@@ -185,6 +327,47 @@ export function App() {
                   element={
                     <ProtectedRoute permission="system.manage_settings">
                       <QuotationSystemSettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/branches"
+                  element={
+                    <ProtectedRoute permission="branches.manage">
+                      <BranchesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/period-lock"
+                  element={
+                    <ProtectedRoute permission="period_lock.manage">
+                      <PeriodLockPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/inventory"
+                  element={
+                    <ProtectedRoute permission="inventory.settings">
+                      <InventorySettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/numbering"
+                  element={
+                    <ProtectedRoute permission="inventory.settings">
+                      <NumberingSettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/recalc-cost"
+                  element={
+                    // The optional product picker also needs products.view (hidden without it).
+                    <ProtectedRoute permission="inventory.recalc_cost">
+                      <RecalcCostPage />
                     </ProtectedRoute>
                   }
                 />

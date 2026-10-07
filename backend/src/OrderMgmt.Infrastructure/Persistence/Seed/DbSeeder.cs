@@ -4,9 +4,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OrderMgmt.Application.Identity.Interfaces;
+using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Enums;
 
@@ -36,10 +38,17 @@ public static class DbSeeder
             {
                 await db.Database.MigrateAsync(ct);
 
-                await SeedPermissionsAsync(db, ct);
-                await SeedRolesAsync(db, ct);
+                // Permission rows and their grants commit together: if the process died between them,
+                // the "newly introduced codes" signal would be lost and the grants never made.
+                await using (var tx = await db.Database.BeginTransactionAsync(ct))
+                {
+                    var newCodes = await SeedPermissionsAsync(db, ct);
+                    await SeedRolesAsync(db, newCodes, ct);
+                    await tx.CommitAsync(ct);
+                }
                 await SeedAdminUserAsync(db, hasher, seedOptions, logger, ct);
                 await SeedReferenceDataAsync(db, ct);
+                await SeedInventoryReferenceDataAsync(db, ct);
 
                 await db.SaveChangesAsync(ct);
                 logger.LogInformation("Database seeding completed.");
@@ -56,7 +65,8 @@ public static class DbSeeder
         }
     }
 
-    private static async Task SeedPermissionsAsync(AppDbContext db, CancellationToken ct)
+    /// <returns>The permission codes inserted by this run (codes introduced by a new release).</returns>
+    private static async Task<IReadOnlySet<string>> SeedPermissionsAsync(AppDbContext db, CancellationToken ct)
     {
         var existing = await db.Permissions.Select(p => p.Code).ToListAsync(ct);
         var permissionDefs = new (string Code, string Module, string Name)[]
@@ -99,17 +109,48 @@ public static class DbSeeder
             (Permissions.Reports.Profit, Permissions.ReportModule, "Báo cáo lợi nhuận"),
             (Permissions.Reports.Debt, Permissions.ReportModule, "Báo cáo công nợ"),
             (Permissions.Reports.Delivery, Permissions.ReportModule, "Báo cáo giao hàng"),
+            (Permissions.Reports.Inventory, Permissions.ReportModule, "Báo cáo tồn kho, thẻ kho"),
+
+            (Permissions.Branches.Manage, Permissions.SystemModule, "Quản lý chi nhánh"),
+            (Permissions.Branches.AccessAll, Permissions.SystemModule, "Làm việc ở mọi chi nhánh"),
+            (Permissions.PeriodLock.Manage, Permissions.SystemModule, "Khóa sổ"),
+
+            (Permissions.Suppliers.View, Permissions.CatalogModule, "Xem nhà cung cấp"),
+            (Permissions.Suppliers.Create, Permissions.CatalogModule, "Tạo nhà cung cấp"),
+            (Permissions.Suppliers.Update, Permissions.CatalogModule, "Cập nhật nhà cung cấp"),
+            (Permissions.Suppliers.Delete, Permissions.CatalogModule, "Xóa nhà cung cấp"),
+
+            (Permissions.StockIn.View, Permissions.InventoryModule, "Xem phiếu nhập kho"),
+            (Permissions.StockIn.Create, Permissions.InventoryModule, "Tạo phiếu nhập kho"),
+            (Permissions.StockIn.Edit, Permissions.InventoryModule, "Sửa phiếu nhập kho"),
+            (Permissions.StockIn.Delete, Permissions.InventoryModule, "Xóa phiếu nhập kho"),
+            (Permissions.StockIn.Cancel, Permissions.InventoryModule, "Hủy / khôi phục phiếu nhập kho"),
+            (Permissions.StockIn.EditAll, Permissions.InventoryModule, "Sửa, xóa, hủy phiếu nhập kho của người khác"),
+            (Permissions.StockOut.View, Permissions.InventoryModule, "Xem phiếu xuất kho"),
+            (Permissions.StockOut.Create, Permissions.InventoryModule, "Tạo phiếu xuất kho"),
+            (Permissions.StockOut.Edit, Permissions.InventoryModule, "Sửa phiếu xuất kho"),
+            (Permissions.StockOut.Delete, Permissions.InventoryModule, "Xóa phiếu xuất kho"),
+            (Permissions.StockOut.Cancel, Permissions.InventoryModule, "Hủy / khôi phục phiếu xuất kho"),
+            (Permissions.StockOut.EditAll, Permissions.InventoryModule, "Sửa, xóa, hủy phiếu xuất kho của người khác"),
+            (Permissions.Inventory.OpeningStock, Permissions.InventoryModule, "Nhập tồn đầu kỳ"),
+            (Permissions.Inventory.ViewCost, Permissions.InventoryModule, "Xem giá vốn, giá trị tồn kho"),
+            (Permissions.Inventory.ManageCatalogs, Permissions.InventoryModule, "Quản lý kho, lý do nhập xuất, hình thức thanh toán"),
+            (Permissions.Inventory.Settings, Permissions.InventoryModule, "Cấu hình kho, đánh số chứng từ"),
+            (Permissions.Inventory.RecalcCost, Permissions.InventoryModule, "Tính lại giá vốn"),
         };
 
+        var inserted = new HashSet<string>();
         foreach (var (code, module, name) in permissionDefs)
         {
             if (existing.Contains(code)) continue;
             db.Permissions.Add(new Permission { Code = code, Module = module, Name = name });
+            inserted.Add(code);
         }
         await db.SaveChangesAsync(ct);
+        return inserted;
     }
 
-    private static async Task SeedRolesAsync(AppDbContext db, CancellationToken ct)
+    private static async Task SeedRolesAsync(AppDbContext db, IReadOnlySet<string> newCodes, CancellationToken ct)
     {
         var allPermissions = await db.Permissions.ToListAsync(ct);
         var existingRoles = await db.Roles.Include(r => r.RolePermissions).ToListAsync(ct);
@@ -130,12 +171,19 @@ public static class DbSeeder
                 Permissions.Customers.View, Permissions.Products.View,
                 Permissions.Quotations.View,
                 Permissions.Quotations.ViewAll,
-                Permissions.Quotations.AccountingConfirm,   // default for new ACCOUNTANT roles; existing roles must be granted manually via UI
+                // AccountingConfirm predates the "grant new codes once" step below, so roles created before
+                // it still need it granted manually via the UI.
+                Permissions.Quotations.AccountingConfirm,
                 Permissions.Reports.Revenue, Permissions.Reports.Debt,
             }),
             (RoleCodes.Warehouse, "Kho / giao hàng", new[]
             {
                 Permissions.Customers.View, Permissions.Products.View,
+                Permissions.StockIn.View, Permissions.StockIn.Create, Permissions.StockIn.Edit,
+                Permissions.StockIn.Delete, Permissions.StockIn.Cancel,
+                Permissions.StockOut.View, Permissions.StockOut.Create, Permissions.StockOut.Edit,
+                Permissions.StockOut.Delete, Permissions.StockOut.Cancel,
+                Permissions.Inventory.OpeningStock, Permissions.Reports.Inventory, Permissions.Suppliers.View,
             }),
             (RoleCodes.Manager, "Quản lý", allPermissions.Select(p => p.Code).ToArray()),
         };
@@ -169,8 +217,11 @@ public static class DbSeeder
                 continue;
             }
 
-            // Existing non-Admin system role with permissions → leave untouched so admin
-            // customisations made via the UI survive restarts.
+            // Existing non-Admin system role with permissions → keep admin customisations made via the UI,
+            // but grant the codes introduced by this release (inserted in this run) that the role's defaults
+            // include. This runs once per code — the permission row exists afterwards — so an admin who later
+            // removes such a code keeps it removed across restarts. It applies to every future code too.
+            AssignPermissions(role, permCodes.Where(newCodes.Contains).ToArray(), allPermissions);
         }
         await db.SaveChangesAsync(ct);
     }
@@ -215,6 +266,42 @@ public static class DbSeeder
             UserRoles = new List<UserRole> { new() { RoleId = adminRole.Id } },
         };
         db.Users.Add(admin);
+        await db.SaveChangesAsync(ct);
+    }
+
+    /// Inventory reference data (Round 1). Every block only adds what is missing, so it is safe to re-run.
+    private static async Task SeedInventoryReferenceDataAsync(AppDbContext db, CancellationToken ct)
+    {
+        // Default document numbering for every branch that lacks it (D13).
+        var branchIds = await db.Branches.Select(b => b.Id).ToListAsync(ct);
+        var existing = await db.DocumentNumberings.Select(n => new { n.BranchId, n.DocType }).ToListAsync(ct);
+        foreach (var branchId in branchIds)
+        foreach (var docType in DocumentNumberingDefaults.AllTypes)
+        {
+            if (existing.Any(e => e.BranchId == branchId && e.DocType == docType)) continue;
+            db.DocumentNumberings.Add(DocumentNumberingDefaults.Create(docType, branchId, DateTimeOffset.UtcNow));
+        }
+
+        // The blocks below run only on an empty table (soft-deleted rows count, so deleted defaults stay deleted).
+        if (!await db.Warehouses.IgnoreQueryFilters().AnyAsync(ct))
+            db.Warehouses.Add(new Warehouse { Code = "KHO01", Name = "Kho chính", BranchId = BranchDefaults.MainBranchId });
+
+        if (!await db.StockReasons.IgnoreQueryFilters().AnyAsync(ct))
+        {
+            db.StockReasons.AddRange(
+                new StockReason { Code = "NMH", Name = "Nhập mua hàng", Direction = StockDirection.In, PartnerType = PartnerType.Supplier, IsSystem = true },
+                new StockReason { Code = "NKH", Name = "Nhập khác", Direction = StockDirection.In, PartnerType = PartnerType.Any, IsSystem = true },
+                new StockReason { Code = "XBH", Name = "Xuất bán hàng", Direction = StockDirection.Out, PartnerType = PartnerType.Customer, IsSystem = true },
+                new StockReason { Code = "XKH", Name = "Xuất khác", Direction = StockDirection.Out, PartnerType = PartnerType.Any, IsSystem = true });
+        }
+
+        if (!await db.PaymentMethods.IgnoreQueryFilters().AnyAsync(ct))
+        {
+            db.PaymentMethods.AddRange(
+                new PaymentMethod { Code = "TM", Name = "Tiền mặt", IsCash = true },
+                new PaymentMethod { Code = "CK", Name = "Chuyển khoản", IsCash = false });
+        }
+
         await db.SaveChangesAsync(ct);
     }
 

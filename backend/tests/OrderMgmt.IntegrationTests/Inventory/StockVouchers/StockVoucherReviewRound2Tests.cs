@@ -1,0 +1,98 @@
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.Inventory.StockVouchers.Models;
+using OrderMgmt.Domain.Enums;
+using OrderMgmt.IntegrationTests.Fixtures;
+using Xunit;
+
+namespace OrderMgmt.IntegrationTests.Inventory.StockVouchers;
+
+/// Regression tests for the second code review of the stock voucher API.
+[Collection(nameof(PostgresCollection))]
+public class StockVoucherReviewRound2Tests : InventoryTestBase
+{
+    public StockVoucherReviewRound2Tests(PostgresFixture pg) : base(pg) { }
+
+    [Fact]
+    public async Task Editing_an_old_voucher_keeps_the_line_snapshot_after_the_product_changed()
+    {
+        var p = await CreateInventoryProductAsync("R2S01", track: false);
+        var voucher = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 5, 10_000));
+        await InDbAsync(async db =>
+        {
+            var product = await db.Products.SingleAsync(x => x.Id == p);
+            product.TrackInventory = true;
+            product.PricingMode = PricingMode.PerSquareMeter;
+            await db.SaveChangesAsync();
+        });
+
+        var request = UpdateRequestFrom(voucher);
+        request.Note = "Chỉ sửa ghi chú";
+        var (status, updated, error) = await PutVoucherAsync(_client, voucher.Id, request);
+
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        updated!.Lines.Single().Should().BeEquivalentTo(new
+        {
+            TrackInventory = false, PricingMode = PricingMode.PerUnit, Quantity = 5m, Amount = 50_000m,
+        });
+        (await LedgerOfAsync(voucher.Id)).Should().BeEmpty();
+
+        // A new line of the same product takes the current product (tracked, m²).
+        var withNewLine = UpdateRequestFrom(updated);
+        withNewLine.Lines.Add(new() { ProductId = p, SortOrder = 1, SheetCount = 2, Length = 1000, Width = 500, UnitPrice = 1_000 });
+        var (newStatus, withNew, newError) = await PutVoucherAsync(_client, voucher.Id, withNewLine);
+        newStatus.Should().Be(HttpStatusCode.OK, newError?.Message);
+        withNew!.Lines.Select(l => (l.TrackInventory, l.PricingMode))
+            .Should().Equal((false, PricingMode.PerUnit), (true, PricingMode.PerSquareMeter));
+        (await LedgerOfAsync(voucher.Id)).Should().ContainSingle().Which.QtyIn.Should().Be(1m);
+        await AssertInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Cost_price_tie_on_voucher_date_goes_to_the_later_created_voucher()
+    {
+        var p = await CreateInventoryProductAsync("R2S02");
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 1, 30_000));
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 1, 10_000));
+        var first = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-01 08:00", LineRequest(p, 1, 50_000));
+
+        // Touching an older voucher recomputes the cost price; the tie on 10-02 resolves to the later created one.
+        var request = UpdateRequestFrom(first);
+        request.Note = "x";
+        (await PutVoucherAsync(_client, first.Id, request)).Status.Should().Be(HttpStatusCode.OK);
+
+        (await InDbAsync(db => db.Products.Where(x => x.Id == p).Select(x => x.CostPrice).SingleAsync()))
+            .Should().Be(10_000m);
+    }
+
+    [Fact]
+    public async Task Voucher_in_a_locked_period_offers_no_actions()
+    {
+        var p = await CreateInventoryProductAsync("R2S03");
+        var locked = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 23:30", LineRequest(p, 1, 1_000));
+        var open = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-03 00:30", LineRequest(p, 1, 1_000));
+        await SetPeriodLockAsync(new DateOnly(2026, 10, 2));
+
+        (await GetVoucherAsync(_client, locked.Id)).Should().BeEquivalentTo(new { CanEdit = false, CanCancel = false, CanDelete = false });
+        (await GetVoucherAsync(_client, open.Id)).Should().BeEquivalentTo(new { CanEdit = true, CanCancel = true, CanDelete = true });
+    }
+
+    [Fact]
+    public async Task Stale_version_on_cancel_returns_409_concurrency()
+    {
+        var p = await CreateInventoryProductAsync("LIM05");
+        var voucher = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 1, 1_000));
+        var edit = UpdateRequestFrom(voucher);
+        edit.Note = "Đổi phiên bản";
+        (await PutVoucherAsync(_client, voucher.Id, edit)).Status.Should().Be(HttpStatusCode.OK);
+
+        var (status, _, error) = await ReadVoucherResponseAsync(await _client.PostAsJsonAsync(
+            $"/api/stock-vouchers/{voucher.Id}/cancel", new StockVoucherActionRequest { Version = voucher.Version }));
+
+        status.Should().Be(HttpStatusCode.Conflict);
+        error!.Code.Should().Be("CONCURRENCY");
+        (await GetVoucherAsync(_client, voucher.Id)).Status.Should().Be(StockVoucherStatus.Active);
+    }
+}

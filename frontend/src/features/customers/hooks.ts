@@ -1,7 +1,25 @@
-import { useMutation, useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  keepPreviousData,
+  type QueryClient,
+} from '@tanstack/react-query';
 import { customersApi } from './api';
+import { supplierKeys } from '@/features/suppliers/keys';
 import { customerKeys } from './keys';
 import type { CustomerListParams, UpsertCustomerRequest } from './types';
+
+// Stock-voucher partner search (Phase 09 keeps stockVoucherKeys.partners(...) under this prefix).
+const STOCK_VOUCHER_PARTNERS_KEY = ['inventory', 'stock-vouchers', 'partners'] as const;
+
+// A dual-role partner shows up in both catalogs, so customer and supplier
+// mutations refresh both, plus the voucher partner search.
+export function invalidatePartnerQueries(qc: QueryClient) {
+  qc.invalidateQueries({ queryKey: customerKeys.all });
+  qc.invalidateQueries({ queryKey: supplierKeys.all });
+  qc.invalidateQueries({ queryKey: STOCK_VOUCHER_PARTNERS_KEY });
+}
 
 export function useCustomers(params: CustomerListParams) {
   return useQuery({
@@ -38,7 +56,7 @@ export function useCreateCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (data: UpsertCustomerRequest) => customersApi.create(data),
-    onSuccess: () => qc.invalidateQueries({ queryKey: customerKeys.lists() }),
+    onSuccess: () => invalidatePartnerQueries(qc),
   });
 }
 
@@ -47,10 +65,7 @@ export function useUpdateCustomer() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpsertCustomerRequest }) =>
       customersApi.update(id, data),
-    onSuccess: (_data, { id }) => {
-      qc.invalidateQueries({ queryKey: customerKeys.lists() });
-      qc.invalidateQueries({ queryKey: customerKeys.detail(id) });
-    },
+    onSuccess: () => invalidatePartnerQueries(qc),
   });
 }
 
@@ -58,6 +73,6 @@ export function useDeleteCustomer() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => customersApi.remove(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: customerKeys.lists() }),
+    onSuccess: () => invalidatePartnerQueries(qc),
   });
 }

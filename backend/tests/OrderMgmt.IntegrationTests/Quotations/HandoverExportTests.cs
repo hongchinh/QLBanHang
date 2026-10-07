@@ -188,7 +188,7 @@ public class HandoverExportTests : QuotationTestBase
     [Fact]
     public async Task HandoverWithPrice_Pdf_returns_pdf_via_fake_converter()
     {
-        var factory = new WebAppFactoryWithFakeHandoverPdfConverter(_pg.ConnectionString);
+        var factory = new WebAppFactoryWithFakeHandoverPdfConverter(_pg);
         await ((IAsyncLifetime)factory).InitializeAsync();
         var client = factory.CreateClient();
         await AuthenticateClientAsync(client);
@@ -209,7 +209,7 @@ public class HandoverExportTests : QuotationTestBase
     [Fact]
     public async Task HandoverNoPrice_Pdf_returns_pdf_via_fake_converter()
     {
-        var factory = new WebAppFactoryWithFakeHandoverPdfConverter(_pg.ConnectionString);
+        var factory = new WebAppFactoryWithFakeHandoverPdfConverter(_pg);
         await ((IAsyncLifetime)factory).InitializeAsync();
         var client = factory.CreateClient();
         await AuthenticateClientAsync(client);
@@ -240,7 +240,7 @@ public class HandoverExportTests : QuotationTestBase
 
 file sealed class WebAppFactoryWithFakeHandoverPdfConverter : WebAppFactory
 {
-    public WebAppFactoryWithFakeHandoverPdfConverter(string connectionString) : base(connectionString) { }
+    public WebAppFactoryWithFakeHandoverPdfConverter(PostgresFixture pg) : base(pg) { }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {

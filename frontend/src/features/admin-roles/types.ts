@@ -1,4 +1,4 @@
-export type PermissionModule = 'system' | 'catalog' | 'sales' | 'report';
+export type PermissionModule = 'system' | 'catalog' | 'sales' | 'inventory' | 'report';
 
 export interface PermissionDto {
   code: string;

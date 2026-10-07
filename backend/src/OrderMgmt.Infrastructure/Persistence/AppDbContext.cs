@@ -5,6 +5,8 @@ using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
+using OrderMgmt.Domain.Entities.Inventory;
+using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Entities.Payments;
 using OrderMgmt.Domain.Entities.Sales;
 using OrderMgmt.Domain.Notifications;
@@ -33,6 +35,21 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
     public DbSet<UserQuotationSettings> UserQuotationSettings => Set<UserQuotationSettings>();
+
+    public DbSet<Branch> Branches => Set<Branch>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<StockReason> StockReasons => Set<StockReason>();
+    public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
+    public DbSet<InventorySettings> InventorySettings => Set<InventorySettings>();
+    public DbSet<DocumentNumbering> DocumentNumberings => Set<DocumentNumbering>();
+    public DbSet<StockVoucher> StockVouchers => Set<StockVoucher>();
+    public DbSet<StockVoucherLine> StockVoucherLines => Set<StockVoucherLine>();
+    public DbSet<StockVoucherActivity> StockVoucherActivities => Set<StockVoucherActivity>();
+    public DbSet<OpeningStock> OpeningStocks => Set<OpeningStock>();
+    public DbSet<InventoryLedgerEntry> InventoryLedger => Set<InventoryLedgerEntry>();
+    public DbSet<InventoryCostPeriod> InventoryCostPeriods => Set<InventoryCostPeriod>();
+    public DbSet<StockBalance> StockBalances => Set<StockBalance>();
+    public DbSet<DocumentCounter> DocumentCounters => Set<DocumentCounter>();
 
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerAddress> CustomerAddresses => Set<CustomerAddress>();

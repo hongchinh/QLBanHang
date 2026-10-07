@@ -120,9 +120,21 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("group");
 
+                    b.Property<bool>("IsCustomer")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_customer");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsSupplier")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_supplier");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -271,6 +283,10 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("cost_price");
 
+                    b.Property<DateTimeOffset?>("CostPriceUpdatedOn")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cost_price_updated_on");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -318,6 +334,12 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("character varying(2000)")
                         .HasColumnName("note");
 
+                    b.Property<bool>("PriceIncludesVat")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("price_includes_vat");
+
                     b.Property<int>("PricingMode")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("integer")
@@ -327,6 +349,18 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.Property<Guid?>("ProductGroupId")
                         .HasColumnType("uuid")
                         .HasColumnName("product_group_id");
+
+                    b.Property<decimal>("PurchaseDiscountRate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("purchase_discount_rate");
+
+                    b.Property<decimal>("SalesDiscountRate")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("numeric(5,2)")
+                        .HasDefaultValue(0m)
+                        .HasColumnName("sales_discount_rate");
 
                     b.Property<string>("Specification")
                         .HasMaxLength(500)
@@ -340,6 +374,12 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.Property<decimal?>("Thickness")
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("thickness");
+
+                    b.Property<bool>("TrackInventory")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("track_inventory");
 
                     b.Property<Guid?>("UnitId")
                         .HasColumnType("uuid")
@@ -760,6 +800,12 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
 
+                    b.Property<Guid>("DefaultBranchId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValue(new Guid("6f1f7c1e-6a4b-4b53-9a3e-0c0b5a000001"))
+                        .HasColumnName("default_branch_id");
+
                     b.Property<DateTimeOffset?>("DeletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("deleted_at");
@@ -819,6 +865,9 @@ namespace OrderMgmt.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_users");
+
+                    b.HasIndex("DefaultBranchId")
+                        .HasDatabaseName("ix_users_default_branch_id");
 
                     b.HasIndex("Email")
                         .IsUnique()
@@ -942,6 +991,1099 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasDatabaseName("ix_user_roles_role_id");
 
                     b.ToTable("user_roles", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.DocumentCounter", b =>
+                {
+                    b.Property<int>("DocType")
+                        .HasColumnType("integer")
+                        .HasColumnName("doc_type");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("PeriodKey")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("period_key");
+
+                    b.Property<long>("Value")
+                        .HasColumnType("bigint")
+                        .HasColumnName("value");
+
+                    b.HasKey("DocType", "BranchId", "PeriodKey")
+                        .HasName("pk_document_counters");
+
+                    b.ToTable("document_counters", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.DocumentNumbering", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<int>("DocType")
+                        .HasColumnType("integer")
+                        .HasColumnName("doc_type");
+
+                    b.Property<int>("Length")
+                        .HasColumnType("integer")
+                        .HasColumnName("length");
+
+                    b.Property<string>("Pattern")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("pattern");
+
+                    b.Property<string>("Prefix")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("prefix");
+
+                    b.Property<int>("ResetPolicy")
+                        .HasColumnType("integer")
+                        .HasColumnName("reset_policy");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_document_numberings");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_document_numberings_branch_id");
+
+                    b.HasIndex("DocType", "BranchId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_document_numberings_doc_type_branch_id");
+
+                    b.ToTable("document_numberings", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.InventoryCostPeriod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("AvgCost")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("avg_cost");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<decimal>("ClosingQty")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("closing_qty");
+
+                    b.Property<decimal>("ClosingValue")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("closing_value");
+
+                    b.Property<decimal>("InQty")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("in_qty");
+
+                    b.Property<decimal>("InValue")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("in_value");
+
+                    b.Property<decimal>("OpeningQty")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("opening_qty");
+
+                    b.Property<decimal>("OpeningValue")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("opening_value");
+
+                    b.Property<decimal>("OutQty")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("out_qty");
+
+                    b.Property<decimal>("OutValue")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("out_value");
+
+                    b.Property<DateOnly>("PeriodEnd")
+                        .HasColumnType("date")
+                        .HasColumnName("period_end");
+
+                    b.Property<DateOnly>("PeriodStart")
+                        .HasColumnType("date")
+                        .HasColumnName("period_start");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid>("ScopeKey")
+                        .HasColumnType("uuid")
+                        .HasColumnName("scope_key");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inventory_cost_periods");
+
+                    b.HasIndex("BranchId", "PeriodStart")
+                        .HasDatabaseName("ix_inventory_cost_periods_branch_id_period_start");
+
+                    b.HasIndex("ProductId", "ScopeKey", "PeriodStart")
+                        .IsUnique()
+                        .HasDatabaseName("ix_inventory_cost_periods_product_id_scope_key_period_start");
+
+                    b.ToTable("inventory_cost_periods", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.InventoryLedgerEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<decimal?>("CostAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("cost_amount");
+
+                    b.Property<decimal>("InValue")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("in_value");
+
+                    b.Property<int>("LineSortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("line_sort_order");
+
+                    b.Property<DateTimeOffset>("PostedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("posted_at");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<decimal>("QtyIn")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("qty_in");
+
+                    b.Property<decimal>("QtyOut")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("qty_out");
+
+                    b.Property<decimal>("RunningQty")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("running_qty");
+
+                    b.Property<string>("SourceCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("source_code");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<Guid?>("SourceLineId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_line_id");
+
+                    b.Property<int>("SourceType")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_type");
+
+                    b.Property<decimal?>("UnitCost")
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("unit_cost");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inventory_ledger");
+
+                    b.HasIndex("SourceType", "SourceId")
+                        .HasDatabaseName("ix_inventory_ledger_source_type_source_id");
+
+                    b.HasIndex("ProductId", "BranchId", "PostedAt")
+                        .HasDatabaseName("ix_inventory_ledger_product_id_branch_id_posted_at");
+
+                    b.HasIndex("ProductId", "WarehouseId", "PostedAt")
+                        .HasDatabaseName("ix_inventory_ledger_product_id_warehouse_id_posted_at");
+
+                    b.ToTable("inventory_ledger", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.InventorySettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CostingMethod")
+                        .HasColumnType("integer")
+                        .HasColumnName("costing_method");
+
+                    b.Property<int>("CostingPeriod")
+                        .HasColumnType("integer")
+                        .HasColumnName("costing_period");
+
+                    b.Property<int>("CostingScope")
+                        .HasColumnType("integer")
+                        .HasColumnName("costing_scope");
+
+                    b.Property<int>("DefaultDateMode")
+                        .HasColumnType("integer")
+                        .HasColumnName("default_date_mode");
+
+                    b.Property<int>("NegativeStockPolicy")
+                        .HasColumnType("integer")
+                        .HasColumnName("negative_stock_policy");
+
+                    b.Property<bool>("NetExcludesVat")
+                        .HasColumnType("boolean")
+                        .HasColumnName("net_excludes_vat");
+
+                    b.Property<bool>("PurchaseCostIncludesVat")
+                        .HasColumnType("boolean")
+                        .HasColumnName("purchase_cost_includes_vat");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_inventory_settings");
+
+                    b.ToTable("inventory_settings", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CostingMethod = 1,
+                            CostingPeriod = 1,
+                            CostingScope = 1,
+                            DefaultDateMode = 0,
+                            NegativeStockPolicy = 1,
+                            NetExcludesVat = false,
+                            PurchaseCostIncludesVat = true,
+                            UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.OpeningStock", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateOnly>("OpeningDate")
+                        .HasColumnType("date")
+                        .HasColumnName("opening_date");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("quantity");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_opening_stocks");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_opening_stocks_branch_id");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_opening_stocks_product_id");
+
+                    b.HasIndex("WarehouseId", "ProductId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_opening_stocks_warehouse_id_product_id")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("opening_stocks", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.PaymentMethod", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsCash")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_cash");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_payment_methods");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_payment_methods_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("payment_methods", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockBalance", b =>
+                {
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("quantity");
+
+                    b.HasKey("WarehouseId", "ProductId")
+                        .HasName("pk_stock_balances");
+
+                    b.ToTable("stock_balances", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockReason", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<int>("Direction")
+                        .HasColumnType("integer")
+                        .HasColumnName("direction");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsSystem")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_system");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<int>("PartnerType")
+                        .HasColumnType("integer")
+                        .HasColumnName("partner_type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_reasons");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stock_reasons_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("stock_reasons", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockVoucher", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<Guid?>("CancelledBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cancelled_by");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<decimal>("Freight")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("freight");
+
+                    b.Property<decimal>("GoodsAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("goods_amount");
+
+                    b.Property<string>("HandlerName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("handler_name");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<decimal>("LineDiscountTotal")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("line_discount_total");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("note");
+
+                    b.Property<decimal>("OrderDiscount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("order_discount");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<decimal>("PaidAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("paid_amount");
+
+                    b.Property<string>("PartnerAddress")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("partner_address");
+
+                    b.Property<Guid?>("PartnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("partner_id");
+
+                    b.Property<string>("PartnerName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("partner_name");
+
+                    b.Property<string>("PartnerTaxCode")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("partner_tax_code");
+
+                    b.Property<Guid?>("PaymentMethodId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("payment_method_id");
+
+                    b.Property<Guid>("ReasonId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("reason_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<decimal>("Total")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("total");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("integer")
+                        .HasColumnName("type");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<decimal>("VatTotal")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("vat_total");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset>("VoucherAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("voucher_at");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_vouchers");
+
+                    b.HasIndex("OwnerUserId")
+                        .HasDatabaseName("ix_stock_vouchers_owner_user_id");
+
+                    b.HasIndex("PartnerId")
+                        .HasDatabaseName("ix_stock_vouchers_partner_id");
+
+                    b.HasIndex("PaymentMethodId")
+                        .HasDatabaseName("ix_stock_vouchers_payment_method_id");
+
+                    b.HasIndex("ReasonId")
+                        .HasDatabaseName("ix_stock_vouchers_reason_id");
+
+                    b.HasIndex("WarehouseId")
+                        .HasDatabaseName("ix_stock_vouchers_warehouse_id");
+
+                    b.HasIndex("BranchId", "Type", "VoucherAt")
+                        .HasDatabaseName("ix_stock_vouchers_branch_id_type_voucher_at");
+
+                    b.HasIndex("Type", "BranchId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_stock_vouchers_type_branch_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("stock_vouchers", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockVoucherActivity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<int>("Action")
+                        .HasColumnType("integer")
+                        .HasColumnName("action");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("actor_user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("metadata_json");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("occurred_at");
+
+                    b.Property<Guid>("StockVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("stock_voucher_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_voucher_activities");
+
+                    b.HasIndex("ActorUserId")
+                        .HasDatabaseName("ix_stock_voucher_activities_actor_user_id");
+
+                    b.HasIndex("StockVoucherId", "OccurredAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_stock_voucher_activities_voucher_occurred");
+
+                    b.ToTable("stock_voucher_activities", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockVoucherLine", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<decimal>("DiscountAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("discount_amount");
+
+                    b.Property<bool>("DiscountManual")
+                        .HasColumnType("boolean")
+                        .HasColumnName("discount_manual");
+
+                    b.Property<decimal>("DiscountRate")
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("discount_rate");
+
+                    b.Property<decimal>("FreightAllocated")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("freight_allocated");
+
+                    b.Property<decimal>("InboundValue")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("inbound_value");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<decimal?>("Length")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("length");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("net_amount");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("note");
+
+                    b.Property<decimal>("OrderDiscountAllocated")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("order_discount_allocated");
+
+                    b.Property<bool>("PriceIncludesVat")
+                        .HasColumnType("boolean")
+                        .HasColumnName("price_includes_vat");
+
+                    b.Property<int>("PricingMode")
+                        .HasColumnType("integer")
+                        .HasColumnName("pricing_mode");
+
+                    b.Property<string>("ProductCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("product_code");
+
+                    b.Property<Guid>("ProductId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("product_id");
+
+                    b.Property<string>("ProductName")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("product_name");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("quantity");
+
+                    b.Property<decimal?>("SheetCount")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("sheet_count");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<Guid>("StockVoucherId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("stock_voucher_id");
+
+                    b.Property<decimal?>("Thickness")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("thickness");
+
+                    b.Property<bool>("TrackInventory")
+                        .HasColumnType("boolean")
+                        .HasColumnName("track_inventory");
+
+                    b.Property<string>("UnitName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("unit_name");
+
+                    b.Property<decimal>("UnitPrice")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("unit_price");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<decimal>("VatAmount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("vat_amount");
+
+                    b.Property<decimal>("VatRate")
+                        .HasColumnType("numeric(5,2)")
+                        .HasColumnName("vat_rate");
+
+                    b.Property<Guid>("WarehouseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("warehouse_id");
+
+                    b.Property<decimal?>("Width")
+                        .HasColumnType("numeric(18,6)")
+                        .HasColumnName("width");
+
+                    b.HasKey("Id")
+                        .HasName("pk_stock_voucher_lines");
+
+                    b.HasIndex("ProductId")
+                        .HasDatabaseName("ix_stock_voucher_lines_product_id");
+
+                    b.HasIndex("StockVoucherId")
+                        .HasDatabaseName("ix_stock_voucher_lines_stock_voucher_id");
+
+                    b.HasIndex("WarehouseId")
+                        .HasDatabaseName("ix_stock_voucher_lines_warehouse_id");
+
+                    b.ToTable("stock_voucher_lines", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.Warehouse", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_warehouses");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_warehouses_branch_id");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_warehouses_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("warehouses", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Organization.Branch", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Address")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("address");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateOnly?>("LockedUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("locked_until");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("name");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_branches");
+
+                    b.HasIndex("Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_branches_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("branches", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("6f1f7c1e-6a4b-4b53-9a3e-0c0b5a000001"),
+                            Code = "CN01",
+                            CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            IsDeleted = false,
+                            Name = "Chi nhánh chính"
+                        });
                 });
 
             modelBuilder.Entity("OrderMgmt.Domain.Entities.Payments.Bank", b =>
@@ -1768,6 +2910,18 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.Navigation("Role");
                 });
 
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Identity.User", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", "DefaultBranch")
+                        .WithMany()
+                        .HasForeignKey("DefaultBranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_users_branches_default_branch_id");
+
+                    b.Navigation("DefaultBranch");
+                });
+
             modelBuilder.Entity("OrderMgmt.Domain.Entities.Identity.UserQuotationSettings", b =>
                 {
                     b.HasOne("OrderMgmt.Domain.Entities.Identity.User", "User")
@@ -1799,6 +2953,155 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.Navigation("Role");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.DocumentNumbering", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_document_numberings_branches_branch_id");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.OpeningStock", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_opening_stocks_branches_branch_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Catalog.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_opening_stocks_products_product_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Inventory.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_opening_stocks_warehouses_warehouse_id");
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockVoucher", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_vouchers_branches_branch_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Identity.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_vouchers_users_owner_user_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Catalog.Customer", "Partner")
+                        .WithMany()
+                        .HasForeignKey("PartnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stock_vouchers_customers_partner_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Inventory.PaymentMethod", "PaymentMethod")
+                        .WithMany()
+                        .HasForeignKey("PaymentMethodId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stock_vouchers_payment_methods_payment_method_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Inventory.StockReason", "Reason")
+                        .WithMany()
+                        .HasForeignKey("ReasonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_vouchers_stock_reasons_reason_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Inventory.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_vouchers_warehouses_warehouse_id");
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Owner");
+
+                    b.Navigation("Partner");
+
+                    b.Navigation("PaymentMethod");
+
+                    b.Navigation("Reason");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockVoucherActivity", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Inventory.StockVoucher", "StockVoucher")
+                        .WithMany("Activities")
+                        .HasForeignKey("StockVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_voucher_activities_stock_vouchers_stock_voucher_id");
+
+                    b.Navigation("StockVoucher");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockVoucherLine", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Catalog.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_voucher_lines_products_product_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Inventory.StockVoucher", "StockVoucher")
+                        .WithMany("Lines")
+                        .HasForeignKey("StockVoucherId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_voucher_lines_stock_vouchers_stock_voucher_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Inventory.Warehouse", "Warehouse")
+                        .WithMany()
+                        .HasForeignKey("WarehouseId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_stock_voucher_lines_warehouses_warehouse_id");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("StockVoucher");
+
+                    b.Navigation("Warehouse");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.Warehouse", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_warehouses_branches_branch_id");
+
+                    b.Navigation("Branch");
                 });
 
             modelBuilder.Entity("OrderMgmt.Domain.Entities.Payments.UserBankAccount", b =>
@@ -1888,6 +3191,13 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.Inventory.StockVoucher", b =>
+                {
+                    b.Navigation("Activities");
+
+                    b.Navigation("Lines");
                 });
 
             modelBuilder.Entity("OrderMgmt.Domain.Entities.Sales.Quotation", b =>

@@ -36,7 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getErrorMessage } from '@/lib/api-client';
+import { formatApiErrorDetails, getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { cn } from '@/lib/utils';
 
@@ -102,7 +102,7 @@ export function ProductFormPage() {
           }
           navigate('/products');
         } catch (err) {
-          toast({ variant: 'destructive', title: 'Không thể lưu', description: getErrorMessage(err) });
+          toast({ variant: 'destructive', title: 'Không thể lưu', description: formatApiErrorDetails(err) });
         }
       }}
     />
@@ -138,6 +138,7 @@ function ProductFormInner({
     resolver: zodResolver(productSchema) as unknown as Resolver<ProductFormValues, unknown, ProductFormParsed>,
     defaultValues: toFormDefaults(initial),
   });
+  const locked = !!initial?.hasInventoryActivity;
 
   return (
     <div className="space-y-4">
@@ -174,9 +175,11 @@ function ProductFormInner({
                     value={field.value}
                     onChange={field.onChange}
                     error={fieldState.error}
+                    disabled={locked}
                   />
                 )}
               />
+              {locked && <LockedHint />}
             </div>
 
             <Field label="Quy cách / mô tả" name="specification" form={form} className="md:col-span-2" />
@@ -187,7 +190,7 @@ function ProductFormInner({
                 control={form.control}
                 name="pricingMode"
                 render={({ field }) => (
-                  <Select value={field.value || 'PerUnit'} onValueChange={field.onChange}>
+                  <Select value={field.value || 'PerUnit'} onValueChange={field.onChange} disabled={locked}>
                     <SelectTrigger id="pricingMode" aria-label="Loại giá">
                       <SelectValue placeholder="Chọn loại giá" />
                     </SelectTrigger>
@@ -199,6 +202,7 @@ function ProductFormInner({
                   </Select>
                 )}
               />
+              {locked && <LockedHint />}
             </div>
 
             {isEdit && (
@@ -245,6 +249,16 @@ function ProductFormInner({
         </Card>
 
         <Card>
+          <CardHeader><CardTitle>Kho & chiết khấu</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <CheckboxField label="Theo dõi tồn kho" name="trackInventory" disabled={locked} form={form} />
+            <CheckboxField label="Giá bán đã gồm VAT" name="priceIncludesVat" disabled={locked} form={form} />
+            <Field label="% CK mua" name="purchaseDiscountRate" type="number" step="any" form={form} />
+            <Field label="% CK bán" name="salesDiscountRate" type="number" step="any" form={form} />
+          </CardContent>
+        </Card>
+
+        <Card>
           <CardHeader><CardTitle>Ghi chú</CardTitle></CardHeader>
           <CardContent>
             <Field label="Ghi chú" name="note" form={form} multiline />
@@ -287,6 +301,19 @@ function toFormDefaults(p?: Product): ProductFormValues {
     note: p?.note ?? '',
     status: p?.status ?? 'Active',
     pricingMode: p?.pricingMode ?? 'PerUnit',
+    trackInventory: p?.trackInventory ?? true,
+    priceIncludesVat: p?.priceIncludesVat ?? false,
+    purchaseDiscountRate: p?.purchaseDiscountRate ?? '',
+    salesDiscountRate: p?.salesDiscountRate ?? '',
+  };
+}
+
+function toInventoryPayload(parsed: ProductFormParsed) {
+  return {
+    trackInventory: parsed.trackInventory,
+    priceIncludesVat: parsed.priceIncludesVat,
+    purchaseDiscountRate: parsed.purchaseDiscountRate ?? 0,
+    salesDiscountRate: parsed.salesDiscountRate ?? 0,
   };
 }
 
@@ -306,6 +333,7 @@ function toCreatePayload(parsed: ProductFormParsed): CreateProductRequest {
     defaultTaxRate: parsed.defaultTaxRate,
     note: parsed.note,
     pricingMode: parsed.pricingMode,
+    ...toInventoryPayload(parsed),
   };
 }
 
@@ -325,11 +353,22 @@ function toUpdatePayload(parsed: ProductFormParsed): UpdateProductRequest {
     note: parsed.note,
     status: parsed.status ?? 'Active',
     pricingMode: parsed.pricingMode,
+    ...toInventoryPayload(parsed),
   };
 }
 
 type TextFieldName = 'code' | 'name' | 'specification' | 'note';
-type NumberFieldName = 'length' | 'width' | 'thickness' | 'density' | 'defaultPrice' | 'costPrice' | 'defaultTaxRate';
+type NumberFieldName =
+  | 'length'
+  | 'width'
+  | 'thickness'
+  | 'density'
+  | 'defaultPrice'
+  | 'costPrice'
+  | 'defaultTaxRate'
+  | 'purchaseDiscountRate'
+  | 'salesDiscountRate';
+type CheckboxFieldName = 'trackInventory' | 'priceIncludesVat';
 type LookupFieldName = 'productGroupId';
 
 interface FieldProps {
@@ -355,6 +394,29 @@ function Field({ label, name, type = 'text', step, hint, className, multiline, f
       )}
       {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
       {error && <p className="text-sm text-destructive">{String(error.message)}</p>}
+    </div>
+  );
+}
+
+function LockedHint() {
+  return <p className="text-xs text-muted-foreground">Hàng đã phát sinh kho — không đổi được</p>;
+}
+
+interface CheckboxFieldProps {
+  label: string;
+  name: CheckboxFieldName;
+  disabled?: boolean;
+  form: UseFormReturn<ProductFormValues, unknown, ProductFormParsed>;
+}
+
+function CheckboxField({ label, name, disabled, form }: CheckboxFieldProps) {
+  return (
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <input id={name} type="checkbox" className="h-4 w-4" disabled={disabled} {...form.register(name)} />
+        <Label htmlFor={name}>{label}</Label>
+      </div>
+      {disabled && <LockedHint />}
     </div>
   );
 }
@@ -398,9 +460,10 @@ interface UnitComboboxProps {
   value: string;
   onChange: (value: string) => void;
   error?: { message?: string };
+  disabled?: boolean;
 }
 
-function UnitCombobox({ units, value, onChange, error }: UnitComboboxProps) {
+function UnitCombobox({ units, value, onChange, error, disabled }: UnitComboboxProps) {
   const nameOf = (val: string) => units.find((u) => u.id === val)?.name ?? val;
 
   const [input, setInput] = useState(() => nameOf(value));
@@ -439,6 +502,7 @@ function UnitCombobox({ units, value, onChange, error }: UnitComboboxProps) {
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Nhập hoặc chọn đơn vị tính"
         autoComplete="off"
+        disabled={disabled}
       />
       {open && (
         <div className="absolute z-50 w-full rounded-md border bg-popover shadow-md mt-1 max-h-56 overflow-auto">

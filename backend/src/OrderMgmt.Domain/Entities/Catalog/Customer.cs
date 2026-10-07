@@ -17,5 +17,9 @@ public class Customer : BaseEntity
     public string? Note { get; set; }
     public CustomerStatus Status { get; set; } = CustomerStatus.Active;
 
+    /// Shared partner catalog: a partner can be a customer, a supplier, or both.
+    public bool IsCustomer { get; set; } = true;
+    public bool IsSupplier { get; set; }
+
     public ICollection<CustomerAddress> Addresses { get; set; } = new List<CustomerAddress>();
 }

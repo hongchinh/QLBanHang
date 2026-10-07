@@ -47,6 +47,12 @@ export function UsersListPage() {
           ),
       },
       {
+        header: 'Chi nhánh',
+        accessorKey: 'defaultBranchName',
+        cell: ({ row }) =>
+          row.original.defaultBranchName ?? <span className="text-muted-foreground">—</span>,
+      },
+      {
         header: 'Trạng thái',
         accessorKey: 'isActive',
         cell: ({ row }) =>

@@ -15,6 +15,8 @@ export interface Customer {
   note?: string;
   status: CustomerStatus;
   createdAt: string;
+  isCustomer: boolean;
+  isSupplier: boolean;
 }
 
 export interface CustomerListItem {
@@ -26,6 +28,8 @@ export interface CustomerListItem {
   contactPerson?: string;
   group: CustomerGroup;
   status: CustomerStatus;
+  isCustomer: boolean;
+  isSupplier: boolean;
 }
 
 export interface PagedResult<T> {
@@ -60,6 +64,9 @@ export interface UpsertCustomerRequest {
   group: CustomerGroup;
   note?: string;
   status?: CustomerStatus;
+  // Partner roles (D2): turning a role on needs that role's permission.
+  isCustomer?: boolean;
+  isSupplier?: boolean;
 }
 
 export interface CustomerSearchItem {

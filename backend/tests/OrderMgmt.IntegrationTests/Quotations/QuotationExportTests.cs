@@ -45,7 +45,7 @@ public class QuotationExportTests : QuotationTestBase
     {
         // Use a factory override that replaces the LibreOffice converter with a fake,
         // so this test runs without LibreOffice installed.
-        var factory = new WebAppFactoryWithFakePdfConverter(_pg.ConnectionString);
+        var factory = new WebAppFactoryWithFakePdfConverter(_pg);
         await ((IAsyncLifetime)factory).InitializeAsync();
         var client = factory.CreateClient();
         await AuthenticateClientAsync(client);
@@ -195,7 +195,7 @@ public class QuotationExportTests : QuotationTestBase
 /// </summary>
 file sealed class WebAppFactoryWithFakePdfConverter : WebAppFactory
 {
-    public WebAppFactoryWithFakePdfConverter(string connectionString) : base(connectionString) { }
+    public WebAppFactoryWithFakePdfConverter(PostgresFixture pg) : base(pg) { }
 
     protected override void ConfigureWebHost(Microsoft.AspNetCore.Hosting.IWebHostBuilder builder)
     {

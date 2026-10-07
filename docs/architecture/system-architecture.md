@@ -16,7 +16,7 @@ Backend (.NET 9 Web API)
 PostgreSQL 16
 ```
 
-The product is quotation-first. The quotation is the main sales document; revenue is counted when a quotation reaches `Confirmed`. Orders, delivery, warehouse and debt tracking are intentionally outside the current implementation.
+The product is quotation-first. The quotation is the main sales document; revenue is counted when a quotation reaches `Confirmed`. Orders and delivery are outside the scope. Inventory (Round 1: branches, stock vouchers, ledger, costing and reports) is implemented and goes live after Round 3; cash vouchers and debt are Round 2.
 
 ## Backend Layers
 
@@ -57,6 +57,9 @@ Refresh-token reuse detection revokes the active token family for the user. The 
 - Custom roles support CRUD; delete is blocked while users are still assigned.
 - `RolePermission` is a join table and is hard-deleted when needed.
 - `DbSeeder` gives ADMIN all permissions on startup and only initializes other system role permissions when they have no assignments yet.
+- Newly introduced permission codes are granted once to the existing system roles whose defaults include them. Inserting the permission rows and granting them run in one transaction, so a later removal by an admin survives restarts.
+- Inventory permissions form the module `inventory` (shown as "Kho" in the role matrix): `stock_in.*`, `stock_out.*` (view/create/edit/delete/cancel/edit_all), `inventory.opening_stock`, `inventory.view_cost`, `inventory.catalogs.manage`, `inventory.settings`, `inventory.recalc_cost`. Related codes: `suppliers.*`, `branches.manage`, `branches.access_all`, `period_lock.manage`, `reports.inventory`.
+- Deploy note (D39): every Round 1 deploy needs one seeder run (`Database__AutoMigrateAndSeed=true`) for the permissions, default grants, `KHO01`, system stock reasons, payment methods and numbering rows. Until go-live, revoke the inventory permissions from WAREHOUSE and MANAGER in production right after the deploy; the seeder never grants them again.
 
 ## Core Business Flows
 
@@ -98,6 +101,47 @@ the app has no way to know whether a transfer actually happened.
   query params (`amount`, `content`); a user's default saved account pre-fills the bank/account
   fields when one exists.
 
+### Inventory (Round 1)
+
+**Working branch.** Every user has a default branch. The frontend sends the chosen branch in `X-Branch-Id`; `ICurrentBranch` honours it only for users with `branches.access_all` and otherwise uses the default branch. Warehouses, vouchers, opening stock, numbering, period locks and reports are scoped to the working branch; quotations and catalogs are shared.
+
+**Posting flow.** Every write that changes stock runs in one `ITransactionRunner` transaction:
+
+1. permission by voucher type, working branch, ownership or `edit_all`, `Version` (xmin) set as the original value;
+2. reference and amount validation (reasons, partner roles, warehouses of the branch, dimensions, discounts, dates);
+3. locks: the branch gate (shared), then one branch-independent key per product; product and warehouse references are re-checked after the locks, because catalog deletes take the same locks;
+4. period lock check (read after the gate);
+5. on create, the document number from the atomic counter row; codes already issued (for example after a reset-policy change) are skipped by advancing the counter;
+6. voucher header and lines with totals from `StockVoucherCalculator` (never from the client); on update, a line with the same id and product keeps its stored product snapshot (stock tracking, pricing mode, unit, VAT-inclusive price);
+7. ledger replacement for the voucher (`IInventoryLedgerService`): rows rewritten, `RunningQty` and `StockBalance` recomputed from the earliest affected time;
+8. negative-stock policy (`Allow` / `Warn` / `Block`), counting only pairs the operation makes worse (D31);
+9. cost recalculation of the affected product scopes;
+10. `Product.CostPrice` recompute from the latest active stock-in (D35);
+11. activity log.
+
+| Operation | Steps |
+|---|---|
+| Create | 1 (create permission, branch), 2, 3, 4, 5, 6, 7–11 |
+| Update | 1–4, 6, 7–11 |
+| Cancel / Delete | 1, 3, 4 (stored date), 7 (empty list), 8–11 |
+| Restore | 1, 3, 4 (stored date), 7 (stored lines unchanged; rejected if the product's stock unit or the warehouse's branch changed), 8–11 |
+
+Opening stock (`/api/inventory/opening-stock`) follows the same flow with source type `Opening`, posted at 00:00 VN of the opening date; saves of one warehouse are serialized by an opening key.
+
+**Lock order (D30).** Branch gate → product keys → document counter row, always before the first `SaveChanges`. Each set of keys is taken in one round trip in ascending key order, one advisory lock per product, so a whole-catalog opening stock grid stays within `max_locks_per_transaction`. Settings changes and manual recalculation take the branch gate **exclusive** (every branch) and no product keys, so they wait for in-flight postings and postings wait for them. Setting a period lock also takes the exclusive gate. Deleting a product takes its product key and deleting a warehouse takes the exclusive branch gate before checking for stock activity.
+
+**Concurrency (D29).** `StockVoucher.Version` maps to PostgreSQL `xmin`. Update, cancel, restore and delete always mark the header modified, so a stale `Version` fails with 409 `CONCURRENCY` even when only lines change. The voucher DTO's `CanEdit` / `CanCancel` / `CanDelete` flags are false inside the period lock.
+
+**Allocation (D10).** Order discount (capped at each line's net) and stock-in freight are split by line value; the rounding remainder goes to the last line with a positive base, and when that would leave a line negative or above its base the split falls back to largest remainder. The frontend preview (`compute-stock-line.ts`) implements the same rule.
+
+**Instants (D27).** Every `DateTimeOffset` written or used as a query parameter is UTC. VN-date rules (period lock, costing period, numbering period, report dates) are UTC ranges built with `VnTime.StartOfDay/StartOfNextDay`.
+
+**Derived data.** `InventoryLedgerEntry`, `InventoryCostPeriod`, `StockBalance` and `DocumentCounter` do not inherit `BaseEntity`; they are hard-deleted and rewritten. Ledger posting order is `PostedAt, SourceType (Opening < StockIn < StockOut), SourceCode, LineSortOrder, Id`.
+
+**Costing.** Periodic weighted average per period (month/quarter/year) and scope (branch or warehouse). The opening of a run is summed from the ledger before the period (D7); a zero closing quantity pushes the rounding residual to the last outbound row (D8); a negative average uses the previous average (D37). Fully locked periods are frozen; a partially locked period is recomputed. Changing the costing period, scope or `PurchaseCostIncludesVat` recalculates every branch from the first unlocked period (D11, D33). Report values follow the costing scope (D32); values of a period that has not ended are flagged provisional.
+
+**Error codes.** 422 `NEGATIVE_STOCK_WARNING` (resend with `acknowledgeNegativeStock: true`) and `NEGATIVE_STOCK_BLOCKED`, with `details` keyed `"{productCode}@{warehouseCode}"`; 409 `CONCURRENCY`; 409 `DUPLICATE` (unique index violation); 400 `PERIOD_LOCKED`; 400 `VALIDATION` with camelCase keys such as `lines[0].width`.
+
 ### Dashboard, Reports, Search, Branding And Notifications
 
 - Dashboard endpoints under `/api/dashboard` expose summary, revenue series, top customers, top products, recent activity and sales leaderboard.
@@ -130,6 +174,9 @@ Failures use the same envelope with `success=false` and an `error` object. `Glob
 | `ForbiddenException` | 403 |
 | `NotFoundException` | 404 |
 | `ConflictException` | 409 |
+| `DbUpdateConcurrencyException` (code `CONCURRENCY`) | 409 |
+| `DbUpdateException` from a PostgreSQL unique violation `23505` (code `DUPLICATE`) | 409 |
+| `NegativeStockException` (`NEGATIVE_STOCK_WARNING` / `NEGATIVE_STOCK_BLOCKED`) | 422 |
 | Rate-limit rejection | 429 |
 | Unhandled exceptions | 500 |
 
@@ -170,3 +217,5 @@ styles/      Shared CSS tokens and form/grid utilities
 ```
 
 Axios interceptors unwrap the backend API envelope, attach access tokens and use refresh flow for expired sessions. TanStack Query owns server-state caching and invalidation.
+
+The working branch lives in `stores/branch-store.ts` and is sent as `X-Branch-Id` on every request. `AppLayout` renders pages only after `useBranchContext` has resolved the branch, so no page fetches with the wrong branch. Switching branch (`useSwitchWorkingBranch`) clears the service-worker API cache and resets the query cache, and `AppLayout` keys the routed page by the working branch so page state from the previous branch is discarded. Inventory queries live under the `['inventory']` root key. The service worker never caches branch- or user-scoped API data (`lib/sw-routes.ts`), and logout or a failed refresh clears its API cache.

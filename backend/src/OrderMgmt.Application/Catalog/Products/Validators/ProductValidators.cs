@@ -24,6 +24,8 @@ public class CreateProductRequestValidator : AbstractValidator<CreateProductRequ
         RuleFor(x => x.CostPrice).GreaterThanOrEqualTo(0).When(x => x.CostPrice.HasValue);
         RuleFor(x => x.DefaultTaxRate).InclusiveBetween(0, 100).When(x => x.DefaultTaxRate.HasValue);
         RuleFor(x => x.PricingMode).IsInEnum();
+        RuleFor(x => x.PurchaseDiscountRate).InclusiveBetween(0, 100);
+        RuleFor(x => x.SalesDiscountRate).InclusiveBetween(0, 100);
     }
 }
 
@@ -46,6 +48,8 @@ public class UpdateProductRequestValidator : AbstractValidator<UpdateProductRequ
         RuleFor(x => x.CostPrice).GreaterThanOrEqualTo(0).When(x => x.CostPrice.HasValue);
         RuleFor(x => x.DefaultTaxRate).InclusiveBetween(0, 100).When(x => x.DefaultTaxRate.HasValue);
         RuleFor(x => x.PricingMode).IsInEnum();
+        RuleFor(x => x.PurchaseDiscountRate).InclusiveBetween(0, 100).When(x => x.PurchaseDiscountRate.HasValue);
+        RuleFor(x => x.SalesDiscountRate).InclusiveBetween(0, 100).When(x => x.SalesDiscountRate.HasValue);
     }
 }
 

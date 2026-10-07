@@ -96,6 +96,82 @@ public class DbSeederUpgradeTests : QuotationTestBase
         restored.PermissionCodes.Should().Contain(Permissions.Customers.View);
     }
 
+    private static readonly string[] Round1Codes =
+    {
+        Permissions.Branches.Manage, Permissions.Branches.AccessAll, Permissions.PeriodLock.Manage,
+        Permissions.Suppliers.View, Permissions.Suppliers.Create, Permissions.Suppliers.Update, Permissions.Suppliers.Delete,
+        Permissions.StockIn.View, Permissions.StockIn.Create, Permissions.StockIn.Edit, Permissions.StockIn.Delete,
+        Permissions.StockIn.Cancel, Permissions.StockIn.EditAll,
+        Permissions.StockOut.View, Permissions.StockOut.Create, Permissions.StockOut.Edit, Permissions.StockOut.Delete,
+        Permissions.StockOut.Cancel, Permissions.StockOut.EditAll,
+        Permissions.Inventory.OpeningStock, Permissions.Inventory.ViewCost, Permissions.Inventory.ManageCatalogs,
+        Permissions.Inventory.Settings, Permissions.Inventory.RecalcCost,
+        Permissions.Reports.Inventory,
+    };
+
+    [Fact]
+    public async Task Fresh_seed_has_round1_permissions_and_warehouse_defaults()
+    {
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var codes = await db.Permissions.Select(p => p.Code).ToListAsync();
+            codes.Should().Contain(Round1Codes);
+        }
+
+        var warehouse = await GetRoleByCodeAsync(RoleCodes.Warehouse);
+        warehouse.PermissionCodes.Should().Contain(new[]
+        {
+            Permissions.StockIn.View, Permissions.StockIn.Create, Permissions.StockIn.Edit,
+            Permissions.StockIn.Delete, Permissions.StockIn.Cancel,
+            Permissions.StockOut.View, Permissions.StockOut.Create, Permissions.StockOut.Edit,
+            Permissions.StockOut.Delete, Permissions.StockOut.Cancel,
+            Permissions.Inventory.OpeningStock, Permissions.Reports.Inventory, Permissions.Suppliers.View,
+        });
+        warehouse.PermissionCodes.Should().NotContain(new[]
+        {
+            Permissions.Inventory.ViewCost, Permissions.StockIn.EditAll, Permissions.Inventory.Settings,
+        });
+    }
+
+    [Fact]
+    public async Task Reseeding_grants_newly_introduced_permission_to_roles_whose_defaults_include_it()
+    {
+        // Simulate an upgrade from a release that did not know stock_out.view yet.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var permission = await db.Permissions.SingleAsync(p => p.Code == Permissions.StockOut.View);
+            var assignments = await db.RolePermissions.IgnoreQueryFilters()
+                .Where(rp => rp.PermissionId == permission.Id)
+                .ToListAsync();
+            db.RolePermissions.RemoveRange(assignments);
+            db.Permissions.Remove(permission);
+            await db.SaveChangesAsync();
+        }
+
+        await DbSeeder.SeedAsync(_factory.Services);
+
+        (await GetRoleByCodeAsync(RoleCodes.Warehouse)).PermissionCodes.Should().Contain(Permissions.StockOut.View);
+        (await GetRoleByCodeAsync(RoleCodes.Manager)).PermissionCodes.Should().Contain(Permissions.StockOut.View);
+        (await GetRoleByCodeAsync(RoleCodes.Sales)).PermissionCodes.Should().NotContain(Permissions.StockOut.View);
+    }
+
+    [Fact]
+    public async Task Reseeding_does_not_regrant_inventory_permission_removed_by_admin()
+    {
+        var warehouse = await GetRoleByCodeAsync(RoleCodes.Warehouse);
+        var trimmed = warehouse.PermissionCodes.Where(c => c != Permissions.StockIn.View).ToArray();
+        var put = await _client.PutAsJsonAsync(
+            $"/api/admin/roles/{warehouse.Id}/permissions",
+            new UpdateRolePermissionsRequest { PermissionCodes = trimmed });
+        put.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        await DbSeeder.SeedAsync(_factory.Services);
+
+        (await GetRoleByCodeAsync(RoleCodes.Warehouse)).PermissionCodes.Should().NotContain(Permissions.StockIn.View);
+    }
+
     private async Task<RoleDetailDto> GetRoleByCodeAsync(string code)
     {
         var list = await _client.GetFromJsonAsync<OrderMgmt.Application.Common.Models.ApiResponse<IReadOnlyList<RoleListItemDto>>>(

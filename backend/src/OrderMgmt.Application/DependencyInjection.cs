@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentValidation;
 using Mapster;
 using MapsterMapper;
@@ -24,6 +25,25 @@ using OrderMgmt.Application.Branding.Interfaces;
 using OrderMgmt.Application.Branding.Services;
 using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Notifications.Services;
+using OrderMgmt.Application.Inventory.Costing;
+using OrderMgmt.Application.Inventory.Ledger;
+using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
+using OrderMgmt.Application.Inventory.OpeningStocks.Services;
+using OrderMgmt.Application.Inventory.PaymentMethods.Interfaces;
+using OrderMgmt.Application.Inventory.Posting;
+using OrderMgmt.Application.Inventory.Reports.Interfaces;
+using OrderMgmt.Application.Inventory.Reports.Services;
+using OrderMgmt.Application.Inventory.Settings.Interfaces;
+using OrderMgmt.Application.Inventory.Settings.Services;
+using OrderMgmt.Application.Inventory.PaymentMethods.Services;
+using OrderMgmt.Application.Inventory.StockReasons.Interfaces;
+using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
+using OrderMgmt.Application.Inventory.StockVouchers.Services;
+using OrderMgmt.Application.Inventory.StockReasons.Services;
+using OrderMgmt.Application.Inventory.Warehouses.Interfaces;
+using OrderMgmt.Application.Inventory.Warehouses.Services;
+using OrderMgmt.Application.Organization.Branches.Interfaces;
+using OrderMgmt.Application.Organization.Branches.Services;
 using OrderMgmt.Application.Payments.Interfaces;
 using OrderMgmt.Application.Payments.Services;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
@@ -46,6 +66,9 @@ public static class DependencyInjection
         services.AddScoped<IMapper, ServiceMapper>();
 
         services.AddValidatorsFromAssembly(assembly);
+        // Error keys use the JSON (camelCase) member names, like the service-built ValidationDomainException keys.
+        ValidatorOptions.Global.PropertyNameResolver = (_, member, _) =>
+            member is null ? null : JsonNamingPolicy.CamelCase.ConvertName(member.Name);
 
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICustomerService, CustomerService>();
@@ -68,6 +91,18 @@ public static class DependencyInjection
         services.AddScoped<IBankLookupService, BankLookupService>();
         services.AddScoped<IPaymentQrService, PaymentQrService>();
         services.AddScoped<IUserBankAccountService, UserBankAccountService>();
+        services.AddScoped<IBranchService, BranchService>();
+        services.AddScoped<IWarehouseService, WarehouseService>();
+        services.AddScoped<IStockReasonService, StockReasonService>();
+        services.AddScoped<IPaymentMethodService, PaymentMethodService>();
+        services.AddScoped<IInventorySettingsService, InventorySettingsService>();
+        services.AddScoped<IInventoryLedgerService, InventoryLedgerService>();
+        services.AddScoped<IInventoryCostingService, InventoryCostingService>();
+        services.AddScoped<IInventoryPostingService, InventoryPostingService>();
+        services.AddScoped<IInventoryRecalcService, InventoryRecalcService>();
+        services.AddScoped<IStockVoucherService, StockVoucherService>();
+        services.AddScoped<IOpeningStockService, OpeningStockService>();
+        services.AddScoped<IInventoryReportService, InventoryReportService>();
 
         return services;
     }

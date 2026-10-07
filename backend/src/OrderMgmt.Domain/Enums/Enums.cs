@@ -14,6 +14,13 @@ public enum CustomerGroup
     Project = 4,
 }
 
+/// Role of a partner in the shared Customer catalog (D1).
+public enum PartnerRole
+{
+    Customer = 1,
+    Supplier = 2,
+}
+
 public enum ProductStatus
 {
     Active = 1,

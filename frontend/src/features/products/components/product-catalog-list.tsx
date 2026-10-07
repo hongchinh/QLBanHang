@@ -6,6 +6,7 @@ import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import { cn } from '@/lib/utils';
 import type { ProductSuggestion } from '@/features/products/types';
+import { toProductSuggestion } from '@/features/products/to-product-suggestion';
 
 interface Props {
   query: string;
@@ -117,16 +118,7 @@ export function ProductCatalogList({
                   )}
                   onClick={() => onSelectId(item.id)}
                   onDoubleClick={() =>
-                    onSelect({
-                      id: item.id,
-                      code: item.code,
-                      name: item.name,
-                      specification: item.specification,
-                      unitName: item.unitName,
-                      pricingMode: item.pricingMode,
-                      defaultPrice: item.defaultPrice,
-                      costPrice: item.costPrice,
-                    })
+                    onSelect(toProductSuggestion(item))
                   }
                 >
                   <td className="px-3 py-2 font-mono text-xs">{item.code}</td>

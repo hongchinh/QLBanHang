@@ -32,6 +32,9 @@
 ## Tests And Verification
 
 - Backend integration tests live in `backend/tests/OrderMgmt.IntegrationTests`.
+- Integration tests run against a local PostgreSQL through `TEST_DB_CONNECTION`, e.g. `Host=localhost;Port=5432;Database=qldonhang_integtest;Username=postgres;Password=1` (bash: `export TEST_DB_CONNECTION="..."`; PowerShell: `$env:TEST_DB_CONNECTION = "..."`). Without it, Testcontainers starts PostgreSQL in Docker.
+- `PostgresFixture` migrates and seeds a template database `<base>_tpl` once per run; every `WebAppFactory` gets its own clone `<base>_<guid>`, dropped on dispose (clones a failing test did not dispose are dropped at the end of the run). The fixture never touches the base database named in `TEST_DB_CONNECTION`, refuses the dev databases `qldonhang_test` / `qldonhang`, and the factory overrides both `ConnectionStrings:Default` and `ConnectionStrings:DefaultConnection` (the app prefers `DefaultConnection`).
+- New integration tests construct `new WebAppFactory(_pg)` (or inherit `QuotationTestBase`); derived factories take `PostgresFixture` (`: base(pg)`). The login rate limit is raised for tests via `RateLimiting:LoginPermitLimit`.
 - Frontend tests use Vitest and Testing Library. Test files sit next to the behavior they cover, usually as `*.test.ts` or `*.test.tsx`.
 - Run backend build/tests from `backend`; run frontend `npm run typecheck`, `npm run test` or `npm run build` from `frontend`.
 
@@ -47,3 +50,25 @@
 - Backend and frontend each have a Dockerfile for Railway-style separate services.
 - `VITE_API_BASE_URL` is a frontend build-time variable; changing it requires rebuilding the frontend image.
 - For cross-domain auth, configure backend CORS and refresh cookie settings together.
+
+## Inventory Patterns (Round 1)
+
+- Type-dependent permissions (for example `stock_in.*` vs `stock_out.*`) are checked in the service when `[HasPermission]` cannot express them.
+- Derived data (`InventoryLedgerEntry`, `InventoryCostPeriod`, `StockBalance`, `DocumentCounter`) does not inherit `BaseEntity`; it is hard-deleted and rewritten.
+- Write use cases that touch stock run inside `ITransactionRunner` and call `IInventoryPostingService.AcquireLocksAsync` (shared branch gate, then product keys) before the first `SaveChangesAsync`. Read `InventorySettings` and `Branch.LockedUntil` after the locks, and re-check referenced products/warehouses there. `IInventoryLock` takes each key set in one statement; keep one advisory lock per product.
+- Check-then-act guards on stock activity (product/warehouse delete, stock-field changes) run under the same locks as the postings they guard.
+- A unique-index violation surfaces as 409 `DUPLICATE`; services still check uniqueness first to return a field-level 400.
+- Every `DateTimeOffset` reaching EF is UTC (D27). VN-date rules are UTC ranges built with `VnTime.StartOfDay/StartOfNextDay`; never compare `.Date` of an instant.
+- Never configure `HasDefaultValue(true)` on a non-nullable `bool` without `.HasSentinel(true)` (D28).
+- New child entities (lines, activities, opening-stock rows) are added through their `DbSet.Add`: `BaseEntity` pre-assigns ids, so adding only through a navigation collection sends an UPDATE.
+- Validation `details` keys are camelCase in both layers (`orderDiscount`, `lines[0].vatRate`); `ValidationDomainException` carries a Vietnamese summary message (its first detail by default).
+- Pure calculators (`PricingQuantity`, `StockVoucherCalculator`, `PeriodicAverageCalculator`, `CostingPeriodCalendar`, `DocumentNumberFormatter`) live next to their feature and are unit-tested in `tests/OrderMgmt.IntegrationTests/Inventory/Unit` without a database.
+- Frontend:
+  - `npm run typecheck` runs `tsc -p tsconfig.app.json`.
+  - Error handling uses `getApiError` / `formatApiErrorDetails` from `lib/api-client.ts`.
+  - Dates go through `lib/vn-datetime.ts`; never derive a local date with `toISOString().slice(0, 10)`.
+  - Money in previews uses `roundAwayFromZero` (`lib/round.ts`); stock quantities use `formatStockQuantity`.
+  - Branch-scoped queries (including `warehouseKeys`) live under the `['inventory']` root key. Change the working branch only through `useSwitchWorkingBranch`; pages are remounted per branch, so don't sync branch-derived state by hand.
+  - Warehouse pickers use `selectableWarehouses` (active ones, plus the current inactive selection). Quantity inputs parse with `parseQuantityInput` (`lib/stock-quantity.ts`), money with `parseMoneyInput`.
+  - Long synchronous calls (cost recalculation, costing settings) pass an explicit `timeout` and treat `isRequestTimeout` as "may still be running".
+  - The service worker caches only allow-listed reference data that is the same for every signed-in user (`CACHEABLE_API_PREFIXES` in `lib/sw-routes.ts`); never add a branch-, user- or permission-scoped path there.

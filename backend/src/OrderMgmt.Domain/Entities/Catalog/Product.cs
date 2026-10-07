@@ -27,4 +27,12 @@ public class Product : BaseEntity
     public string? Note { get; set; }
     public ProductStatus Status { get; set; } = ProductStatus.Active;
     public PricingMode PricingMode { get; set; } = PricingMode.PerUnit;
+
+    public bool TrackInventory { get; set; } = true;
+    public decimal PurchaseDiscountRate { get; set; }
+    public decimal SalesDiscountRate { get; set; }
+    public bool PriceIncludesVat { get; set; }
+
+    /// VoucherAt of the stock-in line that last set CostPrice (set only by stock-in vouchers, D35).
+    public DateTimeOffset? CostPriceUpdatedOn { get; set; }
 }

@@ -16,10 +16,11 @@ const MODULE_LABEL: Record<PermissionModule, string> = {
   system: 'Hệ thống',
   catalog: 'Danh mục',
   sales: 'Bán hàng',
+  inventory: 'Kho',
   report: 'Báo cáo',
 };
 
-const MODULE_ORDER: PermissionModule[] = ['system', 'catalog', 'sales', 'report'];
+const MODULE_ORDER: PermissionModule[] = ['system', 'catalog', 'sales', 'inventory', 'report'];
 
 interface Props {
   roles: RoleListItem[];
@@ -44,10 +45,15 @@ export function RoleMatrixTable({
   onRequestRename,
   onRequestDelete,
 }: Props) {
-  const grouped = MODULE_ORDER
+  // Modules the frontend doesn't know yet go last with their raw name, so a new
+  // backend module never disappears from the matrix.
+  const unknownModules = [...new Set(permissions.map((p) => p.module))].filter(
+    (m) => !MODULE_ORDER.includes(m),
+  );
+  const grouped = [...MODULE_ORDER, ...unknownModules]
     .map((module) => ({
       module,
-      label: MODULE_LABEL[module],
+      label: MODULE_LABEL[module] ?? module,
       perms: permissions.filter((p) => p.module === module),
     }))
     .filter((g) => g.perms.length > 0);

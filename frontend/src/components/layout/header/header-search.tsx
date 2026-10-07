@@ -4,11 +4,14 @@ import { Search } from 'lucide-react';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useGlobalSearch, SEARCH_MIN_LENGTH } from '@/features/search/hooks';
+import type { CustomerSearchItem } from '@/features/search/api';
+import { useAuthStore } from '@/stores/auth-store';
 import { SearchResultsList } from './search-results-list';
-import { flattenResultIndex, totalResultCount } from './search-results-helpers';
+import { flattenResultIndex, partnerResultPath, totalResultCount } from './search-results-helpers';
 
 export function HeaderSearch() {
   const navigate = useNavigate();
+  const hasPermission = useAuthStore((s) => s.hasPermission);
   const inputRef = useRef<HTMLInputElement>(null);
   const [inputValue, setInputValue] = useState('');
   const [open, setOpen] = useState(false);
@@ -28,11 +31,19 @@ export function HeaderSearch() {
   }, [close]);
 
   const handleSelectCustomer = useCallback(
-    (id: string) => {
-      navigate(`/customers/${id}`);
+    (item: CustomerSearchItem) => {
+      navigate(partnerResultPath('customer', item, hasPermission));
       reset();
     },
-    [navigate, reset],
+    [navigate, reset, hasPermission],
+  );
+
+  const handleSelectSupplier = useCallback(
+    (item: CustomerSearchItem) => {
+      navigate(partnerResultPath('supplier', item, hasPermission));
+      reset();
+    },
+    [navigate, reset, hasPermission],
   );
 
   const handleSelectQuotation = useCallback(
@@ -78,7 +89,8 @@ export function HeaderSearch() {
       setActiveIndex((i) => (i <= 0 ? total - 1 : i - 1));
     } else if (e.key === 'Enter') {
       const target = flattenResultIndex(data, activeIndex);
-      if (target?.kind === 'customer') handleSelectCustomer(target.id);
+      if (target?.kind === 'customer') handleSelectCustomer(target.item);
+      else if (target?.kind === 'supplier') handleSelectSupplier(target.item);
       else if (target?.kind === 'quotation') handleSelectQuotation(target.id);
     }
   };
@@ -117,6 +129,7 @@ export function HeaderSearch() {
           isLoading={isFetching}
           activeIndex={activeIndex}
           onSelectCustomer={handleSelectCustomer}
+          onSelectSupplier={handleSelectSupplier}
           onSelectQuotation={handleSelectQuotation}
         />
       </PopoverContent>

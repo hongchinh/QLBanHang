@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi, type LoginRequest } from './api';
 import { useAuthStore } from '@/stores/auth-store';
+import { useBranchStore } from '@/stores/branch-store';
 
 export function useLogin() {
   const setAuth = useAuthStore((s) => s.setAuth);
@@ -24,7 +25,9 @@ export function useLogout() {
     mutationFn: () => authApi.logout().catch(() => undefined),
     onSettled: () => {
       localLogout();
+      useBranchStore.getState().clear();
       qc.clear();
+      if ('caches' in window) void caches.delete('api-cache');
       navigate('/login', { replace: true });
     },
   });

@@ -22,6 +22,7 @@ import { StockReasonListPage } from '@/pages/stock-reasons/stock-reason-list-pag
 import { PaymentMethodListPage } from '@/pages/payment-methods/payment-method-list-page';
 import { QuotationListPage } from '@/pages/quotations/quotation-list-page';
 import { QuotationFormPage } from '@/pages/quotations/quotation-form-page';
+import { StockVoucherFormPage } from '@/pages/stock-vouchers/stock-voucher-form-page';
 import { MyQuotationSettingsPage } from '@/pages/settings/my-quotation-settings-page';
 import { PaymentQrPage } from '@/pages/payment-qr/payment-qr-page';
 import { QuotationSystemSettingsPage } from '@/pages/settings/quotation-system-settings-page';
@@ -232,6 +233,42 @@ export function App() {
                     element={
                       <ProtectedRoute permission="quotations.update">
                         <QuotationFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                <Route path="stock-in">
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="stock_in.create">
+                        <StockVoucherFormPage type="In" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="stock_in.view">
+                        <StockVoucherFormPage type="In" />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                <Route path="stock-out">
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="stock_out.create">
+                        <StockVoucherFormPage type="Out" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="stock_out.view">
+                        <StockVoucherFormPage type="Out" />
                       </ProtectedRoute>
                     }
                   />

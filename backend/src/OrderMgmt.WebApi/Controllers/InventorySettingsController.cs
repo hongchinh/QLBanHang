@@ -15,13 +15,16 @@ public class InventorySettingsController : ApiControllerBase
 {
     private readonly IInventorySettingsService _settings;
     private readonly IValidator<UpdateInventorySettingsRequest> _settingsValidator;
+    private readonly IValidator<UpdateNumberingRequest> _numberingValidator;
 
     public InventorySettingsController(
         IInventorySettingsService settings,
-        IValidator<UpdateInventorySettingsRequest> settingsValidator)
+        IValidator<UpdateInventorySettingsRequest> settingsValidator,
+        IValidator<UpdateNumberingRequest> numberingValidator)
     {
         _settings = settings;
         _settingsValidator = settingsValidator;
+        _numberingValidator = numberingValidator;
     }
 
     [HttpGet("settings")]
@@ -47,5 +50,8 @@ public class InventorySettingsController : ApiControllerBase
     [HasPermission(Permissions.Inventory.Settings)]
     public async Task<ActionResult<ApiResponse<DocumentNumberingDto>>> UpdateNumbering(
         DocumentType docType, [FromBody] UpdateNumberingRequest request, CancellationToken ct)
-        => Success(await _settings.UpdateNumberingAsync(docType, request, ct));
+    {
+        await _numberingValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _settings.UpdateNumberingAsync(docType, request, ct));
+    }
 }

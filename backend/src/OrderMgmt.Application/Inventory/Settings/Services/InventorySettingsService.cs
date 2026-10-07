@@ -80,6 +80,10 @@ public class InventorySettingsService : IInventorySettingsService
     public async Task<DocumentNumberingDto> UpdateNumberingAsync(
         DocumentType docType, UpdateNumberingRequest request, CancellationToken ct = default)
     {
+        if (!Enum.IsDefined(docType))
+            throw new ValidationDomainException(
+                new Dictionary<string, string[]> { ["docType"] = new[] { "Loại chứng từ không hợp lệ." } }, null);
+
         var errors = DocumentNumberFormatter.Validate(request.Pattern, request.Length, request.ResetPolicy);
         if (errors.Count > 0)
             throw new ValidationDomainException(

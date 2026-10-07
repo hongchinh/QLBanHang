@@ -111,6 +111,32 @@ public class StockVoucherCalculatorTests
     }
 
     [Fact]
+    public void Order_discount_falls_back_to_largest_remainder_when_last_line_would_go_negative()
+    {
+        // D10 alone gives [0, 0, 0, 0, 2]: the last line (net 1) would end at net -1.
+        var result = StockVoucherCalculator.Compute(
+            Header(StockDirection.Out, orderDiscount: 2m),
+            new[] { Line(1m, 14m, 10m), Line(1m, 14m, 10m), Line(1m, 14m, 10m), Line(1m, 14m, 10m), Line(1m, 1m, 10m) });
+
+        result.Lines.Select(l => l.OrderDiscountAllocated).Should().Equal(0m, 0m, 1m, 1m, 0m);
+        result.Lines.Should().OnlyContain(l => l.NetAmount >= 0m && l.VatAmount >= 0m);
+        result.Totals.DiscountTotal.Should().Be(2m);
+    }
+
+    [Fact]
+    public void Freight_falls_back_to_largest_remainder_when_last_line_would_go_negative()
+    {
+        // D10 alone gives [1, 1, 1, 1, 1, -2].
+        var result = StockVoucherCalculator.Compute(
+            Header(StockDirection.In, freight: 3m),
+            Enumerable.Range(0, 6).Select(_ => Line(1m, 1m, 0m)).ToArray());
+
+        result.Lines.Select(l => l.FreightAllocated).Should().Equal(0m, 0m, 0m, 1m, 1m, 1m);
+        result.Lines.Select(l => l.InboundValue).Should().Equal(1m, 1m, 1m, 2m, 2m, 2m);
+        result.Totals.Total.Should().Be(9m);
+    }
+
+    [Fact]
     public void Quantity_is_rounded_to_six_decimals_before_amount()
     {
         var line = StockVoucherCalculator.Compute(

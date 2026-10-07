@@ -23,6 +23,7 @@ import { PaymentMethodListPage } from '@/pages/payment-methods/payment-method-li
 import { QuotationListPage } from '@/pages/quotations/quotation-list-page';
 import { QuotationFormPage } from '@/pages/quotations/quotation-form-page';
 import { StockVoucherFormPage } from '@/pages/stock-vouchers/stock-voucher-form-page';
+import { StockVoucherListPage } from '@/pages/stock-vouchers/stock-voucher-list-page';
 import { MyQuotationSettingsPage } from '@/pages/settings/my-quotation-settings-page';
 import { PaymentQrPage } from '@/pages/payment-qr/payment-qr-page';
 import { QuotationSystemSettingsPage } from '@/pages/settings/quotation-system-settings-page';
@@ -239,6 +240,14 @@ export function App() {
                 </Route>
                 <Route path="stock-in">
                   <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="stock_in.view">
+                        <StockVoucherListPage type="In" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
                     path="new"
                     element={
                       <ProtectedRoute permission="stock_in.create">
@@ -256,6 +265,14 @@ export function App() {
                   />
                 </Route>
                 <Route path="stock-out">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="stock_out.view">
+                        <StockVoucherListPage type="Out" />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="new"
                     element={

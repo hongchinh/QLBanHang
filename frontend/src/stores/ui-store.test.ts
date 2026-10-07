@@ -70,3 +70,34 @@ describe('useUiStore rehydration from a pre-existing persisted state', () => {
     expect(useUiStore.getState().quotationStatusFilter).toEqual(['Confirmed']);
   });
 });
+
+describe('useUiStore stockVoucherStatusFilter', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useUiStore.setState({ stockVoucherStatusFilter: { In: null, Out: null } });
+  });
+
+  it('persists stock voucher status filter per type', () => {
+    useUiStore.getState().setStockVoucherStatusFilter('In', 'Cancelled');
+
+    expect(useUiStore.getState().stockVoucherStatusFilter).toEqual({ In: 'Cancelled', Out: null });
+    expect(readPersisted()?.state.stockVoucherStatusFilter).toEqual({ In: 'Cancelled', Out: null });
+
+    useUiStore.getState().setStockVoucherStatusFilter('Out', 'Active');
+    expect(readPersisted()?.state.stockVoucherStatusFilter).toEqual({ In: 'Cancelled', Out: 'Active' });
+  });
+
+  it('a stored all is restored', async () => {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        state: { sidebarCollapsed: false, stockVoucherStatusFilter: { In: 'all', Out: null } },
+        version: 1,
+      }),
+    );
+
+    await useUiStore.persist.rehydrate();
+
+    expect(useUiStore.getState().stockVoucherStatusFilter).toEqual({ In: 'all', Out: null });
+  });
+});

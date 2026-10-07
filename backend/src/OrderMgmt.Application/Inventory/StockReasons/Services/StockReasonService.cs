@@ -60,6 +60,19 @@ public class StockReasonService : IStockReasonService
         if (reason.IsSystem && (reason.Direction != request.Direction || reason.PartnerType != request.PartnerType))
             throw new ConflictException("Lý do hệ thống không được đổi chiều nhập/xuất hoặc loại đối tượng.");
 
+        // Vouchers already saved with this reason were validated against its direction and partner type.
+        var directionChanged = reason.Direction != request.Direction;
+        var partnerTypeChanged = reason.PartnerType != request.PartnerType;
+        if ((directionChanged || partnerTypeChanged) && await _db.StockVouchers.AnyAsync(v => v.ReasonId == id, ct))
+        {
+            var errors = new Dictionary<string, string[]>();
+            if (directionChanged)
+                errors["direction"] = new[] { "Lý do đã được dùng trên phiếu kho, không được đổi chiều nhập/xuất." };
+            if (partnerTypeChanged)
+                errors["partnerType"] = new[] { "Lý do đã được dùng trên phiếu kho, không được đổi loại đối tượng." };
+            throw new ValidationDomainException(errors, null);
+        }
+
         reason.Name = request.Name.Trim();
         reason.Direction = request.Direction;
         reason.PartnerType = request.PartnerType;

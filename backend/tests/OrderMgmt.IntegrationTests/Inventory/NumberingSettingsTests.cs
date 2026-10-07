@@ -56,4 +56,41 @@ public class NumberingSettingsTests : InventoryTestBase
         var reread = await ReadDataAsync<List<DocumentNumberingDto>>(await _client.GetAsync("/api/inventory/numbering"));
         reread.Single(n => n.DocType == DocumentType.StockIn).Pattern.Should().Be("{KH}{NAM}{THANG}{STT}");
     }
+
+    [Fact]
+    public async Task Reset_policy_change_skips_codes_already_issued()
+    {
+        var p = await CreateInventoryProductAsync("NUM01");
+        await SetStockInNumberingAsync("{KH}{NAM}{THANG}{STT}", NumberingResetPolicy.Monthly);
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 1, 1_000));
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-03 08:00", LineRequest(p, 1, 1_000));
+
+        // The None counter restarts at 1, so its first two codes were issued under the Monthly policy.
+        await SetStockInNumberingAsync("{KH}{NAM}{THANG}{STT}", NumberingResetPolicy.None);
+        (await GetDefaultsAsync(_client, $"type=In&voucherAt={Uri.EscapeDataString(Vn("2026-10-04 08:00").ToString("O"))}"))
+            .NextCode.Should().Be("PN20261000003");
+        var third = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-04 08:00", LineRequest(p, 1, 1_000));
+        var fourth = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-05 08:00", LineRequest(p, 1, 1_000));
+
+        third.Code.Should().Be("PN20261000003");
+        fourth.Code.Should().Be("PN20261000004");
+    }
+
+    [Fact]
+    public async Task Update_rejects_bad_shape_and_unknown_doc_type()
+    {
+        var nullPrefix = await _client.PutAsJsonAsync("/api/inventory/numbering/StockIn",
+            new UpdateNumberingRequest { Prefix = null!, Length = 5, ResetPolicy = NumberingResetPolicy.None, Pattern = "{KH}{STT}" });
+        nullPrefix.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var tooLong = await _client.PutAsJsonAsync("/api/inventory/numbering/StockIn",
+            new UpdateNumberingRequest { Prefix = new string('P', 21), Length = 5, ResetPolicy = (NumberingResetPolicy)9, Pattern = "{KH}{STT}" });
+        tooLong.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await tooLong.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details
+            .Should().ContainKeys("prefix", "resetPolicy");
+
+        var unknownType = await _client.PutAsJsonAsync("/api/inventory/numbering/99",
+            new UpdateNumberingRequest { Prefix = "PN", Length = 5, ResetPolicy = NumberingResetPolicy.None, Pattern = "{KH}{STT}" });
+        unknownType.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
 }

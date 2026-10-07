@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Inventory.StockReasons.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Inventory;
@@ -65,5 +66,24 @@ public class StockReasonCrudTests : InventoryTestBase
         var renamed = await ReadDataAsync<StockReasonDto>(await _client.PutAsJsonAsync($"/api/stock-reasons/{id}",
             new UpdateStockReasonRequest { Name = "Đổi tên", Direction = StockDirection.In, PartnerType = PartnerType.Supplier }));
         renamed.Name.Should().Be("Đổi tên");
+    }
+
+    [Fact]
+    public async Task Reason_in_use_keeps_direction_and_partner_type_but_can_be_renamed()
+    {
+        var created = await ReadDataAsync<StockReasonDto>(await _client.PostAsJsonAsync("/api/stock-reasons",
+            new CreateStockReasonRequest { Code = "NDG", Name = "Nhập đổi", Direction = StockDirection.In, PartnerType = PartnerType.Any }));
+        var p = await CreateInventoryProductAsync("SRU01");
+        await CreateVoucherAsync(_client, StockDirection.In, "NDG", "2026-10-02 08:00", LineRequest(p, 1, 1_000));
+
+        var response = await _client.PutAsJsonAsync($"/api/stock-reasons/{created.Id}",
+            new UpdateStockReasonRequest { Name = "Nhập đổi", Direction = StockDirection.Out, PartnerType = PartnerType.None });
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var error = (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!;
+        error.Details.Should().ContainKeys("direction", "partnerType");
+
+        var renamed = await ReadDataAsync<StockReasonDto>(await _client.PutAsJsonAsync($"/api/stock-reasons/{created.Id}",
+            new UpdateStockReasonRequest { Name = "Nhập đổi hàng", Direction = StockDirection.In, PartnerType = PartnerType.Any }));
+        renamed.Name.Should().Be("Nhập đổi hàng");
     }
 }

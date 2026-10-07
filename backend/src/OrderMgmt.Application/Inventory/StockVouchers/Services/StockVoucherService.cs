@@ -292,9 +292,13 @@ public class StockVoucherService : IStockVoucherService
             .Select(u => u.FullName)
             .FirstOrDefaultAsync(ct);
 
+        // Every write is rejected inside a locked period, so none is offered there.
+        var lockedUntil = await _db.Branches.Where(b => b.Id == voucher.BranchId).Select(b => b.LockedUntil).FirstOrDefaultAsync(ct);
+
         var dto = ToDto(voucher, ownerName);
-        var mayAct = voucher.OwnerUserId == _currentUser.UserId
-            || _currentUser.HasPermission(StockVoucherPermissions.EditAll(voucher.Type));
+        var mayAct = !IsLocked(lockedUntil, voucher.VoucherAt)
+            && (voucher.OwnerUserId == _currentUser.UserId
+                || _currentUser.HasPermission(StockVoucherPermissions.EditAll(voucher.Type)));
         var active = voucher.Status != StockVoucherStatus.Cancelled;
         dto.CanEdit = mayAct && active && _currentUser.HasPermission(StockVoucherPermissions.Edit(voucher.Type));
         dto.CanDelete = mayAct && active && _currentUser.HasPermission(StockVoucherPermissions.Delete(voucher.Type));
@@ -346,6 +350,7 @@ public class StockVoucherService : IStockVoucherService
 
             var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
             await _posting.AcquireLocksAsync(branchId, productIds, c);
+            await EnsureReferencesStillExistAsync(request, branchId, c);
             // Read after the shared branch gate, so a concurrent period lock change is serialized (review finding).
             await EnsureNotLockedAsync(branchId, new[] { voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
@@ -384,6 +389,7 @@ public class StockVoucherService : IStockVoucherService
             var productIds = voucher.Lines.Select(l => l.ProductId)
                 .Concat(request.Lines.Select(l => l.ProductId)).Distinct().ToList();
             await _posting.AcquireLocksAsync(voucher.BranchId, productIds, c);
+            await EnsureReferencesStillExistAsync(request, voucher.BranchId, c);
             await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt, voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
 
@@ -508,13 +514,45 @@ public class StockVoucherService : IStockVoucherService
         }
     }
 
+    /// ValidateAsync runs before the locks; a product or warehouse deleted (or a warehouse moved to another branch)
+    /// while this save waited on them is caught here, inside the transaction (review finding).
+    private async Task EnsureReferencesStillExistAsync(UpsertStockVoucherRequest request, Guid branchId, CancellationToken ct)
+    {
+        var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
+        var products = (await _db.Products.Where(p => productIds.Contains(p.Id)).Select(p => p.Id).ToListAsync(ct)).ToHashSet();
+        var warehouseIds = request.Lines.Select(l => l.WarehouseId ?? request.WarehouseId)
+            .Append(request.WarehouseId).Distinct().ToList();
+        var warehouses = (await _db.Warehouses
+            .Where(w => warehouseIds.Contains(w.Id) && w.BranchId == branchId)
+            .Select(w => w.Id)
+            .ToListAsync(ct)).ToHashSet();
+
+        var errors = new Dictionary<string, string[]>();
+        if (!warehouses.Contains(request.WarehouseId))
+            errors["warehouseId"] = new[] { "Kho không thuộc chi nhánh đang làm việc." };
+        for (var i = 0; i < request.Lines.Count; i++)
+        {
+            var line = request.Lines[i];
+            if (!products.Contains(line.ProductId))
+                errors[$"lines[{i}].productId"] = new[] { "Hàng hóa không tồn tại." };
+            if (!warehouses.Contains(line.WarehouseId ?? request.WarehouseId))
+                errors[$"lines[{i}].warehouseId"] = new[] { "Kho không thuộc chi nhánh đang làm việc." };
+        }
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+    }
+
     private async Task EnsureNotLockedAsync(Guid branchId, IEnumerable<DateTimeOffset> instants, CancellationToken ct)
     {
         var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(ct);
-        if (lockedUntil is { } locked && instants.Any(at => VnTime.ToVnDate(at) <= locked))
+        if (lockedUntil is { } locked && instants.Any(at => IsLocked(locked, at)))
             throw new DomainException("PERIOD_LOCKED",
                 string.Create(CultureInfo.InvariantCulture, $"Ngày chứng từ đã khóa sổ (đến {locked:dd/MM/yyyy})."));
     }
+
+    /// The VN date of `at` is on or before the branch's LockedUntil (D14, D18).
+    private static bool IsLocked(DateOnly? lockedUntil, DateTimeOffset at) =>
+        lockedUntil is { } locked && VnTime.ToVnDate(at) <= locked;
 
     /// Reference and amount rules (save rule 3), collected into one 400. `existing` is null on create.
     private async Task ValidateAsync(UpsertStockVoucherRequest request, Guid branchId, StockVoucher? existing, CancellationToken ct)
@@ -537,6 +575,9 @@ public class StockVoucherService : IStockVoucherService
             partner = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == request.PartnerId.Value, ct);
             if (partner is null)
                 Add("partnerId", "Đối tượng không tồn tại.");
+            // Only a newly chosen partner must be active, so old vouchers stay editable.
+            else if (partner.Status != CustomerStatus.Active && existing?.PartnerId != request.PartnerId)
+                Add("partnerId", "Đối tượng đã ngừng hoạt động.");
         }
         switch (reason?.PartnerType)
         {
@@ -585,7 +626,7 @@ public class StockVoucherService : IStockVoucherService
         var products = await LoadProductsAsync(request.Lines.Select(l => l.ProductId), ct);
         var storedLines = existing?.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id)
             ?? new Dictionary<Guid, StockVoucherLine>();
-        var priced = new List<(int Index, UpsertStockVoucherLineRequest Line, Product Product)>();
+        var priced = new List<(int Index, UpsertStockVoucherLineRequest Line, LineSnapshot Snapshot)>();
         for (var i = 0; i < request.Lines.Count; i++)
         {
             var line = request.Lines[i];
@@ -606,6 +647,7 @@ public class StockVoucherService : IStockVoucherService
             }
             if (productChanged && product.Status != ProductStatus.Active)
                 Add($"{key}.productId", "Hàng hóa đã ngừng kinh doanh.");
+            var snapshot = SnapshotOf(productChanged ? null : stored, product);
 
             var dimensionsValid = true;
             void RequirePositive(decimal? value, string field, string label)
@@ -616,7 +658,7 @@ public class StockVoucherService : IStockVoucherService
                     dimensionsValid = false;
                 }
             }
-            if (product.PricingMode == PricingMode.PerUnit)
+            if (snapshot.PricingMode == PricingMode.PerUnit)
             {
                 RequirePositive(line.Quantity, "quantity", "Số lượng");
             }
@@ -624,9 +666,9 @@ public class StockVoucherService : IStockVoucherService
             {
                 RequirePositive(line.SheetCount, "sheetCount", "Số tấm");
                 RequirePositive(line.Length, "length", "Chiều dài");
-                if (product.PricingMode is PricingMode.PerSquareMeter or PricingMode.PerCubicMeter)
+                if (snapshot.PricingMode is PricingMode.PerSquareMeter or PricingMode.PerCubicMeter)
                     RequirePositive(line.Width, "width", "Chiều rộng");
-                if (product.PricingMode == PricingMode.PerCubicMeter)
+                if (snapshot.PricingMode == PricingMode.PerCubicMeter)
                     RequirePositive(line.Thickness, "thickness", "Chiều dày");
             }
 
@@ -637,17 +679,31 @@ public class StockVoucherService : IStockVoucherService
             if (line.VatRate is < 0 or > 100)
                 Add($"{key}.vatRate", "Thuế suất phải từ 0 đến 100.");
             if (dimensionsValid)
-                priced.Add((i, line, product));
+                priced.Add((i, line, snapshot));
         }
 
-        // Amount-based rules use the calculator's line amounts (allocations do not matter here).
-        var computed = StockVoucherCalculator.Compute(new StockHeaderInput(request.Type, 0m, 0m, false),
-            priced.Select(x => ToCalculatorInput(x.Line, x.Product)).ToList()).Lines;
+        // Amount-based rules use the calculator's line amounts (allocations do not matter here), one line at a time
+        // so a line whose quantity or amount overflows is reported on its own key.
         var netSum = 0m;
-        for (var j = 0; j < priced.Count; j++)
+        var lineInputs = new List<StockLineInput>();
+        foreach (var (index, line, snapshot) in priced)
         {
-            var (index, line, _) = priced[j];
-            var result = computed[j];
+            var input = ToCalculatorInput(line, snapshot);
+            StockLineResult result;
+            try
+            {
+                result = StockVoucherCalculator.Compute(new StockHeaderInput(request.Type, 0m, 0m, false), new[] { input }).Lines[0];
+            }
+            catch (OverflowException)
+            {
+                Add($"lines[{index}].quantity", "Số lượng hoặc thành tiền quá lớn.");
+                continue;
+            }
+            lineInputs.Add(input);
+            if (result.Quantity >= MaxQuantity)
+                Add($"lines[{index}].quantity", "Số lượng quá lớn.");
+            if (result.Amount >= MaxMoney)
+                Add($"lines[{index}].unitPrice", "Thành tiền quá lớn.");
             if (result.Quantity <= 0)
                 Add($"lines[{index}].quantity", "Số lượng phải lớn hơn 0.");
             if (line.DiscountManual && line.DiscountAmount is { } amount && (amount < 0 || amount > result.Amount))
@@ -661,13 +717,32 @@ public class StockVoucherService : IStockVoucherService
         if (request.PaidAmount < 0)
             Add("paidAmount", "Số tiền thanh toán không được âm.");
 
+        // Voucher totals share the numeric(18,2) limit of the line amounts.
+        if (errors.Count == 0)
+        {
+            var totals = StockVoucherCalculator.Compute(
+                new StockHeaderInput(request.Type, request.Freight, request.OrderDiscount, false), lineInputs).Totals;
+            if (totals.GoodsAmount >= MaxMoney || totals.Total >= MaxMoney)
+                Add("lines", "Tổng tiền phiếu quá lớn.");
+        }
+
         if (errors.Count > 0)
             throw new ValidationDomainException(errors, null);
     }
 
+    // Exclusive upper bounds of numeric(18,2) and numeric(18,6).
+    private const decimal MaxMoney = 10_000_000_000_000_000m;
+    private const decimal MaxQuantity = 1_000_000_000_000m;
+
     // ---- Writes -----------------------------------------------------------------------------
 
+    private const int CodeBatchSize = 100;
+    private const int MaxCodeBatches = 1000;
+
     /// `peek` reads the next number without using it (form defaults); otherwise the counter is incremented.
+    /// A number whose code is already taken in the (type, branch) is skipped: after a reset-policy change the
+    /// counter of the new period can restart on codes issued under the old one (review finding). Candidates are
+    /// checked in batches; on create the counter row lock is held, so the chosen code stays free until commit.
     private async Task<string> NextCodeAsync(StockDirection type, Guid branchId, DateTimeOffset voucherAt, bool peek,
         CancellationToken ct)
     {
@@ -677,10 +752,34 @@ public class StockVoucherService : IStockVoucherService
             ?? throw new DomainException("NUMBERING_NOT_CONFIGURED", "Chi nhánh chưa cấu hình đánh số chứng từ.");
         var date = VnTime.ToVnDate(voucherAt);
         var periodKey = DocumentNumberFormatter.PeriodKey(numbering.ResetPolicy, date);
-        var counter = peek
+        var next = peek
             ? await _counter.PeekNextAsync(docType, branchId, periodKey, ct)
             : await _counter.NextAsync(docType, branchId, periodKey, ct);
-        return DocumentNumberFormatter.Format(numbering.Pattern, numbering.Prefix, numbering.Length, counter, date);
+
+        for (var batch = 0; batch < MaxCodeBatches; batch++)
+        {
+            var candidates = Enumerable.Range(0, CodeBatchSize)
+                .Select(k => next + batch * CodeBatchSize + k)
+                .Select(value => (Value: value,
+                    Code: DocumentNumberFormatter.Format(numbering.Pattern, numbering.Prefix, numbering.Length, value, date)))
+                .ToList();
+            var codes = candidates.Select(c => c.Code).ToList();
+            // Same scope as the unique index (type, branch_id, code) WHERE is_deleted = false: the query filter matches it.
+            var taken = (await _db.StockVouchers
+                .Where(v => v.Type == type && v.BranchId == branchId && codes.Contains(v.Code))
+                .Select(v => v.Code)
+                .ToListAsync(ct)).ToHashSet();
+
+            foreach (var (value, code) in candidates)
+            {
+                if (taken.Contains(code))
+                    continue;
+                if (!peek && value != next)
+                    await _counter.AdvanceToAsync(docType, branchId, periodKey, value, ct);
+                return code;
+            }
+        }
+        throw new ConflictException("Không tìm được số chứng từ còn trống. Vui lòng đổi mẫu đánh số.");
     }
 
     /// Header fields, line upsert and totals from StockVoucherCalculator (never from the client).
@@ -706,11 +805,14 @@ public class StockVoucherService : IStockVoucherService
 
         var requested = request.Lines.OrderBy(l => l.SortOrder).ToList();
         var products = await LoadProductsAsync(requested.Select(l => l.ProductId), ct);
+        var existing = voucher.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id);
+        var snapshots = requested.Select(l => SnapshotOf(
+            l.Id is { } lineId && existing.TryGetValue(lineId, out var stored) && stored.ProductId == l.ProductId ? stored : null,
+            products[l.ProductId])).ToList();
         var computation = StockVoucherCalculator.Compute(
             new StockHeaderInput(request.Type, request.Freight, request.OrderDiscount, settings.NetExcludesVat),
-            requested.Select(l => ToCalculatorInput(l, products[l.ProductId])).ToList());
+            requested.Select((l, i) => ToCalculatorInput(l, snapshots[i])).ToList());
 
-        var existing = voucher.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id);
         var kept = new HashSet<Guid>();
         for (var i = 0; i < requested.Count; i++)
         {
@@ -727,16 +829,17 @@ public class StockVoucherService : IStockVoucherService
             }
 
             var product = products[line.ProductId];
+            var snapshot = snapshots[i];
             var result = computation.Lines[i];
             entity.SortOrder = line.SortOrder;
             entity.ProductId = product.Id;
             entity.ProductCode = product.Code;
             entity.ProductName = product.Name;
             entity.WarehouseId = line.WarehouseId ?? request.WarehouseId;
-            entity.TrackInventory = product.TrackInventory;
-            entity.PricingMode = product.PricingMode;
-            entity.UnitName = StockUnit.NameFor(product.PricingMode, product.Unit?.Name);
-            entity.PriceIncludesVat = product.PriceIncludesVat;
+            entity.TrackInventory = snapshot.TrackInventory;
+            entity.PricingMode = snapshot.PricingMode;
+            entity.UnitName = snapshot.UnitName;
+            entity.PriceIncludesVat = snapshot.PriceIncludesVat;
             entity.SheetCount = line.SheetCount;
             entity.Length = line.Length;
             entity.Width = line.Width;
@@ -779,8 +882,19 @@ public class StockVoucherService : IStockVoucherService
             .ToDictionaryAsync(p => p.Id, ct);
     }
 
-    private static StockLineInput ToCalculatorInput(UpsertStockVoucherLineRequest line, Product product) =>
-        new(product.TrackInventory, product.PricingMode, product.PriceIncludesVat,
+    /// Stock fields a line keeps from the moment its product was chosen.
+    private sealed record LineSnapshot(bool TrackInventory, PricingMode PricingMode, string UnitName, bool PriceIncludesVat);
+
+    /// A kept line (same id, same product) keeps its stored snapshot, so a later product change (e.g. TrackInventory
+    /// turned on) never re-posts an old voucher differently; new lines and lines whose product changed (`stored`
+    /// null) take the current product (review finding).
+    private static LineSnapshot SnapshotOf(StockVoucherLine? stored, Product product) => stored is not null
+        ? new(stored.TrackInventory, stored.PricingMode, stored.UnitName, stored.PriceIncludesVat)
+        : new(product.TrackInventory, product.PricingMode, StockUnit.NameFor(product.PricingMode, product.Unit?.Name),
+            product.PriceIncludesVat);
+
+    private static StockLineInput ToCalculatorInput(UpsertStockVoucherLineRequest line, LineSnapshot snapshot) =>
+        new(snapshot.TrackInventory, snapshot.PricingMode, snapshot.PriceIncludesVat,
             line.SheetCount, line.Length, line.Width, line.Thickness, line.Quantity,
             line.UnitPrice, line.DiscountRate, line.DiscountAmount, line.DiscountManual, line.VatRate);
 
@@ -804,7 +918,8 @@ public class StockVoucherService : IStockVoucherService
         await _posting.PostAsync(SourceTypeOf(voucher.Type), voucher.Id, drafts, acknowledge, ct);
     }
 
-    /// D35: CostPrice follows the latest Active, non-deleted stock-in line (by VoucherAt, then SortOrder).
+    /// D35: CostPrice follows the latest Active, non-deleted stock-in line (by VoucherAt, then the voucher's
+    /// CreatedAt and Code so vouchers with the same VoucherAt resolve deterministically, then SortOrder).
     private async Task RecomputeCostPricesAsync(IEnumerable<Guid> productIds, CancellationToken ct)
     {
         foreach (var productId in productIds.Distinct())
@@ -814,6 +929,8 @@ public class StockVoucherService : IStockVoucherService
                     && l.StockVoucher!.Type == StockDirection.In
                     && l.StockVoucher.Status == StockVoucherStatus.Active)
                 .OrderByDescending(l => l.StockVoucher!.VoucherAt)
+                .ThenByDescending(l => l.StockVoucher!.CreatedAt)
+                .ThenByDescending(l => l.StockVoucher!.Code)
                 .ThenByDescending(l => l.SortOrder)
                 .Select(l => new { l.UnitPrice, l.StockVoucher!.VoucherAt })
                 .FirstOrDefaultAsync(ct);

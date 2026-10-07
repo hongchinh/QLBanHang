@@ -19,6 +19,12 @@ public sealed class PostgresDocumentCounter : IDocumentCounter
             ON CONFLICT (doc_type, branch_id, period_key) DO UPDATE SET value = document_counters.value + 1
             RETURNING value AS ""Value""").ToListAsync(ct)).Single();
 
+    public Task AdvanceToAsync(DocumentType docType, Guid branchId, string periodKey, long value, CancellationToken ct = default) =>
+        _db.Database.ExecuteSqlInterpolatedAsync($@"
+            INSERT INTO document_counters (doc_type, branch_id, period_key, value)
+            VALUES ({(int)docType}, {branchId}, {periodKey}, {value})
+            ON CONFLICT (doc_type, branch_id, period_key) DO UPDATE SET value = GREATEST(document_counters.value, EXCLUDED.value)", ct);
+
     public async Task<long> PeekNextAsync(DocumentType docType, Guid branchId, string periodKey, CancellationToken ct = default) =>
         (await _db.Database.SqlQuery<long>($@"
             SELECT COALESCE((

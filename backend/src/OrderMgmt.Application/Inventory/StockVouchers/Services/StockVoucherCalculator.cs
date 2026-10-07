@@ -42,13 +42,14 @@ public static class StockVoucherCalculator
             nets[i] = amounts[i] - discounts[i];
         }
 
-        var orderDiscounts = Allocate(header.OrderDiscount, nets);
+        var orderDiscounts = Allocate(header.OrderDiscount, nets, capAtWeight: true);
         var netsAfterOrderDiscount = nets.Select((net, i) => net - orderDiscounts[i]).ToArray();
 
         // Freight only raises the value of tracked goods received (VAT is never part of it, D6).
         var isIn = header.Direction == StockDirection.In;
         var freights = isIn
-            ? Allocate(header.Freight, netsAfterOrderDiscount.Select((net, i) => lines[i].TrackInventory ? net : 0m).ToArray())
+            ? Allocate(header.Freight, netsAfterOrderDiscount.Select((net, i) => lines[i].TrackInventory ? net : 0m).ToArray(),
+                capAtWeight: false)
             : new decimal[lines.Count];
 
         var results = new StockLineResult[lines.Count];
@@ -78,9 +79,11 @@ public static class StockVoucherCalculator
         return new StockVoucherComputation(results, totals);
     }
 
-    /// Splits `total` by `weights`; the last positive weight takes the rounding remainder.
-    /// Nothing is allocated when the weights sum to zero.
-    private static decimal[] Allocate(decimal total, IReadOnlyList<decimal> weights)
+    /// Splits `total` by `weights` (D10): every positive weight but the last gets R0 of its share and the
+    /// last positive weight takes the rounding remainder. When that remainder would make an allocation
+    /// negative (or larger than its weight with `capAtWeight`), it falls back to the largest-remainder
+    /// method. Nothing is allocated when the weights sum to zero.
+    private static decimal[] Allocate(decimal total, IReadOnlyList<decimal> weights, bool capAtWeight)
     {
         var allocations = new decimal[weights.Count];
         var weightSum = weights.Sum();
@@ -95,12 +98,49 @@ public static class StockVoucherCalculator
         var allocated = 0m;
         for (var i = 0; i < weights.Count; i++)
         {
-            if (i == last)
+            if (i == last || weights[i] <= 0m)
                 continue;
             allocations[i] = R0(total * weights[i] / weightSum);
             allocated += allocations[i];
         }
         allocations[last] = total - allocated;
+
+        var valid = allocations.Select((a, i) => a >= 0m && (!capAtWeight || a <= weights[i])).All(ok => ok);
+        return valid ? allocations : AllocateLargestRemainder(total, weights, weightSum);
+    }
+
+    // Floors every share, then hands out what is left one unit at a time by largest fraction
+    // (ties: the later line first), so no allocation is negative or above its share rounded up.
+    private static decimal[] AllocateLargestRemainder(decimal total, IReadOnlyList<decimal> weights, decimal weightSum)
+    {
+        var allocations = new decimal[weights.Count];
+        var fractions = new decimal[weights.Count];
+        for (var i = 0; i < weights.Count; i++)
+        {
+            if (weights[i] <= 0m)
+                continue;
+            var share = total * weights[i] / weightSum;
+            allocations[i] = Math.Floor(share);
+            fractions[i] = share - allocations[i];
+        }
+
+        var order = Enumerable.Range(0, weights.Count)
+            .Where(i => weights[i] > 0m)
+            .OrderByDescending(i => fractions[i])
+            .ThenByDescending(i => i)
+            .ToArray();
+        var left = total - allocations.Sum();
+        while (left > 0m)
+        {
+            foreach (var i in order)
+            {
+                if (left <= 0m)
+                    break;
+                var add = Math.Min(1m, left);
+                allocations[i] += add;
+                left -= add;
+            }
+        }
         return allocations;
     }
 

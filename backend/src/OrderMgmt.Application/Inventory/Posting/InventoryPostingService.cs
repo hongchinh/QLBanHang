@@ -66,7 +66,7 @@ public class InventoryPostingService : IInventoryPostingService
         // Already negative before the window: the first negative point lies before From and does not move.
         if (p.BaseRunningQty < 0)
             return false;
-        return p.OldFirstNegativeAt is not null && p.FirstNegativeAt < p.OldFirstNegativeAt;
+        return p.FirstNegativeMovedEarlier;
     }
 
     private static decimal? MinOf(decimal? a, decimal? b) =>
@@ -90,7 +90,8 @@ public class InventoryPostingService : IInventoryPostingService
             {
                 var product = products[s.ProductId];
                 var unit = StockUnit.NameFor(product.PricingMode, product.UnitName);
-                var at = s.FirstNegativeAt!.Value.ToOffset(VnTime.Offset);
+                // The deepest point with its own time, not the time of the first negative row (review finding).
+                var at = s.MinAt!.Value.ToOffset(VnTime.Offset);
                 return new[]
                 {
                     string.Create(CultureInfo.InvariantCulture,

@@ -221,7 +221,10 @@ export interface StockVoucherActionRequest {
   acknowledgeNegativeStock?: boolean;
 }
 
-// GET /stock-vouchers/partners returns the customer search shape.
-export type PartnerSearchItem = CustomerSearchItem;
+// GET /stock-vouchers/partners returns the customer search shape with the partner roles.
+export interface PartnerSearchItem extends CustomerSearchItem {
+  isCustomer: boolean;
+  isSupplier: boolean;
+}
 
 export type { StockDirection };

@@ -71,6 +71,20 @@ describe('useBranchContext', () => {
     expect(useBranchStore.getState().workingBranchId).toBe('b1');
   });
 
+  it('keeps the working branch when /me/branches refetches', async () => {
+    mockMyBranches(MY_BRANCHES);
+    const { result, rerender } = renderHook(() => useBranchContext());
+    await waitFor(() => expect(result.current.ready).toBe(true));
+
+    // Switched in this tab, storage write blocked (nothing in localStorage).
+    useBranchStore.setState({ workingBranchId: 'b2' });
+    mockMyBranches({ ...MY_BRANCHES, branches: [...MY_BRANCHES.branches] });
+    rerender();
+
+    await waitFor(() => expect(result.current.workingBranch?.id).toBe('b2'));
+    expect(useBranchStore.getState().workingBranchId).toBe('b2');
+  });
+
   it('is ready when /me/branches fails (backend default applies)', () => {
     mockMyBranches(undefined, true);
 

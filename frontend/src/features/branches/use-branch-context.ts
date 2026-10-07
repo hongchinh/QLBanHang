@@ -4,7 +4,8 @@ import { useBranchStore } from '@/stores/branch-store';
 import { useMyBranches } from './hooks';
 
 // Resolves the working branch once per session: the user's stored choice when
-// it is still allowed, otherwise the default branch. `ready` turns true once the
+// it is still allowed, otherwise the default branch. Later /me/branches refetches
+// never touch it again (only the switcher and logout change it, review finding). `ready` turns true once the
 // store holds the branch (or /me/branches failed — the backend default applies),
 // so pages never fetch before X-Branch-Id is set.
 export function useBranchContext() {
@@ -16,7 +17,9 @@ export function useBranchContext() {
 
   useEffect(() => {
     if (!myBranches || !userId) return;
-    restore(userId, myBranches.branches.map((b) => b.id), myBranches.defaultBranchId);
+    if (useBranchStore.getState().workingBranchId === null) {
+      restore(userId, myBranches.branches.map((b) => b.id), myBranches.defaultBranchId);
+    }
     setRestored(true);
   }, [myBranches, userId, restore]);
 

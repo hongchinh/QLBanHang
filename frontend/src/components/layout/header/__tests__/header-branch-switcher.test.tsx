@@ -102,6 +102,10 @@ describe('HeaderBranchSwitcher', () => {
     await waitFor(() => expect(useBranchStore.getState().workingBranchId).toBe('b2'));
     expect(localStorage.getItem('working_branch_u1')).toBe('b2');
     await waitFor(() => expect(resetSpy).toHaveBeenCalled());
+    // Its own /me/branches query is kept, so the switcher does not disappear.
+    const { predicate } = resetSpy.mock.calls[0][0] as { predicate: (q: { queryKey: unknown[] }) => boolean };
+    expect(predicate({ queryKey: ['branches', 'me'] })).toBe(false);
+    expect(predicate({ queryKey: ['stock-vouchers', 'list'] })).toBe(true);
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/stock-in$/));
   });
 });

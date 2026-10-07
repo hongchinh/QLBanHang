@@ -1,8 +1,6 @@
 using System.Net;
-using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using OrderMgmt.Application.Inventory.Settings.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -115,12 +113,5 @@ public class StockVoucherCreateTests : InventoryTestBase
         product.CostPrice.Should().Be(50_000m);
         product.CostPriceUpdatedOn.Should().Be(Vn("2026-10-05 08:00"));
         await AssertInvariantsAsync();
-    }
-
-    private async Task SetStockInNumberingAsync(string pattern, NumberingResetPolicy policy)
-    {
-        var response = await _client.PutAsJsonAsync("/api/inventory/numbering/StockIn",
-            new UpdateNumberingRequest { Prefix = "PN", Length = 5, ResetPolicy = policy, Pattern = pattern });
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }

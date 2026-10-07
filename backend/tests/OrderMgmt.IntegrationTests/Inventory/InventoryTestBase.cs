@@ -10,6 +10,7 @@ using OrderMgmt.Application.Identity.Interfaces;
 using OrderMgmt.Application.Identity.Models;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Ledger;
+using OrderMgmt.Application.Inventory.Settings.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Application.Inventory.Warehouses.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
@@ -320,6 +321,18 @@ public abstract class InventoryTestBase : QuotationTestBase
             new SetPeriodLockRequest { LockedUntil = lockedUntil });
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
+
+    /// StockIn numbering of the main branch (prefix PN, length 5) through the API.
+    protected async Task SetStockInNumberingAsync(string pattern, NumberingResetPolicy policy)
+    {
+        var response = await _client.PutAsJsonAsync("/api/inventory/numbering/StockIn",
+            new UpdateNumberingRequest { Prefix = "PN", Length = 5, ResetPolicy = policy, Pattern = pattern });
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    /// GET /api/stock-vouchers/defaults with the given query string (e.g. "type=In").
+    protected static async Task<StockVoucherDefaultsDto> GetDefaultsAsync(HttpClient client, string query) =>
+        await ReadDataAsync<StockVoucherDefaultsDto>(await client.GetAsync($"/api/stock-vouchers/defaults?{query}"));
 
     protected Task<Guid> CreatePartnerAsync(string code, bool isCustomer, bool isSupplier) =>
         InDbAsync(async db =>

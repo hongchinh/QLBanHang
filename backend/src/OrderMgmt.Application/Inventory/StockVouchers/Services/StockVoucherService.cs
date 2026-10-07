@@ -1,5 +1,6 @@
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.Catalog.Customers.Interfaces;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
@@ -27,9 +28,11 @@ public class StockVoucherService : IStockVoucherService
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryPostingService _posting;
     private readonly IDocumentCounter _counter;
+    private readonly ICustomerService _customers;
 
     public StockVoucherService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch,
-        IDateTime clock, ITransactionRunner transaction, IInventoryPostingService posting, IDocumentCounter counter)
+        IDateTime clock, ITransactionRunner transaction, IInventoryPostingService posting, IDocumentCounter counter,
+        ICustomerService customers)
     {
         _db = db;
         _currentUser = currentUser;
@@ -38,6 +41,7 @@ public class StockVoucherService : IStockVoucherService
         _transaction = transaction;
         _posting = posting;
         _counter = counter;
+        _customers = customers;
     }
 
     public async Task<StockVoucherListResult> ListAsync(StockVoucherListRequest request, CancellationToken ct = default)
@@ -167,15 +171,99 @@ public class StockVoucherService : IStockVoucherService
         return owners.OrderBy(o => o.FullName, vietnameseComparer).ToList();
     }
 
-    public Task<StockVoucherDefaultsDto> GetDefaultsAsync(StockDirection type, DateTimeOffset? voucherAt, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    /// Form defaults: selections from the current user's latest-created voucher of the type, else the fallbacks;
+    /// NextCode is a peek and does not use a number.
+    public async Task<StockVoucherDefaultsDto> GetDefaultsAsync(StockDirection type, DateTimeOffset? voucherAt, CancellationToken ct = default)
+    {
+        EnsurePermission(StockVoucherPermissions.Create(type));
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var userId = _currentUser.UserId;
+        var previous = await _db.StockVouchers.AsNoTracking()
+            .Where(v => v.BranchId == branchId && v.Type == type && v.OwnerUserId == userId)
+            .OrderByDescending(v => v.CreatedAt)
+            .Select(v => new { v.VoucherAt, v.WarehouseId, v.ReasonId, v.PaymentMethodId })
+            .FirstOrDefaultAsync(ct);
+        var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, ct);
 
-    public Task<IReadOnlyList<StockAtResult>> GetStockAtAsync(StockAtRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+        // Never IDateTime.Now (D27).
+        var at = voucherAt is { } requested ? VnTime.ToUtc(requested)
+            : settings.DefaultDateMode == DefaultDateMode.PreviousVoucher && previous is not null ? previous.VoucherAt
+            : _clock.UtcNow;
 
-    public Task<List<CustomerSearchItemDto>> SearchPartnersAsync(StockDirection type, string? keyword, int limit,
-        Guid? reasonId, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+        return new StockVoucherDefaultsDto
+        {
+            NextCode = await NextCodeAsync(type, branchId, at, peek: true, ct),
+            VoucherAt = at,
+            WarehouseId = previous?.WarehouseId ?? await _db.Warehouses.AsNoTracking()
+                .Where(w => w.BranchId == branchId && w.IsActive)
+                .OrderBy(w => w.Code)
+                .Select(w => (Guid?)w.Id)
+                .FirstOrDefaultAsync(ct),
+            ReasonId = previous?.ReasonId ?? await _db.StockReasons.AsNoTracking()
+                .Where(r => r.Direction == type)
+                .OrderByDescending(r => r.IsSystem)
+                .ThenBy(r => r.Code)
+                .Select(r => (Guid?)r.Id)
+                .FirstOrDefaultAsync(ct),
+            PaymentMethodId = previous?.PaymentMethodId,
+        };
+    }
+
+    /// Quantity per requested (product, warehouse) from the working branch's ledger up to `At` (inclusive),
+    /// without the rows of the voucher being edited; pairs without rows return 0.
+    public async Task<IReadOnlyList<StockAtResult>> GetStockAtAsync(StockAtRequest request, CancellationToken ct = default)
+    {
+        EnsurePermission(StockVoucherPermissions.View(request.Type));
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var at = VnTime.ToUtc(request.At);
+        var pairs = request.Items.Select(i => (i.ProductId, i.WarehouseId)).Distinct().ToList();
+        var productIds = pairs.Select(p => p.ProductId).Distinct().ToList();
+        var warehouseIds = pairs.Select(p => p.WarehouseId).Distinct().ToList();
+
+        var rows = _db.InventoryLedger.AsNoTracking()
+            .Where(e => e.BranchId == branchId && e.PostedAt <= at
+                && productIds.Contains(e.ProductId) && warehouseIds.Contains(e.WarehouseId));
+        if (request.ExcludeVoucherId is { } excluded)
+            rows = rows.Where(e => e.SourceId != excluded);
+
+        var quantities = await rows
+            .GroupBy(e => new { e.ProductId, e.WarehouseId })
+            .Select(g => new { g.Key.ProductId, g.Key.WarehouseId, Quantity = g.Sum(e => e.QtyIn - e.QtyOut) })
+            .ToDictionaryAsync(x => (x.ProductId, x.WarehouseId), x => x.Quantity, ct);
+
+        return pairs.Select(p => new StockAtResult
+        {
+            ProductId = p.ProductId,
+            WarehouseId = p.WarehouseId,
+            Quantity = quantities.GetValueOrDefault(p),
+        }).ToList();
+    }
+
+    /// Partner picker (D3). With a reason (form): its partner type, active partners only.
+    /// Without one (list filter): any role, inactive partners included.
+    public async Task<List<CustomerSearchItemDto>> SearchPartnersAsync(StockDirection type, string? keyword, int limit,
+        Guid? reasonId, CancellationToken ct = default)
+    {
+        EnsurePermission(StockVoucherPermissions.View(type));
+        var partnerType = PartnerType.Any;
+        if (reasonId is { } id)
+        {
+            var reason = await _db.StockReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct);
+            if (reason is null || reason.Direction != type)
+                throw new ValidationDomainException(new Dictionary<string, string[]>
+                {
+                    ["reasonId"] = new[] { reason is null ? "Lý do không tồn tại." : "Lý do không đúng loại phiếu." },
+                }, null);
+            partnerType = reason.PartnerType;
+        }
+
+        return await _customers.SearchAsync(new CustomerSearchRequest
+        {
+            Keyword = keyword ?? string.Empty,
+            Limit = limit,
+            ActiveOnly = reasonId.HasValue,
+        }, partnerType, ct);
+    }
 
     public async Task<StockVoucherDto> GetAsync(Guid id, CancellationToken ct = default)
     {
@@ -256,7 +344,7 @@ public class StockVoucherService : IStockVoucherService
             var voucher = new StockVoucher
             {
                 Type = request.Type,
-                Code = await NextCodeAsync(request.Type, branchId, voucherAt, c),
+                Code = await NextCodeAsync(request.Type, branchId, voucherAt, peek: false, c),
                 BranchId = branchId,
                 OwnerUserId = _currentUser.UserId ?? throw new UnauthorizedAccessException(),
             };
@@ -538,15 +626,19 @@ public class StockVoucherService : IStockVoucherService
 
     // ---- Writes -----------------------------------------------------------------------------
 
-    private async Task<string> NextCodeAsync(StockDirection type, Guid branchId, DateTimeOffset voucherAt, CancellationToken ct)
+    /// `peek` reads the next number without using it (form defaults); otherwise the counter is incremented.
+    private async Task<string> NextCodeAsync(StockDirection type, Guid branchId, DateTimeOffset voucherAt, bool peek,
+        CancellationToken ct)
     {
         var docType = DocTypeOf(type);
         var numbering = await _db.DocumentNumberings.AsNoTracking()
             .SingleOrDefaultAsync(n => n.DocType == docType && n.BranchId == branchId, ct)
             ?? throw new DomainException("NUMBERING_NOT_CONFIGURED", "Chi nhánh chưa cấu hình đánh số chứng từ.");
         var date = VnTime.ToVnDate(voucherAt);
-        var counter = await _counter.NextAsync(docType, branchId,
-            DocumentNumberFormatter.PeriodKey(numbering.ResetPolicy, date), ct);
+        var periodKey = DocumentNumberFormatter.PeriodKey(numbering.ResetPolicy, date);
+        var counter = peek
+            ? await _counter.PeekNextAsync(docType, branchId, periodKey, ct)
+            : await _counter.NextAsync(docType, branchId, periodKey, ct);
         return DocumentNumberFormatter.Format(numbering.Pattern, numbering.Prefix, numbering.Length, counter, date);
     }
 

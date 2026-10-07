@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
@@ -38,6 +39,26 @@ public class StockVouchersController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<IReadOnlyList<StockVoucherOwnerDto>>>> ListOwners(
         [FromQuery] StockDirection type, CancellationToken ct)
         => Success(await _service.ListOwnersAsync(type, ct));
+
+    /// `voucherAt` must carry an offset (…Z or +07:00).
+    [HttpGet("defaults")]
+    public async Task<ActionResult<ApiResponse<StockVoucherDefaultsDto>>> GetDefaults(
+        [FromQuery] StockDirection type, [FromQuery] DateTimeOffset? voucherAt, CancellationToken ct)
+        => Success(await _service.GetDefaultsAsync(type, voucherAt, ct));
+
+    [HttpPost("stock-at")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<StockAtResult>>>> GetStockAt(
+        [FromBody] StockAtRequest request, CancellationToken ct)
+        => Success(await _service.GetStockAtAsync(request, ct));
+
+    [HttpGet("partners")]
+    public async Task<ActionResult<ApiResponse<List<CustomerSearchItemDto>>>> SearchPartners(
+        [FromQuery] StockDirection type,
+        [FromQuery] string? keyword = null,
+        [FromQuery] int limit = 20,
+        [FromQuery] Guid? reasonId = null,
+        CancellationToken ct = default)
+        => Success(await _service.SearchPartnersAsync(type, keyword, limit, reasonId, ct));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Get(Guid id, CancellationToken ct)

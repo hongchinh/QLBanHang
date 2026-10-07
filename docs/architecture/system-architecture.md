@@ -138,7 +138,7 @@ Opening stock (`/api/inventory/opening-stock`) follows the same flow with source
 
 **Costing.** Periodic weighted average per period (month/quarter/year) and scope (branch or warehouse). The opening of a run is summed from the ledger before the period (D7); a zero closing quantity pushes the rounding residual to the last outbound row (D8); a negative average uses the previous average (D37). Fully locked periods are frozen; a partially locked period is recomputed. Changing the costing period, scope or `PurchaseCostIncludesVat` recalculates every branch from the first unlocked period (D11, D33). Report values follow the costing scope (D32); values of a period that has not ended are flagged provisional.
 
-**Error codes.** 422 `NEGATIVE_STOCK_WARNING` (resend with `acknowledgeNegativeStock: true`) and `NEGATIVE_STOCK_BLOCKED`, with `details` keyed `"{productCode}@{warehouseCode}"`; 409 `CONCURRENCY`; 400 `PERIOD_LOCKED`; 400 `VALIDATION` with camelCase keys such as `lines[0].width`.
+**Error codes.** 422 `NEGATIVE_STOCK_WARNING` (resend with `acknowledgeNegativeStock: true`) and `NEGATIVE_STOCK_BLOCKED`, with `details` keyed `"{productCode}@{warehouseCode}"`; 409 `CONCURRENCY`; 409 `DUPLICATE` (unique index violation); 400 `PERIOD_LOCKED`; 400 `VALIDATION` with camelCase keys such as `lines[0].width`.
 
 ### Dashboard, Reports, Search, Branding And Notifications
 
@@ -173,6 +173,7 @@ Failures use the same envelope with `success=false` and an `error` object. `Glob
 | `NotFoundException` | 404 |
 | `ConflictException` | 409 |
 | `DbUpdateConcurrencyException` (code `CONCURRENCY`) | 409 |
+| `DbUpdateException` from a PostgreSQL unique violation `23505` (code `DUPLICATE`) | 409 |
 | `NegativeStockException` (`NEGATIVE_STOCK_WARNING` / `NEGATIVE_STOCK_BLOCKED`) | 422 |
 | Rate-limit rejection | 429 |
 | Unhandled exceptions | 500 |

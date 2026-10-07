@@ -1,6 +1,6 @@
 # Inventory Round 1 — Stock-in / Stock-out Vouchers (Đợt 1 — Kho)
 
-> Created: 2026-10-06 22:59:36 · Source design: [brainstorm SUMMARY](../../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md), [section-03 Round 1 design](../../brainstorms/261006-2139-stock-voucher-clone/section-03-round1-design.md), [section-05 review decisions](../../brainstorms/261006-2139-stock-voucher-clone/section-05-review-decisions.md), [section-02 legacy bug decisions](../../brainstorms/261006-2139-stock-voucher-clone/section-02-legacy-bug-decisions.md)
+> Created: 2026-10-06 22:59:36 · Source design: [brainstorm SUMMARY](../../../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md), [section-03 Round 1 design](../../../brainstorms/261006-2139-stock-voucher-clone/section-03-round1-design.md), [section-05 review decisions](../../../brainstorms/261006-2139-stock-voucher-clone/section-05-review-decisions.md), [section-02 legacy bug decisions](../../../brainstorms/261006-2139-stock-voucher-clone/section-02-legacy-bug-decisions.md)
 
 ## Goal
 
@@ -102,7 +102,7 @@ Deliver Round 1 of the legacy `PhieuNhapXuat` replacement: branches with a per-u
 - [x] Phase 08 — Frontend catalog & settings screens (L) — `phase-08-frontend-catalogs-settings.md`
 - [x] Phase 09 — Frontend stock voucher list & form (XL) — `phase-09-frontend-stock-vouchers.md`
 - [x] Phase 10 — Frontend opening stock & inventory reports (M) — `phase-10-frontend-opening-and-reports.md`
-- [-] Phase 11 — Documentation & final verification (S) — `phase-11-docs-and-verification.md`
+- [x] Phase 11 — Documentation & final verification (S) — `phase-11-docs-and-verification.md`
 
 Phases run in order. Phase 00 runs first because every later backend test relies on the fast test database. Phases 07–10 depend on the API contracts from 01–06 and must not start before Phase 06 is complete.
 

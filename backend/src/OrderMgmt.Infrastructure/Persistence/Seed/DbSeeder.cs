@@ -137,6 +137,37 @@ public static class DbSeeder
             (Permissions.Inventory.ManageCatalogs, Permissions.InventoryModule, "Quản lý kho, lý do nhập xuất, hình thức thanh toán"),
             (Permissions.Inventory.Settings, Permissions.InventoryModule, "Cấu hình kho, đánh số chứng từ"),
             (Permissions.Inventory.RecalcCost, Permissions.InventoryModule, "Tính lại giá vốn"),
+
+            (Permissions.Receipts.View, Permissions.CashModule, "Phiếu thu - Xem"),
+            (Permissions.Receipts.Create, Permissions.CashModule, "Phiếu thu - Tạo"),
+            (Permissions.Receipts.Edit, Permissions.CashModule, "Phiếu thu - Sửa"),
+            (Permissions.Receipts.Delete, Permissions.CashModule, "Phiếu thu - Xóa"),
+            (Permissions.Receipts.Cancel, Permissions.CashModule, "Phiếu thu - Hủy"),
+            (Permissions.Receipts.EditAll, Permissions.CashModule, "Phiếu thu - Sửa của người khác"),
+            (Permissions.Payments.View, Permissions.CashModule, "Phiếu chi - Xem"),
+            (Permissions.Payments.Create, Permissions.CashModule, "Phiếu chi - Tạo"),
+            (Permissions.Payments.Edit, Permissions.CashModule, "Phiếu chi - Sửa"),
+            (Permissions.Payments.Delete, Permissions.CashModule, "Phiếu chi - Xóa"),
+            (Permissions.Payments.Cancel, Permissions.CashModule, "Phiếu chi - Hủy"),
+            (Permissions.Payments.EditAll, Permissions.CashModule, "Phiếu chi - Sửa của người khác"),
+            (Permissions.FundTransfers.View, Permissions.CashModule, "Chuyển quỹ - Xem"),
+            (Permissions.FundTransfers.Create, Permissions.CashModule, "Chuyển quỹ - Tạo"),
+            (Permissions.FundTransfers.Edit, Permissions.CashModule, "Chuyển quỹ - Sửa"),
+            (Permissions.FundTransfers.Delete, Permissions.CashModule, "Chuyển quỹ - Xóa"),
+            (Permissions.FundTransfers.Cancel, Permissions.CashModule, "Chuyển quỹ - Hủy"),
+            (Permissions.FundTransfers.EditAll, Permissions.CashModule, "Chuyển quỹ - Sửa của người khác"),
+            (Permissions.DebtOffsets.View, Permissions.CashModule, "Bù trừ công nợ - Xem"),
+            (Permissions.DebtOffsets.Create, Permissions.CashModule, "Bù trừ công nợ - Tạo"),
+            (Permissions.DebtOffsets.Cancel, Permissions.CashModule, "Bù trừ công nợ - Hủy"),
+            (Permissions.DebtOffsets.Delete, Permissions.CashModule, "Bù trừ công nợ - Xóa"),
+            (Permissions.Debt.Matching, Permissions.CashModule, "Đối trừ chứng từ"),
+            (Permissions.Debt.OpeningBalance, Permissions.CashModule, "Nợ đầu kỳ"),
+            (Permissions.Debt.PartnerSummary, Permissions.CashModule, "Xem công nợ khách trên phiếu xuất"),
+            (Permissions.Cash.OpeningBalance, Permissions.CashModule, "Số dư quỹ đầu kỳ"),
+            (Permissions.Cash.ManageCatalogs, Permissions.CashModule, "Danh mục lý do thu/chi và quỹ"),
+            (Permissions.Cash.Settings, Permissions.CashModule, "Cấu hình tiền & công nợ"),
+            (Permissions.CreditLimits.Manage, Permissions.CashModule, "Hạn mức nợ"),
+            (Permissions.Reports.Cash, Permissions.ReportModule, "Sổ quỹ"),
         };
 
         var inserted = new HashSet<string>();
@@ -165,6 +196,7 @@ public static class DbSeeder
                 Permissions.Quotations.View, Permissions.Quotations.Create, Permissions.Quotations.Update,
                 Permissions.Quotations.Print,
                 Permissions.Quotations.TransferOwn,
+                Permissions.Debt.PartnerSummary,
             }),
             (RoleCodes.Accountant, "Kế toán", new[]
             {
@@ -175,6 +207,17 @@ public static class DbSeeder
                 // it still need it granted manually via the UI.
                 Permissions.Quotations.AccountingConfirm,
                 Permissions.Reports.Revenue, Permissions.Reports.Debt,
+                Permissions.Receipts.View, Permissions.Receipts.Create, Permissions.Receipts.Edit,
+                Permissions.Receipts.Delete, Permissions.Receipts.Cancel, Permissions.Receipts.EditAll,
+                Permissions.Payments.View, Permissions.Payments.Create, Permissions.Payments.Edit,
+                Permissions.Payments.Delete, Permissions.Payments.Cancel, Permissions.Payments.EditAll,
+                Permissions.FundTransfers.View, Permissions.FundTransfers.Create, Permissions.FundTransfers.Edit,
+                Permissions.FundTransfers.Delete, Permissions.FundTransfers.Cancel, Permissions.FundTransfers.EditAll,
+                Permissions.DebtOffsets.View, Permissions.DebtOffsets.Create, Permissions.DebtOffsets.Cancel,
+                Permissions.DebtOffsets.Delete,
+                Permissions.Debt.Matching, Permissions.Debt.OpeningBalance, Permissions.Debt.PartnerSummary,
+                Permissions.Cash.OpeningBalance, Permissions.Cash.ManageCatalogs, Permissions.Cash.Settings,
+                Permissions.CreditLimits.Manage, Permissions.Reports.Cash,
             }),
             (RoleCodes.Warehouse, "Kho / giao hàng", new[]
             {

@@ -9,9 +9,9 @@ declare const self: ServiceWorkerGlobalScope
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
-// Branch- or user-scoped API GETs are not routed here, so they go straight to the network.
+// Only allow-listed reference data is cached; every other API GET goes straight to the network.
 registerRoute(
-  ({ url }) => url.pathname.startsWith('/api/') && isCacheableApiPath(url.pathname),
+  ({ url }) => isCacheableApiPath(url.pathname),
   new NetworkFirst({
     cacheName: 'api-cache',
     networkTimeoutSeconds: 8,
@@ -20,7 +20,7 @@ registerRoute(
   'GET'
 )
 
-self.addEventListener('message', (event: any) => {
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
   if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting()
   }

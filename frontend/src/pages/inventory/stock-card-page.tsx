@@ -1,22 +1,23 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useStockCard } from '@/features/inventory-reports/hooks';
 import type { StockCardRow } from '@/features/inventory-reports/types';
 import type { ProductSuggestion } from '@/features/products/types';
 import { useWarehouses } from '@/features/warehouses/hooks';
+import { selectableWarehouses } from '@/features/warehouses/utils';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
+import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getErrorMessage } from '@/lib/api-client';
 import { formatStockQuantity } from '@/lib/stock-quantity';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
 
 const ALL = 'all';
-const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-const fmtMoney = (value?: number | null) => (value == null ? '' : money.format(value));
 
 function voucherLink(row: StockCardRow): string | null {
   if (row.sourceType === 'StockIn') return `/stock-in/${row.sourceId}`;
@@ -29,30 +30,56 @@ export function StockCardPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const productId = searchParams.get('productId') ?? '';
   const warehouseId = searchParams.get('warehouseId') ?? ALL;
-  const { data: warehouses = [] } = useWarehouses();
+  const { data: warehouses = [], isSuccess: warehousesLoaded } = useWarehouses();
 
   const [productText, setProductText] = useState('');
   const [from, setFrom] = useState(() => firstDayOfMonthYmd());
   const [to, setTo] = useState(() => todayYmd());
 
-  const { data: card, isLoading } = useStockCard({
-    productId,
-    warehouseId: warehouseId === ALL ? undefined : warehouseId,
-    from,
-    to,
-  });
+  // yyyy-MM-dd strings compare chronologically.
+  const rangeError = !from || !to ? 'Chọn đủ Từ ngày và Đến ngày' : from > to ? 'Từ ngày không được sau Đến ngày' : null;
+
+  const {
+    data: card,
+    isLoading,
+    isError,
+    error,
+  } = useStockCard(
+    {
+      productId,
+      warehouseId: warehouseId === ALL ? undefined : warehouseId,
+      from,
+      to,
+    },
+    { enabled: !rangeError },
+  );
 
   // A product given through the URL shows its code once the card arrives.
   useEffect(() => {
     if (card && card.productId === productId && !productText) setProductText(card.productCode);
   }, [card, productId, productText]);
 
-  const setParam = (key: string, value: string | null) => {
-    const next = new URLSearchParams(searchParams);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setSearchParams(next, { replace: true });
-  };
+  const setParam = useCallback(
+    (key: string, value: string | null) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (value) next.set(key, value);
+          else next.delete(key);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // A warehouse from another branch (old link, or the branch was switched) falls back to all warehouses.
+  useEffect(() => {
+    if (warehousesLoaded && warehouseId !== ALL && !warehouses.some((w) => w.id === warehouseId)) {
+      setParam('warehouseId', null);
+    }
+  }, [warehousesLoaded, warehouses, warehouseId, setParam]);
 
   const selectProduct = (s: ProductSuggestion) => {
     setProductText(s.code);
@@ -89,7 +116,7 @@ export function StockCardPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Tất cả kho</SelectItem>
-                {warehouses.map((w) => (
+                {selectableWarehouses(warehouses, warehouseId).map((w) => (
                   <SelectItem key={w.id} value={w.id}>
                     {w.code} — {w.name}
                   </SelectItem>
@@ -110,6 +137,10 @@ export function StockCardPage() {
 
       {!productId ? (
         <p className="text-sm text-muted-foreground">Chọn hàng hóa để xem thẻ kho</p>
+      ) : rangeError ? (
+        <p className="text-sm text-destructive">{rangeError}</p>
+      ) : isError ? (
+        <p className="text-sm text-destructive">{getErrorMessage(error)}</p>
       ) : card ? (
         <>
           <Card>
@@ -126,7 +157,7 @@ export function StockCardPage() {
                     <div className="font-semibold tabular-nums">
                       {formatStockQuantity(s.qty)} {card.unitName}
                     </div>
-                    {s.value != null && <div className="tabular-nums">{money.format(s.value)}</div>}
+                    {s.value != null && <div className="tabular-nums">{formatMoneyForDisplay(s.value)}</div>}
                   </div>
                 ))}
               </div>
@@ -178,11 +209,11 @@ export function StockCardPage() {
                         <td className="px-2 py-2 text-right tabular-nums">{row.qtyIn ? formatStockQuantity(row.qtyIn) : ''}</td>
                         <td className="px-2 py-2 text-right tabular-nums">{row.qtyOut ? formatStockQuantity(row.qtyOut) : ''}</td>
                         <td className="px-2 py-2 text-right tabular-nums">{formatStockQuantity(row.runningQty)}</td>
-                        {canViewCost && <td className="px-2 py-2 text-right tabular-nums">{fmtMoney(row.unitCost)}</td>}
-                        {canViewCost && <td className="px-2 py-2 text-right tabular-nums">{fmtMoney(row.inValue)}</td>}
-                        {canViewCost && <td className="px-2 py-2 text-right tabular-nums">{fmtMoney(row.costAmount)}</td>}
+                        {canViewCost && <td className="px-2 py-2 text-right tabular-nums">{formatMoneyForDisplay(row.unitCost)}</td>}
+                        {canViewCost && <td className="px-2 py-2 text-right tabular-nums">{formatMoneyForDisplay(row.inValue)}</td>}
+                        {canViewCost && <td className="px-2 py-2 text-right tabular-nums">{formatMoneyForDisplay(row.costAmount)}</td>}
                         {showRunningValue && (
-                          <td className="px-2 py-2 text-right tabular-nums">{fmtMoney(row.runningValue)}</td>
+                          <td className="px-2 py-2 text-right tabular-nums">{formatMoneyForDisplay(row.runningValue)}</td>
                         )}
                       </tr>
                     );

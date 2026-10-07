@@ -4,12 +4,13 @@ import type {
   InventorySettings,
   UpdateInventorySettingsRequest,
 } from '@/features/inventory-settings/types';
+import { RECALC_TIMEOUT_TOAST } from '@/features/inventory-settings/utils';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { formatApiErrorDetails, getErrorMessage } from '@/lib/api-client';
+import { formatApiErrorDetails, getErrorMessage, isRequestTimeout } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 
 const COSTING_METHODS = [
@@ -92,6 +93,12 @@ function InventorySettingsForm({ initial }: { initial: InventorySettings }) {
       toast({ variant: 'success', title: 'Đã lưu cấu hình kho' });
       setConfirmOpen(false);
     } catch (err) {
+      // A costing change recalculates on the server; a client timeout does not mean it failed.
+      if (costingChanged && isRequestTimeout(err)) {
+        toast(RECALC_TIMEOUT_TOAST);
+        setConfirmOpen(false);
+        return;
+      }
       toast({ variant: 'destructive', title: 'Không thể lưu', description: formatApiErrorDetails(err) });
     }
   };

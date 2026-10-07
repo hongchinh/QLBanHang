@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { InventorySettingsPage } from './inventory-settings-page';
+import { toast } from '@/lib/use-toast';
 import type { InventorySettings } from '@/features/inventory-settings/types';
 
 const updateMock = vi.fn();
@@ -49,6 +50,25 @@ describe('InventorySettingsPage', () => {
 
     await waitFor(() =>
       expect(updateMock).toHaveBeenCalledWith({ ...SETTINGS, costingPeriod: 'Quarter' }),
+    );
+  });
+
+  it('a client timeout on a costing change says the recalculation may still be running', async () => {
+    updateMock.mockReset().mockRejectedValue({ isAxiosError: true, code: 'ECONNABORTED', message: 'timeout of 300000ms exceeded' });
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <InventorySettingsPage />
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getByRole('combobox', { name: 'Kỳ tính giá' }));
+    await user.click(screen.getByRole('option', { name: 'Quý' }));
+    await user.click(screen.getByRole('button', { name: 'Lưu' }));
+    await user.click(await screen.findByRole('button', { name: 'Tiếp tục' }));
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Giá vốn có thể vẫn đang được tính lại' })),
     );
   });
 });

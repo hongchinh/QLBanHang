@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { LayoutDashboard } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
+import { useBranchStore } from '@/stores/branch-store';
 import { useUiStore } from '@/stores/ui-store';
 import { useNotificationHub } from '@/hooks/useNotificationHub';
 import { useBranchContext } from '@/features/branches/use-branch-context';
@@ -26,6 +27,9 @@ export function AppLayout() {
   // Pages render only once the working branch is in the store, so their first
   // request already carries X-Branch-Id.
   const { ready: branchReady } = useBranchContext();
+  // Keyed by the working branch: a switch remounts the page, so no state (selected warehouse,
+  // unsaved lines) of the previous branch survives.
+  const workingBranchId = useBranchStore((s) => s.workingBranchId);
 
   useEffect(() => {
     closeMobileDrawer();
@@ -60,7 +64,7 @@ export function AppLayout() {
           id="main-content"
           className="overflow-y-auto p-4 md:p-3"
         >
-          {branchReady ? <Outlet /> : <PageLoaderOverlay open title="Đang tải chi nhánh..." />}
+          {branchReady ? <Outlet key={workingBranchId ?? 'none'} /> : <PageLoaderOverlay open title="Đang tải chi nhánh..." />}
         </main>
 
         {mobileDrawerOpen && (

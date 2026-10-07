@@ -86,6 +86,7 @@ describe('WarehouseListPage', () => {
 
     granted = new Set(['inventory.catalogs.manage', 'branches.access_all']);
     renderPage();
-    expect(screen.getByRole('combobox', { name: 'Lọc chi nhánh' })).toBeInTheDocument();
+    // Without a branch the backend lists the working branch only, so the default says so.
+    expect(screen.getByRole('combobox', { name: 'Lọc chi nhánh' })).toHaveTextContent('Chi nhánh làm việc');
   });
 });

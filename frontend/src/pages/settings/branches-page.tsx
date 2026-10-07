@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { branchesApi } from '@/features/branches/api';
 import { useBranches, useDeleteBranch } from '@/features/branches/hooks';
+import { branchKeys } from '@/features/branches/keys';
+import { useSwitchWorkingBranch } from '@/features/branches/use-switch-working-branch';
 import type { Branch } from '@/features/branches/types';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
+import { useBranchStore } from '@/stores/branch-store';
 import { BranchFormDialog } from './branch-form-dialog';
 
 // `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
@@ -25,6 +30,25 @@ export function BranchesPage() {
 
   const { data, isLoading, isError, error } = useBranches();
   const remove = useDeleteBranch();
+  const queryClient = useQueryClient();
+  const switchWorkingBranch = useSwitchWorkingBranch();
+
+  // Deleting the working branch: the backend would silently fall back to the default branch while
+  // the switcher still shows the deleted one, so move to the default branch like the header switcher.
+  const leaveDeletedWorkingBranch = async (deletedId: string) => {
+    if (useBranchStore.getState().workingBranchId !== deletedId) return;
+    try {
+      const me = await queryClient.fetchQuery({
+        queryKey: branchKeys.me(),
+        queryFn: () => branchesApi.me(),
+        staleTime: 0,
+      });
+      const next = me.branches.some((b) => b.id === me.defaultBranchId) ? me.defaultBranchId : me.workingBranchId;
+      await switchWorkingBranch(next);
+    } catch (err) {
+      toast({ variant: 'destructive', title: 'Không thể chuyển chi nhánh làm việc', description: getErrorMessage(err) });
+    }
+  };
 
   const openCreate = () => {
     setEditTarget(undefined);
@@ -81,6 +105,7 @@ export function BranchesPage() {
       onSuccess: () => {
         toast({ variant: 'success', title: 'Đã xóa chi nhánh', description: target.name });
         setPendingDelete(null);
+        void leaveDeletedWorkingBranch(target.id);
       },
       onError: (err) => {
         toast({ variant: 'destructive', title: 'Không thể xóa', description: getErrorMessage(err) });

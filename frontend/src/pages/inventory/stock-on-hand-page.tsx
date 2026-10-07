@@ -4,17 +4,19 @@ import { useStockOnHand } from '@/features/inventory-reports/hooks';
 import type { StockOnHandParams } from '@/features/inventory-reports/types';
 import { useProductGroups } from '@/features/products/hooks';
 import { useWarehouses } from '@/features/warehouses/hooks';
+import { selectableWarehouses } from '@/features/warehouses/utils';
+import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getErrorMessage } from '@/lib/api-client';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { formatStockQuantity } from '@/lib/stock-quantity';
 import { fromDateTimeLocalValue } from '@/lib/vn-datetime';
 
 const ALL = 'all';
-const money = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
 // Route permission: reports.inventory. Values come back only with inventory.view_cost (canViewCost).
 export function StockOnHandPage() {
@@ -34,7 +36,7 @@ export function StockOnHandPage() {
     productGroupId: productGroupId === ALL ? undefined : productGroupId,
     search: debouncedSearch.trim() || undefined,
   };
-  const { data: report, isLoading } = useStockOnHand(params);
+  const { data: report, isLoading, isError, error } = useStockOnHand(params);
   const canViewCost = report?.canViewCost ?? false;
   const rows = report?.rows ?? [];
 
@@ -60,7 +62,7 @@ export function StockOnHandPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>Tất cả kho</SelectItem>
-                {warehouses.map((w) => (
+                {selectableWarehouses(warehouses, warehouseId).map((w) => (
                   <SelectItem key={w.id} value={w.id}>
                     {w.code} — {w.name}
                   </SelectItem>
@@ -127,12 +129,19 @@ export function StockOnHandPage() {
                   <td className="px-2 py-2 text-right tabular-nums">{formatStockQuantity(r.quantity)}</td>
                   {canViewCost && (
                     <td className="px-2 py-2 text-right tabular-nums">
-                      {r.value == null ? '' : money.format(r.value)}
+                      {formatMoneyForDisplay(r.value)}
                     </td>
                   )}
                 </tr>
               ))}
-              {!isLoading && rows.length === 0 && (
+              {isError && (
+                <tr>
+                  <td colSpan={canViewCost ? 7 : 6} className="px-2 py-6 text-center text-destructive">
+                    {getErrorMessage(error)}
+                  </td>
+                </tr>
+              )}
+              {!isLoading && !isError && rows.length === 0 && (
                 <tr>
                   <td colSpan={canViewCost ? 7 : 6} className="px-2 py-6 text-center text-muted-foreground">
                     Không có hàng tồn
@@ -140,13 +149,13 @@ export function StockOnHandPage() {
                 </tr>
               )}
             </tbody>
-            {canViewCost && (
+            {canViewCost && !isError && (
               <tfoot>
                 <tr className="font-semibold">
                   <td colSpan={6} className="px-2 py-2 text-right">
                     Tổng giá trị
                   </td>
-                  <td className="px-2 py-2 text-right tabular-nums">{money.format(report?.totalValue ?? 0)}</td>
+                  <td className="px-2 py-2 text-right tabular-nums">{formatMoneyForDisplay(report?.totalValue ?? 0)}</td>
                 </tr>
               </tfoot>
             )}

@@ -3,6 +3,30 @@ import { isCacheableApiPath } from './sw-routes';
 
 describe('isCacheableApiPath', () => {
   it.each([
+    '/api/lookups/units',
+    '/api/lookups/product-groups',
+    '/api/banks',
+    '/api/settings/branding',
+  ])('caches non-scoped reference data %s', (path) => {
+    expect(isCacheableApiPath(path)).toBe(true);
+  });
+
+  it.each([
+    // user- or permission-scoped
+    '/api/auth/me',
+    '/api/search/global',
+    '/api/quotations',
+    '/api/quotations/abc-123',
+    '/api/dashboard/summary',
+    '/api/notifications',
+    '/api/notifications/unread-count',
+    '/api/me/branches',
+    '/api/me/quotation-settings',
+    '/api/products/search',
+    '/api/customers/search',
+    '/api/settings/quotation',
+    '/api/admin/users',
+    // branch-scoped
     '/api/stock-vouchers',
     '/api/stock-vouchers/abc-123',
     '/api/inventory/opening-stock',
@@ -10,18 +34,11 @@ describe('isCacheableApiPath', () => {
     '/api/reports/stock-on-hand',
     '/api/warehouses',
     '/api/branches',
-    '/api/me/branches',
-    '/api/me/quotation-settings',
     '/api/suppliers/search',
     '/api/stock-reasons',
     '/api/payment-methods',
-  ])('never caches branch- or user-scoped %s', (path) => {
+  ])('never caches scoped %s', (path) => {
     expect(isCacheableApiPath(path)).toBe(false);
-  });
-
-  it('caches other API paths', () => {
-    expect(isCacheableApiPath('/api/products/search')).toBe(true);
-    expect(isCacheableApiPath('/api/lookups/units')).toBe(true);
   });
 
   it('returns false for non-API paths', () => {

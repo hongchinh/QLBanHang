@@ -4,10 +4,14 @@ import { Search } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useGlobalSearch, SEARCH_MIN_LENGTH } from '@/features/search/hooks';
+import type { CustomerSearchItem } from '@/features/search/api';
+import { useAuthStore } from '@/stores/auth-store';
 import { SearchResultsList } from './search-results-list';
+import { partnerResultPath } from './search-results-helpers';
 
 export function HeaderSearchMobileSheet() {
   const navigate = useNavigate();
+  const hasPermission = useAuthStore((s) => s.hasPermission);
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -28,13 +32,13 @@ export function HeaderSearchMobileSheet() {
     }
   }, [open]);
 
-  const handleSelectCustomer = (id: string) => {
-    navigate(`/customers/${id}`);
+  const handleSelectCustomer = (item: CustomerSearchItem) => {
+    navigate(partnerResultPath('customer', item, hasPermission));
     close();
   };
 
-  const handleSelectSupplier = (id: string) => {
-    navigate(`/suppliers/${id}`);
+  const handleSelectSupplier = (item: CustomerSearchItem) => {
+    navigate(partnerResultPath('supplier', item, hasPermission));
     close();
   };
 

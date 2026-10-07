@@ -67,4 +67,4 @@
   - Dates go through `lib/vn-datetime.ts`; never derive a local date with `toISOString().slice(0, 10)`.
   - Money in previews uses `roundAwayFromZero` (`lib/round.ts`); stock quantities use `formatStockQuantity`.
   - Branch-scoped queries live under the `['inventory']` root key.
-  - The service worker caches only non-scoped API paths; add any new branch- or user-scoped prefix to `NEVER_CACHE_PREFIXES` in `lib/sw-routes.ts`.
+  - The service worker caches only allow-listed reference data that is the same for every signed-in user (`CACHEABLE_API_PREFIXES` in `lib/sw-routes.ts`); never add a branch-, user- or permission-scoped path there.

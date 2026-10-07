@@ -9,6 +9,14 @@ export function formatStockQuantity(value: number | undefined | null): string {
   return stockQuantityFmt.format(value);
 }
 
+// Quantity input: dot decimal, no thousands grouping ("1.5" → 1.5). Empty or unparsable → undefined.
+export function parseQuantityInput(text: string): number | undefined {
+  const trimmed = text.trim();
+  if (trimmed === '' || !/^-?\d*(?:\.\d*)?$/.test(trimmed)) return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : undefined;
+}
+
 const METRE_UNITS: Partial<Record<PricingMode, string>> = {
   PerLinearMeter: 'm',
   PerSquareMeter: 'm²',

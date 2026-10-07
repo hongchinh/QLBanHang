@@ -1,4 +1,3 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Select,
@@ -8,7 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useMyBranches } from '@/features/branches/hooks';
-import { branchKeys } from '@/features/branches/keys';
+import { useSwitchWorkingBranch } from '@/features/branches/use-switch-working-branch';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
 
@@ -19,8 +18,7 @@ export function HeaderBranchSwitcher() {
   const { data: myBranches } = useMyBranches();
   const userId = useAuthStore((s) => s.user?.id);
   const workingBranchId = useBranchStore((s) => s.workingBranchId);
-  const setWorkingBranch = useBranchStore((s) => s.setWorkingBranch);
-  const queryClient = useQueryClient();
+  const switchWorkingBranch = useSwitchWorkingBranch();
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -28,12 +26,7 @@ export function HeaderBranchSwitcher() {
 
   const handleChange = async (branchId: string) => {
     if (branchId === workingBranchId) return;
-    setWorkingBranch(userId, branchId);
-    if ('caches' in window) await caches.delete('api-cache');
-    // resetQueries also drops inactive cached data (invalidateQueries would keep it).
-    // /me/branches is not branch-scoped and keeps the switcher itself rendered.
-    const meKey = JSON.stringify(branchKeys.me());
-    void queryClient.resetQueries({ predicate: (q) => JSON.stringify(q.queryKey) !== meKey });
+    await switchWorkingBranch(branchId);
     const voucherPage = VOUCHER_PAGE.exec(pathname);
     if (voucherPage) navigate(`/${voucherPage[1]}`);
   };

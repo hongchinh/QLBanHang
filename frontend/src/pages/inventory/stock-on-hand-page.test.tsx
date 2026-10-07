@@ -16,10 +16,10 @@ vi.mock('@/features/products/hooks', () => ({
   useProductGroups: () => ({ data: [{ id: 'g1', code: 'EPS', name: 'Xốp EPS' }] }),
 }));
 
-const reportState: { data: StockOnHandReport | undefined } = { data: undefined };
+const reportState: { data: StockOnHandReport | undefined; error?: Error } = { data: undefined };
 const useStockOnHandMock = vi.fn((params: StockOnHandParams) => {
   void params;
-  return { data: reportState.data, isLoading: false };
+  return { data: reportState.data, isLoading: false, isError: !!reportState.error, error: reportState.error };
 });
 vi.mock('@/features/inventory-reports/hooks', () => ({
   useStockOnHand: (params: StockOnHandParams) => useStockOnHandMock(params),
@@ -51,6 +51,7 @@ describe('StockOnHandPage', () => {
   beforeEach(() => {
     navigateMock.mockReset();
     useStockOnHandMock.mockClear();
+    reportState.error = undefined;
   });
 
   it('renders rows, provisional badge and opens the stock card on row click', () => {
@@ -62,7 +63,7 @@ describe('StockOnHandPage', () => {
     expect(screen.getByText('Giá trị tạm tính')).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: 'Giá trị' })).toBeInTheDocument();
     expect(screen.getByText('Tổng giá trị')).toBeInTheDocument();
-    expect(screen.getAllByText('1,250,000')).toHaveLength(2);
+    expect(screen.getAllByText('1.250.000')).toHaveLength(2); // vi-VN grouping
 
     fireEvent.click(screen.getByText('Tôn lạnh'));
     expect(navigateMock).toHaveBeenCalledWith('/inventory/stock-card?productId=p1&warehouseId=w1');
@@ -94,5 +95,14 @@ describe('StockOnHandPage', () => {
     expect(screen.queryByRole('columnheader', { name: 'Giá trị' })).not.toBeInTheDocument();
     expect(screen.queryByText('Tổng giá trị')).not.toBeInTheDocument();
     expect(screen.queryByText('Giá trị tạm tính')).not.toBeInTheDocument();
+  });
+
+  it('shows the request error instead of the empty state', () => {
+    reportState.data = undefined;
+    reportState.error = new Error('Máy chủ lỗi');
+    render(<StockOnHandPage />);
+
+    expect(screen.getByText('Máy chủ lỗi')).toBeInTheDocument();
+    expect(screen.queryByText('Không có hàng tồn')).not.toBeInTheDocument();
   });
 });

@@ -16,17 +16,18 @@ import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { WarehouseFormDialog } from './warehouse-form-dialog';
 
-const ALL_BRANCHES = 'all';
+// No branchId → the backend lists the working branch's warehouses, not every branch.
+const WORKING_BRANCH = 'working';
 
 export function WarehouseListPage() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canFilterBranch = hasPermission('branches.access_all');
-  const [branchFilter, setBranchFilter] = useState(ALL_BRANCHES);
+  const [branchFilter, setBranchFilter] = useState(WORKING_BRANCH);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Warehouse | undefined>();
   const [pendingDelete, setPendingDelete] = useState<Warehouse | null>(null);
 
-  const branchId = canFilterBranch && branchFilter !== ALL_BRANCHES ? branchFilter : undefined;
+  const branchId = canFilterBranch && branchFilter !== WORKING_BRANCH ? branchFilter : undefined;
   const { data, isLoading, isError, error } = useWarehouses(branchId ? { branchId } : undefined);
   const { data: branches } = useBranches();
   const remove = useDeleteWarehouse();
@@ -127,7 +128,7 @@ export function WarehouseListPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL_BRANCHES}>Tất cả chi nhánh</SelectItem>
+                  <SelectItem value={WORKING_BRANCH}>Chi nhánh làm việc</SelectItem>
                   {(branches ?? []).map((b) => (
                     <SelectItem key={b.id} value={b.id}>
                       {b.code} — {b.name}

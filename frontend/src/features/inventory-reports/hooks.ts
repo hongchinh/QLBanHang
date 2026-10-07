@@ -10,10 +10,11 @@ export function useStockOnHand(params: StockOnHandParams) {
   });
 }
 
-export function useStockCard(params: StockCardParams) {
+// `enabled: false` lets the page hold the request while its filters are invalid (e.g. from > to).
+export function useStockCard(params: StockCardParams, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: inventoryReportKeys.stockCard(params),
     queryFn: () => inventoryReportsApi.stockCard(params),
-    enabled: !!params.productId,
+    enabled: !!params.productId && (options.enabled ?? true),
   });
 }

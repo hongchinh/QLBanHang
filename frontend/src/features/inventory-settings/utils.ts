@@ -31,3 +31,10 @@ export function listPeriodStarts(period: CostingPeriod, today: Date, count: numb
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
   });
 }
+
+// Shown when the client times out on a recalculation: the server keeps running it.
+export const RECALC_TIMEOUT_TOAST = {
+  title: 'Giá vốn có thể vẫn đang được tính lại',
+  description: 'Máy chủ chưa phản hồi kịp nhưng việc tính lại có thể vẫn đang chạy. Vui lòng kiểm tra lại sau ít phút.',
+  durationMs: 10_000,
+} as const;

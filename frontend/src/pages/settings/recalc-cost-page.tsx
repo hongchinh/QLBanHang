@@ -2,8 +2,9 @@ import { useMemo, useState } from 'react';
 import { Calculator, X } from 'lucide-react';
 import { useInventorySettings, useRecalcCost } from '@/features/inventory-settings/hooks';
 import type { CostingPeriod } from '@/features/inventory-settings/types';
-import { listPeriodStarts } from '@/features/inventory-settings/utils';
+import { listPeriodStarts, RECALC_TIMEOUT_TOAST } from '@/features/inventory-settings/utils';
 import { useWarehouses } from '@/features/warehouses/hooks';
+import { selectableWarehouses } from '@/features/warehouses/utils';
 import type { ProductSuggestion } from '@/features/products/types';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { formatApiErrorDetails } from '@/lib/api-client';
+import { formatApiErrorDetails, getErrorMessage, isRequestTimeout } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -30,7 +31,7 @@ function periodLabel(period: CostingPeriod, start: string): string {
 export function RecalcCostPage() {
   const canPickProduct = useAuthStore((s) => s.hasPermission('products.view'));
   const settings = useInventorySettings();
-  const { data: warehouses } = useWarehouses();
+  const { data: warehouses = [] } = useWarehouses();
   const recalc = useRecalcCost();
 
   const costingPeriod = settings.data?.costingPeriod ?? 'Month';
@@ -64,6 +65,11 @@ export function RecalcCostPage() {
       toast({ variant: 'success', title: `Đã tính lại giá vốn cho ${result.scopeCount} phạm vi hàng hóa` });
       setConfirmOpen(false);
     } catch (err) {
+      if (isRequestTimeout(err)) {
+        toast(RECALC_TIMEOUT_TOAST);
+        setConfirmOpen(false);
+        return;
+      }
       toast({ variant: 'destructive', title: 'Không thể tính lại giá vốn', description: formatApiErrorDetails(err) });
     }
   };
@@ -76,6 +82,12 @@ export function RecalcCostPage() {
           Tính lại giá vốn bình quân từ kỳ đã chọn đến nay cho chi nhánh làm việc.
         </p>
       </div>
+
+      {settings.isError && (
+        <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+          {getErrorMessage(settings.error)}
+        </div>
+      )}
 
       <Card>
         <CardContent className="grid gap-4 p-4 md:grid-cols-3">
@@ -103,7 +115,7 @@ export function RecalcCostPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_WAREHOUSES}>Tất cả kho</SelectItem>
-                {(warehouses ?? []).map((w) => (
+                {selectableWarehouses(warehouses, warehouseId).map((w) => (
                   <SelectItem key={w.id} value={w.id}>
                     {w.code} — {w.name}
                   </SelectItem>
@@ -143,7 +155,12 @@ export function RecalcCostPage() {
           )}
 
           <div className="flex justify-end md:col-span-3">
-            <Button type="button" onClick={() => setConfirmOpen(true)} disabled={!selectedPeriod || recalc.isPending}>
+            {/* The period list depends on the costing period: wait for the settings. */}
+            <Button
+              type="button"
+              onClick={() => setConfirmOpen(true)}
+              disabled={!settings.data || !selectedPeriod || recalc.isPending}
+            >
               <Calculator className="mr-2 h-4 w-4 text-blue-600" /> Tính lại giá vốn
             </Button>
           </div>

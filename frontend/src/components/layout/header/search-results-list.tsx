@@ -6,8 +6,8 @@ interface SearchResultsListProps {
   data: GlobalSearchResult | undefined;
   isLoading: boolean;
   activeIndex: number;
-  onSelectCustomer: (id: string) => void;
-  onSelectSupplier: (id: string) => void;
+  onSelectCustomer: (item: CustomerSearchItem) => void;
+  onSelectSupplier: (item: CustomerSearchItem) => void;
   onSelectQuotation: (id: string) => void;
 }
 
@@ -50,7 +50,7 @@ export function SearchResultsList({
   }
 
   let index = 0;
-  const partnerGroup = (title: string, items: CustomerSearchItem[], onSelect: (id: string) => void) =>
+  const partnerGroup = (title: string, items: CustomerSearchItem[], onSelect: (item: CustomerSearchItem) => void) =>
     items.length > 0 && (
       <div className="mb-1">
         <div className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -65,7 +65,7 @@ export function SearchResultsList({
               role="option"
               aria-selected={isActive}
               key={c.id}
-              onClick={() => onSelect(c.id)}
+              onClick={() => onSelect(c)}
               className={cn(
                 'flex w-full items-center gap-3 rounded-sm px-2 py-2 text-left text-sm',
                 isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',

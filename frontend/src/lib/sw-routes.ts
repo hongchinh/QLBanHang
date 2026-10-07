@@ -1,22 +1,17 @@
 // Imported by sw.ts; kept free of DOM/service-worker APIs so it is testable.
 //
 // The service worker's NetworkFirst cache keys on the URL only. X-Branch-Id and
-// Authorization are not part of the key, so branch- or user-scoped responses
-// (including cost values) must never be cached: on a slow or offline network
-// they would be served to another branch or user.
-const NEVER_CACHE_PREFIXES = [
-  '/api/stock-vouchers',
-  '/api/inventory',
-  '/api/reports',
-  '/api/warehouses',
-  '/api/branches',
-  '/api/me/',
-  '/api/suppliers',
-  '/api/stock-reasons',
-  '/api/payment-methods',
+// Authorization are not part of the key, so a cached branch-, user- or
+// permission-scoped response would be served to another branch or user on a
+// slow or offline network. Only reference data that is the same for every
+// signed-in user is cached, so this is an allow-list: a new endpoint is never
+// cached unless it is added here.
+const CACHEABLE_API_PREFIXES = [
+  '/api/lookups/', // active product groups and units (LookupsController, [Authorize] only)
+  '/api/banks', // VietQR bank list (BanksController, [Authorize] only)
+  '/api/settings/branding', // logo / app branding meta (SettingsController GET, [Authorize] only)
 ];
 
 export function isCacheableApiPath(pathname: string): boolean {
-  if (!pathname.startsWith('/api/')) return false;
-  return !NEVER_CACHE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+  return CACHEABLE_API_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }

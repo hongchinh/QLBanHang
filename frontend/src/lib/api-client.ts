@@ -169,6 +169,11 @@ export function getErrorMessage(error: unknown): string {
   return 'Đã xảy ra lỗi không mong muốn.';
 }
 
+// The client gave up waiting (axios `timeout`); the server may still be processing the request.
+export function isRequestTimeout(error: unknown): boolean {
+  return axios.isAxiosError(error) && (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT');
+}
+
 export interface ApiErrorShape {
   code: string;
   message: string;

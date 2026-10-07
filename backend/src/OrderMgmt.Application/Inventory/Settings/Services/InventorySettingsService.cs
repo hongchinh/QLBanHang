@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Inventory.Costing;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.Settings.Interfaces;
 using OrderMgmt.Application.Inventory.Settings.Models;
@@ -15,35 +16,49 @@ public class InventorySettingsService : IInventorySettingsService
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
     private readonly ICurrentBranch _currentBranch;
+    private readonly ITransactionRunner _transaction;
+    private readonly IInventoryRecalcService _recalc;
 
-    public InventorySettingsService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch)
+    public InventorySettingsService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
+        ITransactionRunner transaction, IInventoryRecalcService recalc)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
         _currentBranch = currentBranch;
+        _transaction = transaction;
+        _recalc = recalc;
     }
 
     public async Task<InventorySettingsDto> GetAsync(CancellationToken ct = default)
         => ToDto(await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, ct));
 
-    public async Task<InventorySettingsDto> UpdateAsync(UpdateInventorySettingsRequest request, CancellationToken ct = default)
-    {
-        var settings = await _db.InventorySettings.SingleAsync(s => s.Id == 1, ct);
+    public Task<InventorySettingsDto> UpdateAsync(UpdateInventorySettingsRequest request, CancellationToken ct = default) =>
+        _transaction.RunAsync(async c =>
+        {
+            var settings = await _db.InventorySettings.SingleAsync(s => s.Id == 1, c);
+            var before = new InventorySettings
+            {
+                CostingPeriod = settings.CostingPeriod,
+                CostingScope = settings.CostingScope,
+                PurchaseCostIncludesVat = settings.PurchaseCostIncludesVat,
+            };
 
-        settings.CostingMethod = request.CostingMethod;
-        settings.CostingPeriod = request.CostingPeriod;
-        settings.CostingScope = request.CostingScope;
-        settings.PurchaseCostIncludesVat = request.PurchaseCostIncludesVat;
-        settings.NegativeStockPolicy = request.NegativeStockPolicy;
-        settings.NetExcludesVat = request.NetExcludesVat;
-        settings.DefaultDateMode = request.DefaultDateMode;
-        settings.UpdatedAt = _clock.UtcNow;
-        settings.UpdatedBy = _currentUser.UserId;
+            settings.CostingMethod = request.CostingMethod;
+            settings.CostingPeriod = request.CostingPeriod;
+            settings.CostingScope = request.CostingScope;
+            settings.PurchaseCostIncludesVat = request.PurchaseCostIncludesVat;
+            settings.NegativeStockPolicy = request.NegativeStockPolicy;
+            settings.NetExcludesVat = request.NetExcludesVat;
+            settings.DefaultDateMode = request.DefaultDateMode;
+            settings.UpdatedAt = _clock.UtcNow;
+            settings.UpdatedBy = _currentUser.UserId;
 
-        await _db.SaveChangesAsync(ct);
-        return ToDto(settings);
-    }
+            await _db.SaveChangesAsync(c);
+            // D11: recalculation reads the saved settings; a lock-date rejection rolls the save back.
+            await _recalc.ApplySettingsChangeAsync(before, settings, c);
+            return ToDto(settings);
+        }, ct);
 
     public async Task<IReadOnlyList<DocumentNumberingDto>> ListNumberingAsync(CancellationToken ct = default)
     {

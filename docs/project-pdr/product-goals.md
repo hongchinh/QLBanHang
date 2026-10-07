@@ -10,8 +10,8 @@ The scope is being expanded (approved 2026-10-06) to replace the stock voucher w
 
 - **Sales**: create quotations, maintain customer/product details, send quotations, confirm successful deals and manage their own quotation templates.
 - **Manager/Admin**: view cross-user quotations, transfer ownership, manage users/roles, configure lock rules, cancel confirmed quotations and monitor revenue.
-- **Accounting/Reporting users**: view revenue reports when granted report permissions. Planned: cash vouchers, receivables/payables, period lock and cost recalculation.
-- **Warehouse staff** (planned): stock-in/stock-out vouchers, opening stock and stock reports.
+- **Accounting/Reporting users**: view revenue reports when granted report permissions; lock periods per branch and recalculate costs. Planned (Round 2): cash vouchers and receivables/payables.
+- **Warehouse staff**: stock-in/stock-out vouchers, opening stock and stock reports.
 
 ## Current Scope
 
@@ -30,12 +30,21 @@ The scope is being expanded (approved 2026-10-06) to replace the stock voucher w
 - VietQR payment-QR generation: pick/save a receiving bank account, enter an amount and transfer
   content, get a scannable NAPAS/EMVCo QR code. A quotation's detail page can jump into this screen
   with its total and code pre-filled.
+- **Round 1 — Inventory** (implemented; goes live after Round 3):
+  - Branches with a default branch per user and a header switch for users with `branches.access_all`.
+  - Warehouses, stock reasons and payment methods per branch.
+  - One partner catalog with customer/supplier flags and separate supplier screens.
+  - Product inventory fields: inventory tracking, purchase/sales discount, VAT-inclusive price.
+  - Opening stock per warehouse.
+  - Stock-in/stock-out vouchers with a quotation-style list, a form with live totals, unsaved drafts and a negative-stock confirmation.
+  - Stock per warehouse with periodic weighted-average costing and manual cost recalculation.
+  - Negative-stock policy, period lock per branch and document numbering per branch.
+  - Stock-on-hand and stock-card reports.
 
 ## Planned Scope
 
-Approved but not yet implemented. Delivered in three rounds; go-live happens after all three. Design: [stock voucher brainstorm](../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md).
+Approved but not yet implemented. Go-live happens after Round 3. Design: [stock voucher brainstorm](../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md).
 
-- **Round 1 — Inventory**: branches (default branch per user, cross-branch permission), warehouses, a unified partner catalog (customer/supplier flags), stock reasons, payment methods and a per-product inventory-tracking flag; opening stock; stock-in/stock-out vouchers with a quotation-style list and form; stock per warehouse; periodic weighted-average costing; negative-stock policy; period lock per branch; document numbering; stock-on-hand and stock-card reports.
 - **Round 2 — Cash and debt**: receipt/payment vouchers, automatic cash vouchers from stock vouchers paid in cash, opening debt balances, customer credit limits, debt offset and a debt balance report.
 - **Round 3 — Output and productivity**: template-based print/Excel export of vouchers (forms 01-VT/02-VT), Excel import of voucher lines and voucher copy.
 - **Backlog**: FIFO costing, warehouse transfer, stocktake, returns and quotation → sales voucher conversion.
@@ -53,18 +62,18 @@ Approved but not yet implemented. Delivered in three rounds; go-live happens aft
 - Confirmed quotations can be cancelled only by users with the dedicated cancel permission.
 - Export uses the owner user's template when present, then falls back to the default template.
 
-### Inventory (planned)
+### Inventory
 
 - Every user has a default branch; only users with the cross-branch permission can switch the working branch. Branches scope the inventory and cash modules only; quotations and catalogs are shared.
 - Users see every voucher in their working branch. They can edit, delete or cancel their own vouchers; acting on other users' vouchers requires `edit_all`. Stock-in and stock-out permissions are separate, and viewing cost requires its own permission.
-- Customers and suppliers share one partner catalog; a partner can be both. The stock reason decides which partner type a voucher accepts.
+- Customers and suppliers share one partner catalog; a partner can be both. The stock reason decides which partner type a voucher accepts. Editing or deleting a partner requires the update/delete permission of every role it has, so sales users cannot edit a partner that is also a supplier without `suppliers.*`.
 - A product has exactly one stock unit, derived from its `PricingMode` (unit, linear metre, m², m³). Lines for metre-based products take a sheet count plus dimensions. Products not tracking inventory (e.g. transport service) never affect stock.
 - Vouchers carry a date and time; the stock shown on a voucher is the balance at that moment.
 - The order discount is allocated to lines by value before VAT. Inbound value is the line amount after line discount, minus the allocated order discount, plus allocated freight; whether input VAT is included is a setting.
-- Cost of goods issued uses periodic weighted average with a configurable period (month, quarter, year) and scope (branch or warehouse). Cost lives only in the inventory ledger, never on voucher lines, and is recalculated automatically after back-dated changes.
-- Every operation that changes stock (save, cancel, restore, delete, opening stock edit) is checked against the negative-stock policy (allow, warn or block).
-- The period lock can be set to any date and blocks vouchers dated on or before it. Costs of a costing period that has not ended may still be recalculated until the period ends.
-- Stock-in vouchers update `Product.CostPrice` (latest purchase price), which is the default cost on quotations.
+- Cost of goods issued uses periodic weighted average with a configurable period (month, quarter, year) and scope (branch or warehouse). Cost lives only in the inventory ledger, never on voucher lines, and is recalculated automatically after back-dated changes. Costs of a period that has not ended are shown as provisional ("tạm tính"). Report values follow the costing scope: under branch scope a warehouse's value is the branch value split by quantity.
+- Every operation that changes stock (save, cancel, restore, delete, opening stock edit) is checked against the negative-stock policy (allow, warn or block; default warn). Only an operation that makes stock worse is reported: a receipt that only reduces an existing deficit always passes (pending BA confirmation).
+- The period lock can be set to any date. Creating, editing, cancelling, restoring or deleting a voucher dated on or before it, and editing opening stock dated on or before it, are rejected. Fully locked costing periods are frozen; a partially locked period is still recalculated.
+- `Product.CostPrice` (the default cost on quotations) follows the latest active stock-in line: it is recomputed after every stock-in create, edit, cancel, restore or delete (pending BA confirmation).
 
 ## Non-Goals
 

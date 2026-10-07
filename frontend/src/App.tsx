@@ -33,6 +33,7 @@ import { PeriodLockPage } from '@/pages/settings/period-lock-page';
 import { InventorySettingsPage } from '@/pages/settings/inventory-settings-page';
 import { NumberingSettingsPage } from '@/pages/settings/numbering-settings-page';
 import { RecalcCostPage } from '@/pages/settings/recalc-cost-page';
+import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -290,6 +291,14 @@ export function App() {
                     }
                   />
                 </Route>
+                <Route
+                  path="inventory/opening-stock"
+                  element={
+                    <ProtectedRoute permission="inventory.opening_stock">
+                      <OpeningStockPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="settings/my-quotation-settings"
                   element={<MyQuotationSettingsPage />}

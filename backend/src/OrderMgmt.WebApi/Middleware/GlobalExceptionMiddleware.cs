@@ -75,6 +75,12 @@ public class GlobalExceptionMiddleware
                 Code = ae.Code,
                 Message = ae.Message,
             }),
+            NegativeStockException nse => (StatusCodes.Status422UnprocessableEntity, new ApiError
+            {
+                Code = nse.Code,
+                Message = nse.Message,
+                Details = nse.Shortages,
+            }),
             DomainException de => (StatusCodes.Status400BadRequest, new ApiError
             {
                 Code = de.Code,

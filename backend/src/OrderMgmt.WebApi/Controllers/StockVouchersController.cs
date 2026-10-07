@@ -10,6 +10,7 @@ namespace OrderMgmt.WebApi.Controllers;
 /// Type-specific permissions (stock_in.* / stock_out.*) are checked by the service.
 [Route("api/stock-vouchers")]
 [Authorize]
+[ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
 public class StockVouchersController : ApiControllerBase
 {
     private readonly IStockVoucherService _service;

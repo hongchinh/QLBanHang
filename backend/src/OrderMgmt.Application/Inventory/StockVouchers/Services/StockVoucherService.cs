@@ -585,7 +585,7 @@ public class StockVoucherService : IStockVoucherService
         var products = await LoadProductsAsync(request.Lines.Select(l => l.ProductId), ct);
         var storedLines = existing?.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id)
             ?? new Dictionary<Guid, StockVoucherLine>();
-        var priced = new List<(int Index, UpsertStockVoucherLineRequest Line, Product Product)>();
+        var priced = new List<(int Index, UpsertStockVoucherLineRequest Line, LineSnapshot Snapshot)>();
         for (var i = 0; i < request.Lines.Count; i++)
         {
             var line = request.Lines[i];
@@ -606,6 +606,7 @@ public class StockVoucherService : IStockVoucherService
             }
             if (productChanged && product.Status != ProductStatus.Active)
                 Add($"{key}.productId", "Hàng hóa đã ngừng kinh doanh.");
+            var snapshot = SnapshotOf(productChanged ? null : stored, product);
 
             var dimensionsValid = true;
             void RequirePositive(decimal? value, string field, string label)
@@ -616,7 +617,7 @@ public class StockVoucherService : IStockVoucherService
                     dimensionsValid = false;
                 }
             }
-            if (product.PricingMode == PricingMode.PerUnit)
+            if (snapshot.PricingMode == PricingMode.PerUnit)
             {
                 RequirePositive(line.Quantity, "quantity", "Số lượng");
             }
@@ -624,9 +625,9 @@ public class StockVoucherService : IStockVoucherService
             {
                 RequirePositive(line.SheetCount, "sheetCount", "Số tấm");
                 RequirePositive(line.Length, "length", "Chiều dài");
-                if (product.PricingMode is PricingMode.PerSquareMeter or PricingMode.PerCubicMeter)
+                if (snapshot.PricingMode is PricingMode.PerSquareMeter or PricingMode.PerCubicMeter)
                     RequirePositive(line.Width, "width", "Chiều rộng");
-                if (product.PricingMode == PricingMode.PerCubicMeter)
+                if (snapshot.PricingMode == PricingMode.PerCubicMeter)
                     RequirePositive(line.Thickness, "thickness", "Chiều dày");
             }
 
@@ -637,12 +638,12 @@ public class StockVoucherService : IStockVoucherService
             if (line.VatRate is < 0 or > 100)
                 Add($"{key}.vatRate", "Thuế suất phải từ 0 đến 100.");
             if (dimensionsValid)
-                priced.Add((i, line, product));
+                priced.Add((i, line, snapshot));
         }
 
         // Amount-based rules use the calculator's line amounts (allocations do not matter here).
         var computed = StockVoucherCalculator.Compute(new StockHeaderInput(request.Type, 0m, 0m, false),
-            priced.Select(x => ToCalculatorInput(x.Line, x.Product)).ToList()).Lines;
+            priced.Select(x => ToCalculatorInput(x.Line, x.Snapshot)).ToList()).Lines;
         var netSum = 0m;
         for (var j = 0; j < priced.Count; j++)
         {
@@ -706,11 +707,14 @@ public class StockVoucherService : IStockVoucherService
 
         var requested = request.Lines.OrderBy(l => l.SortOrder).ToList();
         var products = await LoadProductsAsync(requested.Select(l => l.ProductId), ct);
+        var existing = voucher.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id);
+        var snapshots = requested.Select(l => SnapshotOf(
+            l.Id is { } lineId && existing.TryGetValue(lineId, out var stored) && stored.ProductId == l.ProductId ? stored : null,
+            products[l.ProductId])).ToList();
         var computation = StockVoucherCalculator.Compute(
             new StockHeaderInput(request.Type, request.Freight, request.OrderDiscount, settings.NetExcludesVat),
-            requested.Select(l => ToCalculatorInput(l, products[l.ProductId])).ToList());
+            requested.Select((l, i) => ToCalculatorInput(l, snapshots[i])).ToList());
 
-        var existing = voucher.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id);
         var kept = new HashSet<Guid>();
         for (var i = 0; i < requested.Count; i++)
         {
@@ -727,16 +731,17 @@ public class StockVoucherService : IStockVoucherService
             }
 
             var product = products[line.ProductId];
+            var snapshot = snapshots[i];
             var result = computation.Lines[i];
             entity.SortOrder = line.SortOrder;
             entity.ProductId = product.Id;
             entity.ProductCode = product.Code;
             entity.ProductName = product.Name;
             entity.WarehouseId = line.WarehouseId ?? request.WarehouseId;
-            entity.TrackInventory = product.TrackInventory;
-            entity.PricingMode = product.PricingMode;
-            entity.UnitName = StockUnit.NameFor(product.PricingMode, product.Unit?.Name);
-            entity.PriceIncludesVat = product.PriceIncludesVat;
+            entity.TrackInventory = snapshot.TrackInventory;
+            entity.PricingMode = snapshot.PricingMode;
+            entity.UnitName = snapshot.UnitName;
+            entity.PriceIncludesVat = snapshot.PriceIncludesVat;
             entity.SheetCount = line.SheetCount;
             entity.Length = line.Length;
             entity.Width = line.Width;
@@ -779,8 +784,19 @@ public class StockVoucherService : IStockVoucherService
             .ToDictionaryAsync(p => p.Id, ct);
     }
 
-    private static StockLineInput ToCalculatorInput(UpsertStockVoucherLineRequest line, Product product) =>
-        new(product.TrackInventory, product.PricingMode, product.PriceIncludesVat,
+    /// Stock fields a line keeps from the moment its product was chosen.
+    private sealed record LineSnapshot(bool TrackInventory, PricingMode PricingMode, string UnitName, bool PriceIncludesVat);
+
+    /// A kept line (same id, same product) keeps its stored snapshot, so a later product change (e.g. TrackInventory
+    /// turned on) never re-posts an old voucher differently; new lines and lines whose product changed (`stored`
+    /// null) take the current product (review finding).
+    private static LineSnapshot SnapshotOf(StockVoucherLine? stored, Product product) => stored is not null
+        ? new(stored.TrackInventory, stored.PricingMode, stored.UnitName, stored.PriceIncludesVat)
+        : new(product.TrackInventory, product.PricingMode, StockUnit.NameFor(product.PricingMode, product.Unit?.Name),
+            product.PriceIncludesVat);
+
+    private static StockLineInput ToCalculatorInput(UpsertStockVoucherLineRequest line, LineSnapshot snapshot) =>
+        new(snapshot.TrackInventory, snapshot.PricingMode, snapshot.PriceIncludesVat,
             line.SheetCount, line.Length, line.Width, line.Thickness, line.Quantity,
             line.UnitPrice, line.DiscountRate, line.DiscountAmount, line.DiscountManual, line.VatRate);
 

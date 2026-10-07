@@ -5,7 +5,7 @@ namespace OrderMgmt.Application.Inventory.Posting;
 
 public interface IInventoryPostingService
 {
-    // Shared branch gate first, then the (productId, branchId) keys in ascending order (D30).
+    // Shared branch gate first, then one key per product, in ascending key order (D30).
     Task AcquireLocksAsync(Guid branchId, IEnumerable<Guid> productIds, CancellationToken ct = default);
 
     // ReplaceSourceAsync → negative-stock policy → ScopesForAsync + RecalculateAsync.

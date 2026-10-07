@@ -29,10 +29,9 @@ public class InventoryPostingService : IInventoryPostingService
     public async Task AcquireLocksAsync(Guid branchId, IEnumerable<Guid> productIds, CancellationToken ct = default)
     {
         await _lock.AcquireBranchGateAsync(new[] { branchId }, exclusive: false, ct);
-        var ids = productIds.ToList();
-        await _lock.AcquireAsync(ids.Select(productId => (productId, branchId)), ct);
-        // Branch-independent product keys serialize product-wide writes (D35 cost price, catalog guards).
-        await _lock.AcquireProductsAsync(ids, ct);
+        // One branch-independent key per product: it covers the product's pairs in every branch and serializes
+        // product-wide writes (D35 cost price, catalog guards), so no (product, branch) key is needed (review finding).
+        await _lock.AcquireProductsAsync(productIds, ct);
     }
 
     public async Task<LedgerChangeResult> PostAsync(LedgerSourceType sourceType, Guid sourceId,

@@ -109,7 +109,7 @@ the app has no way to know whether a transfer actually happened.
 
 1. permission by voucher type, working branch, ownership or `edit_all`, `Version` (xmin) set as the original value;
 2. reference and amount validation (reasons, partner roles, warehouses of the branch, dimensions, discounts, dates);
-3. locks: the branch gate (shared), then the `(product, branch)` keys and the branch-independent product keys;
+3. locks: the branch gate (shared), then one branch-independent key per product;
 4. period lock check (read after the gate);
 5. on create, the document number from the atomic counter row;
 6. voucher header and lines with totals from `StockVoucherCalculator` (never from the client);
@@ -128,7 +128,7 @@ the app has no way to know whether a transfer actually happened.
 
 Opening stock (`/api/inventory/opening-stock`) follows the same flow with source type `Opening`, posted at 00:00 VN of the opening date; saves of one warehouse are serialized by an opening key.
 
-**Lock order (D30).** Branch gate → `(product, branch)` keys → product keys → document counter row, always before the first `SaveChanges`. Settings changes and manual recalculation take the branch gate **exclusive** (every branch, ascending id) and no product keys, so they wait for in-flight postings and postings wait for them. Setting a period lock also takes the exclusive gate.
+**Lock order (D30).** Branch gate → product keys → document counter row, always before the first `SaveChanges`. Each set of keys is taken in one round trip in ascending key order, one advisory lock per product, so a whole-catalog opening stock grid stays within `max_locks_per_transaction`. Settings changes and manual recalculation take the branch gate **exclusive** (every branch) and no product keys, so they wait for in-flight postings and postings wait for them. Setting a period lock also takes the exclusive gate.
 
 **Concurrency (D29).** `StockVoucher.Version` maps to PostgreSQL `xmin`. Update, cancel, restore and delete always mark the header modified, so a stale `Version` fails with 409 `CONCURRENCY` even when only lines change.
 

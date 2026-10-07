@@ -10,6 +10,9 @@ namespace OrderMgmt.Application.CashDebt.Funds.Services;
 
 public class FundService : IFundService
 {
+    private const string DefaultInUseMessage =
+        "Quỹ mặc định không thể xóa hoặc đổi loại khi còn quỹ khác cùng loại. Chọn quỹ mặc định khác trước.";
+
     private readonly IAppDbContext _db;
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
@@ -90,7 +93,12 @@ public class FundService : IFundService
             var fund = await FindAsync(id, c);
             var kindChanged = fund.Kind != request.Kind;
             if (kindChanged)
+            {
                 await EnsureNotUsedAsync(fund, c);
+                if (fund.IsDefault
+                    && await _db.Funds.AnyAsync(f => f.BranchId == fund.BranchId && f.Kind == fund.Kind && f.Id != id, c))
+                    throw new ConflictException(DefaultInUseMessage);
+            }
             else if (fund.IsDefault && !request.IsDefault)
                 throw Invalid("isDefault", "Chọn quỹ mặc định khác trước.");
 
@@ -99,8 +107,6 @@ public class FundService : IFundService
                 || !await _db.Funds.AnyAsync(f => f.BranchId == fund.BranchId && f.Kind == request.Kind && f.Id != id, c);
             EnsureDefaultIsActive(makeDefault, request.IsActive);
 
-            if (kindChanged && fund.IsDefault)
-                await PromoteReplacementDefaultAsync(fund, c);
             if (makeDefault)
                 await ClearDefaultsAsync(fund.BranchId, request.Kind, id, c);
 
@@ -122,7 +128,7 @@ public class FundService : IFundService
             var fund = await FindAsync(id, c);
             if (fund.IsDefault
                 && await _db.Funds.AnyAsync(f => f.BranchId == fund.BranchId && f.Kind == fund.Kind && f.Id != id, c))
-                throw new ConflictException("Quỹ mặc định không thể xóa khi còn quỹ khác cùng loại. Chọn quỹ mặc định khác trước.");
+                throw new ConflictException(DefaultInUseMessage);
             await EnsureNotUsedAsync(fund, c);
 
             fund.IsDeleted = true;
@@ -153,17 +159,9 @@ public class FundService : IFundService
             .ToListAsync(ct);
         foreach (var other in others)
             other.IsDefault = false;
-    }
-
-    /// A default fund leaving its kind hands the default to the first active fund left behind.
-    private async Task PromoteReplacementDefaultAsync(Fund fund, CancellationToken ct)
-    {
-        var replacement = await _db.Funds
-            .Where(f => f.BranchId == fund.BranchId && f.Kind == fund.Kind && f.Id != fund.Id && f.IsActive)
-            .OrderBy(f => f.Code)
-            .FirstOrDefaultAsync(ct);
-        if (replacement != null)
-            replacement.IsDefault = true;
+        // Saved before the new default is set, so the unique index never sees two defaults in one save.
+        if (others.Count > 0)
+            await _db.SaveChangesAsync(ct);
     }
 
     private async Task<Fund> FindAsync(Guid id, CancellationToken ct)

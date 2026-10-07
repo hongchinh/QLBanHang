@@ -157,4 +157,48 @@ public class FundCrudTests : CashDebtTestBase
         (await client.PutAsJsonAsync($"/api/funds/{fund.Id}", kind)).StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await client.DeleteAsync($"/api/funds/{fund.Id}")).StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
+
+    [Fact]
+    public async Task Kind_change_keeps_the_default_rules()
+    {
+        var (client, _) = await NewBranchClientAsync();
+        var qtm = (await ReadDataAsync<List<FundDto>>(await client.GetAsync("/api/funds"))).Single();
+        var nh01 = await ReadDataAsync<FundDto>(await client.PostAsJsonAsync("/api/funds", NewFund("NH01", FundKind.Bank)));
+        var nh02 = await ReadDataAsync<FundDto>(await client.PostAsJsonAsync("/api/funds", NewFund("NH02", FundKind.Bank)));
+        nh02.IsDefault.Should().BeFalse();
+
+        // A non-default fund moves into a kind that already has a default: stays non-default.
+        var toCash = ToUpdate(nh02);
+        toCash.Kind = FundKind.Cash;
+        var moved = await ReadDataAsync<FundDto>(await client.PutAsJsonAsync($"/api/funds/{nh02.Id}", toCash));
+        moved.Kind.Should().Be(FundKind.Cash);
+        moved.IsDefault.Should().BeFalse();
+        (await ReadDataAsync<FundDto>(await client.GetAsync($"/api/funds/{qtm.Id}"))).IsDefault.Should().BeTrue();
+        (await ReadDataAsync<FundDto>(await client.GetAsync($"/api/funds/{nh01.Id}"))).IsDefault.Should().BeTrue();
+
+        // The default of a kind cannot leave while a sibling remains.
+        var sibling = await ReadDataAsync<FundDto>(await client.PostAsJsonAsync("/api/funds", NewFund("NH03", FundKind.Bank)));
+        var leave = ToUpdate(nh01);
+        leave.Kind = FundKind.Cash;
+        (await client.PutAsJsonAsync($"/api/funds/{nh01.Id}", leave)).StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await ReadDataAsync<FundDto>(await client.GetAsync($"/api/funds/{nh01.Id}"))).Kind.Should().Be(FundKind.Bank);
+
+        // A non-default fund of the default's kind moves freely, the old kind keeps its default.
+        var siblingToCash = ToUpdate(sibling);
+        siblingToCash.Kind = FundKind.Cash;
+        (await client.PutAsJsonAsync($"/api/funds/{sibling.Id}", siblingToCash)).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await ReadDataAsync<FundDto>(await client.GetAsync($"/api/funds/{nh01.Id}"))).IsDefault.Should().BeTrue();
+
+        // The only fund of its kind moves into an empty kind and becomes the default there.
+        var (client2, _) = await NewBranchClientAsync();
+        var lone = await ReadDataAsync<FundDto>(await client2.PostAsJsonAsync("/api/funds", NewFund("NH01", FundKind.Bank)));
+        var toCashAlone = ToUpdate(lone);
+        toCashAlone.Kind = FundKind.Cash;
+        // Empty the Cash kind first by deleting the seeded QTM.
+        var qtm2 = (await ReadDataAsync<List<FundDto>>(await client2.GetAsync("/api/funds?kind=Cash"))).Single();
+        (await client2.DeleteAsync($"/api/funds/{qtm2.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        var alone = await ReadDataAsync<FundDto>(await client2.PutAsJsonAsync($"/api/funds/{lone.Id}", toCashAlone));
+        alone.Kind.Should().Be(FundKind.Cash);
+        alone.IsDefault.Should().BeTrue();
+    }
 }

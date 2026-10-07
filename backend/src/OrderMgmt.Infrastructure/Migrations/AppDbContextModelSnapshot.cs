@@ -271,6 +271,11 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasDatabaseName("ix_funds_branch_id_code")
                         .HasFilter("is_deleted = false");
 
+                    b.HasIndex("BranchId", "Kind")
+                        .IsUnique()
+                        .HasDatabaseName("ix_funds_branch_id_kind")
+                        .HasFilter("is_default AND is_deleted = false");
+
                     b.ToTable("funds", (string)null);
                 });
 

@@ -33,6 +33,7 @@ public class FundConfiguration : IEntityTypeConfiguration<Fund>
         b.Property(x => x.IsActive).HasDefaultValue(true).HasSentinel(true);
 
         b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        b.HasIndex(x => new { x.BranchId, x.Kind }).IsUnique().HasFilter("is_default AND is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
 
         b.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);

@@ -83,6 +83,12 @@ public class GlobalExceptionMiddleware
                 Message = nse.Message,
                 Details = nse.Shortages,
             }),
+            ConfirmationRequiredException cre => (StatusCodes.Status422UnprocessableEntity, new ApiError
+            {
+                Code = cre.Code,
+                Message = cre.Message,
+                Details = cre.Details,
+            }),
             DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, new ApiError
             {
                 Code = "CONCURRENCY",

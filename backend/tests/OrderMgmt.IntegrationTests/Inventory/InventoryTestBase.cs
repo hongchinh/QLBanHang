@@ -40,6 +40,11 @@ public abstract class InventoryTestBase : QuotationTestBase
         DefaultWarehouseId = await InDbAsync(db => db.Warehouses.Where(w => w.Code == "KHO01").Select(w => w.Id).SingleAsync());
     }
 
+    /// Sets a branch's opening date straight in the DB (the API refuses once the branch has documents).
+    protected Task SetBranchOpeningDateAsync(Guid branchId, DateOnly? date) =>
+        InDbAsync(db => db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.OpeningDate, date)));
+
     protected async Task InDbAsync(Func<AppDbContext, Task> work)
     {
         using var scope = _factory.Services.CreateScope();

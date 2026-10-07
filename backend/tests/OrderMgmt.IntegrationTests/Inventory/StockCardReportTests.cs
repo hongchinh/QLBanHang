@@ -191,10 +191,10 @@ public class StockCardReportTests : InventoryTestBase
 
     private async Task SaveOpeningAsync(Guid productId, DateOnly date, decimal quantity, decimal amount)
     {
+        await SetBranchOpeningDateAsync(MainBranchId, date);
         var response = await _client.PutAsJsonAsync("/api/inventory/opening-stock", new SaveOpeningStockRequest
         {
             WarehouseId = DefaultWarehouseId,
-            OpeningDate = date,
             Lines = { new SaveOpeningStockLine { ProductId = productId, Quantity = quantity, Amount = amount } },
         });
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());

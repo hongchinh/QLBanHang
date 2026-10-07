@@ -42,10 +42,10 @@ public class OpeningStockLargeGridTests : InventoryEngineTestBase
     public async Task Saves_an_opening_stock_grid_of_many_products()
     {
         var productIds = await CreateProductsAsync(ProductCount);
+        await SetBranchOpeningDateAsync(MainBranchId, new DateOnly(2026, 10, 1));
         var request = new SaveOpeningStockRequest
         {
             WarehouseId = DefaultWarehouseId,
-            OpeningDate = new DateOnly(2026, 10, 1),
             Lines = productIds.Select(id => new SaveOpeningStockLine { ProductId = id, Quantity = 2, Amount = 200_000 }).ToList(),
         };
 

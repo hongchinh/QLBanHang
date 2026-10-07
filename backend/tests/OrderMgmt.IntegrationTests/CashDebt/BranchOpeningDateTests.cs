@@ -93,7 +93,6 @@ public class BranchOpeningDateTests : CashDebtTestBase
         var saved = await branchClient.PutAsJsonAsync("/api/inventory/opening-stock", new SaveOpeningStockRequest
         {
             WarehouseId = warehouseId,
-            OpeningDate = new DateOnly(2026, 10, 1),
             Lines = { new SaveOpeningStockLine { ProductId = product, Quantity = 5, Amount = 500_000 } },
         });
         saved.StatusCode.Should().Be(HttpStatusCode.OK, await saved.Content.ReadAsStringAsync());
@@ -127,7 +126,7 @@ public class BranchOpeningDateTests : CashDebtTestBase
         var p2 = await CreateInventoryProductAsync(NewCode("ODR"));
 
         // The SQL is not scoped to one branch: snapshot every branch's date and restore it afterwards.
-        var before = await InDbAsync(db => db.Branches.AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.OpeningDate));
+        var before = await InDbAsync(db => db.Branches.IgnoreQueryFilters().AsNoTracking().ToDictionaryAsync(b => b.Id, b => b.OpeningDate));
         try
         {
             await InDbAsync(async db =>

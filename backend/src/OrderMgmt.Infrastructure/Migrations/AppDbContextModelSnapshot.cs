@@ -2094,6 +2094,10 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("character varying(255)")
                         .HasColumnName("name");
 
+                    b.Property<DateOnly?>("OpeningDate")
+                        .HasColumnType("date")
+                        .HasColumnName("opening_date");
+
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");

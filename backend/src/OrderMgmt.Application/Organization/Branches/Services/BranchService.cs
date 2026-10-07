@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
+using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Common;
@@ -18,9 +19,10 @@ public class BranchService : IBranchService
     private readonly ICurrentBranch _currentBranch;
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryLock _inventoryLock;
+    private readonly IOpeningStockService _openingStock;
 
     public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
-        ITransactionRunner transaction, IInventoryLock inventoryLock)
+        ITransactionRunner transaction, IInventoryLock inventoryLock, IOpeningStockService openingStock)
     {
         _db = db;
         _clock = clock;
@@ -28,6 +30,7 @@ public class BranchService : IBranchService
         _currentBranch = currentBranch;
         _transaction = transaction;
         _inventoryLock = inventoryLock;
+        _openingStock = openingStock;
     }
 
     public async Task<MyBranchesDto> GetMyBranchesAsync(CancellationToken ct = default)
@@ -130,6 +133,38 @@ public class BranchService : IBranchService
         }, ct);
     }
 
+    public async Task<BranchDto> SetOpeningDateAsync(Guid id, SetOpeningDateRequest request, CancellationToken ct = default)
+    {
+        return await _transaction.RunAsync(async c =>
+        {
+            await _inventoryLock.AcquireBranchGateAsync(new[] { id }, exclusive: true, c);
+            var branch = await FindAsync(id, c);
+
+            var oldDate = branch.OpeningDate;
+            var newDate = request.OpeningDate;
+            PeriodLockGuard.EnsureNotLocked(branch.LockedUntil,
+                new[] { oldDate, newDate }.Where(d => d is not null).Select(d => d!.Value));
+            if (await HasDocumentsAsync(id, c))
+                throw new ConflictException("BRANCH_HAS_DOCUMENTS", "Chi nhánh đã có chứng từ, không đổi được ngày đầu kỳ.");
+            if (oldDate == newDate)
+                return ToDto(branch);
+
+            var hasOpeningStock = await _db.OpeningStocks.AnyAsync(o => o.BranchId == id, c);
+            if (newDate is null && hasOpeningStock)
+                throw new ConflictException("OPENING_DATA_EXISTS", "Chi nhánh đã có tồn đầu kỳ, không xóa được ngày đầu kỳ.");
+
+            branch.OpeningDate = newDate;
+            await _db.SaveChangesAsync(c);
+            if (newDate is { } date && hasOpeningStock)
+                await _openingStock.RepostBranchAsync(id, date, c);
+            return ToDto(branch);
+        }, ct);
+    }
+
+    // Phases 05, 06 and 08 add their document tables here.
+    private Task<bool> HasDocumentsAsync(Guid branchId, CancellationToken ct) =>
+        _db.StockVouchers.AnyAsync(v => v.BranchId == branchId, ct);
+
     private async Task<Branch> FindAsync(Guid id, CancellationToken ct) =>
         await _db.Branches.FirstOrDefaultAsync(b => b.Id == id, ct)
         ?? throw new NotFoundException(nameof(Branch), id);
@@ -141,5 +176,6 @@ public class BranchService : IBranchService
         Name = b.Name,
         Address = b.Address,
         LockedUntil = b.LockedUntil,
+        OpeningDate = b.OpeningDate,
     };
 }

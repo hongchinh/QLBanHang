@@ -10,5 +10,6 @@ public interface IBranchService
     Task<BranchDto> UpdateAsync(Guid id, UpdateBranchRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CancellationToken ct = default);
     Task<BranchDto> SetLockAsync(Guid id, SetPeriodLockRequest request, CancellationToken ct = default);
+    Task<BranchDto> SetOpeningDateAsync(Guid id, SetOpeningDateRequest request, CancellationToken ct = default);
     Task<MyBranchesDto> GetMyBranchesAsync(CancellationToken ct = default);
 }

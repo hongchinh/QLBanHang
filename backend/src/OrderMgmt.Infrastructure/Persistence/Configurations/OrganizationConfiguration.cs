@@ -15,6 +15,7 @@ public class BranchConfiguration : IEntityTypeConfiguration<Branch>
         b.Property(x => x.Name).IsRequired().HasMaxLength(255);
         b.Property(x => x.Address).HasMaxLength(1000);
         b.Property(x => x.LockedUntil).HasColumnType("date");
+        b.Property(x => x.OpeningDate).HasColumnType("date");
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);

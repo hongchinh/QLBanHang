@@ -150,6 +150,35 @@ public class OpeningStockService : IOpeningStockService
         return await GetAsync(request.WarehouseId, ct);
     }
 
+    public async Task RepostBranchAsync(Guid branchId, DateOnly newDate, CancellationToken ct = default)
+    {
+        await _transaction.RunAsync(async c =>
+        {
+            var rows = await _db.OpeningStocks.Where(o => o.BranchId == branchId).ToListAsync(c);
+            if (rows.Count == 0)
+                return;
+
+            // Same order as SaveAsync: branch gate (held by the caller), warehouse keys, then product keys.
+            foreach (var warehouseId in rows.Select(o => o.WarehouseId).Distinct().OrderBy(id => id))
+                await _inventoryLock.AcquireOpeningStockAsync(warehouseId, c);
+            await _posting.AcquireLocksAsync(branchId, rows.Select(o => o.ProductId).Distinct(), c);
+            foreach (var row in rows)
+                row.OpeningDate = newDate;
+            await _db.SaveChangesAsync(c);
+
+            var postedAt = VnTime.StartOfDay(newDate);
+            foreach (var group in rows.GroupBy(o => o.WarehouseId).OrderBy(g => g.Key))
+            {
+                var drafts = group.Select((row, index) => new LedgerEntryDraft(
+                        row.ProductId, row.WarehouseId, branchId, postedAt,
+                        LedgerSourceType.Opening, group.Key, row.Id, SourceCode, index,
+                        row.Quantity, 0m, row.Amount))
+                    .ToList();
+                await _posting.PostAsync(LedgerSourceType.Opening, group.Key, drafts, acknowledgeNegativeStock: true, c);
+            }
+        }, ct);
+    }
+
     /// The warehouse must exist and belong to the working branch; returns that branch.
     private async Task<Guid> EnsureWarehouseAsync(Guid warehouseId, CancellationToken ct)
     {

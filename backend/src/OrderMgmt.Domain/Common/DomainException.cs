@@ -19,6 +19,7 @@ public sealed class NotFoundException : DomainException
 public sealed class ConflictException : DomainException
 {
     public ConflictException(string message) : base("CONFLICT", message) { }
+    public ConflictException(string code, string message) : base(code, message) { }
 }
 
 public sealed class ForbiddenException : DomainException

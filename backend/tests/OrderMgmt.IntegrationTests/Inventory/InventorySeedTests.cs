@@ -35,6 +35,6 @@ public class InventorySeedTests : InventoryTestBase
         (await InDbAsync(db => db.Warehouses.CountAsync())).Should().Be(1);
         (await InDbAsync(db => db.StockReasons.CountAsync())).Should().Be(4);
         (await InDbAsync(db => db.PaymentMethods.CountAsync())).Should().Be(2);
-        (await InDbAsync(db => db.DocumentNumberings.CountAsync())).Should().Be(2);
+        (await InDbAsync(db => db.DocumentNumberings.CountAsync())).Should().Be(6);
     }
 }

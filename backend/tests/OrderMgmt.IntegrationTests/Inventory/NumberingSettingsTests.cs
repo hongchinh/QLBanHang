@@ -18,7 +18,7 @@ public class NumberingSettingsTests : InventoryTestBase
     public async Task Every_branch_has_default_numbering_scoped_to_working_branch()
     {
         var main = await ReadDataAsync<List<DocumentNumberingDto>>(await _client.GetAsync("/api/inventory/numbering"));
-        main.Should().HaveCount(2);
+        main.Should().HaveCount(6);
         var stockIn = main.Single(n => n.DocType == DocumentType.StockIn);
         stockIn.Prefix.Should().Be("PN");
         stockIn.Length.Should().Be(5);
@@ -33,7 +33,7 @@ public class NumberingSettingsTests : InventoryTestBase
         var inB = CloneAdminClient();
         UseBranch(inB, b);
         var branchRows = await ReadDataAsync<List<DocumentNumberingDto>>(await inB.GetAsync("/api/inventory/numbering"));
-        branchRows.Should().HaveCount(2);
+        branchRows.Should().HaveCount(6);
         branchRows.Single(n => n.DocType == DocumentType.StockIn).Prefix.Should().Be("PN", "the main branch update must not leak into branch B");
     }
 

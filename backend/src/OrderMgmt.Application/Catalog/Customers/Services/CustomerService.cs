@@ -120,6 +120,7 @@ public class CustomerService : ICustomerService
                 Status = c.Status,
                 IsCustomer = c.IsCustomer,
                 IsSupplier = c.IsSupplier,
+                CreditDays = c.CreditDays,
             })
             .ToListAsync(ct);
     }
@@ -161,6 +162,7 @@ public class CustomerService : ICustomerService
                 Status = CustomerStatus.Active,
                 IsCustomer = isCustomer,
                 IsSupplier = isSupplier,
+                CreditDays = request.CreditDays,
             };
 
             _db.Customers.Add(customer);
@@ -214,6 +216,7 @@ public class CustomerService : ICustomerService
         customer.Status = request.Status;
         customer.IsCustomer = isCustomer;
         customer.IsSupplier = isSupplier;
+        customer.CreditDays = request.CreditDays;
 
         await _db.SaveChangesAsync(ct);
         return customer.Adapt<CustomerDto>();

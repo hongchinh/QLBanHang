@@ -182,6 +182,67 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.ToTable("cash_reasons", (string)null);
                 });
 
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.CreditLimit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("CustomerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("customer_id");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_credit_limits");
+
+                    b.HasIndex("BranchId")
+                        .HasDatabaseName("ix_credit_limits_branch_id");
+
+                    b.HasIndex("CustomerId", "BranchId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_credit_limits_customer_id_branch_id")
+                        .HasFilter("is_deleted = false");
+
+                    b.ToTable("credit_limits", (string)null);
+                });
+
             modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.Fund", b =>
                 {
                     b.Property<Guid>("Id")
@@ -309,6 +370,10 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.Property<Guid?>("CreatedBy")
                         .HasColumnType("uuid")
                         .HasColumnName("created_by");
+
+                    b.Property<int?>("CreditDays")
+                        .HasColumnType("integer")
+                        .HasColumnName("credit_days");
 
                     b.Property<string>("DefaultShippingAddress")
                         .HasMaxLength(1000)
@@ -3066,6 +3131,25 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasDatabaseName("ix_push_subscriptions_user_id");
 
                     b.ToTable("push_subscriptions", (string)null);
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.CreditLimit", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_credit_limits_branches_branch_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Catalog.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_credit_limits_customers_customer_id");
+
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.Fund", b =>

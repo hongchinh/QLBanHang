@@ -27,6 +27,8 @@ using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Notifications.Services;
 using OrderMgmt.Application.CashDebt.CashReasons.Interfaces;
 using OrderMgmt.Application.CashDebt.CashReasons.Services;
+using OrderMgmt.Application.CashDebt.CreditLimits.Interfaces;
+using OrderMgmt.Application.CashDebt.CreditLimits.Services;
 using OrderMgmt.Application.CashDebt.Funds.Interfaces;
 using OrderMgmt.Application.CashDebt.Funds.Services;
 using OrderMgmt.Application.CashDebt.Settings.Interfaces;
@@ -105,6 +107,7 @@ public static class DependencyInjection
         services.AddScoped<ICashDebtSettingsService, CashDebtSettingsService>();
         services.AddScoped<ICashReasonService, CashReasonService>();
         services.AddScoped<IFundService, FundService>();
+        services.AddScoped<ICreditLimitService, CreditLimitService>();
         services.AddScoped<IInventoryLedgerService, InventoryLedgerService>();
         services.AddScoped<IInventoryCostingService, InventoryCostingService>();
         services.AddScoped<IInventoryPostingService, InventoryPostingService>();

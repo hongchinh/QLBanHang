@@ -57,3 +57,19 @@ public class CashDebtSettingsConfiguration : IEntityTypeConfiguration<CashDebtSe
         });
     }
 }
+
+public class CreditLimitConfiguration : IEntityTypeConfiguration<CreditLimit>
+{
+    public void Configure(EntityTypeBuilder<CreditLimit> b)
+    {
+        b.ToTable("credit_limits");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+
+        b.HasIndex(x => new { x.CustomerId, x.BranchId }).IsUnique().HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+
+        b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<OrderMgmt.Domain.Entities.Organization.Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

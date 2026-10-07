@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { useBranchStore } from '@/stores/branch-store';
 import api, {
@@ -180,13 +180,7 @@ describe('formatApiErrorDetails', () => {
 describe('refresh failure', () => {
   const originalAdapter = api.defaults.adapter;
 
-  afterEach(() => {
-    api.defaults.adapter = originalAdapter;
-    useBranchStore.getState().clear();
-  });
-
-  it('refresh failure clears the branch store', async () => {
-    useBranchStore.setState({ workingBranchId: 'branch-2' });
+  beforeEach(() => {
     api.defaults.adapter = async (config) => {
       throw new AxiosError('Unauthorized', 'ERR_BAD_REQUEST', config, null, {
         status: 401,
@@ -196,9 +190,28 @@ describe('refresh failure', () => {
         data: { success: false, error: { code: 'UNAUTHORIZED', message: 'Unauthorized' }, timestamp: '' },
       });
     };
+  });
+
+  afterEach(() => {
+    api.defaults.adapter = originalAdapter;
+    useBranchStore.getState().clear();
+    vi.unstubAllGlobals();
+  });
+
+  it('refresh failure clears the branch store', async () => {
+    useBranchStore.setState({ workingBranchId: 'branch-2' });
 
     await expect(apiGet('/x')).rejects.toBeInstanceOf(AxiosError);
 
     expect(useBranchStore.getState().workingBranchId).toBeNull();
+  });
+
+  it('refresh failure deletes the api cache', async () => {
+    const deleteCache = vi.fn().mockResolvedValue(true);
+    vi.stubGlobal('caches', { delete: deleteCache });
+
+    await expect(apiGet('/x')).rejects.toBeInstanceOf(AxiosError);
+
+    expect(deleteCache).toHaveBeenCalledWith('api-cache');
   });
 });

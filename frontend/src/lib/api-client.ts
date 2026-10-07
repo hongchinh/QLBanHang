@@ -108,6 +108,7 @@ api.interceptors.response.use(
       useAuthStore.getState().logout();
       useBranchStore.getState().clear();
       queryClient.clear();
+      if ('caches' in window) void caches.delete('api-cache');
     }
 
     return Promise.reject(error);

@@ -27,6 +27,7 @@ export function useLogout() {
       localLogout();
       useBranchStore.getState().clear();
       qc.clear();
+      if ('caches' in window) void caches.delete('api-cache');
       navigate('/login', { replace: true });
     },
   });

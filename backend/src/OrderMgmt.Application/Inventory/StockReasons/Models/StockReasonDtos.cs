@@ -9,6 +9,7 @@ public class StockReasonDto
     public string Name { get; set; } = default!;
     public StockDirection Direction { get; set; }
     public PartnerType PartnerType { get; set; }
+    public DebtEffect DebtEffect { get; set; }
     public bool IsSystem { get; set; }
 }
 
@@ -18,6 +19,7 @@ public class CreateStockReasonRequest
     public string Name { get; set; } = default!;
     public StockDirection Direction { get; set; }
     public PartnerType PartnerType { get; set; }
+    public DebtEffect DebtEffect { get; set; }
 }
 
 public class UpdateStockReasonRequest
@@ -25,4 +27,5 @@ public class UpdateStockReasonRequest
     public string Name { get; set; } = default!;
     public StockDirection Direction { get; set; }
     public PartnerType PartnerType { get; set; }
+    public DebtEffect DebtEffect { get; set; }
 }

@@ -11,6 +11,7 @@ public class CreateStockReasonRequestValidator : AbstractValidator<CreateStockRe
         RuleFor(x => x.Name).NotEmpty().MaximumLength(255);
         RuleFor(x => x.Direction).IsInEnum();
         RuleFor(x => x.PartnerType).IsInEnum();
+        RuleFor(x => x.DebtEffect).IsInEnum();
     }
 }
 
@@ -21,5 +22,6 @@ public class UpdateStockReasonRequestValidator : AbstractValidator<UpdateStockRe
         RuleFor(x => x.Name).NotEmpty().MaximumLength(255);
         RuleFor(x => x.Direction).IsInEnum();
         RuleFor(x => x.PartnerType).IsInEnum();
+        RuleFor(x => x.DebtEffect).IsInEnum();
     }
 }

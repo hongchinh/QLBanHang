@@ -330,14 +330,18 @@ public static class DbSeeder
         if (!await db.Warehouses.IgnoreQueryFilters().AnyAsync(ct))
             db.Warehouses.Add(new Warehouse { Code = "KHO01", Name = "Kho chính", BranchId = BranchDefaults.MainBranchId });
 
-        if (!await db.StockReasons.IgnoreQueryFilters().AnyAsync(ct))
+        // System stock reasons: each is inserted only when its code is missing (soft-deleted rows count).
+        var stockReasonCodes = await db.StockReasons.IgnoreQueryFilters().Select(r => r.Code).ToListAsync(ct);
+        var stockReasonSeeds = new[]
         {
-            db.StockReasons.AddRange(
-                new StockReason { Code = "NMH", Name = "Nhập mua hàng", Direction = StockDirection.In, PartnerType = PartnerType.Supplier, IsSystem = true },
-                new StockReason { Code = "NKH", Name = "Nhập khác", Direction = StockDirection.In, PartnerType = PartnerType.Any, IsSystem = true },
-                new StockReason { Code = "XBH", Name = "Xuất bán hàng", Direction = StockDirection.Out, PartnerType = PartnerType.Customer, IsSystem = true },
-                new StockReason { Code = "XKH", Name = "Xuất khác", Direction = StockDirection.Out, PartnerType = PartnerType.Any, IsSystem = true });
-        }
+            NewStockReason("NMH", "Nhập mua hàng", StockDirection.In, PartnerType.Supplier, DebtEffect.PayableIncrease),
+            NewStockReason("NKH", "Nhập khác", StockDirection.In, PartnerType.Any, DebtEffect.None),
+            NewStockReason("XBH", "Xuất bán hàng", StockDirection.Out, PartnerType.Customer, DebtEffect.ReceivableIncrease),
+            NewStockReason("XKH", "Xuất khác", StockDirection.Out, PartnerType.Any, DebtEffect.None),
+            NewStockReason("NTL", "Nhập hàng bán bị trả lại", StockDirection.In, PartnerType.Customer, DebtEffect.ReceivableDecrease),
+            NewStockReason("XTL", "Xuất trả hàng NCC", StockDirection.Out, PartnerType.Supplier, DebtEffect.PayableDecrease),
+        };
+        db.StockReasons.AddRange(stockReasonSeeds.Where(r => !stockReasonCodes.Contains(r.Code)));
 
         if (!await db.PaymentMethods.IgnoreQueryFilters().AnyAsync(ct))
         {
@@ -368,6 +372,9 @@ public static class DbSeeder
 
         await db.SaveChangesAsync(ct);
     }
+
+    private static StockReason NewStockReason(string code, string name, StockDirection direction, PartnerType partnerType, DebtEffect effect)
+        => new() { Code = code, Name = name, Direction = direction, PartnerType = partnerType, DebtEffect = effect, IsSystem = true };
 
     private static CashReason NewCashReason(string code, string name, CashVoucherType type, PartnerType partnerType, DebtEffect effect, bool isAuto)
         => new() { Code = code, Name = name, Type = type, PartnerType = partnerType, DebtEffect = effect, IsSystem = true, IsAuto = isAuto };

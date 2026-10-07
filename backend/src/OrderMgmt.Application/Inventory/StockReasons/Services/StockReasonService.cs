@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.StockReasons.Interfaces;
 using OrderMgmt.Application.Inventory.StockReasons.Models;
@@ -37,6 +38,8 @@ public class StockReasonService : IStockReasonService
 
     public async Task<StockReasonDto> CreateAsync(CreateStockReasonRequest request, CancellationToken ct = default)
     {
+        EnsureCombination(request.Direction, request.PartnerType, request.DebtEffect);
+
         var code = request.Code.Trim();
         if (await _db.StockReasons.AnyAsync(r => r.Code == code, ct))
             throw new ConflictException($"Mã lý do '{code}' đã tồn tại.");
@@ -47,6 +50,7 @@ public class StockReasonService : IStockReasonService
             Name = request.Name.Trim(),
             Direction = request.Direction,
             PartnerType = request.PartnerType,
+            DebtEffect = request.DebtEffect,
         };
         _db.StockReasons.Add(reason);
         await _db.SaveChangesAsync(ct);
@@ -60,22 +64,28 @@ public class StockReasonService : IStockReasonService
         if (reason.IsSystem && (reason.Direction != request.Direction || reason.PartnerType != request.PartnerType))
             throw new ConflictException("Lý do hệ thống không được đổi chiều nhập/xuất hoặc loại đối tượng.");
 
+        EnsureCombination(request.Direction, request.PartnerType, request.DebtEffect);
+
         // Vouchers already saved with this reason were validated against its direction and partner type.
         var directionChanged = reason.Direction != request.Direction;
         var partnerTypeChanged = reason.PartnerType != request.PartnerType;
-        if ((directionChanged || partnerTypeChanged) && await _db.StockVouchers.AnyAsync(v => v.ReasonId == id, ct))
+        var debtEffectChanged = reason.DebtEffect != request.DebtEffect;
+        if ((directionChanged || partnerTypeChanged || debtEffectChanged) && await _db.StockVouchers.AnyAsync(v => v.ReasonId == id, ct))
         {
             var errors = new Dictionary<string, string[]>();
             if (directionChanged)
                 errors["direction"] = new[] { "Lý do đã được dùng trên phiếu kho, không được đổi chiều nhập/xuất." };
             if (partnerTypeChanged)
                 errors["partnerType"] = new[] { "Lý do đã được dùng trên phiếu kho, không được đổi loại đối tượng." };
+            if (debtEffectChanged)
+                errors["debtEffect"] = new[] { "Lý do đã được dùng trên phiếu kho, không được đổi ảnh hưởng công nợ." };
             throw new ValidationDomainException(errors, null);
         }
 
         reason.Name = request.Name.Trim();
         reason.Direction = request.Direction;
         reason.PartnerType = request.PartnerType;
+        reason.DebtEffect = request.DebtEffect;
         await _db.SaveChangesAsync(ct);
         return ToDto(reason);
     }
@@ -94,6 +104,18 @@ public class StockReasonService : IStockReasonService
         await _db.SaveChangesAsync(ct);
     }
 
+    /// Collects every broken combination rule (P19) into one validation error.
+    private static void EnsureCombination(StockDirection direction, PartnerType partnerType, DebtEffect effect)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (!DebtEffectRules.IsAllowedForStock(direction, effect))
+            errors["debtEffect"] = new[] { "Ảnh hưởng công nợ không phù hợp với chiều nhập/xuất." };
+        if (!DebtEffectRules.IsAllowedPartnerType(effect, partnerType))
+            errors["partnerType"] = new[] { "Loại đối tượng không phù hợp với ảnh hưởng công nợ." };
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+    }
+
     private async Task<StockReason> FindAsync(Guid id, CancellationToken ct) =>
         await _db.StockReasons.FirstOrDefaultAsync(r => r.Id == id, ct)
         ?? throw new NotFoundException(nameof(StockReason), id);
@@ -105,6 +127,7 @@ public class StockReasonService : IStockReasonService
         Name = r.Name,
         Direction = r.Direction,
         PartnerType = r.PartnerType,
+        DebtEffect = r.DebtEffect,
         IsSystem = r.IsSystem,
     };
 }

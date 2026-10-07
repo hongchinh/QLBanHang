@@ -24,8 +24,10 @@ public class InventorySeedTests : InventoryTestBase
         reasons.Select(r => (r.Code, r.Direction, r.PartnerType, r.IsSystem)).Should().Equal(
             ("NKH", StockDirection.In, PartnerType.Any, true),
             ("NMH", StockDirection.In, PartnerType.Supplier, true),
+            ("NTL", StockDirection.In, PartnerType.Customer, true),
             ("XBH", StockDirection.Out, PartnerType.Customer, true),
-            ("XKH", StockDirection.Out, PartnerType.Any, true));
+            ("XKH", StockDirection.Out, PartnerType.Any, true),
+            ("XTL", StockDirection.Out, PartnerType.Supplier, true));
 
         var methods = await InDbAsync(db => db.PaymentMethods.AsNoTracking().OrderBy(m => m.Code).ToListAsync());
         methods.Select(m => (m.Code, m.FundKind)).Should().Equal(("CK", FundKind.Bank), ("TM", FundKind.Cash));
@@ -33,7 +35,7 @@ public class InventorySeedTests : InventoryTestBase
         await DbSeeder.SeedAsync(_factory.Services);
 
         (await InDbAsync(db => db.Warehouses.CountAsync())).Should().Be(1);
-        (await InDbAsync(db => db.StockReasons.CountAsync())).Should().Be(4);
+        (await InDbAsync(db => db.StockReasons.CountAsync())).Should().Be(6);
         (await InDbAsync(db => db.PaymentMethods.CountAsync())).Should().Be(2);
         (await InDbAsync(db => db.DocumentNumberings.CountAsync())).Should().Be(6);
     }

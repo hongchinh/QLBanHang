@@ -16,4 +16,9 @@ public interface IInventoryLock
     // span branches: the D35 cost price and catalog changes guarded by inventory activity.
     // Key: hashtextextended('inv-product:{productId:N}', 0). Throws InvalidOperationException without a transaction.
     Task AcquireProductsAsync(IEnumerable<Guid> productIds, CancellationToken ct = default);
+
+    // Serializes opening-stock saves of one warehouse: they all replace the same Opening ledger source.
+    // Taken after the shared branch gate and before the product keys.
+    // Key: hashtextextended('inv-opening:{warehouseId:N}', 0). Throws InvalidOperationException without a transaction.
+    Task AcquireOpeningStockAsync(Guid warehouseId, CancellationToken ct = default);
 }

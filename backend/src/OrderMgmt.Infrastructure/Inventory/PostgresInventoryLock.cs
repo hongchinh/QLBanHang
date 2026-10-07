@@ -44,6 +44,13 @@ public sealed class PostgresInventoryLock : IInventoryLock
         }
     }
 
+    public async Task AcquireOpeningStockAsync(Guid warehouseId, CancellationToken ct = default)
+    {
+        EnsureTransaction();
+        var key = $"inv-opening:{warehouseId:N}";
+        await _db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock(hashtextextended({key}, 0))", ct);
+    }
+
     private void EnsureTransaction()
     {
         if (_db.Database.CurrentTransaction is null)

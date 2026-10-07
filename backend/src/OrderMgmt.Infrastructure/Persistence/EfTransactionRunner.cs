@@ -31,6 +31,17 @@ public sealed class EfTransactionRunner : ITransactionRunner
         }
     }
 
+    public async Task<T> RunSnapshotAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken ct = default)
+    {
+        if (_db.Database.CurrentTransaction is not null)
+            return await work(ct);
+
+        await using var tx = await _db.Database.BeginTransactionAsync(IsolationLevel.RepeatableRead, ct);
+        var result = await work(ct);
+        await tx.CommitAsync(ct);
+        return result;
+    }
+
     public Task RunAsync(Func<CancellationToken, Task> work, CancellationToken ct = default) =>
         RunAsync(async c =>
         {

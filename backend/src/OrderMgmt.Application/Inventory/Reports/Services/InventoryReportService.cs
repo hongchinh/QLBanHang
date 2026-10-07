@@ -17,16 +17,23 @@ public class InventoryReportService : IInventoryReportService
     private readonly ICurrentUser _currentUser;
     private readonly ICurrentBranch _currentBranch;
     private readonly IDateTime _clock;
+    private readonly ITransactionRunner _transaction;
 
-    public InventoryReportService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch, IDateTime clock)
+    public InventoryReportService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch, IDateTime clock,
+        ITransactionRunner transaction)
     {
         _db = db;
         _currentUser = currentUser;
         _currentBranch = currentBranch;
         _clock = clock;
+        _transaction = transaction;
     }
 
-    public async Task<StockOnHandReportDto> GetStockOnHandAsync(StockOnHandReportRequest request, CancellationToken ct = default)
+    /// One REPEATABLE READ snapshot for all the report's queries (review finding: no read skew).
+    public Task<StockOnHandReportDto> GetStockOnHandAsync(StockOnHandReportRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildStockOnHandAsync(request, c), ct);
+
+    private async Task<StockOnHandReportDto> BuildStockOnHandAsync(StockOnHandReportRequest request, CancellationToken ct)
     {
         var branchId = await _currentBranch.GetIdAsync(ct);
         var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, ct);
@@ -124,15 +131,20 @@ public class InventoryReportService : IInventoryReportService
             CanViewCost = canViewCost,
             TotalValue = canViewCost ? totalValue : null,
             Rows = rows
-                .Where(r => r.Row.Quantity != 0m || r.Value != 0m)
+                // Mask first, then drop: without view_cost a zero-quantity row never reveals a residual value.
                 .Select(r => { r.Row.Value = canViewCost ? r.Value : null; return r.Row; })
+                .Where(r => r.Quantity != 0m || (r.Value ?? 0m) != 0m)
                 .OrderBy(r => r.ProductCode, StringComparer.Ordinal)
                 .ThenBy(r => r.WarehouseCode, StringComparer.Ordinal)
                 .ToList(),
         };
     }
 
-    public async Task<StockCardDto> GetStockCardAsync(StockCardRequest request, CancellationToken ct = default)
+    /// One REPEATABLE READ snapshot for all the report's queries (review finding: no read skew).
+    public Task<StockCardDto> GetStockCardAsync(StockCardRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildStockCardAsync(request, c), ct);
+
+    private async Task<StockCardDto> BuildStockCardAsync(StockCardRequest request, CancellationToken ct)
     {
         var branchId = await _currentBranch.GetIdAsync(ct);
         var from = request.From!.Value;

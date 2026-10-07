@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Ledger;
 using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
 using OrderMgmt.Application.Inventory.OpeningStocks.Models;
@@ -24,10 +25,12 @@ public class OpeningStockService : IOpeningStockService
     private readonly ICurrentBranch _currentBranch;
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryPostingService _posting;
+    private readonly IInventoryLock _inventoryLock;
 
     public OpeningStockService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch,
-        ITransactionRunner transaction, IInventoryPostingService posting)
+        ITransactionRunner transaction, IInventoryPostingService posting, IInventoryLock inventoryLock)
     {
+        _inventoryLock = inventoryLock;
         _db = db;
         _currentUser = currentUser;
         _currentBranch = currentBranch;
@@ -77,7 +80,16 @@ public class OpeningStockService : IOpeningStockService
 
         await _transaction.RunAsync(async c =>
         {
-            await ValidateProductsAsync(request, c);
+            // Branch gate, then the per-warehouse opening key, so concurrent saves of this warehouse run one
+            // after the other and each sees the rows the previous one committed (review finding).
+            await _inventoryLock.AcquireBranchGateAsync(new[] { branchId }, exclusive: false, c);
+            await _inventoryLock.AcquireOpeningStockAsync(request.WarehouseId, c);
+            // A move to another branch takes the exclusive gate of the old branch, so after the shared gate the
+            // warehouse's branch can no longer change under this save.
+            var currentBranchId = await _db.Warehouses.Where(w => w.Id == request.WarehouseId)
+                .Select(w => (Guid?)w.BranchId).FirstOrDefaultAsync(c);
+            if (currentBranchId != branchId)
+                throw new ConflictException("Kho vừa được chuyển sang chi nhánh khác. Vui lòng tải lại.");
 
             var lockedProductIds = (await _db.OpeningStocks.AsNoTracking()
                     .Where(o => o.WarehouseId == request.WarehouseId)
@@ -87,6 +99,8 @@ public class OpeningStockService : IOpeningStockService
                 .Distinct()
                 .ToList();
             await _posting.AcquireLocksAsync(branchId, lockedProductIds, c);
+            // Product checks after the product keys, so a concurrent stock-field change cannot slip in.
+            await ValidateProductsAsync(request, c);
 
             var existing = await _db.OpeningStocks.Where(o => o.WarehouseId == request.WarehouseId).ToListAsync(c);
             // A concurrent save added a product between the read and the locks: its pair is not locked.

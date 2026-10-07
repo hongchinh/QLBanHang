@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Costing;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.Settings.Interfaces;
 using OrderMgmt.Application.Inventory.Settings.Models;
@@ -18,10 +19,12 @@ public class InventorySettingsService : IInventorySettingsService
     private readonly ICurrentBranch _currentBranch;
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryRecalcService _recalc;
+    private readonly IInventoryLock _lock;
 
     public InventorySettingsService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
-        ITransactionRunner transaction, IInventoryRecalcService recalc)
+        ITransactionRunner transaction, IInventoryRecalcService recalc, IInventoryLock inventoryLock)
     {
+        _lock = inventoryLock;
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
@@ -36,6 +39,10 @@ public class InventorySettingsService : IInventorySettingsService
     public Task<InventorySettingsDto> UpdateAsync(UpdateInventorySettingsRequest request, CancellationToken ct = default) =>
         _transaction.RunAsync(async c =>
         {
+            // Settings writers wait for each other and for in-flight postings before reading the row (D30, review
+            // finding), so `before` is never stale. ApplySettingsChangeAsync re-takes the same gates (re-entrant).
+            var allBranchIds = await _db.Branches.IgnoreQueryFilters().Select(b => b.Id).ToListAsync(c);
+            await _lock.AcquireBranchGateAsync(allBranchIds, exclusive: true, c);
             var settings = await _db.InventorySettings.SingleAsync(s => s.Id == 1, c);
             var before = new InventorySettings
             {

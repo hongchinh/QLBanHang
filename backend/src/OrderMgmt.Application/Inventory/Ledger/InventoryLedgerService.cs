@@ -29,14 +29,15 @@ public class InventoryLedgerService : IInventoryLedgerService
             .ToList();
 
         // The pre-change state of each window, read before the old rows go (D31).
-        var before = new List<(decimal? Min, DateTimeOffset? FirstNegativeAt)>();
+        var before = new List<(decimal? Min, Position? FirstNegative)>();
         foreach (var p in pairs)
         {
             var window = PairRows(p.ProductId, p.WarehouseId).Where(e => e.PostedAt >= p.From);
             before.Add((
                 await window.MinAsync(e => (decimal?)e.RunningQty, ct),
                 await window.Where(e => e.RunningQty < 0).InPostingOrder()
-                    .Select(e => (DateTimeOffset?)e.PostedAt).FirstOrDefaultAsync(ct)));
+                    .Select(e => new Position(e.PostedAt, e.SourceType, e.SourceCode, e.LineSortOrder))
+                    .FirstOrDefaultAsync(ct)));
         }
 
         await sourceRows.ExecuteDeleteAsync(ct);
@@ -76,13 +77,17 @@ public class InventoryLedgerService : IInventoryLedgerService
 
             var running = baseQty ?? 0m;
             decimal? min = null;
+            DateTimeOffset? minAt = null;
             DateTimeOffset? firstNegativeAt = null;
             foreach (var row in rows)
             {
                 running += row.QtyIn - row.QtyOut;
                 row.RunningQty = running;
                 if (min is null || running < min)
+                {
                     min = running;
+                    minAt = row.PostedAt;
+                }
                 if (running < 0 && firstNegativeAt is null)
                     firstNegativeAt = row.PostedAt;
             }
@@ -108,14 +113,38 @@ public class InventoryLedgerService : IInventoryLedgerService
                 balance.Quantity = running;
             }
 
-            changes.Add(new PairChange(p.ProductId, p.WarehouseId, p.BranchId, p.From, min, firstNegativeAt,
-                before[i].Min, before[i].FirstNegativeAt, running, baseQty));
+            changes.Add(new PairChange(p.ProductId, p.WarehouseId, p.BranchId, p.From, min, minAt, firstNegativeAt,
+                before[i].Min, before[i].FirstNegative?.PostedAt, false, running, baseQty));
         }
 
         await _db.SaveChangesAsync(ct);
+
+        // D31 "first negative point moved earlier", by the full posting position: a row that goes negative at the
+        // same instant but sorts before the old point counts too (review finding).
+        for (var i = 0; i < changes.Count; i++)
+        {
+            if (before[i].FirstNegative is not { } old || changes[i].FirstNegativeAt is null)
+                continue;
+            var p = pairs[i];
+            var movedEarlier = await RowsBefore(PairRows(p.ProductId, p.WarehouseId), old)
+                .AnyAsync(e => e.PostedAt >= p.From && e.RunningQty < 0, ct);
+            changes[i] = changes[i] with { FirstNegativeMovedEarlier = movedEarlier };
+        }
+
         return new LedgerChangeResult(changes);
     }
 
     private IQueryable<InventoryLedgerEntry> PairRows(Guid productId, Guid warehouseId) =>
         _db.InventoryLedger.Where(e => e.ProductId == productId && e.WarehouseId == warehouseId);
+
+    /// Rows strictly before `at` in posting order (D34). The database compares, so SourceCode follows the same
+    /// collation as InPostingOrder. Id is left out: a replaced source gets new ids, and the same line re-posted at the
+    /// same position must not count as earlier.
+    private static IQueryable<InventoryLedgerEntry> RowsBefore(IQueryable<InventoryLedgerEntry> rows, Position at) =>
+        rows.Where(e => e.PostedAt < at.PostedAt
+            || (e.PostedAt == at.PostedAt && (e.SourceType < at.SourceType
+                || (e.SourceType == at.SourceType && (string.Compare(e.SourceCode, at.SourceCode) < 0
+                    || (e.SourceCode == at.SourceCode && e.LineSortOrder < at.LineSortOrder))))));
+
+    private sealed record Position(DateTimeOffset PostedAt, LedgerSourceType SourceType, string SourceCode, int LineSortOrder);
 }

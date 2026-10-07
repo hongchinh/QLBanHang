@@ -266,18 +266,24 @@ public class ProductService : IProductService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, ct)
-            ?? throw new NotFoundException(nameof(Product), id);
+        await _transaction.RunAsync(async c =>
+        {
+            var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == id && !p.IsDeleted, c)
+                ?? throw new NotFoundException(nameof(Product), id);
 
-        if (await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, ct)
-            || await _db.StockVoucherLines.AnyAsync(l => l.ProductId == id, ct))
-            throw new ConflictException("Hàng hóa đã phát sinh kho, không thể xóa.");
+            // As in UpdateAsync: the product key serializes the check with postings and opening-stock saves
+            // (review finding).
+            await _inventoryLock.AcquireProductsAsync(new[] { id }, c);
+            if (await _db.InventoryLedger.AnyAsync(e => e.ProductId == id, c)
+                || await _db.StockVoucherLines.AnyAsync(l => l.ProductId == id, c))
+                throw new ConflictException("Hàng hóa đã phát sinh kho, không thể xóa.");
 
-        product.IsDeleted = true;
-        product.DeletedAt = _clock.UtcNow;
-        product.DeletedBy = _currentUser.UserId;
+            product.IsDeleted = true;
+            product.DeletedAt = _clock.UtcNow;
+            product.DeletedBy = _currentUser.UserId;
 
-        await _db.SaveChangesAsync(ct);
+            await _db.SaveChangesAsync(c);
+        }, ct);
     }
 
     private async Task EnsureReferencesAsync(Guid productGroupId, Guid unitId, CancellationToken ct)

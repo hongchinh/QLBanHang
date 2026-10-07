@@ -24,7 +24,15 @@ public sealed class EfTransactionRunner : ITransactionRunner
         }
         catch
         {
-            await tx.RollbackAsync(CancellationToken.None);
+            try
+            {
+                await tx.RollbackAsync(CancellationToken.None);
+            }
+            catch
+            {
+                // A failed rollback (e.g. a broken connection) must not hide the original exception;
+                // PostgreSQL drops the transaction with the connection anyway.
+            }
             // Tracked entities still hold the rolled-back state.
             _db.ChangeTracker.Clear();
             throw;

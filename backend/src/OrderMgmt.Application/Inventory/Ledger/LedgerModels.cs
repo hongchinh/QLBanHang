@@ -12,9 +12,12 @@ public sealed record PairChange(
     Guid ProductId, Guid WarehouseId, Guid BranchId,
     DateTimeOffset From,                // earliest old/new PostedAt of this pair (UTC)
     decimal? MinRunningQty,             // AFTER the change: min RunningQty among rows with PostedAt >= From (null if none)
+    DateTimeOffset? MinAt,              // AFTER: PostedAt of the first row that reaches MinRunningQty
     DateTimeOffset? FirstNegativeAt,    // AFTER: PostedAt of the first such row with RunningQty < 0
     decimal? OldMinRunningQty,          // BEFORE the change, same window (read before the old rows are deleted; D31)
     DateTimeOffset? OldFirstNegativeAt, // BEFORE: first negative point in the same window
+    bool FirstNegativeMovedEarlier,     // both exist and the new first negative row lies strictly before the old one
+                                        // in posting order (D34: PostedAt, SourceType, SourceCode, LineSortOrder)
     decimal Balance,                    // StockBalance after the change
     decimal? BaseRunningQty);           // RunningQty of the last row before From (same before and after; null if none)
 

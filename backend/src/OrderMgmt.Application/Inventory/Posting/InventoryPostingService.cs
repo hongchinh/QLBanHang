@@ -29,10 +29,9 @@ public class InventoryPostingService : IInventoryPostingService
     public async Task AcquireLocksAsync(Guid branchId, IEnumerable<Guid> productIds, CancellationToken ct = default)
     {
         await _lock.AcquireBranchGateAsync(new[] { branchId }, exclusive: false, ct);
-        var ids = productIds.ToList();
-        await _lock.AcquireAsync(ids.Select(productId => (productId, branchId)), ct);
-        // Branch-independent product keys serialize product-wide writes (D35 cost price, catalog guards).
-        await _lock.AcquireProductsAsync(ids, ct);
+        // One branch-independent key per product: it covers the product's pairs in every branch and serializes
+        // product-wide writes (D35 cost price, catalog guards), so no (product, branch) key is needed (review finding).
+        await _lock.AcquireProductsAsync(productIds, ct);
     }
 
     public async Task<LedgerChangeResult> PostAsync(LedgerSourceType sourceType, Guid sourceId,
@@ -67,7 +66,7 @@ public class InventoryPostingService : IInventoryPostingService
         // Already negative before the window: the first negative point lies before From and does not move.
         if (p.BaseRunningQty < 0)
             return false;
-        return p.OldFirstNegativeAt is not null && p.FirstNegativeAt < p.OldFirstNegativeAt;
+        return p.FirstNegativeMovedEarlier;
     }
 
     private static decimal? MinOf(decimal? a, decimal? b) =>
@@ -91,7 +90,8 @@ public class InventoryPostingService : IInventoryPostingService
             {
                 var product = products[s.ProductId];
                 var unit = StockUnit.NameFor(product.PricingMode, product.UnitName);
-                var at = s.FirstNegativeAt!.Value.ToOffset(VnTime.Offset);
+                // The deepest point with its own time, not the time of the first negative row (review finding).
+                var at = s.MinAt!.Value.ToOffset(VnTime.Offset);
                 return new[]
                 {
                     string.Create(CultureInfo.InvariantCulture,

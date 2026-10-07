@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Domain.Entities.Organization;
+using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
 
@@ -53,6 +54,20 @@ public class TransactionRunnerTests : InventoryTestBase
         await failing.Should().ThrowAsync<InvalidOperationException>();
 
         (await BranchCodesAsync()).Should().NotContain("TX04");
+    }
+
+    [Fact]
+    public async Task A_failing_rollback_keeps_the_original_exception()
+    {
+        var failing = () => InScopeAsync(async (runner, db) =>
+            await runner.RunAsync(async ct =>
+            {
+                // Ending the transaction inside the work makes the runner's rollback throw.
+                await ((AppDbContext)db).Database.CurrentTransaction!.CommitAsync(ct);
+                throw new ApplicationException("original");
+            }));
+
+        (await failing.Should().ThrowAsync<ApplicationException>()).WithMessage("original");
     }
 
     private async Task InScopeAsync(Func<ITransactionRunner, IAppDbContext, Task> work)

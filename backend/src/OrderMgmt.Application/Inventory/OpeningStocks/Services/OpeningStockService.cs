@@ -21,17 +21,19 @@ public class OpeningStockService : IOpeningStockService
     public const string SourceCode = "TDK";
 
     private readonly IAppDbContext _db;
+    private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
     private readonly ICurrentBranch _currentBranch;
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryPostingService _posting;
     private readonly IInventoryLock _inventoryLock;
 
-    public OpeningStockService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch,
+    public OpeningStockService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
         ITransactionRunner transaction, IInventoryPostingService posting, IInventoryLock inventoryLock)
     {
         _inventoryLock = inventoryLock;
         _db = db;
+        _clock = clock;
         _currentUser = currentUser;
         _currentBranch = currentBranch;
         _transaction = transaction;
@@ -131,6 +133,7 @@ public class OpeningStockService : IOpeningStockService
             foreach (var removed in byProduct.Values)
             {
                 removed.IsDeleted = true;
+                removed.DeletedAt = _clock.UtcNow;
                 removed.DeletedBy = _currentUser.UserId;
             }
             await _db.SaveChangesAsync(c);

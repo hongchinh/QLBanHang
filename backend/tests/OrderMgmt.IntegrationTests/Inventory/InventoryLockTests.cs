@@ -22,23 +22,23 @@ public class InventoryLockTests : InventoryTestBase
 
         var gate = () => inventoryLock.AcquireBranchGateAsync(new[] { MainBranchId }, exclusive: false);
         await gate.Should().ThrowAsync<InvalidOperationException>();
-        var keys = () => inventoryLock.AcquireAsync(new[] { (_productId, MainBranchId) });
+        var keys = () => inventoryLock.AcquireProductsAsync(new[] { _productId });
         await keys.Should().ThrowAsync<InvalidOperationException>();
     }
 
     [Fact]
     public async Task Same_key_blocks_and_different_key_does_not()
     {
-        var k = (_productId, MainBranchId);
-        var k2 = (Guid.NewGuid(), MainBranchId);
+        var k = _productId;
+        var k2 = Guid.NewGuid();
 
         await using var a = await Session.BeginAsync(_factory.Services);
-        await a.Lock.AcquireAsync(new[] { k });
+        await a.Lock.AcquireProductsAsync(new[] { k });
 
         await using (var b = await Session.BeginAsync(_factory.Services, shortLockTimeout: true))
         {
-            await b.Lock.AcquireAsync(new[] { k2 });
-            var blocked = () => b.Lock.AcquireAsync(new[] { k });
+            await b.Lock.AcquireProductsAsync(new[] { k2 });
+            var blocked = () => b.Lock.AcquireProductsAsync(new[] { k });
             (await blocked.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be("55P03");
             await b.Db.Database.RollbackTransactionAsync();
         }
@@ -46,7 +46,7 @@ public class InventoryLockTests : InventoryTestBase
         await a.Db.Database.CommitTransactionAsync();
 
         await using var c = await Session.BeginAsync(_factory.Services, shortLockTimeout: true);
-        await c.Lock.AcquireAsync(new[] { k });
+        await c.Lock.AcquireProductsAsync(new[] { k });
         await c.Db.Database.CommitTransactionAsync();
     }
 

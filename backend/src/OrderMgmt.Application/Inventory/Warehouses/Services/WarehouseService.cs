@@ -116,20 +116,26 @@ public class WarehouseService : IWarehouseService
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.Id == id, ct)
-            ?? throw new NotFoundException(nameof(Warehouse), id);
-        await EnsureAccessibleAsync(warehouse, ct);
+        await _transaction.RunAsync(async c =>
+        {
+            var warehouse = await _db.Warehouses.FirstOrDefaultAsync(w => w.Id == id, c)
+                ?? throw new NotFoundException(nameof(Warehouse), id);
+            await EnsureAccessibleAsync(warehouse, c);
 
-        if (await _db.InventoryLedger.AnyAsync(e => e.WarehouseId == id, ct)
-            || await _db.StockVouchers.AnyAsync(v => v.WarehouseId == id, ct)
-            || await _db.StockVoucherLines.AnyAsync(l => l.WarehouseId == id, ct)
-            || await _db.OpeningStocks.AnyAsync(o => o.WarehouseId == id, ct))
-            throw new ConflictException("Kho đã phát sinh dữ liệu kho, không thể xóa.");
+            // As in UpdateAsync: the exclusive gate waits for in-flight voucher and opening-stock saves of the branch,
+            // so the checks below cannot race a first posting into this warehouse (review finding).
+            await _inventoryLock.AcquireBranchGateAsync(new[] { warehouse.BranchId }, exclusive: true, c);
+            if (await _db.InventoryLedger.AnyAsync(e => e.WarehouseId == id, c)
+                || await _db.StockVouchers.AnyAsync(v => v.WarehouseId == id, c)
+                || await _db.StockVoucherLines.AnyAsync(l => l.WarehouseId == id, c)
+                || await _db.OpeningStocks.AnyAsync(o => o.WarehouseId == id, c))
+                throw new ConflictException("Kho đã phát sinh dữ liệu kho, không thể xóa.");
 
-        warehouse.IsDeleted = true;
-        warehouse.DeletedAt = _clock.UtcNow;
-        warehouse.DeletedBy = _currentUser.UserId;
-        await _db.SaveChangesAsync(ct);
+            warehouse.IsDeleted = true;
+            warehouse.DeletedAt = _clock.UtcNow;
+            warehouse.DeletedBy = _currentUser.UserId;
+            await _db.SaveChangesAsync(c);
+        }, ct);
     }
 
     /// A warehouse of another branch is visible and editable only with branches.access_all (review finding).

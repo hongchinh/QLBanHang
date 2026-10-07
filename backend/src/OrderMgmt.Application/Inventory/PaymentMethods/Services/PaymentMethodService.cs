@@ -35,7 +35,7 @@ public class PaymentMethodService : IPaymentMethodService
         if (await _db.PaymentMethods.AnyAsync(m => m.Code == code, ct))
             throw new ConflictException($"Mã hình thức thanh toán '{code}' đã tồn tại.");
 
-        var method = new PaymentMethod { Code = code, Name = request.Name.Trim(), IsCash = request.IsCash };
+        var method = new PaymentMethod { Code = code, Name = request.Name.Trim(), FundKind = request.FundKind };
         _db.PaymentMethods.Add(method);
         await _db.SaveChangesAsync(ct);
         return ToDto(method);
@@ -45,7 +45,7 @@ public class PaymentMethodService : IPaymentMethodService
     {
         var method = await FindAsync(id, ct);
         method.Name = request.Name.Trim();
-        method.IsCash = request.IsCash;
+        method.FundKind = request.FundKind;
         await _db.SaveChangesAsync(ct);
         return ToDto(method);
     }
@@ -71,6 +71,6 @@ public class PaymentMethodService : IPaymentMethodService
         Id = m.Id,
         Code = m.Code,
         Name = m.Name,
-        IsCash = m.IsCash,
+        FundKind = m.FundKind,
     };
 }

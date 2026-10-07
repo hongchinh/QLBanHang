@@ -28,7 +28,7 @@ public class InventorySeedTests : InventoryTestBase
             ("XKH", StockDirection.Out, PartnerType.Any, true));
 
         var methods = await InDbAsync(db => db.PaymentMethods.AsNoTracking().OrderBy(m => m.Code).ToListAsync());
-        methods.Select(m => (m.Code, m.IsCash)).Should().Equal(("CK", false), ("TM", true));
+        methods.Select(m => (m.Code, m.FundKind)).Should().Equal(("CK", FundKind.Bank), ("TM", FundKind.Cash));
 
         await DbSeeder.SeedAsync(_factory.Services);
 

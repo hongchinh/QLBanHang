@@ -342,8 +342,8 @@ public static class DbSeeder
         if (!await db.PaymentMethods.IgnoreQueryFilters().AnyAsync(ct))
         {
             db.PaymentMethods.AddRange(
-                new PaymentMethod { Code = "TM", Name = "Tiền mặt", IsCash = true },
-                new PaymentMethod { Code = "CK", Name = "Chuyển khoản", IsCash = false });
+                new PaymentMethod { Code = "TM", Name = "Tiền mặt", FundKind = FundKind.Cash },
+                new PaymentMethod { Code = "CK", Name = "Chuyển khoản", FundKind = FundKind.Bank });
         }
 
         // System cash reasons: each is inserted only when its code is missing (soft-deleted rows count).

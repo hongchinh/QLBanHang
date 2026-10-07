@@ -1613,9 +1613,9 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deleted_by");
 
-                    b.Property<bool>("IsCash")
-                        .HasColumnType("boolean")
-                        .HasColumnName("is_cash");
+                    b.Property<int>("FundKind")
+                        .HasColumnType("integer")
+                        .HasColumnName("fund_kind");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")

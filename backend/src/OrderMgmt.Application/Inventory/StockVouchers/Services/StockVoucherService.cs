@@ -124,13 +124,17 @@ public class StockVoucherService : IStockVoucherService
                 PaidAmount = v.PaidAmount,
                 Status = v.Status,
                 OwnerUserId = v.OwnerUserId,
-                OwnerName = _db.Users.IgnoreQueryFilters()
-                    .Where(u => u.Id == v.OwnerUserId)
-                    .Select(u => u.FullName)
-                    .FirstOrDefault(),
                 CreatedAt = v.CreatedAt,
             })
             .ToListAsync(ct);
+
+        // Separate query: IgnoreQueryFilters anywhere in a query also switches off the vouchers' soft-delete filter.
+        var pageOwnerIds = items.Select(i => i.OwnerUserId).Distinct().ToList();
+        var ownerNames = await _db.Users.IgnoreQueryFilters().AsNoTracking()
+            .Where(u => pageOwnerIds.Contains(u.Id))
+            .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+        foreach (var item in items)
+            item.OwnerName = ownerNames.GetValueOrDefault(item.OwnerUserId);
 
         return new StockVoucherListResult
         {
@@ -147,9 +151,12 @@ public class StockVoucherService : IStockVoucherService
     {
         EnsurePermission(StockVoucherPermissions.View(type));
         var branchId = await _currentBranch.GetIdAsync(ct);
-        var ownerIds = _db.StockVouchers
+        // Materialized first: composed into the IgnoreQueryFilters query below, deleted vouchers would count.
+        var ownerIds = await _db.StockVouchers
             .Where(v => v.BranchId == branchId && v.Type == type)
-            .Select(v => v.OwnerUserId);
+            .Select(v => v.OwnerUserId)
+            .Distinct()
+            .ToListAsync(ct);
 
         var owners = await _db.Users.IgnoreQueryFilters().AsNoTracking()
             .Where(u => ownerIds.Contains(u.Id))
@@ -296,14 +303,58 @@ public class StockVoucherService : IStockVoucherService
         return await GetAsync(id, ct);
     }
 
-    public Task<StockVoucherDto> CancelAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<StockVoucherDto> CancelAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default)
+    {
+        await ChangeLifecycleAsync(id, request, StockVoucherPermissions.Cancel, StockVoucherActivityAction.Cancelled, "Hủy phiếu",
+            v =>
+            {
+                v.Status = StockVoucherStatus.Cancelled;
+                v.CancelledAt = _clock.UtcNow;
+                v.CancelledBy = _currentUser.UserId;
+            }, ct);
+        return await GetAsync(id, ct);
+    }
 
-    public Task<StockVoucherDto> RestoreAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<StockVoucherDto> RestoreAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default)
+    {
+        await ChangeLifecycleAsync(id, request, StockVoucherPermissions.Cancel, StockVoucherActivityAction.Restored, "Khôi phục phiếu",
+            v =>
+            {
+                v.Status = StockVoucherStatus.Active;
+                v.CancelledAt = null;
+                v.CancelledBy = null;
+            }, ct);
+        return await GetAsync(id, ct);
+    }
 
+    // Soft delete; AppDbContext cascades IsDeleted to the lines and activities.
     public Task DeleteAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+        ChangeLifecycleAsync(id, request, StockVoucherPermissions.Delete, StockVoucherActivityAction.Deleted, "Xóa phiếu",
+            v => v.IsDeleted = true, ct);
+
+    /// Cancel / delete: steps 1, 2 (stored date), 4, 7 (empty list), 8, 9.
+    /// Restore: the same steps, reposting the stored lines as they are (no re-validation, no re-snapshot).
+    private Task ChangeLifecycleAsync(Guid id, StockVoucherActionRequest request, Func<StockDirection, string> permission,
+        StockVoucherActivityAction action, string description, Action<StockVoucher> apply, CancellationToken ct) =>
+        _transaction.RunAsync(async c =>
+        {
+            var restore = action == StockVoucherActivityAction.Restored;
+            var voucher = await LoadForWriteAsync(id, permission, request.Version, cancelled: restore, c);
+            await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt }, c);
+
+            var productIds = voucher.Lines.Select(l => l.ProductId).Distinct().ToList();
+            await _posting.AcquireLocksAsync(voucher.BranchId, productIds, c);
+            var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
+
+            apply(voucher);
+            await _db.SaveChangesAsync(c);
+
+            await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c, removeAll: !restore);
+            if (voucher.Type == StockDirection.In)
+                await RecomputeCostPricesAsync(productIds, c);
+            AddActivity(voucher, action, description);
+            await _db.SaveChangesAsync(c);
+        }, ct);
 
     // ---- Save rules 1 to 3 -------------------------------------------------------------------
 

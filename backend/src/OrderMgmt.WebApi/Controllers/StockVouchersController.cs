@@ -63,4 +63,22 @@ public class StockVouchersController : ApiControllerBase
         await _upsertValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.UpdateAsync(id, request, ct));
     }
+
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Cancel(
+        Guid id, [FromBody] StockVoucherActionRequest request, CancellationToken ct)
+        => Success(await _service.CancelAsync(id, request, ct));
+
+    [HttpPost("{id:guid}/restore")]
+    public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Restore(
+        Guid id, [FromBody] StockVoucherActionRequest request, CancellationToken ct)
+        => Success(await _service.RestoreAsync(id, request, ct));
+
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult<ApiResponse>> Delete(
+        Guid id, [FromQuery] StockVoucherActionRequest request, CancellationToken ct)
+    {
+        await _service.DeleteAsync(id, request, ct);
+        return Success();
+    }
 }

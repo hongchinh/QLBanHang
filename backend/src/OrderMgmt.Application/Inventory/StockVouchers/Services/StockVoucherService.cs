@@ -350,6 +350,7 @@ public class StockVoucherService : IStockVoucherService
 
             var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
             await _posting.AcquireLocksAsync(branchId, productIds, c);
+            await EnsureReferencesStillExistAsync(request, branchId, c);
             // Read after the shared branch gate, so a concurrent period lock change is serialized (review finding).
             await EnsureNotLockedAsync(branchId, new[] { voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
@@ -388,6 +389,7 @@ public class StockVoucherService : IStockVoucherService
             var productIds = voucher.Lines.Select(l => l.ProductId)
                 .Concat(request.Lines.Select(l => l.ProductId)).Distinct().ToList();
             await _posting.AcquireLocksAsync(voucher.BranchId, productIds, c);
+            await EnsureReferencesStillExistAsync(request, voucher.BranchId, c);
             await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt, voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
 
@@ -510,6 +512,34 @@ public class StockVoucherService : IStockVoucherService
                 || StockUnit.NameFor(product.PricingMode, product.Unit?.Name) != line.UnitName)
                 throw new ConflictException($"Không thể khôi phục: hàng hóa {line.ProductCode} đã đổi cách tính, ĐVT hoặc theo dõi tồn.");
         }
+    }
+
+    /// ValidateAsync runs before the locks; a product or warehouse deleted (or a warehouse moved to another branch)
+    /// while this save waited on them is caught here, inside the transaction (review finding).
+    private async Task EnsureReferencesStillExistAsync(UpsertStockVoucherRequest request, Guid branchId, CancellationToken ct)
+    {
+        var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
+        var products = (await _db.Products.Where(p => productIds.Contains(p.Id)).Select(p => p.Id).ToListAsync(ct)).ToHashSet();
+        var warehouseIds = request.Lines.Select(l => l.WarehouseId ?? request.WarehouseId)
+            .Append(request.WarehouseId).Distinct().ToList();
+        var warehouses = (await _db.Warehouses
+            .Where(w => warehouseIds.Contains(w.Id) && w.BranchId == branchId)
+            .Select(w => w.Id)
+            .ToListAsync(ct)).ToHashSet();
+
+        var errors = new Dictionary<string, string[]>();
+        if (!warehouses.Contains(request.WarehouseId))
+            errors["warehouseId"] = new[] { "Kho không thuộc chi nhánh đang làm việc." };
+        for (var i = 0; i < request.Lines.Count; i++)
+        {
+            var line = request.Lines[i];
+            if (!products.Contains(line.ProductId))
+                errors[$"lines[{i}].productId"] = new[] { "Hàng hóa không tồn tại." };
+            if (!warehouses.Contains(line.WarehouseId ?? request.WarehouseId))
+                errors[$"lines[{i}].warehouseId"] = new[] { "Kho không thuộc chi nhánh đang làm việc." };
+        }
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
     }
 
     private async Task EnsureNotLockedAsync(Guid branchId, IEnumerable<DateTimeOffset> instants, CancellationToken ct)

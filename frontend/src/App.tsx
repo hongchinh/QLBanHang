@@ -16,6 +16,7 @@ import { ProductListPage } from '@/pages/products/product-list-page';
 import { ProductFormPage } from '@/pages/products/product-form-page';
 import { ProductGroupListPage } from '@/pages/product-groups/product-group-list-page';
 import { WarehouseListPage } from '@/pages/warehouses/warehouse-list-page';
+import { StockReasonListPage } from '@/pages/stock-reasons/stock-reason-list-page';
 import { QuotationListPage } from '@/pages/quotations/quotation-list-page';
 import { QuotationFormPage } from '@/pages/quotations/quotation-form-page';
 import { MyQuotationSettingsPage } from '@/pages/settings/my-quotation-settings-page';
@@ -155,6 +156,14 @@ export function App() {
                   element={
                     <ProtectedRoute permission="inventory.catalogs.manage">
                       <WarehouseListPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="stock-reasons"
+                  element={
+                    <ProtectedRoute permission="inventory.catalogs.manage">
+                      <StockReasonListPage />
                     </ProtectedRoute>
                   }
                 />

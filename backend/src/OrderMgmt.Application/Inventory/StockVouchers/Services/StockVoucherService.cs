@@ -292,9 +292,13 @@ public class StockVoucherService : IStockVoucherService
             .Select(u => u.FullName)
             .FirstOrDefaultAsync(ct);
 
+        // Every write is rejected inside a locked period, so none is offered there.
+        var lockedUntil = await _db.Branches.Where(b => b.Id == voucher.BranchId).Select(b => b.LockedUntil).FirstOrDefaultAsync(ct);
+
         var dto = ToDto(voucher, ownerName);
-        var mayAct = voucher.OwnerUserId == _currentUser.UserId
-            || _currentUser.HasPermission(StockVoucherPermissions.EditAll(voucher.Type));
+        var mayAct = !IsLocked(lockedUntil, voucher.VoucherAt)
+            && (voucher.OwnerUserId == _currentUser.UserId
+                || _currentUser.HasPermission(StockVoucherPermissions.EditAll(voucher.Type)));
         var active = voucher.Status != StockVoucherStatus.Cancelled;
         dto.CanEdit = mayAct && active && _currentUser.HasPermission(StockVoucherPermissions.Edit(voucher.Type));
         dto.CanDelete = mayAct && active && _currentUser.HasPermission(StockVoucherPermissions.Delete(voucher.Type));
@@ -511,10 +515,14 @@ public class StockVoucherService : IStockVoucherService
     private async Task EnsureNotLockedAsync(Guid branchId, IEnumerable<DateTimeOffset> instants, CancellationToken ct)
     {
         var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(ct);
-        if (lockedUntil is { } locked && instants.Any(at => VnTime.ToVnDate(at) <= locked))
+        if (lockedUntil is { } locked && instants.Any(at => IsLocked(locked, at)))
             throw new DomainException("PERIOD_LOCKED",
                 string.Create(CultureInfo.InvariantCulture, $"Ngày chứng từ đã khóa sổ (đến {locked:dd/MM/yyyy})."));
     }
+
+    /// The VN date of `at` is on or before the branch's LockedUntil (D14, D18).
+    private static bool IsLocked(DateOnly? lockedUntil, DateTimeOffset at) =>
+        lockedUntil is { } locked && VnTime.ToVnDate(at) <= locked;
 
     /// Reference and amount rules (save rule 3), collected into one 400. `existing` is null on create.
     private async Task ValidateAsync(UpsertStockVoucherRequest request, Guid branchId, StockVoucher? existing, CancellationToken ct)

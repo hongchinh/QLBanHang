@@ -64,4 +64,16 @@ public class StockVoucherReviewRound2Tests : InventoryTestBase
         (await InDbAsync(db => db.Products.Where(x => x.Id == p).Select(x => x.CostPrice).SingleAsync()))
             .Should().Be(10_000m);
     }
+
+    [Fact]
+    public async Task Voucher_in_a_locked_period_offers_no_actions()
+    {
+        var p = await CreateInventoryProductAsync("R2S03");
+        var locked = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 23:30", LineRequest(p, 1, 1_000));
+        var open = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-03 00:30", LineRequest(p, 1, 1_000));
+        await SetPeriodLockAsync(new DateOnly(2026, 10, 2));
+
+        (await GetVoucherAsync(_client, locked.Id)).Should().BeEquivalentTo(new { CanEdit = false, CanCancel = false, CanDelete = false });
+        (await GetVoucherAsync(_client, open.Id)).Should().BeEquivalentTo(new { CanEdit = true, CanCancel = true, CanDelete = true });
+    }
 }

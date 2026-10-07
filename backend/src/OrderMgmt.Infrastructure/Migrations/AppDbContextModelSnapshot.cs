@@ -67,6 +67,43 @@ namespace OrderMgmt.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.CashDebtSettings", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    b.Property<int>("CreditLimitPolicy")
+                        .HasColumnType("integer")
+                        .HasColumnName("credit_limit_policy");
+
+                    b.Property<int>("NegativeFundPolicy")
+                        .HasColumnType("integer")
+                        .HasColumnName("negative_fund_policy");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.HasKey("Id")
+                        .HasName("pk_cash_debt_settings");
+
+                    b.ToTable("cash_debt_settings", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            CreditLimitPolicy = 1,
+                            NegativeFundPolicy = 1,
+                            UpdatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0))
+                        });
+                });
+
             modelBuilder.Entity("OrderMgmt.Domain.Entities.Catalog.Customer", b =>
                 {
                     b.Property<Guid>("Id")

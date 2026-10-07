@@ -4,6 +4,7 @@ using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
+using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Entities.Identity;
 using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Entities.Organization;
@@ -41,6 +42,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<StockReason> StockReasons => Set<StockReason>();
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<InventorySettings> InventorySettings => Set<InventorySettings>();
+    public DbSet<CashDebtSettings> CashDebtSettings => Set<CashDebtSettings>();
     public DbSet<DocumentNumbering> DocumentNumberings => Set<DocumentNumbering>();
     public DbSet<StockVoucher> StockVouchers => Set<StockVoucher>();
     public DbSet<StockVoucherLine> StockVoucherLines => Set<StockVoucherLine>();

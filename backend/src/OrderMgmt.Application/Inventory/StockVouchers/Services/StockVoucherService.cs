@@ -850,7 +850,8 @@ public class StockVoucherService : IStockVoucherService
         await _posting.PostAsync(SourceTypeOf(voucher.Type), voucher.Id, drafts, acknowledge, ct);
     }
 
-    /// D35: CostPrice follows the latest Active, non-deleted stock-in line (by VoucherAt, then SortOrder).
+    /// D35: CostPrice follows the latest Active, non-deleted stock-in line (by VoucherAt, then the voucher's
+    /// CreatedAt and Code so vouchers with the same VoucherAt resolve deterministically, then SortOrder).
     private async Task RecomputeCostPricesAsync(IEnumerable<Guid> productIds, CancellationToken ct)
     {
         foreach (var productId in productIds.Distinct())
@@ -860,6 +861,8 @@ public class StockVoucherService : IStockVoucherService
                     && l.StockVoucher!.Type == StockDirection.In
                     && l.StockVoucher.Status == StockVoucherStatus.Active)
                 .OrderByDescending(l => l.StockVoucher!.VoucherAt)
+                .ThenByDescending(l => l.StockVoucher!.CreatedAt)
+                .ThenByDescending(l => l.StockVoucher!.Code)
                 .ThenByDescending(l => l.SortOrder)
                 .Select(l => new { l.UnitPrice, l.StockVoucher!.VoucherAt })
                 .FirstOrDefaultAsync(ct);

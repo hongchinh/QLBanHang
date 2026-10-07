@@ -47,4 +47,21 @@ public class StockVoucherReviewRound2Tests : InventoryTestBase
         (await LedgerOfAsync(voucher.Id)).Should().ContainSingle().Which.QtyIn.Should().Be(1m);
         await AssertInvariantsAsync();
     }
+
+    [Fact]
+    public async Task Cost_price_tie_on_voucher_date_goes_to_the_later_created_voucher()
+    {
+        var p = await CreateInventoryProductAsync("R2S02");
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 1, 30_000));
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 1, 10_000));
+        var first = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-01 08:00", LineRequest(p, 1, 50_000));
+
+        // Touching an older voucher recomputes the cost price; the tie on 10-02 resolves to the later created one.
+        var request = UpdateRequestFrom(first);
+        request.Note = "x";
+        (await PutVoucherAsync(_client, first.Id, request)).Status.Should().Be(HttpStatusCode.OK);
+
+        (await InDbAsync(db => db.Products.Where(x => x.Id == p).Select(x => x.CostPrice).SingleAsync()))
+            .Should().Be(10_000m);
+    }
 }

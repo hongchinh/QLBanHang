@@ -33,6 +33,11 @@ export function HeaderSearchMobileSheet() {
     close();
   };
 
+  const handleSelectSupplier = (id: string) => {
+    navigate(`/suppliers/${id}`);
+    close();
+  };
+
   const handleSelectQuotation = (id: string) => {
     navigate(`/quotations/${id}`);
     close();
@@ -74,6 +79,7 @@ export function HeaderSearchMobileSheet() {
               isLoading={isFetching}
               activeIndex={-1}
               onSelectCustomer={handleSelectCustomer}
+              onSelectSupplier={handleSelectSupplier}
               onSelectQuotation={handleSelectQuotation}
             />
           )}

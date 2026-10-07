@@ -17,6 +17,10 @@ export const productSchema = z.object({
   note: optionalString(2000),
   status: z.enum(['Active', 'Inactive']).optional(),
   pricingMode: z.enum(['PerUnit', 'PerSquareMeter', 'PerLinearMeter', 'PerCubicMeter']),
+  trackInventory: z.boolean().default(true),
+  priceIncludesVat: z.boolean().default(false),
+  purchaseDiscountRate: optionalNumber({ min: 0, max: 100 }),
+  salesDiscountRate: optionalNumber({ min: 0, max: 100 }),
 });
 
 export type ProductFormValues = z.input<typeof productSchema>;

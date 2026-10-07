@@ -35,6 +35,14 @@ export function HeaderSearch() {
     [navigate, reset],
   );
 
+  const handleSelectSupplier = useCallback(
+    (id: string) => {
+      navigate(`/suppliers/${id}`);
+      reset();
+    },
+    [navigate, reset],
+  );
+
   const handleSelectQuotation = useCallback(
     (id: string) => {
       navigate(`/quotations/${id}`);
@@ -79,6 +87,7 @@ export function HeaderSearch() {
     } else if (e.key === 'Enter') {
       const target = flattenResultIndex(data, activeIndex);
       if (target?.kind === 'customer') handleSelectCustomer(target.id);
+      else if (target?.kind === 'supplier') handleSelectSupplier(target.id);
       else if (target?.kind === 'quotation') handleSelectQuotation(target.id);
     }
   };
@@ -117,6 +126,7 @@ export function HeaderSearch() {
           isLoading={isFetching}
           activeIndex={activeIndex}
           onSelectCustomer={handleSelectCustomer}
+          onSelectSupplier={handleSelectSupplier}
           onSelectQuotation={handleSelectQuotation}
         />
       </PopoverContent>

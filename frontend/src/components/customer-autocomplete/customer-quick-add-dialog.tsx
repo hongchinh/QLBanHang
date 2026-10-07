@@ -23,6 +23,7 @@ export function CustomerQuickAddDialog({ open, onOpenChange, onCreated }: Props)
           isEdit={false}
           showHeader={false}
           showStatusField={false}
+          showRoles={false}
           submitting={create.isPending}
           submitError={getErrorMessage(create.error)}
           hasSubmitError={create.isError}

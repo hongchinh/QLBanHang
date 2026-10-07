@@ -1,6 +1,6 @@
 # Phase 10 — Frontend opening stock & inventory reports
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

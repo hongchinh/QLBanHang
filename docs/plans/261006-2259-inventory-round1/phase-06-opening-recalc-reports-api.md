@@ -1,6 +1,6 @@
 # Phase 06 — Opening stock, cost recalculation & report APIs
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

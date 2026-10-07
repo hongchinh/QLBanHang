@@ -545,6 +545,9 @@ public class StockVoucherService : IStockVoucherService
             partner = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == request.PartnerId.Value, ct);
             if (partner is null)
                 Add("partnerId", "Đối tượng không tồn tại.");
+            // Only a newly chosen partner must be active, so old vouchers stay editable.
+            else if (partner.Status != CustomerStatus.Active && existing?.PartnerId != request.PartnerId)
+                Add("partnerId", "Đối tượng đã ngừng hoạt động.");
         }
         switch (reason?.PartnerType)
         {
@@ -649,14 +652,28 @@ public class StockVoucherService : IStockVoucherService
                 priced.Add((i, line, snapshot));
         }
 
-        // Amount-based rules use the calculator's line amounts (allocations do not matter here).
-        var computed = StockVoucherCalculator.Compute(new StockHeaderInput(request.Type, 0m, 0m, false),
-            priced.Select(x => ToCalculatorInput(x.Line, x.Snapshot)).ToList()).Lines;
+        // Amount-based rules use the calculator's line amounts (allocations do not matter here), one line at a time
+        // so a line whose quantity or amount overflows is reported on its own key.
         var netSum = 0m;
-        for (var j = 0; j < priced.Count; j++)
+        var lineInputs = new List<StockLineInput>();
+        foreach (var (index, line, snapshot) in priced)
         {
-            var (index, line, _) = priced[j];
-            var result = computed[j];
+            var input = ToCalculatorInput(line, snapshot);
+            StockLineResult result;
+            try
+            {
+                result = StockVoucherCalculator.Compute(new StockHeaderInput(request.Type, 0m, 0m, false), new[] { input }).Lines[0];
+            }
+            catch (OverflowException)
+            {
+                Add($"lines[{index}].quantity", "Số lượng hoặc thành tiền quá lớn.");
+                continue;
+            }
+            lineInputs.Add(input);
+            if (result.Quantity >= MaxQuantity)
+                Add($"lines[{index}].quantity", "Số lượng quá lớn.");
+            if (result.Amount >= MaxMoney)
+                Add($"lines[{index}].unitPrice", "Thành tiền quá lớn.");
             if (result.Quantity <= 0)
                 Add($"lines[{index}].quantity", "Số lượng phải lớn hơn 0.");
             if (line.DiscountManual && line.DiscountAmount is { } amount && (amount < 0 || amount > result.Amount))
@@ -670,9 +687,22 @@ public class StockVoucherService : IStockVoucherService
         if (request.PaidAmount < 0)
             Add("paidAmount", "Số tiền thanh toán không được âm.");
 
+        // Voucher totals share the numeric(18,2) limit of the line amounts.
+        if (errors.Count == 0)
+        {
+            var totals = StockVoucherCalculator.Compute(
+                new StockHeaderInput(request.Type, request.Freight, request.OrderDiscount, false), lineInputs).Totals;
+            if (totals.GoodsAmount >= MaxMoney || totals.Total >= MaxMoney)
+                Add("lines", "Tổng tiền phiếu quá lớn.");
+        }
+
         if (errors.Count > 0)
             throw new ValidationDomainException(errors, null);
     }
+
+    // Exclusive upper bounds of numeric(18,2) and numeric(18,6).
+    private const decimal MaxMoney = 10_000_000_000_000_000m;
+    private const decimal MaxQuantity = 1_000_000_000_000m;
 
     // ---- Writes -----------------------------------------------------------------------------
 

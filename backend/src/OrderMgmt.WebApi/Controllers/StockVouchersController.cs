@@ -18,13 +18,15 @@ public class StockVouchersController : ApiControllerBase
     private readonly IStockVoucherService _service;
     private readonly IValidator<UpsertStockVoucherRequest> _upsertValidator;
     private readonly IValidator<StockVoucherListRequest> _listValidator;
+    private readonly IValidator<StockAtRequest> _stockAtValidator;
 
     public StockVouchersController(IStockVoucherService service, IValidator<UpsertStockVoucherRequest> upsertValidator,
-        IValidator<StockVoucherListRequest> listValidator)
+        IValidator<StockVoucherListRequest> listValidator, IValidator<StockAtRequest> stockAtValidator)
     {
         _service = service;
         _upsertValidator = upsertValidator;
         _listValidator = listValidator;
+        _stockAtValidator = stockAtValidator;
     }
 
     [HttpGet]
@@ -49,7 +51,10 @@ public class StockVouchersController : ApiControllerBase
     [HttpPost("stock-at")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<StockAtResult>>>> GetStockAt(
         [FromBody] StockAtRequest request, CancellationToken ct)
-        => Success(await _service.GetStockAtAsync(request, ct));
+    {
+        await _stockAtValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetStockAtAsync(request, ct));
+    }
 
     [HttpGet("partners")]
     public async Task<ActionResult<ApiResponse<List<CustomerSearchItemDto>>>> SearchPartners(

@@ -7,7 +7,9 @@ using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Entities.Organization;
+using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Organization.Branches.Services;
 
@@ -88,6 +90,8 @@ public class BranchService : IBranchService
         // A new branch starts with the default document numbering (D13), so vouchers can be numbered at once.
         foreach (var docType in DocumentNumberingDefaults.AllTypes)
             _db.DocumentNumberings.Add(DocumentNumberingDefaults.Create(docType, branch.Id, _clock.UtcNow));
+        // Every branch has a default cash fund (P18).
+        _db.Funds.Add(new Fund { BranchId = branch.Id, Code = "QTM", Name = "Quỹ tiền mặt", Kind = FundKind.Cash, IsDefault = true });
         await _db.SaveChangesAsync(ct);
         return ToDto(branch);
     }

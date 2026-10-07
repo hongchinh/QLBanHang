@@ -19,6 +19,26 @@ public class CashReasonConfiguration : IEntityTypeConfiguration<CashReason>
     }
 }
 
+public class FundConfiguration : IEntityTypeConfiguration<Fund>
+{
+    public void Configure(EntityTypeBuilder<Fund> b)
+    {
+        b.ToTable("funds");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Code).IsRequired().HasMaxLength(20);
+        b.Property(x => x.Name).IsRequired().HasMaxLength(255);
+        b.Property(x => x.BankName).HasMaxLength(255);
+        b.Property(x => x.AccountNumber).HasMaxLength(50);
+        b.Property(x => x.OpeningAmount).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
+        b.Property(x => x.IsActive).HasDefaultValue(true).HasSentinel(true);
+
+        b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        b.HasQueryFilter(x => !x.IsDeleted);
+
+        b.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public class CashDebtSettingsConfiguration : IEntityTypeConfiguration<CashDebtSettings>
 {
     public void Configure(EntityTypeBuilder<CashDebtSettings> b)

@@ -29,6 +29,7 @@ public interface IAppDbContext
     DbSet<InventorySettings> InventorySettings { get; }
     DbSet<CashDebtSettings> CashDebtSettings { get; }
     DbSet<CashReason> CashReasons { get; }
+    DbSet<Fund> Funds { get; }
     DbSet<DocumentNumbering> DocumentNumberings { get; }
     DbSet<StockVoucher> StockVouchers { get; }
     DbSet<StockVoucherLine> StockVoucherLines { get; }

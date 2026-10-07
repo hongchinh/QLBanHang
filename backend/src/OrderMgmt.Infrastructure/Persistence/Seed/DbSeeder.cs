@@ -361,6 +361,11 @@ public static class DbSeeder
         };
         db.CashReasons.AddRange(cashReasonSeeds.Where(r => !cashReasonCodes.Contains(r.Code)));
 
+        // Every branch without any fund (soft-deleted ones count) gets the default cash fund QTM (P18).
+        var branchesWithFund = await db.Funds.IgnoreQueryFilters().Select(f => f.BranchId).Distinct().ToListAsync(ct);
+        foreach (var branchId in branchIds.Except(branchesWithFund))
+            db.Funds.Add(new Fund { BranchId = branchId, Code = "QTM", Name = "Quỹ tiền mặt", Kind = FundKind.Cash, IsDefault = true });
+
         await db.SaveChangesAsync(ct);
     }
 

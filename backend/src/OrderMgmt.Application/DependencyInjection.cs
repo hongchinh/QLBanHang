@@ -31,6 +31,8 @@ using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
 using OrderMgmt.Application.Inventory.OpeningStocks.Services;
 using OrderMgmt.Application.Inventory.PaymentMethods.Interfaces;
 using OrderMgmt.Application.Inventory.Posting;
+using OrderMgmt.Application.Inventory.Reports.Interfaces;
+using OrderMgmt.Application.Inventory.Reports.Services;
 using OrderMgmt.Application.Inventory.Settings.Interfaces;
 using OrderMgmt.Application.Inventory.Settings.Services;
 using OrderMgmt.Application.Inventory.PaymentMethods.Services;
@@ -100,6 +102,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryRecalcService, InventoryRecalcService>();
         services.AddScoped<IStockVoucherService, StockVoucherService>();
         services.AddScoped<IOpeningStockService, OpeningStockService>();
+        services.AddScoped<IInventoryReportService, InventoryReportService>();
 
         return services;
     }

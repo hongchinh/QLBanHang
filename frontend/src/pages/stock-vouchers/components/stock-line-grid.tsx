@@ -46,6 +46,24 @@ function cellId(field: LineFocusField | 'stock-at', idx: number): string {
   return `stock-line-${field}-${idx}`;
 }
 
+function errorId(field: LineFocusField, idx: number): string {
+  return `${cellId(field, idx)}-error`;
+}
+
+// Screen readers hear which row a cell belongs to ("Số lượng dòng 3").
+function rowLabel(label: string, idx: number): string {
+  return `${label} dòng ${idx + 1}`;
+}
+
+// Props linking an input to its CellError.
+function errorProps(field: LineFocusField, idx: number, error: string | undefined) {
+  return {
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': error ? errorId(field, idx) : undefined,
+    title: error,
+  };
+}
+
 function parseCellId(id: string): { field: LineFocusField; rowIndex: number } | null {
   const match = /^stock-line-(.+)-(\d+)$/.exec(id);
   if (!match) return null;
@@ -91,7 +109,8 @@ function parseQuantityInput(text: string): number | undefined {
 }
 
 interface NumberCellProps {
-  id: string;
+  field: LineFocusField;
+  rowIndex: number;
   label: string;
   value: number | undefined;
   format: (value: number | undefined) => string;
@@ -102,17 +121,16 @@ interface NumberCellProps {
 }
 
 // Formatted when idle; raw text while focused. Every keystroke commits the parsed value.
-function NumberCell({ id, label, value, format, parse, onCommit, disabled, error }: NumberCellProps) {
+function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, disabled, error }: NumberCellProps) {
   const [editing, setEditing] = useState<string | null>(null);
   return (
     <input
-      id={id}
+      id={cellId(field, rowIndex)}
       className="cell-input cell-number tabular-nums"
       type="text"
       inputMode="decimal"
-      aria-label={label}
-      aria-invalid={error ? true : undefined}
-      title={error}
+      aria-label={rowLabel(label, rowIndex)}
+      {...errorProps(field, rowIndex, error)}
       disabled={disabled}
       value={editing ?? format(value)}
       onFocus={(e) => {
@@ -129,9 +147,53 @@ function NumberCell({ id, label, value, format, parse, onCommit, disabled, error
   );
 }
 
-function CellError({ message }: { message?: string }) {
+function CellError({ id, message }: { id: string; message?: string }) {
   if (!message) return null;
-  return <div className="px-1 text-[11px] leading-tight text-destructive">{message}</div>;
+  return (
+    <div id={id} className="px-1 text-[11px] leading-tight text-destructive">
+      {message}
+    </div>
+  );
+}
+
+// %CK / %VAT: an emptied cell stays empty while typing and counts as 0 (written back on blur).
+function PercentCell({
+  field,
+  rowIndex,
+  label,
+  value,
+  onCommit,
+  disabled,
+  error,
+}: {
+  field: LineFocusField;
+  rowIndex: number;
+  label: string;
+  value: number | undefined;
+  onCommit: (value: number) => void;
+  disabled: boolean;
+  error?: string;
+}) {
+  const [editing, setEditing] = useState<string | null>(null);
+  return (
+    <input
+      id={cellId(field, rowIndex)}
+      className="cell-input cell-number tabular-nums"
+      type="number"
+      step="any"
+      min={0}
+      max={100}
+      aria-label={rowLabel(label, rowIndex)}
+      {...errorProps(field, rowIndex, error)}
+      disabled={disabled}
+      value={editing ?? value ?? ''}
+      onChange={(e) => {
+        setEditing(e.target.value);
+        onCommit(toNum(e.target.value) ?? 0);
+      }}
+      onBlur={() => setEditing(null)}
+    />
+  );
 }
 
 export interface StockLineGridProps {
@@ -246,14 +308,13 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           className="cell-input cell-number tabular-nums"
           type="number"
           step="any"
-          aria-label={label}
-          aria-invalid={error ? true : undefined}
-          title={error}
+          aria-label={rowLabel(label, idx)}
+          {...errorProps(focusField, idx, error)}
           disabled={disabled}
           value={(line?.[field] ?? '') as number | string}
           onChange={(e) => setLineField(idx, field, toNum(e.target.value) ?? '')}
         />
-        <CellError message={error} />
+        <CellError id={errorId(focusField, idx)} message={error} />
       </td>
     );
   };
@@ -262,27 +323,21 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     const error = errorOf(idx, field);
     return (
       <td className="cell-number">
-        <input
-          id={cellId(focusField, idx)}
-          className="cell-input cell-number tabular-nums"
-          type="number"
-          step="any"
-          min={0}
-          max={100}
-          aria-label={label}
-          aria-invalid={error ? true : undefined}
-          title={error}
+        <PercentCell
+          field={focusField}
+          rowIndex={idx}
+          label={label}
+          value={toNum(rows[idx]?.[field])}
           disabled={readOnly}
-          value={(rows[idx]?.[field] ?? '') as number | string}
-          onChange={(e) => {
-            const value = toNum(e.target.value) ?? 0;
+          error={error}
+          onCommit={(value) => {
             if (field === 'discountRate') {
               form.setValue(`lines.${idx}.discountManual`, false, { shouldDirty: true });
             }
             setLineField(idx, field, value);
           }}
         />
-        <CellError message={error} />
+        <CellError id={errorId(focusField, idx)} message={error} />
       </td>
     );
   };
@@ -355,7 +410,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                       <input
                         id={cellId('product-code', idx)}
                         className="cell-input"
-                        aria-label="Mã hàng"
+                        aria-label={rowLabel('Mã hàng', idx)}
                         value={line.productCode ?? ''}
                         disabled
                       />
@@ -369,7 +424,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                         onSelect={(s) => applyProduct(idx, s)}
                       />
                     )}
-                    <CellError message={productError} />
+                    <CellError id={errorId('product-code', idx)} message={productError} />
                   </td>
                   <td>
                     <div className="cell-readonly" title={line.productName}>
@@ -383,8 +438,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                     <select
                       id={cellId('warehouse', idx)}
                       className="cell-input"
-                      aria-label="Kho"
-                      aria-invalid={warehouseError ? true : undefined}
+                      aria-label={rowLabel('Kho', idx)}
+                      {...errorProps('warehouse', idx, warehouseError)}
                       disabled={readOnly}
                       value={line.warehouseId ?? ''}
                       onChange={(e) => setLineField(idx, 'warehouseId', e.target.value)}
@@ -396,7 +451,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                         </option>
                       ))}
                     </select>
-                    <CellError message={warehouseError} />
+                    <CellError id={errorId('warehouse', idx)} message={warehouseError} />
                   </td>
                   {numberInput(idx, 'sheetCount', 'sheet-count', 'Số tấm')}
                   {numberInput(idx, 'length', 'length', 'Dài')}
@@ -404,7 +459,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                   {numberInput(idx, 'thickness', 'thickness', 'Dày')}
                   <td className="cell-number">
                     <NumberCell
-                      id={cellId('quantity', idx)}
+                      field="quantity"
+                      rowIndex={idx}
                       label="Số lượng"
                       value={quantityValue}
                       format={formatStockQuantity}
@@ -413,7 +469,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                       disabled={readOnly || isFieldDisabled(mode, 'quantity')}
                       error={errorOf(idx, 'quantity')}
                     />
-                    <CellError message={errorOf(idx, 'quantity')} />
+                    <CellError id={errorId('quantity', idx)} message={errorOf(idx, 'quantity')} />
                   </td>
                   <td className="cell-number">
                     <div id={cellId('stock-at', idx)} className="cell-readonly cell-number tabular-nums">
@@ -426,7 +482,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                   </td>
                   <td className="cell-number">
                     <NumberCell
-                      id={cellId('unit-price', idx)}
+                      field="unit-price"
+                      rowIndex={idx}
                       label="Đơn giá"
                       value={toNum(line.unitPrice)}
                       format={formatMoneyForDisplay}
@@ -435,7 +492,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                       disabled={readOnly}
                       error={errorOf(idx, 'unitPrice')}
                     />
-                    <CellError message={errorOf(idx, 'unitPrice')} />
+                    <CellError id={errorId('unit-price', idx)} message={errorOf(idx, 'unitPrice')} />
                   </td>
                   <td className="cell-number">
                     <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.amount ?? 0)}</div>
@@ -443,7 +500,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                   {percentInput(idx, 'discountRate', 'discount-rate', '%CK')}
                   <td className="cell-number">
                     <NumberCell
-                      id={cellId('discount-amount', idx)}
+                      field="discount-amount"
+                      rowIndex={idx}
                       label="Tiền CK"
                       value={line.discountManual ? toNum(line.discountAmount) : result?.discountAmount}
                       format={formatMoneyForDisplay}
@@ -455,7 +513,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                       disabled={readOnly}
                       error={errorOf(idx, 'discountAmount')}
                     />
-                    <CellError message={errorOf(idx, 'discountAmount')} />
+                    <CellError id={errorId('discount-amount', idx)} message={errorOf(idx, 'discountAmount')} />
                   </td>
                   {percentInput(idx, 'vatRate', 'vat-rate', '%VAT')}
                   <td className="cell-number">
@@ -468,7 +526,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                     <input
                       id={cellId('note', idx)}
                       className="cell-input"
-                      aria-label="Ghi chú"
+                      aria-label={rowLabel('Ghi chú', idx)}
                       disabled={readOnly}
                       value={line.note ?? ''}
                       onChange={(e) => setLineField(idx, 'note', e.target.value)}
@@ -476,7 +534,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                   </td>
                   {!readOnly && (
                     <td className="cell-action">
-                      <button type="button" aria-label="Xóa dòng" onClick={() => remove(idx)}>
+                      <button type="button" aria-label={rowLabel('Xóa', idx)} onClick={() => remove(idx)}>
                         <Trash2
                           className="h-4 w-4 text-red-600"
                           style={{ display: 'inline-block', verticalAlign: 'middle' }}

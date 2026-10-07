@@ -47,26 +47,45 @@ const r0 = (x: number) => roundAwayFromZero(x, 0);
 const r6 = (x: number) => roundAwayFromZero(x, 6);
 const sum = (values: number[]) => values.reduce((acc, v) => acc + v, 0);
 
-// Splits `total` by `weights`; the last positive weight takes the rounding remainder (D10).
-// Nothing is allocated when the weights sum to zero.
-function allocate(total: number, weights: number[]): number[] {
-  const allocations = weights.map(() => 0);
+const r2 = (x: number) => roundAwayFromZero(x, 2);
+const EPSILON = 1e-9;
+
+// Mirrors backend StockVoucherCalculator.Allocate. Nothing is allocated when the weights sum to zero.
+// Primary split (D10): each positive weight gets its rounded share and the last positive weight takes
+// the rounding remainder. When that remainder would go negative, or (capAtWeight) push a line above its
+// own weight, the split falls back to largest remainder on whole units instead.
+function allocate(total: number, weights: number[], capAtWeight: boolean): number[] {
   const weightSum = sum(weights);
-  if (weightSum <= 0) return allocations;
+  if (weightSum <= 0) return weights.map(() => 0);
 
   let last = -1;
   weights.forEach((w, i) => {
     if (w > 0) last = i;
   });
 
-  let allocated = 0;
-  weights.forEach((w, i) => {
-    if (i === last) return;
-    allocations[i] = r0((total * w) / weightSum);
-    allocated += allocations[i];
-  });
-  allocations[last] = total - allocated;
-  return allocations;
+  const primary = weights.map((w, i) => (w > 0 && i !== last ? r0((total * w) / weightSum) : 0));
+  primary[last] = total - sum(primary);
+  const valid = primary.every((a, i) => a >= 0 && (!capAtWeight || a <= weights[i]));
+  if (valid) return primary;
+
+  const shares = weights.map((w) => (w > 0 ? (total * w) / weightSum : 0));
+  const allocations = shares.map((share) => Math.floor(share + EPSILON));
+  let left = total - sum(allocations);
+  // Largest fractional part first; ties go to the later line.
+  const order = weights
+    .map((w, i) => ({ i, fraction: shares[i] - allocations[i], positive: w > 0 }))
+    .filter((x) => x.positive)
+    .sort((a, b) => b.fraction - a.fraction || b.i - a.i)
+    .map((x) => x.i);
+  while (left > EPSILON) {
+    for (const i of order) {
+      if (left <= EPSILON) break;
+      const add = Math.min(1, left);
+      allocations[i] += add;
+      left -= add;
+    }
+  }
+  return allocations.map(r2);
 }
 
 // Live preview of backend StockVoucherCalculator (D6, D9, D10); the backend stays authoritative.
@@ -82,7 +101,8 @@ export function computeStockVoucher(
   );
   const nets = amounts.map((amount, i) => amount - discounts[i]);
 
-  const orderDiscounts = allocate(header.orderDiscount, nets);
+  // The order discount never takes a line below zero (capped at its Net).
+  const orderDiscounts = allocate(header.orderDiscount, nets, true);
   const netsAfterOrderDiscount = nets.map((net, i) => net - orderDiscounts[i]);
 
   // Freight only raises the value of tracked goods received (VAT is never part of it, D6).
@@ -91,6 +111,7 @@ export function computeStockVoucher(
       ? allocate(
           header.freight,
           netsAfterOrderDiscount.map((net, i) => (lines[i].trackInventory ? net : 0)),
+          false,
         )
       : lines.map(() => 0);
 

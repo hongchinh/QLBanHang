@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { NegativeStockDialog, toShortages } from './negative-stock-dialog';
+import { NegativeStockDialog } from './negative-stock-dialog';
+import { toShortages } from './negative-stock';
 
 const details = {
   'TON01@KHO01': ['Tồn 5, cần 8 — thiếu 3'],
@@ -21,7 +22,7 @@ describe('NegativeStockDialog', () => {
       />,
     );
 
-    expect(screen.getByText('Cảnh báo xuất âm kho')).toBeInTheDocument();
+    expect(screen.getByText('Cảnh báo âm kho')).toBeInTheDocument();
     expect(screen.getByText('TON01 @ KHO01')).toBeInTheDocument();
     expect(screen.getByText('Tồn 5, cần 8 — thiếu 3')).toBeInTheDocument();
     expect(screen.getByText('GO01 @ KHO02')).toBeInTheDocument();

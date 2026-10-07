@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch, type FieldPath, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Ban, RotateCcw, Save, Trash2, X } from 'lucide-react';
 import {
   useCancelStockVoucher,
@@ -27,6 +27,7 @@ import {
   type StockVoucherDraftPartner,
   type StockVoucherDraftStorage,
 } from '@/features/stock-vouchers/use-stock-voucher-draft';
+import type { PartnerType } from '@/features/stock-reasons/types';
 import type {
   PartnerSearchItem,
   StockAtItem,
@@ -50,12 +51,13 @@ import { Label } from '@/components/ui/label';
 import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
-import { fromDateTimeLocalValue } from '@/lib/vn-datetime';
+import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
 import { StockLineGrid } from './components/stock-line-grid';
 import { StockTotalsPanel } from './components/stock-totals-panel';
-import { NegativeStockDialog, toShortages, type NegativeStockShortage } from './components/negative-stock-dialog';
+import { NegativeStockDialog } from './components/negative-stock-dialog';
+import { toShortages, type NegativeStockShortage } from './components/negative-stock';
 import { StockVoucherActivityHistory } from './components/stock-voucher-activity-history';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
@@ -82,6 +84,8 @@ const ERROR_TITLES: Record<PendingAction['kind'], string> = {
 
 const CONCURRENCY_MESSAGE =
   'Phiếu đã được người khác cập nhật. Đã tải lại dữ liệu — các thay đổi chưa lưu đã bị bỏ.';
+const CONCURRENCY_RELOAD_FAILED_MESSAGE =
+  'Phiếu đã được người khác cập nhật nhưng không tải lại được dữ liệu. Các thay đổi của bạn vẫn được giữ — vui lòng thử lại.';
 
 const LINE_ERROR_FIELDS = new Set<string>([
   'productId',
@@ -105,8 +109,9 @@ export function StockVoucherFormPage({ type }: { type: StockDirection }) {
   const { id } = useParams<{ id: string }>();
   const isEdit = !!id && id !== 'new';
   const voucherQuery = useStockVoucher(isEdit ? id : undefined);
-  // Only this first defaults load (server "now") gates the form mount.
-  const defaultsQuery = useStockVoucherDefaults(type, undefined, { enabled: !isEdit });
+  // Only this first defaults load (server "now") gates the form mount. It is always fetched on
+  // mount and never cached, so a new voucher cannot start from a stale "now".
+  const defaultsQuery = useStockVoucherDefaults(type, undefined, { enabled: !isEdit, fresh: true });
 
   if (isEdit && voucherQuery.isLoading) {
     return <div className="text-sm text-muted-foreground">Đang tải...</div>;
@@ -114,7 +119,11 @@ export function StockVoucherFormPage({ type }: { type: StockDirection }) {
   if (isEdit && !voucherQuery.data) {
     return <div className="text-sm text-destructive">Không tìm thấy phiếu.</div>;
   }
-  if (!isEdit && (!defaultsQuery.data || defaultsQuery.isPlaceholderData) && !defaultsQuery.isError) {
+  // /stock-in/<id of a stock-out> (or the reverse) opens the voucher under its own route.
+  if (isEdit && voucherQuery.data && voucherQuery.data.type !== type) {
+    return <Navigate to={`${STOCK_VOUCHER_LABELS[voucherQuery.data.type].basePath}/${id}`} replace />;
+  }
+  if (!isEdit && !defaultsQuery.isFetchedAfterMount) {
     return <div className="text-sm text-muted-foreground">Đang tải...</div>;
   }
 
@@ -125,7 +134,11 @@ export function StockVoucherFormPage({ type }: { type: StockDirection }) {
       id={isEdit ? id : undefined}
       voucher={isEdit ? voucherQuery.data : undefined}
       defaults={isEdit ? undefined : defaultsQuery.data}
-      refetchVoucher={async () => (await voucherQuery.refetch()).data}
+      refetchVoucher={async () => {
+        // A failed refetch still carries the old cached data (and version): report it as no data.
+        const result = await voucherQuery.refetch();
+        return result.status === 'success' ? result.data : undefined;
+      }}
     />
   );
 }
@@ -169,6 +182,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     () => mountData.draft?.selectedPartner ?? partnerOf(voucher),
   );
   const [busy, setBusy] = useState(false);
+  // `busy` is set only after async validation; the ref blocks a second submit (Ctrl+S key repeat) at once.
+  const submittingRef = useRef(false);
   const [confirmKind, setConfirmKind] = useState<VoucherActionKind | null>(null);
   const [negative, setNegative] = useState<{
     action: PendingAction;
@@ -216,6 +231,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const voucherAt = useWatch({ control: form.control, name: 'voucherAt' });
   const warehouseId = useWatch({ control: form.control, name: 'warehouseId' });
   const reasonId = useWatch({ control: form.control, name: 'reasonId' });
+  const paymentMethodId = useWatch({ control: form.control, name: 'paymentMethodId' });
   const selectedReason = reasons.find((r) => r.id === reasonId);
 
   const computed = computeStockVoucher(
@@ -231,12 +247,12 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   }, [form, paidAmountTouched, paidAmount, total]);
 
   // Expected number for the chosen date; never resets or unmounts the form (review m5).
-  const initialVoucherAtRef = useRef(voucherAt);
+  // `defaults` holds the number for server "now"; any other date (a restored draft's included) asks again.
+  const defaultsVoucherAt = defaults ? toDateTimeLocalValue(defaults.voucherAt) : undefined;
   const debouncedVoucherAt = useDebouncedValue(voucherAt, 400);
-  const datedDefaults = useStockVoucherDefaults(type, debouncedVoucherAt, {
-    enabled: !isEdit && !!debouncedVoucherAt && debouncedVoucherAt !== initialVoucherAtRef.current,
-  });
-  const expectedCode = datedDefaults.data?.nextCode ?? defaults?.nextCode;
+  const usesDatedDefaults = !isEdit && !!debouncedVoucherAt && debouncedVoucherAt !== defaultsVoucherAt;
+  const datedDefaults = useStockVoucherDefaults(type, debouncedVoucherAt, { enabled: usesDatedDefaults });
+  const expectedCode = usesDatedDefaults ? datedDefaults.data?.nextCode : defaults?.nextCode;
 
   const atIso = toIsoOrEmpty(voucherAt);
   const stockAtItems = atIso ? distinctTrackedPairs(watchedLines) : [];
@@ -275,7 +291,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       } else if (id) {
         const body = { version: action.version, acknowledgeNegativeStock };
         if (action.kind === 'delete') {
-          await remove.mutateAsync({ id, body });
+          await remove.mutateAsync({ id, type, body });
           toast({ variant: 'success', title: 'Đã xóa phiếu' });
           navigate(labels.basePath);
         } else {
@@ -305,7 +321,12 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       case 'CONCURRENCY': {
         // D29: reload and drop local edits; never resend stale values with the new version.
         const fresh = await refetchVoucher().catch(() => undefined);
-        if (fresh) resetTo(fresh);
+        if (!fresh) {
+          // Nothing reloaded: keep the user's edits rather than resetting to the stale cache.
+          toast({ variant: 'destructive', title: CONCURRENCY_RELOAD_FAILED_MESSAGE });
+          return;
+        }
+        resetTo(fresh);
         toast({ variant: 'destructive', title: CONCURRENCY_MESSAGE });
         return;
       }
@@ -342,11 +363,14 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   }
 
   function submitWithIntent(intent: SubmitIntent) {
-    if (busy || readOnly) return;
+    if (submittingRef.current || busy || readOnly) return;
+    submittingRef.current = true;
     dropBlankLines();
-    void form.handleSubmit((parsed) =>
-      runAction({ kind: 'save', intent, payload: toUpsertPayload(type, parsed) }, false),
-    )();
+    void form
+      .handleSubmit((parsed) => runAction({ kind: 'save', intent, payload: toUpsertPayload(type, parsed) }, false))()
+      .finally(() => {
+        submittingRef.current = false;
+      });
   }
 
   function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
@@ -366,7 +390,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     form.setValue('partnerName', p.name, { shouldDirty: true });
     form.setValue('partnerAddress', p.companyAddress ?? '', { shouldDirty: true });
     form.setValue('partnerTaxCode', p.taxCode ?? '', { shouldDirty: true });
-    setSelectedPartner({ id: p.id, code: p.code, name: p.name });
+    setSelectedPartner({ id: p.id, code: p.code, name: p.name, isCustomer: p.isCustomer, isSupplier: p.isSupplier });
   }
 
   function clearPartner() {
@@ -388,9 +412,13 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     });
   }
 
+  // A partner that does not fit the new reason's role is dropped (the server would reject it).
   function handleReasonChange(nextId: string) {
+    const previousType = selectedReason?.partnerType;
+    const nextType = reasons.find((r) => r.id === nextId)?.partnerType;
     form.setValue('reasonId', nextId, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
-    if (reasons.find((r) => r.id === nextId)?.partnerType === 'None') clearPartner();
+    if (nextType === 'None') clearPartner();
+    else if (selectedPartner && !partnerFits(selectedPartner, nextType, previousType)) clearPartner();
   }
 
   const errors = form.formState.errors;
@@ -567,7 +595,12 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                   <Label htmlFor="stock-handler-name" className="field-label">{labels.handlerLabel}</Label>
                   <Input id="stock-handler-name" className="h-7" {...form.register('handlerName')} />
                   <Label htmlFor="stock-payment-method" className="field-label">HTTT</Label>
-                  <select id="stock-payment-method" className={SELECT_CLASS} {...form.register('paymentMethodId')}>
+                  <select
+                    id="stock-payment-method"
+                    className={SELECT_CLASS}
+                    value={paymentMethodId ?? ''}
+                    onChange={(e) => form.setValue('paymentMethodId', e.target.value, { shouldDirty: true })}
+                  >
                     <option value="">-- Hình thức thanh toán --</option>
                     {paymentMethods.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -701,6 +734,18 @@ function FieldError({ message }: { message?: string }) {
 function partnerOf(voucher?: StockVoucher): StockVoucherDraftPartner | null {
   if (!voucher?.partnerId) return null;
   return { id: voucher.partnerId, code: voucher.partnerCode ?? '', name: voucher.partnerName ?? '' };
+}
+
+// Role flags are known only for a partner picked in this session; otherwise the partner is kept
+// only while the required role stays the same.
+function partnerFits(
+  partner: StockVoucherDraftPartner,
+  nextType: PartnerType | undefined,
+  previousType: PartnerType | undefined,
+): boolean {
+  if (nextType !== 'Customer' && nextType !== 'Supplier') return true;
+  const role = nextType === 'Customer' ? partner.isCustomer : partner.isSupplier;
+  return role ?? nextType === previousType;
 }
 
 function toNum(v: unknown): number | undefined {

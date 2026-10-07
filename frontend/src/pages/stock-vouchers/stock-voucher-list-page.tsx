@@ -98,17 +98,19 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
   const labels = STOCK_VOUCHER_LABELS[type];
   const navigate = useNavigate();
   const [, setParams] = useSearchParams();
-  const [search, setSearch] = useSearchParamString('q');
+  // Filter changes go through updateParams (one URL write that also resets the page): two setters in
+  // one handler would each write the URL and the second would drop the first.
+  const [search] = useSearchParamString('q');
   const [page, setPage] = useSearchParamNumber('page', 1);
-  const [sizeParam, setSizeParam] = useSearchParamNumber('size', DEFAULT_PAGE_SIZE);
+  const [sizeParam] = useSearchParamNumber('size', DEFAULT_PAGE_SIZE);
   const [fromDate] = useSearchParamString('from');
   const [toDate] = useSearchParamString('to');
-  const [warehouseId, setWarehouseId] = useSearchParamString('warehouseId');
-  const [reasonId, setReasonId] = useSearchParamString('reasonId');
+  const [warehouseId] = useSearchParamString('warehouseId');
+  const [reasonId] = useSearchParamString('reasonId');
   const [partnerId] = useSearchParamString('partnerId');
   const [partnerName] = useSearchParamString('partnerName');
   const [statusParam] = useSearchParamString('status');
-  const [ownersParam, setOwnersParam] = useSearchParamString('owners');
+  const [ownersParam] = useSearchParamString('owners');
   const debouncedSearch = useDebouncedValue(search, 300);
 
   const savedStatus = useUiStore((s) => s.stockVoucherStatusFilter[type]);
@@ -251,10 +253,7 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
               <Input
                 placeholder="Tìm theo số phiếu / đối tượng..."
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  if (page !== 1) setPage(1);
-                }}
+                onChange={(e) => updateParams({ q: e.target.value })}
                 className="pl-9"
               />
             </div>
@@ -268,10 +267,7 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
               aria-label="Kho"
               className={SELECT_CLASS}
               value={warehouseId}
-              onChange={(e) => {
-                setWarehouseId(e.target.value);
-                if (page !== 1) setPage(1);
-              }}
+              onChange={(e) => updateParams({ warehouseId: e.target.value })}
             >
               <option value="">Tất cả kho</option>
               {warehouses.map((w) => (
@@ -285,10 +281,7 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
               aria-label="Lý do"
               className={SELECT_CLASS}
               value={reasonId}
-              onChange={(e) => {
-                setReasonId(e.target.value);
-                if (page !== 1) setPage(1);
-              }}
+              onChange={(e) => updateParams({ reasonId: e.target.value })}
             >
               <option value="">Tất cả lý do</option>
               {reasons.map((r) => (
@@ -328,10 +321,7 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
             <MultiSelect<string>
               options={ownerOptions}
               value={ownerIds}
-              onChange={(next) => {
-                setOwnersParam(next.join(','));
-                if (page !== 1) setPage(1);
-              }}
+              onChange={(next) => updateParams({ owners: next.join(',') })}
               placeholder="Người tạo"
               triggerClassName="w-48"
               ariaLabel="Người tạo"
@@ -417,10 +407,7 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
             hasPrev={data?.hasPreviousPage ?? false}
             hasNext={data?.hasNextPage ?? false}
             onPageChange={setPage}
-            onPageSizeChange={(next) => {
-              setSizeParam(next);
-              if (page !== 1) setPage(1);
-            }}
+            onPageSizeChange={(next) => updateParams({ size: next === DEFAULT_PAGE_SIZE ? '' : String(next) })}
             note={status === 'all' ? 'tổng tiền không gồm phiếu đã hủy' : undefined}
             loading={isFetching}
             errored={isError}

@@ -7,6 +7,9 @@ export interface StockVoucherDraftPartner {
   id: string;
   code: string;
   name: string;
+  // Known only when the partner was picked from the search (not for a loaded voucher).
+  isCustomer?: boolean;
+  isSupplier?: boolean;
 }
 
 export interface StockVoucherDraftStorage {

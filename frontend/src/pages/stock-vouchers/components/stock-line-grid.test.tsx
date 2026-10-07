@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { StockLineGrid } from './stock-line-grid';
 import { toFormDefaults, createEmptyStockLine } from '@/features/stock-vouchers/payload';
@@ -264,6 +264,40 @@ describe('StockLineGrid', () => {
     expect(controls.length).toBeGreaterThan(0);
     controls.forEach((el) => expect(el).toBeDisabled());
     expect(screen.queryByRole('button', { name: /Thêm dòng/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Xóa dòng' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Xóa dòng/ })).not.toBeInTheDocument();
+  });
+
+  it('cell labels carry the row number and cell errors are described', async () => {
+    let setError: ((message: string) => void) | undefined;
+    function ErrorHarness() {
+      const form = useForm<StockVoucherFormValues, unknown, StockVoucherFormParsed>({
+        defaultValues: { ...toFormDefaults(), warehouseId: WH1, lines: [line(), line({ _uiKey: 'b' })] },
+      });
+      setError = (message) => form.setError('lines.1.unitPrice', { type: 'server', message });
+      return (
+        <StockLineGrid form={form} type="In" warehouses={warehouses} computed={[]} stockAt={{}} readOnly={false} />
+      );
+    }
+    render(<ErrorHarness />);
+
+    expect(screen.getByLabelText('Số lượng dòng 2')).toBe(byId('stock-line-quantity-1'));
+    expect(screen.getByRole('button', { name: 'Xóa dòng 1' })).toBeInTheDocument();
+
+    act(() => setError?.('Đơn giá không hợp lệ'));
+    const price = await screen.findByLabelText('Đơn giá dòng 2');
+    await waitFor(() => expect(price).toHaveAttribute('aria-invalid', 'true'));
+    expect(price).toHaveAccessibleDescription('Đơn giá không hợp lệ');
+  });
+
+  it('an emptied %VAT stays empty while typing, counts as 0 and shows 0 after blur', () => {
+    const values = renderGrid({ lines: [line({ vatRate: 10 })] });
+    const vat = byId('stock-line-vat-rate-0');
+
+    fireEvent.change(vat, { target: { value: '' } });
+    expect(vat).toHaveValue(null);
+    expect(values().lines[0].vatRate).toBe(0);
+
+    fireEvent.blur(vat);
+    expect(vat).toHaveValue(0);
   });
 });

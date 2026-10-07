@@ -182,4 +182,28 @@ describe('computeStockVoucher', () => {
     expect(result.lines.map((l) => l.freightAllocated)).toEqual([0, 0]);
     expect(result.totals.total).toBe(210_000);
   });
+
+  it('order discount falls back to largest remainder instead of a negative Net', () => {
+    const result = computeStockVoucher(header('Out', { orderDiscount: 2 }), [
+      line(1, 14, 0),
+      line(1, 14, 0),
+      line(1, 14, 0),
+      line(1, 14, 0),
+      line(1, 1, 0),
+    ]);
+
+    expect(result.lines.map((l) => l.orderDiscountAllocated)).toEqual([0, 0, 1, 1, 0]);
+    expect(result.lines.every((l) => l.netAmount >= 0)).toBe(true);
+    expect(result.totals.total).toBe(55);
+  });
+
+  it('freight falls back to largest remainder when the last line would go negative', () => {
+    const result = computeStockVoucher(
+      header('In', { freight: 3 }),
+      Array.from({ length: 6 }, () => line(1, 1, 0)),
+    );
+
+    expect(result.lines.map((l) => l.freightAllocated)).toEqual([0, 0, 0, 1, 1, 1]);
+    expect(result.totals.total).toBe(9);
+  });
 });

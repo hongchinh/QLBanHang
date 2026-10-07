@@ -1,25 +1,31 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type * as ReactRouterDom from 'react-router-dom';
 import { StockVoucherFormPage } from './stock-voucher-form-page';
 import { toDateTimeLocalValue } from '@/lib/vn-datetime';
+import { toFormDefaults } from '@/features/stock-vouchers/payload';
 import { useBranchStore } from '@/stores/branch-store';
 import type { ProductSuggestion } from '@/features/products/types';
 import type { StockReason } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
-import type { StockVoucher, StockVoucherDefaults } from '@/features/stock-vouchers/types';
+import type { PartnerSearchItem, StockVoucher, StockVoucherDefaults } from '@/features/stock-vouchers/types';
 
 const routeParams: { id: string } = { id: 'new' };
 const navigateMock = vi.fn();
 
 vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+  const actual = await vi.importActual<typeof ReactRouterDom>('react-router-dom');
   return {
     ...actual,
     useParams: () => routeParams,
     useNavigate: () => navigateMock,
     Link: ({ children, to, ...rest }: { children: React.ReactNode; to: string }) =>
       React.createElement('a', { href: String(to), ...rest }, children),
+    Navigate: ({ to, replace }: { to: string; replace?: boolean }) => {
+      navigateMock(to, { replace });
+      return null;
+    },
   };
 });
 
@@ -42,6 +48,9 @@ const deleteMock = vi.fn();
 const refetchMock = vi.fn();
 const useStockAtMock = vi.fn();
 const useStockReasonsMock = vi.fn();
+const defaultsMock = vi.fn();
+const partnerResults: { data: PartnerSearchItem[] } = { data: [] };
+const paymentMethodsState: { data: { id: string; code: string; name: string; isCash: boolean }[] } = { data: [] };
 const voucherState: { data: StockVoucher | undefined } = { data: undefined };
 const activitiesState: { data: unknown[] } = { data: [] };
 
@@ -53,7 +62,7 @@ vi.mock('@/features/stock-vouchers/hooks', () => ({
     isLoading: false,
     refetch: refetchMock,
   }),
-  useStockVoucherDefaults: (type: 'In' | 'Out') => ({ data: defaultsFor(type), isLoading: false, isPending: false }),
+  useStockVoucherDefaults: (...args: unknown[]) => defaultsMock(...args),
   useStockAt: (body: unknown) => {
     useStockAtMock(body);
     return { data: [] };
@@ -65,7 +74,11 @@ vi.mock('@/features/stock-vouchers/hooks', () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  usePartnerSearch: () => ({ data: [], isLoading: false, isError: false }),
+  usePartnerSearch: (_type: string, keyword: string) => ({
+    data: keyword ? partnerResults.data : [],
+    isLoading: false,
+    isError: false,
+  }),
   useCreateStockVoucher: () => mutation(createMock),
   useUpdateStockVoucher: () => mutation(updateMock),
   useCancelStockVoucher: () => mutation(cancelMock),
@@ -77,6 +90,7 @@ const WH1 = '11111111-1111-4111-8111-111111111111';
 const R_IN = '22222222-2222-4222-8222-222222222222';
 const R_IN2 = '22222222-2222-4222-8222-222222222223';
 const R_OUT = '22222222-2222-4222-8222-222222222224';
+const R_IN_CUSTOMER = '22222222-2222-4222-8222-222222222225';
 const PM1 = '33333333-3333-4333-8333-333333333333';
 const P1 = '44444444-4444-4444-8444-444444444444';
 const V1 = '55555555-5555-4555-8555-555555555555';
@@ -89,6 +103,7 @@ const warehouses: Warehouse[] = [
 const reasons: StockReason[] = [
   { id: R_IN, code: 'NMH', name: 'Nhập mua hàng', direction: 'In', partnerType: 'Supplier', isSystem: true },
   { id: R_IN2, code: 'NKH', name: 'Nhập khác', direction: 'In', partnerType: 'None', isSystem: true },
+  { id: R_IN_CUSTOMER, code: 'NTL', name: 'Nhập hàng trả lại', direction: 'In', partnerType: 'Customer', isSystem: true },
   { id: R_OUT, code: 'XBH', name: 'Xuất bán hàng', direction: 'Out', partnerType: 'Customer', isSystem: true },
 ];
 
@@ -100,7 +115,7 @@ vi.mock('@/features/stock-reasons/hooks', () => ({
   },
 }));
 vi.mock('@/features/payment-methods/hooks', () => ({
-  usePaymentMethods: () => ({ data: [{ id: PM1, code: 'TM', name: 'Tiền mặt', isCash: true }] }),
+  usePaymentMethods: () => ({ data: paymentMethodsState.data }),
 }));
 vi.mock('@/features/inventory-settings/hooks', () => ({
   useInventorySettings: () => ({ data: { netExcludesVat: false } }),
@@ -132,6 +147,22 @@ vi.mock('@/features/products/hooks', () => ({
 }));
 
 const DEFAULT_AT = '2026-10-07T01:30:00.000Z';
+const PAYMENT_METHODS = [{ id: PM1, code: 'TM', name: 'Tiền mặt', isCash: true }];
+
+const supplier: PartnerSearchItem = {
+  id: '77777777-7777-4777-8777-777777777777',
+  code: 'NCC01',
+  name: 'Công ty Thép Việt',
+  status: 'Active',
+  isCustomer: false,
+  isSupplier: true,
+};
+
+// Server "now" defaults, fetched after mount; a dated lookup answers for that date.
+function defaultsResult(type: 'In' | 'Out', voucherAt?: string) {
+  const data = voucherAt ? { ...defaultsFor(type), nextCode: `${type === 'In' ? 'PN' : 'PX'}-AT-${voucherAt}` } : defaultsFor(type);
+  return { data, isLoading: false, isPending: false, isFetchedAfterMount: true };
+}
 
 function defaultsFor(type: 'In' | 'Out'): StockVoucherDefaults {
   return {
@@ -246,6 +277,10 @@ describe('StockVoucherFormPage', () => {
     refetchMock.mockReset();
     useStockAtMock.mockReset();
     useStockReasonsMock.mockReset();
+    defaultsMock.mockReset();
+    defaultsMock.mockImplementation((type: 'In' | 'Out', voucherAt?: string) => defaultsResult(type, voucherAt));
+    partnerResults.data = [];
+    paymentMethodsState.data = PAYMENT_METHODS;
     useBranchStore.setState({ workingBranchId: 'b1' });
   });
 
@@ -309,7 +344,7 @@ describe('StockVoucherFormPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
 
-    expect(await screen.findByText('Cảnh báo xuất âm kho')).toBeInTheDocument();
+    expect(await screen.findByText('Cảnh báo âm kho')).toBeInTheDocument();
     expect(screen.getByText('SP01 @ KHO01')).toBeInTheDocument();
     fireEvent.click(dialog().getByRole('button', { name: 'Vẫn lưu' }));
 
@@ -365,7 +400,11 @@ describe('StockVoucherFormPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Vẫn xóa' }));
 
     await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(2));
-    expect(deleteMock.mock.calls[1][0]).toEqual({ id: V1, body: { version: 7, acknowledgeNegativeStock: true } });
+    expect(deleteMock.mock.calls[1][0]).toEqual({
+      id: V1,
+      type: 'In',
+      body: { version: 7, acknowledgeNegativeStock: true },
+    });
     await waitFor(() => expect(navigateMock).toHaveBeenCalledWith('/stock-in'));
   });
 
@@ -373,7 +412,7 @@ describe('StockVoucherFormPage', () => {
     routeParams.id = V1;
     voucherState.data = voucher();
     updateMock.mockRejectedValueOnce(apiError(409, 'CONCURRENCY'));
-    refetchMock.mockResolvedValueOnce({ data: voucher({ version: 8, note: 'Ghi chú máy chủ' }) });
+    refetchMock.mockResolvedValueOnce({ status: 'success', data: voucher({ version: 8, note: 'Ghi chú máy chủ' }) });
     renderPage('In');
 
     fireEvent.change(byId('stock-voucher-note'), { target: { value: 'Sửa cục bộ' } });
@@ -388,6 +427,25 @@ describe('StockVoucherFormPage', () => {
         title: 'Phiếu đã được người khác cập nhật. Đã tải lại dữ liệu — các thay đổi chưa lưu đã bị bỏ.',
       }),
     );
+  });
+
+  it('concurrency conflict keeps local edits when the reload fails', async () => {
+    routeParams.id = V1;
+    voucherState.data = voucher();
+    updateMock.mockRejectedValueOnce(apiError(409, 'CONCURRENCY'));
+    // A failed refetch still returns the old cached data.
+    refetchMock.mockResolvedValueOnce({ status: 'error', data: voucher() });
+    renderPage('In');
+
+    fireEvent.change(byId('stock-voucher-note'), { target: { value: 'Sửa cục bộ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+    await waitFor(() =>
+      expect(toastMock).toHaveBeenCalledWith(
+        expect.objectContaining({ variant: 'destructive', title: expect.stringContaining('không tải lại được') }),
+      ),
+    );
+    expect(byId('stock-voucher-note').value).toBe('Sửa cục bộ');
   });
 
   it('validation details map lines[0].width onto the grid cell', async () => {
@@ -410,6 +468,83 @@ describe('StockVoucherFormPage', () => {
     fireEvent.keyDown(byId('stock-voucher-note'), { key: 's', ctrlKey: true });
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+  });
+
+  it('a repeated Ctrl+S submits only once', async () => {
+    createMock.mockReturnValue(new Promise(() => {}));
+    renderPage('In');
+    await fillPerUnitLine(2);
+
+    fireEvent.keyDown(byId('stock-voucher-note'), { key: 's', ctrlKey: true });
+    fireEvent.keyDown(byId('stock-voucher-note'), { key: 's', ctrlKey: true });
+    fireEvent.keyDown(byId('stock-voucher-note'), { key: 's', ctrlKey: true });
+
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(createMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('new voucher waits for defaults fetched after mount, never cached ones', () => {
+    defaultsMock.mockImplementation((type: 'In' | 'Out', voucherAt?: string) => ({
+      ...defaultsResult(type, voucherAt),
+      isFetchedAfterMount: false,
+    }));
+    renderPage('In');
+
+    expect(screen.getByText('Đang tải...')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Thêm phiếu nhập kho' })).not.toBeInTheDocument();
+    expect(defaultsMock).toHaveBeenCalledWith('In', undefined, { enabled: true, fresh: true });
+  });
+
+  it('restored draft shows the expected code for the draft date', async () => {
+    const draftAt = '2026-09-01T08:00';
+    localStorage.setItem(
+      'stock_voucher_draft_In_user-test_b1',
+      JSON.stringify({
+        savedAt: DEFAULT_AT,
+        values: { ...toFormDefaults(undefined, defaultsFor('In')), voucherAt: draftAt },
+        selectedPartner: null,
+      }),
+    );
+    renderPage('In');
+
+    expect(byId('stock-voucher-at').value).toBe(draftAt);
+    expect(screen.queryByText('Số phiếu dự kiến: PN00001')).not.toBeInTheDocument();
+    expect(await screen.findByText(`Số phiếu dự kiến: PN-AT-${draftAt}`)).toBeInTheDocument();
+    expect(defaultsMock).toHaveBeenCalledWith('In', draftAt, { enabled: true });
+  });
+
+  it('payment method select shows the value once its options load', () => {
+    paymentMethodsState.data = [];
+    const { rerender } = renderPage('In');
+
+    paymentMethodsState.data = PAYMENT_METHODS;
+    rerender(<StockVoucherFormPage type="In" />);
+
+    expect(byId('stock-payment-method').value).toBe(PM1);
+  });
+
+  it('a voucher of the other type redirects to its own route', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher({ type: 'Out', code: 'PX00007' });
+    renderPage('In');
+
+    expect(navigateMock).toHaveBeenCalledWith(`/stock-out/${V1}`, { replace: true });
+    expect(screen.queryByRole('heading', { name: /Phiếu nhập kho/ })).not.toBeInTheDocument();
+  });
+
+  it('switching to a reason of another partner role clears a partner without that role', async () => {
+    partnerResults.data = [supplier];
+    renderPage('In');
+
+    fireEvent.change(byId('stock-partner'), { target: { value: 'NCC' } });
+    fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('NCC01'));
+    await waitFor(() => expect(byId('stock-partner-name').value).toBe(supplier.name));
+
+    fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
+
+    await waitFor(() => expect(byId('stock-partner-name').value).toBe(''));
+    expect(byId('stock-partner').value).toBe('');
   });
 
   it('new voucher sends no excludeVoucherId to stock-at', async () => {

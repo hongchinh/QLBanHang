@@ -9,15 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-export interface NegativeStockShortage {
-  // "{productCode}@{warehouseCode}" (D17).
-  key: string;
-  messages: string[];
-}
-
-export function toShortages(details?: Record<string, string[]>): NegativeStockShortage[] {
-  return Object.entries(details ?? {}).map(([key, messages]) => ({ key, messages }));
-}
+import type { NegativeStockShortage } from './negative-stock';
 
 function formatKey(key: string): string {
   const at = key.lastIndexOf('@');
@@ -47,7 +39,7 @@ export function NegativeStockDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className={blocked ? 'h-5 w-5 text-red-600' : 'h-5 w-5 text-amber-600'} />
-            {blocked ? 'Không đủ tồn kho' : 'Cảnh báo xuất âm kho'}
+            {blocked ? 'Không đủ tồn kho' : 'Cảnh báo âm kho'}
           </DialogTitle>
           <DialogDescription>
             {blocked

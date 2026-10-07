@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes, useLocation, useParams } from 'react-route
 import { StockVoucherListPage } from './stock-voucher-list-page';
 import { stockVouchersApi } from '@/features/stock-vouchers/api';
 import { apiGet } from '@/lib/api-client';
+import type * as ApiClient from '@/lib/api-client';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import type {
@@ -14,7 +15,7 @@ import type {
 } from '@/features/stock-vouchers/types';
 
 vi.mock('@/lib/api-client', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/api-client')>();
+  const actual = await importOriginal<typeof ApiClient>();
   return { ...actual, apiGet: vi.fn().mockResolvedValue({}) };
 });
 
@@ -225,6 +226,30 @@ describe('StockVoucherListPage', () => {
     const sent = vi.mocked(apiGet).mock.calls[0][1] as Record<string, unknown>;
     expect(sent).not.toHaveProperty('status');
     expect(sent.type).toBe('In');
+  });
+
+  it('on page 2, changing a filter keeps the filter and goes back to page 1', async () => {
+    renderPage('In', '/stock-in?page=2&reasonId=r1');
+    expect(lastParams()).toMatchObject({ page: 2, reasonId: 'r1' });
+
+    fireEvent.change(screen.getByLabelText('Kho'), { target: { value: 'w1' } });
+
+    await waitFor(() => expect(lastParams()).toMatchObject({ page: 1, warehouseId: 'w1', reasonId: 'r1' }));
+    const search = new URLSearchParams((screen.getByTestId('location').textContent ?? '').split('?')[1]);
+    expect(search.get('warehouseId')).toBe('w1');
+    expect(search.get('reasonId')).toBe('r1');
+    expect(search.has('page')).toBe(false);
+  });
+
+  it('on page 2, typing a search keeps the first keystroke and goes back to page 1', async () => {
+    renderPage('In', '/stock-in?page=2');
+
+    fireEvent.change(screen.getByPlaceholderText('Tìm theo số phiếu / đối tượng...'), { target: { value: 'P' } });
+
+    await waitFor(() => expect(lastParams().page).toBe(1));
+    const search = new URLSearchParams((screen.getByTestId('location').textContent ?? '').split('?')[1]);
+    expect(search.get('q')).toBe('P');
+    expect(search.has('page')).toBe(false);
   });
 
   it('changing the status filter persists it for the type', () => {

@@ -13,11 +13,14 @@ public class InventoryReportsController : ApiControllerBase
 {
     private readonly IInventoryReportService _service;
     private readonly IValidator<StockOnHandReportRequest> _stockOnHandValidator;
+    private readonly IValidator<StockCardRequest> _stockCardValidator;
 
-    public InventoryReportsController(IInventoryReportService service, IValidator<StockOnHandReportRequest> stockOnHandValidator)
+    public InventoryReportsController(IInventoryReportService service, IValidator<StockOnHandReportRequest> stockOnHandValidator,
+        IValidator<StockCardRequest> stockCardValidator)
     {
         _service = service;
         _stockOnHandValidator = stockOnHandValidator;
+        _stockCardValidator = stockCardValidator;
     }
 
     [HttpGet("stock-on-hand")]
@@ -27,5 +30,14 @@ public class InventoryReportsController : ApiControllerBase
     {
         await _stockOnHandValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.GetStockOnHandAsync(request, ct));
+    }
+
+    [HttpGet("stock-card")]
+    [HasPermission(Permissions.Reports.Inventory)]
+    public async Task<ActionResult<ApiResponse<StockCardDto>>> StockCard(
+        [FromQuery] StockCardRequest request, CancellationToken ct)
+    {
+        await _stockCardValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetStockCardAsync(request, ct));
     }
 }

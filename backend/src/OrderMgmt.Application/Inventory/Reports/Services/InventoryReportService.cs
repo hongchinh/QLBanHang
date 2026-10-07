@@ -1,8 +1,10 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.Ledger;
 using OrderMgmt.Application.Inventory.Reports.Interfaces;
 using OrderMgmt.Application.Inventory.Reports.Models;
+using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 
@@ -130,6 +132,109 @@ public class InventoryReportService : IInventoryReportService
         };
     }
 
+    public async Task<StockCardDto> GetStockCardAsync(StockCardRequest request, CancellationToken ct = default)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var from = request.From!.Value;
+        var to = request.To!.Value;
+        var product = await _db.Products.IgnoreQueryFilters().AsNoTracking()
+            .Where(p => p.Id == request.ProductId)
+            .Select(p => new { p.Id, p.Code, p.Name, p.PricingMode, UnitName = p.Unit != null ? p.Unit.Name : null })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException("Product", request.ProductId);
+        if (request.WarehouseId is { } requestedWarehouseId)
+        {
+            var warehouseBranchId = await _db.Warehouses.AsNoTracking()
+                .Where(w => w.Id == requestedWarehouseId)
+                .Select(w => (Guid?)w.BranchId)
+                .FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundException("Warehouse", requestedWarehouseId);
+            if (warehouseBranchId != branchId)
+                throw new ForbiddenException("Kho không thuộc chi nhánh đang làm việc.");
+        }
+        var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, ct);
+
+        var ledger = _db.InventoryLedger.AsNoTracking().Where(e => e.BranchId == branchId && e.ProductId == request.ProductId);
+        if (request.WarehouseId is { } warehouseId)
+            ledger = ledger.Where(e => e.WarehouseId == warehouseId);
+        var start = VnTime.StartOfDay(from);
+        var end = VnTime.StartOfNextDay(to);
+        var before = ledger.Where(e => e.PostedAt < start);
+        var openingQty = await before.SumAsync(e => e.QtyIn - e.QtyOut, ct);
+        var openingValue = await before.SumAsync(e => e.InValue - (e.CostAmount ?? 0m), ct);
+        var entries = await ledger.Where(e => e.PostedAt >= start && e.PostedAt < end).InPostingOrder().ToListAsync(ct);
+
+        var voucherIds = entries.Where(e => e.SourceType != LedgerSourceType.Opening).Select(e => e.SourceId).Distinct().ToList();
+        var vouchers = await _db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+            .Where(v => voucherIds.Contains(v.Id))
+            .Select(v => new { v.Id, ReasonName = v.Reason != null ? v.Reason.Name : null, v.PartnerName })
+            .ToDictionaryAsync(v => v.Id, ct);
+        var warehouseIds = entries.Select(e => e.WarehouseId).Distinct().ToList();
+        var warehouseCodes = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+            .Where(w => warehouseIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, w => w.Code, ct);
+
+        var canViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost);
+        // D32: under Branch scope a single warehouse has no value of its own.
+        var valuesAtScopeOnly = request.WarehouseId is not null && settings.CostingScope == CostingScope.Branch;
+        var showRunning = canViewCost && !valuesAtScopeOnly;
+
+        var runningQty = openingQty;
+        var runningValue = openingValue;
+        var rows = new List<StockCardRowDto>(entries.Count);
+        foreach (var e in entries)
+        {
+            runningQty += e.QtyIn - e.QtyOut;
+            runningValue += e.InValue - (e.CostAmount ?? 0m);
+            var opening = e.SourceType == LedgerSourceType.Opening;
+            var voucher = opening ? null : vouchers.GetValueOrDefault(e.SourceId);
+            var unitCost = e.QtyOut > 0m ? e.UnitCost : e.QtyIn > 0m ? R4(e.InValue / e.QtyIn) : (decimal?)null;
+            rows.Add(new StockCardRowDto
+            {
+                PostedAt = e.PostedAt,
+                SourceType = e.SourceType,
+                SourceId = e.SourceId,
+                SourceCode = e.SourceCode,
+                ReasonName = opening ? "Tồn đầu kỳ" : voucher?.ReasonName,
+                PartnerName = voucher?.PartnerName,
+                WarehouseCode = warehouseCodes.GetValueOrDefault(e.WarehouseId) ?? "",
+                QtyIn = e.QtyIn,
+                QtyOut = e.QtyOut,
+                UnitCost = canViewCost ? unitCost : null,
+                InValue = canViewCost ? e.InValue : null,
+                CostAmount = canViewCost ? e.CostAmount : null,
+                RunningQty = runningQty,
+                RunningValue = showRunning ? runningValue : null,
+            });
+        }
+
+        var inQty = entries.Sum(e => e.QtyIn);
+        var outQty = entries.Sum(e => e.QtyOut);
+        var inValue = entries.Sum(e => e.InValue);
+        var outValue = entries.Sum(e => e.CostAmount ?? 0m);
+        return new StockCardDto
+        {
+            ProductId = product.Id,
+            ProductCode = product.Code,
+            ProductName = product.Name,
+            UnitName = StockUnit.NameFor(product.PricingMode, product.UnitName),
+            From = from,
+            To = to,
+            IsProvisional = IsProvisional(to, settings.CostingPeriod),
+            CanViewCost = canViewCost,
+            ValuesAtScopeOnly = valuesAtScopeOnly,
+            OpeningQty = openingQty,
+            OpeningValue = showRunning ? openingValue : null,
+            InQty = inQty,
+            OutQty = outQty,
+            InValue = canViewCost ? inValue : null,
+            OutValue = canViewCost ? outValue : null,
+            ClosingQty = openingQty + inQty - outQty,
+            ClosingValue = showRunning ? openingValue + inValue - outValue : null,
+            Rows = rows,
+        };
+    }
+
     /// Branch scope (D32): each warehouse gets R0(scopeValue × qty / scopeQty); the rounding residual goes to the last
     /// warehouse (by code) holding stock. A zero scope quantity gives every warehouse 0.
     private static List<decimal> SplitByQuantity(decimal scopeValue, IReadOnlyList<decimal> quantities)
@@ -151,6 +256,8 @@ public class InventoryReportService : IInventoryReportService
         CostingPeriodCalendar.PeriodOf(date, period).End >= VnTime.ToVnDate(_clock.UtcNow);
 
     private static decimal R0(decimal x) => Math.Round(x, 0, MidpointRounding.AwayFromZero);
+
+    private static decimal R4(decimal x) => Math.Round(x, 4, MidpointRounding.AwayFromZero);
 
     private static string EscapeLike(string input) =>
         input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");

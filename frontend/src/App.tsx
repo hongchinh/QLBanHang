@@ -26,6 +26,8 @@ import { MyQuotationSettingsPage } from '@/pages/settings/my-quotation-settings-
 import { PaymentQrPage } from '@/pages/payment-qr/payment-qr-page';
 import { QuotationSystemSettingsPage } from '@/pages/settings/quotation-system-settings-page';
 import { SettingsHubPage } from '@/pages/settings/settings-hub-page';
+import { BranchesPage } from '@/pages/settings/branches-page';
+import { PeriodLockPage } from '@/pages/settings/period-lock-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -241,6 +243,22 @@ export function App() {
                   element={
                     <ProtectedRoute permission="system.manage_settings">
                       <QuotationSystemSettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/branches"
+                  element={
+                    <ProtectedRoute permission="branches.manage">
+                      <BranchesPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/period-lock"
+                  element={
+                    <ProtectedRoute permission="period_lock.manage">
+                      <PeriodLockPage />
                     </ProtectedRoute>
                   }
                 />

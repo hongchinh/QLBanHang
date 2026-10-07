@@ -104,7 +104,8 @@ public class BranchService : IBranchService
 
         if (branch.Id == BranchDefaults.MainBranchId)
             throw new ConflictException("Không thể xóa chi nhánh chính.");
-        if (await _db.Users.AnyAsync(u => u.DefaultBranchId == id, ct))
+        // Soft-deleted users count too: their rows still reference the branch (review finding).
+        if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.DefaultBranchId == id, ct))
             throw new ConflictException("Chi nhánh đang là chi nhánh mặc định của người dùng, không thể xóa.");
         if (await _db.Warehouses.AnyAsync(w => w.BranchId == id, ct))
             throw new ConflictException("Chi nhánh đang có kho, không thể xóa.");

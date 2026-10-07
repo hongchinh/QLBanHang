@@ -2,10 +2,13 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Identity.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.IntegrationTests.Fixtures;
 using OrderMgmt.IntegrationTests.Quotations;
 using Xunit;
@@ -64,6 +67,16 @@ public class BranchCrudTests : QuotationTestBase
 
         var used = await CreateAsync("CN03", "Chi nhánh 3");
         await CreateTestUserAsync("cn03_user", "Pass@123", RoleCodes.Sales, used.Id);
+        (await _client.DeleteAsync($"/api/branches/{used.Id}"))
+            .StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // A soft-deleted user still references the branch.
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.Users.SingleAsync(u => u.Username == "cn03_user")).IsDeleted = true;
+            await db.SaveChangesAsync();
+        }
         (await _client.DeleteAsync($"/api/branches/{used.Id}"))
             .StatusCode.Should().Be(HttpStatusCode.Conflict);
     }

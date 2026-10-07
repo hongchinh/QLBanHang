@@ -28,6 +28,8 @@ import { QuotationSystemSettingsPage } from '@/pages/settings/quotation-system-s
 import { SettingsHubPage } from '@/pages/settings/settings-hub-page';
 import { BranchesPage } from '@/pages/settings/branches-page';
 import { PeriodLockPage } from '@/pages/settings/period-lock-page';
+import { InventorySettingsPage } from '@/pages/settings/inventory-settings-page';
+import { NumberingSettingsPage } from '@/pages/settings/numbering-settings-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -259,6 +261,22 @@ export function App() {
                   element={
                     <ProtectedRoute permission="period_lock.manage">
                       <PeriodLockPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/inventory"
+                  element={
+                    <ProtectedRoute permission="inventory.settings">
+                      <InventorySettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/numbering"
+                  element={
+                    <ProtectedRoute permission="inventory.settings">
+                      <NumberingSettingsPage />
                     </ProtectedRoute>
                   }
                 />

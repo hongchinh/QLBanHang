@@ -241,6 +241,86 @@ public abstract class InventoryTestBase : QuotationTestBase
         return (response.StatusCode, parsed?.Data, parsed?.Error);
     }
 
+    protected Task<StockVoucherDto> CreateVoucherAsync(HttpClient client, StockDirection type, string reasonCode, string at,
+        params UpsertStockVoucherLineRequest[] lines) => CreateVoucherAsync(client, type, reasonCode, at, null, lines);
+
+    /// Creates a voucher through the API and asserts 200.
+    protected async Task<StockVoucherDto> CreateVoucherAsync(HttpClient client, StockDirection type, string reasonCode, string at,
+        Action<UpsertStockVoucherRequest>? configure, params UpsertStockVoucherLineRequest[] lines)
+    {
+        var request = VoucherRequest(type, await ReasonIdAsync(reasonCode), at, lines);
+        configure?.Invoke(request);
+        var (status, voucher, error) = await PostVoucherAsync(client, request);
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        return voucher!;
+    }
+
+    protected static async Task<StockVoucherDto> GetVoucherAsync(HttpClient client, Guid id) =>
+        await ReadDataAsync<StockVoucherDto>(await client.GetAsync($"/api/stock-vouchers/{id}"));
+
+    /// An update request that resends the stored voucher unchanged (line ids and version included).
+    protected static UpsertStockVoucherRequest UpdateRequestFrom(StockVoucherDto v) => new()
+    {
+        Type = v.Type,
+        VoucherAt = v.VoucherAt,
+        WarehouseId = v.WarehouseId,
+        ReasonId = v.ReasonId,
+        PartnerId = v.PartnerId,
+        PartnerName = v.PartnerName,
+        PartnerAddress = v.PartnerAddress,
+        PartnerTaxCode = v.PartnerTaxCode,
+        HandlerName = v.HandlerName,
+        PaymentMethodId = v.PaymentMethodId,
+        Note = v.Note,
+        Freight = v.Freight,
+        OrderDiscount = v.OrderDiscount,
+        PaidAmount = v.PaidAmount,
+        Version = v.Version,
+        Lines = v.Lines.Select(l => new UpsertStockVoucherLineRequest
+        {
+            Id = l.Id,
+            SortOrder = l.SortOrder,
+            ProductId = l.ProductId,
+            WarehouseId = l.WarehouseId,
+            SheetCount = l.SheetCount,
+            Length = l.Length,
+            Width = l.Width,
+            Thickness = l.Thickness,
+            Quantity = l.Quantity,
+            UnitPrice = l.UnitPrice,
+            DiscountRate = l.DiscountRate,
+            DiscountAmount = l.DiscountAmount,
+            DiscountManual = l.DiscountManual,
+            VatRate = l.VatRate,
+            Note = l.Note,
+        }).ToList(),
+    };
+
+    protected static async Task<(HttpStatusCode Status, StockVoucherDto? Voucher, ApiError? Error)> PutVoucherAsync(
+        HttpClient c, Guid id, UpsertStockVoucherRequest r) =>
+        await ReadVoucherResponseAsync(await c.PutAsJsonAsync($"/api/stock-vouchers/{id}", r));
+
+    /// Quantity of the StockBalance row; a pair without ledger rows has no row (0).
+    protected Task<decimal> StockOfAsync(Guid productId, Guid warehouseId) =>
+        InDbAsync(async db => await db.StockBalances
+            .Where(b => b.ProductId == productId && b.WarehouseId == warehouseId)
+            .Select(b => (decimal?)b.Quantity)
+            .SingleOrDefaultAsync() ?? 0m);
+
+    protected Task<List<InventoryLedgerEntry>> LedgerOfAsync(Guid voucherId) =>
+        InDbAsync(db => db.InventoryLedger.AsNoTracking()
+            .Where(e => e.SourceId == voucherId)
+            .OrderBy(e => e.LineSortOrder)
+            .ToListAsync());
+
+    /// Locks the main branch through the API.
+    protected async Task SetPeriodLockAsync(DateOnly? lockedUntil)
+    {
+        var response = await _client.PutAsJsonAsync($"/api/branches/{MainBranchId}/lock",
+            new SetPeriodLockRequest { LockedUntil = lockedUntil });
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+    }
+
     protected Task<Guid> CreatePartnerAsync(string code, bool isCustomer, bool isSupplier) =>
         InDbAsync(async db =>
         {

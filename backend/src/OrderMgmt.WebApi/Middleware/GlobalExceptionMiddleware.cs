@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using FluentValidation;
+using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Domain.Common;
 
@@ -80,6 +81,11 @@ public class GlobalExceptionMiddleware
                 Code = nse.Code,
                 Message = nse.Message,
                 Details = nse.Shortages,
+            }),
+            DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, new ApiError
+            {
+                Code = "CONCURRENCY",
+                Message = "Dữ liệu đã được người khác cập nhật. Vui lòng tải lại.",
             }),
             DomainException de => (StatusCodes.Status400BadRequest, new ApiError
             {

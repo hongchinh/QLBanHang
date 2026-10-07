@@ -21,7 +21,7 @@ public class StockVoucherQueryTests : InventoryTestBase
     public async Task Get_returns_line_snapshots_and_permission_flags()
     {
         var p = await CreateInventoryProductAsync("QG01");
-        var adminVoucher = await CreateAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 5, 20_000));
+        var adminVoucher = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(p, 5, 20_000));
         await InDbAsync(async db =>
         {
             var product = await db.Products.SingleAsync(x => x.Id == p);
@@ -29,7 +29,7 @@ public class StockVoucherQueryTests : InventoryTestBase
             await db.SaveChangesAsync();
         });
 
-        var dto = await GetAsync(_client, adminVoucher.Id);
+        var dto = await GetVoucherAsync(_client, adminVoucher.Id);
         dto.Should().BeEquivalentTo(new
         {
             Code = "PN00001", WarehouseCode = "KHO01", ReasonName = "Nhập khác", OwnerName = AdminName,
@@ -42,12 +42,12 @@ public class StockVoucherQueryTests : InventoryTestBase
         });
 
         var warehouseUser = await CreateClientForRoleAsync("qg_kho", RoleCodes.Warehouse);
-        (await GetAsync(warehouseUser, adminVoucher.Id)).Should().BeEquivalentTo(new { CanEdit = false, CanCancel = false, CanDelete = false });
-        var ownVoucher = await CreateAsync(warehouseUser, StockDirection.In, "NKH", "2026-10-03 08:00", LineRequest(p, 1, 20_000));
-        (await GetAsync(warehouseUser, ownVoucher.Id)).Should().BeEquivalentTo(new { CanEdit = true, CanCancel = true, CanDelete = true });
+        (await GetVoucherAsync(warehouseUser, adminVoucher.Id)).Should().BeEquivalentTo(new { CanEdit = false, CanCancel = false, CanDelete = false });
+        var ownVoucher = await CreateVoucherAsync(warehouseUser, StockDirection.In, "NKH", "2026-10-03 08:00", LineRequest(p, 1, 20_000));
+        (await GetVoucherAsync(warehouseUser, ownVoucher.Id)).Should().BeEquivalentTo(new { CanEdit = true, CanCancel = true, CanDelete = true });
 
         await SetCancelledAsync(adminVoucher.Id);
-        (await GetAsync(_client, adminVoucher.Id)).Should().BeEquivalentTo(new
+        (await GetVoucherAsync(_client, adminVoucher.Id)).Should().BeEquivalentTo(new
         {
             Status = StockVoucherStatus.Cancelled, CanEdit = false, CanCancel = true, CanDelete = false,
         });
@@ -63,14 +63,14 @@ public class StockVoucherQueryTests : InventoryTestBase
         var warehouseB = await CreateWarehouseAsync(branchB, "KHO-B");
         var other = await CreateClientWithPermissionsAsync("ql_other", null, Permissions.StockIn.View, Permissions.StockIn.Create);
 
-        var v1 = await CreateAsync(_client, StockDirection.In, "NMH", "2026-10-02 00:10", r => r.PartnerId = supplier, LineRequest(service, 1, 100_000));
-        var v2 = await CreateAsync(_client, StockDirection.In, "NKH", "2026-10-06 00:30", r => r.Lines[0].WarehouseId = kho02, LineRequest(service, 1, 200_000));
-        var v3 = await CreateAsync(other, StockDirection.In, "NKH", "2026-10-10 08:00", r => r.WarehouseId = kho02, LineRequest(service, 1, 300_000));
-        var v4 = await CreateAsync(_client, StockDirection.Out, "XKH", "2026-10-03 08:00", LineRequest(service, 1, 50_000));
+        var v1 = await CreateVoucherAsync(_client, StockDirection.In, "NMH", "2026-10-02 00:10", r => r.PartnerId = supplier, LineRequest(service, 1, 100_000));
+        var v2 = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-06 00:30", r => r.Lines[0].WarehouseId = kho02, LineRequest(service, 1, 200_000));
+        var v3 = await CreateVoucherAsync(other, StockDirection.In, "NKH", "2026-10-10 08:00", r => r.WarehouseId = kho02, LineRequest(service, 1, 300_000));
+        var v4 = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-03 08:00", LineRequest(service, 1, 50_000));
         var adminB = CloneAdminClient();
         UseBranch(adminB, branchB);
-        await CreateAsync(adminB, StockDirection.In, "NKH", "2026-10-03 08:00", r => r.WarehouseId = warehouseB, LineRequest(service, 1, 70_000));
-        var v6 = await CreateAsync(_client, StockDirection.In, "NKH", "2026-10-04 08:00", LineRequest(service, 1, 400_000));
+        await CreateVoucherAsync(adminB, StockDirection.In, "NKH", "2026-10-03 08:00", r => r.WarehouseId = warehouseB, LineRequest(service, 1, 70_000));
+        var v6 = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-04 08:00", LineRequest(service, 1, 400_000));
         await SetCancelledAsync(v6.Id);
         var otherId = v3.OwnerUserId;
 
@@ -121,12 +121,12 @@ public class StockVoucherQueryTests : InventoryTestBase
         var warehouseB = await CreateWarehouseAsync(branchB, "KHO-B");
         var adminB = CloneAdminClient();
         UseBranch(adminB, branchB);
-        var foreign = await CreateAsync(adminB, StockDirection.In, "NKH", "2026-10-03 08:00", r => r.WarehouseId = warehouseB, LineRequest(service, 1, 70_000));
+        var foreign = await CreateVoucherAsync(adminB, StockDirection.In, "NKH", "2026-10-03 08:00", r => r.WarehouseId = warehouseB, LineRequest(service, 1, 70_000));
 
         (await _client.GetAsync($"/api/stock-vouchers/{foreign.Id}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         (await _client.GetAsync($"/api/stock-vouchers/{foreign.Id}/activities")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
 
-        var outVoucher = await CreateAsync(_client, StockDirection.Out, "XKH", "2026-10-03 08:00", LineRequest(service, 1, 50_000));
+        var outVoucher = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-03 08:00", LineRequest(service, 1, 50_000));
         var viewer = await CreateClientWithPermissionsAsync("qa_view", null, Permissions.StockIn.View);
         (await viewer.GetAsync("/api/stock-vouchers?type=In")).StatusCode.Should().Be(HttpStatusCode.OK);
         (await viewer.GetAsync("/api/stock-vouchers?type=Out")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
@@ -144,12 +144,12 @@ public class StockVoucherQueryTests : InventoryTestBase
         var khoB = await CreateClientWithPermissionsAsync("qo_b", null,
             Permissions.StockIn.View, Permissions.StockIn.Create, Permissions.StockOut.View, Permissions.StockOut.Create);
 
-        var adminVoucher = await CreateAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(service, 1, 10_000));
-        var aVoucher = await CreateAsync(khoA, StockDirection.In, "NKH", "2026-10-02 09:00", LineRequest(service, 1, 10_000));
-        var bVoucher = await CreateAsync(khoB, StockDirection.Out, "XKH", "2026-10-02 10:00", LineRequest(service, 1, 10_000));
+        var adminVoucher = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00", LineRequest(service, 1, 10_000));
+        var aVoucher = await CreateVoucherAsync(khoA, StockDirection.In, "NKH", "2026-10-02 09:00", LineRequest(service, 1, 10_000));
+        var bVoucher = await CreateVoucherAsync(khoB, StockDirection.Out, "XKH", "2026-10-02 10:00", LineRequest(service, 1, 10_000));
         var adminB = CloneAdminClient();
         UseBranch(adminB, branchB);
-        var foreign = await CreateAsync(adminB, StockDirection.In, "NKH", "2026-10-03 08:00", r => r.WarehouseId = warehouseB, LineRequest(service, 1, 10_000));
+        var foreign = await CreateVoucherAsync(adminB, StockDirection.In, "NKH", "2026-10-03 08:00", r => r.WarehouseId = warehouseB, LineRequest(service, 1, 10_000));
         // An In voucher owned by qo_b, but in branch B: not an owner of the main branch's stock-in list.
         await InDbAsync(async db =>
         {
@@ -182,22 +182,6 @@ public class StockVoucherQueryTests : InventoryTestBase
             (StockVoucherActivityAction.Updated, "Test qo_a", "Cập nhật phiếu"),
             (StockVoucherActivityAction.Created, AdminName, "Tạo phiếu"));
     }
-
-    private Task<StockVoucherDto> CreateAsync(HttpClient client, StockDirection type, string reasonCode, string at,
-        params UpsertStockVoucherLineRequest[] lines) => CreateAsync(client, type, reasonCode, at, null, lines);
-
-    private async Task<StockVoucherDto> CreateAsync(HttpClient client, StockDirection type, string reasonCode, string at,
-        Action<UpsertStockVoucherRequest>? configure, params UpsertStockVoucherLineRequest[] lines)
-    {
-        var request = VoucherRequest(type, await ReasonIdAsync(reasonCode), at, lines);
-        configure?.Invoke(request);
-        var (status, voucher, error) = await PostVoucherAsync(client, request);
-        status.Should().Be(HttpStatusCode.OK, error?.Message);
-        return voucher!;
-    }
-
-    private static async Task<StockVoucherDto> GetAsync(HttpClient client, Guid id) =>
-        await ReadDataAsync<StockVoucherDto>(await client.GetAsync($"/api/stock-vouchers/{id}"));
 
     private static async Task<StockVoucherListResult> ListAsync(HttpClient client, string query) =>
         await ReadDataAsync<StockVoucherListResult>(await client.GetAsync($"/api/stock-vouchers?{query}"));

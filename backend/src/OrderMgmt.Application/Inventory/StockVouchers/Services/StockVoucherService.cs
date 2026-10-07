@@ -268,8 +268,33 @@ public class StockVoucherService : IStockVoucherService
         return await GetAsync(id, ct);
     }
 
-    public Task<StockVoucherDto> UpdateAsync(Guid id, UpsertStockVoucherRequest request, CancellationToken ct = default) =>
-        throw new NotImplementedException();
+    public async Task<StockVoucherDto> UpdateAsync(Guid id, UpsertStockVoucherRequest request, CancellationToken ct = default)
+    {
+        var voucherAt = VnTime.ToUtc(request.VoucherAt);
+
+        await _transaction.RunAsync(async c =>
+        {
+            var voucher = await LoadForWriteAsync(id, StockVoucherPermissions.Edit, request.Version, cancelled: false, c);
+            await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt, voucherAt }, c);
+            await ValidateAsync(request, voucher.BranchId, voucher, c);
+
+            var productIds = voucher.Lines.Select(l => l.ProductId)
+                .Concat(request.Lines.Select(l => l.ProductId)).Distinct().ToList();
+            await _posting.AcquireLocksAsync(voucher.BranchId, productIds, c);
+            var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
+
+            await ApplyRequestAsync(voucher, request, voucherAt, settings, c);
+            await _db.SaveChangesAsync(c);
+
+            await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
+            if (voucher.Type == StockDirection.In)
+                await RecomputeCostPricesAsync(productIds, c);
+            AddActivity(voucher, StockVoucherActivityAction.Updated, "Cập nhật phiếu");
+            await _db.SaveChangesAsync(c);
+        }, ct);
+
+        return await GetAsync(id, ct);
+    }
 
     public Task<StockVoucherDto> CancelAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default) =>
         throw new NotImplementedException();
@@ -280,7 +305,34 @@ public class StockVoucherService : IStockVoucherService
     public Task DeleteAsync(Guid id, StockVoucherActionRequest request, CancellationToken ct = default) =>
         throw new NotImplementedException();
 
-    // ---- Save rules 2 and 3 -------------------------------------------------------------------
+    // ---- Save rules 1 to 3 -------------------------------------------------------------------
+
+    /// Save rule 1 for update, cancel, restore and delete. `cancelled` is the status the operation requires.
+    /// The header is always marked modified so the xmin check runs even when only lines change (D29).
+    private async Task<StockVoucher> LoadForWriteAsync(Guid id, Func<StockDirection, string> permission, uint? version,
+        bool cancelled, CancellationToken ct)
+    {
+        var voucher = await _db.StockVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.Id == id, ct)
+            ?? throw new NotFoundException(nameof(StockVoucher), id);
+
+        EnsurePermission(permission(voucher.Type));
+        await EnsureWorkingBranchAsync(voucher.BranchId, ct);
+        if (voucher.OwnerUserId != _currentUser.UserId
+            && !_currentUser.HasPermission(StockVoucherPermissions.EditAll(voucher.Type)))
+            throw new ForbiddenException("Bạn chỉ được thao tác trên phiếu do mình tạo.");
+        if (cancelled && voucher.Status != StockVoucherStatus.Cancelled)
+            throw new ConflictException("Phiếu chưa bị hủy.");
+        if (!cancelled && voucher.Status == StockVoucherStatus.Cancelled)
+            throw new ConflictException("Phiếu đã hủy, không thể thay đổi.");
+        if (version is null)
+            throw new ValidationDomainException(
+                new Dictionary<string, string[]> { ["version"] = new[] { "Thiếu phiên bản dữ liệu của phiếu." } }, null);
+
+        _db.Entry(voucher).Property(v => v.Version).OriginalValue = version.Value;
+        voucher.UpdatedAt = _clock.UtcNow;
+        voucher.UpdatedBy = _currentUser.UserId;
+        return voucher;
+    }
 
     private async Task EnsureNotLockedAsync(Guid branchId, IEnumerable<DateTimeOffset> instants, CancellationToken ct)
     {
@@ -295,6 +347,9 @@ public class StockVoucherService : IStockVoucherService
     {
         var errors = new Dictionary<string, string[]>();
         void Add(string key, string message) => errors.TryAdd(key, new[] { message });
+
+        if (existing is not null && existing.Type != request.Type)
+            Add("type", "Không được đổi loại phiếu.");
 
         var reason = await _db.StockReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == request.ReasonId, ct);
         if (reason is null)

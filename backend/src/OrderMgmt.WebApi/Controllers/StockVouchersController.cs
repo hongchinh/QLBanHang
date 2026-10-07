@@ -55,4 +55,12 @@ public class StockVouchersController : ApiControllerBase
         await _upsertValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.CreateAsync(request, ct));
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Update(
+        Guid id, [FromBody] UpsertStockVoucherRequest request, CancellationToken ct)
+    {
+        await _upsertValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.UpdateAsync(id, request, ct));
+    }
 }

@@ -27,6 +27,8 @@ using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Notifications.Services;
 using OrderMgmt.Application.Inventory.Costing;
 using OrderMgmt.Application.Inventory.Ledger;
+using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
+using OrderMgmt.Application.Inventory.OpeningStocks.Services;
 using OrderMgmt.Application.Inventory.PaymentMethods.Interfaces;
 using OrderMgmt.Application.Inventory.Posting;
 using OrderMgmt.Application.Inventory.Settings.Interfaces;
@@ -96,6 +98,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryCostingService, InventoryCostingService>();
         services.AddScoped<IInventoryPostingService, InventoryPostingService>();
         services.AddScoped<IStockVoucherService, StockVoucherService>();
+        services.AddScoped<IOpeningStockService, OpeningStockService>();
 
         return services;
     }

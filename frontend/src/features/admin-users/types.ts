@@ -7,6 +7,8 @@ export interface AdminUserListItem {
   roleCode: string | null;
   isActive: boolean;
   lastLoginAt: string | null;
+  defaultBranchId: string;
+  defaultBranchName: string | null;
 }
 
 export interface AdminUserListParams {
@@ -26,6 +28,8 @@ export interface AdminUserDetail {
   lastLoginAt: string | null;
   createdAt: string;
   updatedAt: string | null;
+  defaultBranchId: string;
+  defaultBranchName: string | null;
 }
 
 export interface CreateUserPayload {
@@ -36,6 +40,8 @@ export interface CreateUserPayload {
   roleCode: string;
   password: string;
   status: UserStatus;
+  // Omitted → the backend assigns the main branch.
+  defaultBranchId?: string;
 }
 
 export interface UpdateUserPayload {
@@ -44,6 +50,7 @@ export interface UpdateUserPayload {
   phoneNumber?: string | null;
   roleCode: string;
   status: UserStatus;
+  defaultBranchId?: string;
 }
 
 export interface ResetPasswordPayload {

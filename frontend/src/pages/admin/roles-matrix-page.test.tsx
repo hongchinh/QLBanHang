@@ -222,6 +222,38 @@ describe('RolesMatrixPage', () => {
     await waitFor(() => expect(updatePermissionsMock).toHaveBeenCalledTimes(1));
   });
 
+  it('renders the Kho module and toggles stock_in.view', async () => {
+    listPermissionsMock.mockResolvedValue([
+      ...PERMISSIONS,
+      { code: 'stock_in.view', name: 'Xem phiếu nhập kho', module: 'inventory' },
+    ]);
+    renderPage();
+    await waitForMatrix();
+
+    expect(screen.getByText('Kho')).toBeInTheDocument();
+    const box = screen.getByRole('checkbox', { name: /SALES stock_in\.view/i }) as HTMLInputElement;
+    expect(box.checked).toBe(false);
+
+    fireEvent.click(box);
+
+    expect(box.checked).toBe(true);
+    await waitFor(() =>
+      expect(screen.getByText(/1 thay đổi chưa lưu/i)).toBeInTheDocument(),
+    );
+  });
+
+  it('renders an unknown module at the end with its raw name', async () => {
+    listPermissionsMock.mockResolvedValue([
+      ...PERMISSIONS,
+      { code: 'cash.view', name: 'Xem phiếu thu chi', module: 'cash' },
+    ]);
+    renderPage();
+    await waitForMatrix();
+
+    expect(screen.getByText('cash')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /SALES cash\.view/i })).toBeInTheDocument();
+  });
+
   it('opens create dialog and submits POST', async () => {
     createMock.mockResolvedValue({
       ...DETAILS['r-custom'],

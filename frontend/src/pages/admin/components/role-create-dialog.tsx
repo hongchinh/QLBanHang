@@ -22,6 +22,7 @@ const MODULE_LABEL: Record<PermissionModule, string> = {
   system: 'Hệ thống',
   catalog: 'Danh mục',
   sales: 'Bán hàng',
+  inventory: 'Kho',
   report: 'Báo cáo',
 };
 

@@ -68,3 +68,61 @@ describe('canAccessRoute', () => {
     )).toBe(true);
   });
 });
+
+describe('inventory routes', () => {
+  function expectRule(path: string, permission: string) {
+    expect(canAccessRoute(path, [], [])).toBe(false);
+    expect(canAccessRoute(path, SALES_PERMS, ['SALES'])).toBe(false);
+    expect(canAccessRoute(path, [permission], [])).toBe(true);
+  }
+
+  it('/stock-in và /stock-in/:id cần stock_in.view', () => {
+    expectRule('/stock-in', 'stock_in.view');
+    expectRule('/stock-in/abc-123', 'stock_in.view');
+    expectRule('/stock-in/new', 'stock_in.view');
+    expect(canAccessRoute('/stock-in', ['stock_out.view'], [])).toBe(false);
+  });
+
+  it('/stock-out và /stock-out/:id cần stock_out.view', () => {
+    expectRule('/stock-out', 'stock_out.view');
+    expectRule('/stock-out/abc-123', 'stock_out.view');
+    expect(canAccessRoute('/stock-out', ['stock_in.view'], [])).toBe(false);
+  });
+
+  it('/inventory/opening-stock cần inventory.opening_stock', () => {
+    expectRule('/inventory/opening-stock', 'inventory.opening_stock');
+  });
+
+  it('/inventory/stock-on-hand và /inventory/stock-card cần reports.inventory', () => {
+    expectRule('/inventory/stock-on-hand', 'reports.inventory');
+    expectRule('/inventory/stock-card', 'reports.inventory');
+  });
+
+  it('/suppliers và /suppliers/:id cần suppliers.view', () => {
+    expectRule('/suppliers', 'suppliers.view');
+    expectRule('/suppliers/abc-123', 'suppliers.view');
+  });
+
+  it('/warehouses, /stock-reasons, /payment-methods cần inventory.catalogs.manage', () => {
+    expectRule('/warehouses', 'inventory.catalogs.manage');
+    expectRule('/stock-reasons', 'inventory.catalogs.manage');
+    expectRule('/payment-methods', 'inventory.catalogs.manage');
+  });
+
+  it('/settings/branches cần branches.manage', () => {
+    expectRule('/settings/branches', 'branches.manage');
+  });
+
+  it('/settings/period-lock cần period_lock.manage', () => {
+    expectRule('/settings/period-lock', 'period_lock.manage');
+  });
+
+  it('/settings/inventory và /settings/numbering cần inventory.settings', () => {
+    expectRule('/settings/inventory', 'inventory.settings');
+    expectRule('/settings/numbering', 'inventory.settings');
+  });
+
+  it('/settings/recalc-cost cần inventory.recalc_cost', () => {
+    expectRule('/settings/recalc-cost', 'inventory.recalc_cost');
+  });
+});

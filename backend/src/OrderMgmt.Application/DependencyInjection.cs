@@ -97,6 +97,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryLedgerService, InventoryLedgerService>();
         services.AddScoped<IInventoryCostingService, InventoryCostingService>();
         services.AddScoped<IInventoryPostingService, InventoryPostingService>();
+        services.AddScoped<IInventoryRecalcService, InventoryRecalcService>();
         services.AddScoped<IStockVoucherService, StockVoucherService>();
         services.AddScoped<IOpeningStockService, OpeningStockService>();
 

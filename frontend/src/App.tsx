@@ -35,6 +35,7 @@ import { NumberingSettingsPage } from '@/pages/settings/numbering-settings-page'
 import { RecalcCostPage } from '@/pages/settings/recalc-cost-page';
 import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
 import { StockOnHandPage } from '@/pages/inventory/stock-on-hand-page';
+import { StockCardPage } from '@/pages/inventory/stock-card-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -305,6 +306,14 @@ export function App() {
                   element={
                     <ProtectedRoute permission="reports.inventory">
                       <StockOnHandPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="inventory/stock-card"
+                  element={
+                    <ProtectedRoute permission="reports.inventory">
+                      <StockCardPage />
                     </ProtectedRoute>
                   }
                 />

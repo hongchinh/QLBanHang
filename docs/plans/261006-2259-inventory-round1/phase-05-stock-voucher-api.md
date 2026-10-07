@@ -1,6 +1,6 @@
 # Phase 05 — Stock voucher API
 
-**Status:** [-] in progress
+**Status:** [x] complete
 **Complexity:** XL
 
 ## Objective

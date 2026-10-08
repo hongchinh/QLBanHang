@@ -48,6 +48,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<CreditLimit> CreditLimits => Set<CreditLimit>();
     public DbSet<DebtEntry> DebtEntries => Set<DebtEntry>();
     public DbSet<DebtSettlement> DebtSettlements => Set<DebtSettlement>();
+    public DbSet<OpeningDebt> OpeningDebts => Set<OpeningDebt>();
     public DbSet<DocumentNumbering> DocumentNumberings => Set<DocumentNumbering>();
     public DbSet<StockVoucher> StockVouchers => Set<StockVoucher>();
     public DbSet<StockVoucherLine> StockVoucherLines => Set<StockVoucherLine>();

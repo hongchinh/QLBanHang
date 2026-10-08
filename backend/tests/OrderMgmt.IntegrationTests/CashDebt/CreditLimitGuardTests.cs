@@ -22,6 +22,8 @@ public class CreditLimitGuardTests : CashDebtTestBase
 
     public CreditLimitGuardTests(PostgresFixture pg) : base(pg) { }
 
+    protected override bool PostsSyntheticOpeningEntries => true;
+
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();

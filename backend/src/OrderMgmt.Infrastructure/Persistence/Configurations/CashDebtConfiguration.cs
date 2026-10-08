@@ -110,3 +110,21 @@ public class DebtSettlementConfiguration : IEntityTypeConfiguration<DebtSettleme
         b.HasOne<DebtEntry>().WithMany().HasForeignKey(x => x.DecreaseEntryId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public class OpeningDebtConfiguration : IEntityTypeConfiguration<OpeningDebt>
+{
+    public void Configure(EntityTypeBuilder<OpeningDebt> b)
+    {
+        b.ToTable("opening_debts");
+        b.HasKey(x => x.Id);
+        b.Property(x => x.DocNo).IsRequired().HasMaxLength(50);
+        b.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+        b.Property(x => x.Note).HasMaxLength(500);
+
+        b.HasIndex(x => new { x.BranchId, x.PartnerId });
+        b.HasQueryFilter(x => !x.IsDeleted);
+
+        b.HasOne(x => x.Partner).WithMany().HasForeignKey(x => x.PartnerId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<OrderMgmt.Domain.Entities.Organization.Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

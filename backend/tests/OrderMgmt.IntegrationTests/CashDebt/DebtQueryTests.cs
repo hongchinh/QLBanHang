@@ -21,6 +21,8 @@ public class DebtQueryTests : CashDebtTestBase
 
     public DebtQueryTests(PostgresFixture pg) : base(pg) { }
 
+    protected override bool PostsSyntheticOpeningEntries => true;
+
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();

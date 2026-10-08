@@ -62,3 +62,10 @@ public enum SettlementOrigin
     Offset = 3,
     Auto = 4,
 }
+
+/// An opening debt row: a legacy document still owed (Debt) or an advance already paid (Prepayment).
+public enum OpeningDebtKind
+{
+    Debt = 1,
+    Prepayment = 2,
+}

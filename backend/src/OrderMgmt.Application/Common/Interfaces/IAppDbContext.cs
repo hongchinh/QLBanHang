@@ -33,6 +33,7 @@ public interface IAppDbContext
     DbSet<CreditLimit> CreditLimits { get; }
     DbSet<DebtEntry> DebtEntries { get; }
     DbSet<DebtSettlement> DebtSettlements { get; }
+    DbSet<OpeningDebt> OpeningDebts { get; }
     DbSet<DocumentNumbering> DocumentNumberings { get; }
     DbSet<StockVoucher> StockVouchers { get; }
     DbSet<StockVoucherLine> StockVoucherLines { get; }

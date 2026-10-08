@@ -91,5 +91,45 @@ public abstract class CashDebtTestBase : InventoryTestBase
             entries.Values.GroupBy(e => (e.SourceType, e.SourceId, e.Side))
                 .Where(g => g.Count() > 1).Select(g => g.Key)
                 .Should().BeEmpty("a source has at most one entry per side");
+
+            // 5. Every non-deleted opening debt has exactly one entry matching it, posted at the branch opening date.
+            var openingDebts = await db.OpeningDebts.AsNoTracking().ToListAsync();
+            var openingDates = await db.Branches.IgnoreQueryFilters().AsNoTracking()
+                .ToDictionaryAsync(b => b.Id, b => b.OpeningDate);
+            foreach (var row in openingDebts)
+            {
+                var direction = row.Kind == OpeningDebtKind.Debt ? DebtDirection.Increase : DebtDirection.Decrease;
+                var openingDate = openingDates[row.BranchId];
+                openingDate.Should().NotBeNull($"branch of opening debt {row.DocNo} has an opening date");
+                entries.Values.Where(e => e.SourceType == DebtSourceType.Opening && e.SourceId == row.Id)
+                    .Should().ContainSingle($"opening debt {row.DocNo} has one entry")
+                    .Which.Should().BeEquivalentTo(new
+                    {
+                        row.BranchId,
+                        row.PartnerId,
+                        row.Side,
+                        Direction = direction,
+                        row.Amount,
+                        PostedAt = VnTime.StartOfDay(openingDate!.Value),
+                        row.DocDate,
+                        DueDate = DebtDates.EntryDueDate(direction, row.DocDate, row.DueDate),
+                        row.OwnerUserId,
+                        DocCode = row.DocNo,
+                        Description = row.Note ?? "Nợ đầu kỳ",
+                    }, $"entry of opening debt {row.DocNo}");
+            }
+
+            // 6. Every Opening entry belongs to a non-deleted opening debt.
+            if (!PostsSyntheticOpeningEntries)
+            {
+                var rowIds = openingDebts.Select(o => o.Id).ToHashSet();
+                entries.Values.Where(e => e.SourceType == DebtSourceType.Opening && !rowIds.Contains(e.SourceId))
+                    .Select(e => e.DocCode)
+                    .Should().BeEmpty("every Opening entry belongs to a non-deleted opening debt");
+            }
         });
+
+    /// Ledger-level tests post Opening entries for fresh Guids without an opening debt row (Task 4.3).
+    /// They return true, which skips only invariant 6 (every Opening entry has a row).
+    protected virtual bool PostsSyntheticOpeningEntries => false;
 }

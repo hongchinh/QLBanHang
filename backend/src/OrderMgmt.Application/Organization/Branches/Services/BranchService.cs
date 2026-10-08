@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
@@ -22,9 +23,11 @@ public class BranchService : IBranchService
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryLock _inventoryLock;
     private readonly IOpeningStockService _openingStock;
+    private readonly IOpeningDebtService _openingDebt;
 
     public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
-        ITransactionRunner transaction, IInventoryLock inventoryLock, IOpeningStockService openingStock)
+        ITransactionRunner transaction, IInventoryLock inventoryLock, IOpeningStockService openingStock,
+        IOpeningDebtService openingDebt)
     {
         _db = db;
         _clock = clock;
@@ -33,6 +36,7 @@ public class BranchService : IBranchService
         _transaction = transaction;
         _inventoryLock = inventoryLock;
         _openingStock = openingStock;
+        _openingDebt = openingDebt;
     }
 
     public async Task<MyBranchesDto> GetMyBranchesAsync(CancellationToken ct = default)
@@ -156,11 +160,17 @@ public class BranchService : IBranchService
             var hasOpeningStock = await _db.OpeningStocks.AnyAsync(o => o.BranchId == id, c);
             if (newDate is null && hasOpeningStock)
                 throw new ConflictException("OPENING_DATA_EXISTS", "Chi nhánh đã có tồn đầu kỳ, không xóa được ngày đầu kỳ.");
+            var hasOpeningDebts = await _db.OpeningDebts.AnyAsync(o => o.BranchId == id, c);
+            if (newDate is null && hasOpeningDebts)
+                throw new ConflictException("OPENING_DATA_EXISTS", "Chi nhánh đã có công nợ đầu kỳ, không xóa được ngày đầu kỳ.");
 
             branch.OpeningDate = newDate;
             await _db.SaveChangesAsync(c);
             if (newDate is { } date && hasOpeningStock)
                 await _openingStock.RepostBranchAsync(id, date, c);
+            // Opening debt entries follow the new date, and the ledger moves their settlements' EffectiveAt (P8).
+            if (newDate is not null && hasOpeningDebts)
+                await _openingDebt.RepostBranchAsync(id, c);
             return ToDto(branch);
         }, ct);
     }

@@ -10,6 +10,7 @@ using OrderMgmt.Application.CashDebt.OpeningDebts.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -330,4 +331,25 @@ public abstract class CashDebtTestBase : InventoryTestBase
         _ledgerOnlyOpeningSources.Add(sourceId);
         return sourceId;
     }
+
+    /// Waits until `task` has finished or `count` backends of this test's database wait on a lock. Polled through
+    /// new connections: pg_stat_activity stays frozen inside a transaction.
+    protected async Task WaitForBlockedAsync(Task task, int count)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (!task.IsCompleted && await InDbAsync(db => db.Database.SqlQuery<int>(
+                   $"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE datname = current_database() AND cardinality(pg_blocking_pids(pid)) > 0")
+                   .SingleAsync()) < count)
+        {
+            if (DateTime.UtcNow > deadline)
+                throw new TimeoutException($"Expected {count} request(s) waiting on a lock.");
+            await Task.Delay(20);
+        }
+    }
+
+    /// Takes the branch's next `docType` number in the transaction that holds a race: a create of that type then
+    /// waits on the counter row, the last lock of its save (P14).
+    protected static Func<IServiceProvider, Task> HoldNextCode(DocumentType docType, Guid branchId) => sp =>
+        sp.GetRequiredService<IDocumentCodeAllocator>().NextAsync(docType, branchId, Vn("2026-10-05 09:00"),
+            peek: false, (_, _) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>()));
 }

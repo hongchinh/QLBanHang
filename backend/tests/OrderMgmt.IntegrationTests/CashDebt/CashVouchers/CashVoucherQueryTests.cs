@@ -8,7 +8,6 @@ using OrderMgmt.Application.CashDebt.CashReasons.Models;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Funds.Models;
 using OrderMgmt.Application.Common.Models;
-using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.Settings.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Constants;
@@ -271,7 +270,7 @@ public class CashVoucherQueryTests : CashDebtTestBase
         // A create takes its number (the counter row) after its locks and rules: while it waits there, the reason
         // edit waits for it and then sees the reason in use.
         var edited = await CreateReasonAsync(CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None);
-        var (create, edit) = await RaceAsync(HoldNextReceiptCode(branchId),
+        var (create, edit) = await RaceAsync(HoldNextCode(DocumentType.Receipt, branchId),
             () => PostCashAsync(client, CashRequest(CashVoucherType.Receipt, edited, cashFund, "2026-10-05 09:00", null, 100m)),
             () => PutReasonAsync(edited, CashVoucherType.Receipt, PartnerType.Any, DebtEffect.ReceivableDecrease));
         create.Status.Should().Be(HttpStatusCode.OK, create.Error?.Message);
@@ -279,7 +278,7 @@ public class CashVoucherQueryTests : CashDebtTestBase
         edit.Error!.Details!.Should().ContainKey("debtEffect");
 
         var deleted = await CreateReasonAsync(CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None);
-        var (createOnDeleted, delete) = await RaceAsync(HoldNextReceiptCode(branchId),
+        var (createOnDeleted, delete) = await RaceAsync(HoldNextCode(DocumentType.Receipt, branchId),
             () => PostCashAsync(client, CashRequest(CashVoucherType.Receipt, deleted, cashFund, "2026-10-05 10:00", null, 100m)),
             () => _client.DeleteAsync($"/api/cash-reasons/{deleted}"));
         createOnDeleted.Status.Should().Be(HttpStatusCode.OK, createOnDeleted.Error?.Message);
@@ -423,26 +422,6 @@ public class CashVoucherQueryTests : CashDebtTestBase
         }
         return (await firstTask, await secondTask);
     }
-
-    /// Waits until `task` has finished or `count` backends of this test's database wait on a lock. Polled through
-    /// new connections: pg_stat_activity stays frozen inside a transaction.
-    private async Task WaitForBlockedAsync(Task task, int count)
-    {
-        var deadline = DateTime.UtcNow.AddSeconds(15);
-        while (!task.IsCompleted && await InDbAsync(db => db.Database.SqlQuery<int>(
-                   $"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE datname = current_database() AND cardinality(pg_blocking_pids(pid)) > 0")
-                   .SingleAsync()) < count)
-        {
-            if (DateTime.UtcNow > deadline)
-                throw new TimeoutException($"Expected {count} request(s) waiting on a lock.");
-            await Task.Delay(20);
-        }
-    }
-
-    /// Takes the branch's next receipt number in the race's transaction: a create then waits on the counter row.
-    private static Func<IServiceProvider, Task> HoldNextReceiptCode(Guid branchId) => sp =>
-        sp.GetRequiredService<IDocumentCodeAllocator>().NextAsync(DocumentType.Receipt, branchId, Vn("2026-10-05 09:00"),
-            peek: false, (_, _) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>()));
 
     /// Locks a row in the race's transaction. FOR NO KEY UPDATE: an UPDATE of the row waits, a foreign-key check
     /// does not.

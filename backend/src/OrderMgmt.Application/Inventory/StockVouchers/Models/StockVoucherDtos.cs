@@ -18,9 +18,9 @@ public class UpsertStockVoucherRequest
     public string? Note { get; set; }
     public decimal Freight { get; set; }
     public decimal OrderDiscount { get; set; }
-    public decimal? PaidAmount { get; set; }            // null → Total
-    public DateOnly? DueDate { get; set; }
-    public Guid? FundId { get; set; }
+    public decimal? PaidAmount { get; set; }            // null → Total when the payment method has a fund, else 0 (P9)
+    public DateOnly? DueDate { get; set; }              // null → VN date + partner CreditDays on Increase reasons (P27)
+    public Guid? FundId { get; set; }                   // null → the branch's default fund of the method's kind
     public uint? Version { get; set; }                  // required on update
     public bool AcknowledgeNegativeStock { get; set; }
     public bool ConfirmRemoveSettlements { get; set; }

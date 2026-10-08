@@ -358,6 +358,27 @@ public abstract class InventoryTestBase : QuotationTestBase
             return partner.Id;
         });
 
+    /// Inserts a bank fund straight into the DB (default: the main branch). Like FundService, the first bank fund of
+    /// the branch becomes its default, so a stock voucher paid by CK finds it (P9, P18).
+    protected Task<Guid> CreateBankFundAsync(string code = "NH01", Guid? branchId = null, decimal opening = 0) =>
+        InDbAsync(async db =>
+        {
+            var branch = branchId ?? MainBranchId;
+            var fund = new OrderMgmt.Domain.Entities.CashDebt.Fund
+            {
+                BranchId = branch,
+                Code = code,
+                Name = $"Ngân hàng {code}",
+                Kind = FundKind.Bank,
+                IsDefault = !await db.Funds.AnyAsync(f => f.BranchId == branch && f.Kind == FundKind.Bank),
+                OpeningAmount = opening,
+                IsActive = true,
+            };
+            db.Funds.Add(fund);
+            await db.SaveChangesAsync();
+            return fund.Id;
+        });
+
     protected static async Task<T> ReadDataAsync<T>(HttpResponseMessage response)
     {
         var body = await response.Content.ReadAsStringAsync();

@@ -63,7 +63,13 @@ public class StockVoucherQueryTests : InventoryTestBase
         var warehouseB = await CreateWarehouseAsync(branchB, "KHO-B");
         var other = await CreateClientWithPermissionsAsync("ql_other", null, Permissions.StockIn.View, Permissions.StockIn.Create);
 
-        var v1 = await CreateVoucherAsync(_client, StockDirection.In, "NMH", "2026-10-02 00:10", r => r.PartnerId = supplier, LineRequest(service, 1, 100_000));
+        // Only v1 is paid (TM → the whole total); the others have no payment method, so they pay nothing (P9).
+        var tm = await InDbAsync(db => db.PaymentMethods.Where(m => m.Code == "TM").Select(m => m.Id).SingleAsync());
+        var v1 = await CreateVoucherAsync(_client, StockDirection.In, "NMH", "2026-10-02 00:10", r =>
+        {
+            r.PartnerId = supplier;
+            r.PaymentMethodId = tm;
+        }, LineRequest(service, 1, 100_000));
         var v2 = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-06 00:30", r => r.Lines[0].WarehouseId = kho02, LineRequest(service, 1, 200_000));
         var v3 = await CreateVoucherAsync(other, StockDirection.In, "NKH", "2026-10-10 08:00", r => r.WarehouseId = kho02, LineRequest(service, 1, 300_000));
         var v4 = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-03 08:00", LineRequest(service, 1, 50_000));
@@ -78,7 +84,7 @@ public class StockVoucherQueryTests : InventoryTestBase
         var all = await ListAsync(_client, "type=In");
         all.Items.Select(i => i.Code).Should().Equal(v3.Code, v2.Code, v6.Code, v1.Code);
         all.TotalItems.Should().Be(4);
-        all.Aggregates.Should().BeEquivalentTo(new { GoodsAmount = 600_000m, Total = 600_000m, PaidAmount = 600_000m, DiscountTotal = 0m });
+        all.Aggregates.Should().BeEquivalentTo(new { GoodsAmount = 600_000m, Total = 600_000m, PaidAmount = 100_000m, DiscountTotal = 0m });
         all.Items.Single(i => i.Id == v1.Id).Should().BeEquivalentTo(new
         {
             WarehouseName = "Kho chính", PartnerName = "Đối tượng NCCQ1", ReasonName = "Nhập mua hàng",

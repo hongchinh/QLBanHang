@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Catalog.Customers.Interfaces;
 using OrderMgmt.Application.Catalog.Customers.Models;
+using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Ledger;
@@ -354,7 +355,7 @@ public class StockVoucherService : IStockVoucherService
 
         var id = await _transaction.RunAsync(async c =>
         {
-            await ValidateAsync(request, branchId, null, c);
+            var terms = await ValidateAsync(request, branchId, null, c);
 
             var productIds = request.Lines.Select(l => l.ProductId).Distinct().ToList();
             await _posting.AcquireLocksAsync(branchId, productIds, c);
@@ -371,7 +372,7 @@ public class StockVoucherService : IStockVoucherService
                 OwnerUserId = _currentUser.UserId ?? throw new UnauthorizedAccessException(),
             };
             _db.StockVouchers.Add(voucher);
-            await ApplyRequestAsync(voucher, request, voucherAt, settings, c);
+            await ApplyRequestAsync(voucher, request, voucherAt, settings, terms, c);
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
@@ -392,7 +393,7 @@ public class StockVoucherService : IStockVoucherService
         await _transaction.RunAsync(async c =>
         {
             var voucher = await LoadForWriteAsync(id, StockVoucherPermissions.Edit, request.Version, cancelled: false, c);
-            await ValidateAsync(request, voucher.BranchId, voucher, c);
+            var terms = await ValidateAsync(request, voucher.BranchId, voucher, c);
 
             var productIds = voucher.Lines.Select(l => l.ProductId)
                 .Concat(request.Lines.Select(l => l.ProductId)).Distinct().ToList();
@@ -401,7 +402,7 @@ public class StockVoucherService : IStockVoucherService
             await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt, voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
 
-            await ApplyRequestAsync(voucher, request, voucherAt, settings, c);
+            await ApplyRequestAsync(voucher, request, voucherAt, settings, terms, c);
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
@@ -562,8 +563,13 @@ public class StockVoucherService : IStockVoucherService
     private static bool IsLocked(DateOnly? lockedUntil, DateTimeOffset at) =>
         lockedUntil is { } locked && VnTime.ToVnDate(at) <= locked;
 
+    /// The paid amount's fund and the due date resolved by ValidateAsync (P9, P27). `FundId` is used only when the
+    /// paid amount ends up > 0; `MethodFundKind` drives the paid amount default.
+    private sealed record PaymentTerms(FundKind MethodFundKind, Guid? FundId, DateOnly? DueDate);
+
     /// Reference and amount rules (save rule 3), collected into one 400. `existing` is null on create.
-    private async Task ValidateAsync(UpsertStockVoucherRequest request, Guid branchId, StockVoucher? existing, CancellationToken ct)
+    private async Task<PaymentTerms> ValidateAsync(UpsertStockVoucherRequest request, Guid branchId, StockVoucher? existing,
+        CancellationToken ct)
     {
         var errors = new Dictionary<string, string[]>();
         void Add(string key, string message) => errors.TryAdd(key, new[] { message });
@@ -587,24 +593,8 @@ public class StockVoucherService : IStockVoucherService
             else if (partner.Status != CustomerStatus.Active && existing?.PartnerId != request.PartnerId)
                 Add("partnerId", "Đối tượng đã ngừng hoạt động.");
         }
-        switch (reason?.PartnerType)
-        {
-            case PartnerType.None when request.PartnerId.HasValue:
-                Add("partnerId", "Lý do này không dùng đối tượng.");
-                break;
-            case PartnerType.Customer when request.PartnerId is null:
-                Add("partnerId", "Lý do này yêu cầu chọn khách hàng.");
-                break;
-            case PartnerType.Customer when partner is { IsCustomer: false }:
-                Add("partnerId", "Đối tượng không phải khách hàng.");
-                break;
-            case PartnerType.Supplier when request.PartnerId is null:
-                Add("partnerId", "Lý do này yêu cầu chọn nhà cung cấp.");
-                break;
-            case PartnerType.Supplier when partner is { IsSupplier: false }:
-                Add("partnerId", "Đối tượng không phải nhà cung cấp.");
-                break;
-        }
+        if (reason is not null)
+            ValidatePartner(reason, request.PartnerId, partner, Add);
 
         var warehouseIds = request.Lines.Select(l => l.WarehouseId ?? request.WarehouseId)
             .Append(request.WarehouseId).Distinct().ToList();
@@ -620,9 +610,13 @@ public class StockVoucherService : IStockVoucherService
         if (WarehouseError(request.WarehouseId, existing is null || existing.WarehouseId != request.WarehouseId) is { } headerError)
             Add("warehouseId", headerError);
 
-        if (request.PaymentMethodId.HasValue
-            && !await _db.PaymentMethods.AnyAsync(m => m.Id == request.PaymentMethodId.Value, ct))
-            Add("paymentMethodId", "Phương thức thanh toán không tồn tại.");
+        PaymentMethod? method = null;
+        if (request.PaymentMethodId is { } methodId)
+        {
+            method = await _db.PaymentMethods.AsNoTracking().FirstOrDefaultAsync(m => m.Id == methodId, ct);
+            if (method is null)
+                Add("paymentMethodId", "Phương thức thanh toán không tồn tại.");
+        }
 
         if (request.Lines.Count == 0)
             Add("lines", "Phiếu phải có ít nhất 1 dòng hàng.");
@@ -726,16 +720,99 @@ public class StockVoucherService : IStockVoucherService
             Add("paidAmount", "Số tiền thanh toán không được âm.");
 
         // Voucher totals share the numeric(18,2) limit of the line amounts.
+        decimal? total = null;
         if (errors.Count == 0)
         {
             var totals = StockVoucherCalculator.Compute(
                 new StockHeaderInput(request.Type, request.Freight, request.OrderDiscount, false), lineInputs).Totals;
             if (totals.GoodsAmount >= MaxMoney || totals.Total >= MaxMoney)
                 Add("lines", "Tổng tiền phiếu quá lớn.");
+            // Only its sign matters here, and the NetExcludesVat setting (read after the locks) does not change it.
+            total = totals.Total;
+        }
+
+        // P9: the paid amount defaults to the total when the method has a fund, else 0. While other rules fail the
+        // total is unknown, so a payment is assumed and the fund rules are still reported.
+        var methodFundKind = method?.FundKind ?? FundKind.None;
+        var pays = request.PaidAmount is { } paid
+            ? paid > 0
+            : methodFundKind != FundKind.None && total is null or > 0;
+        Guid? fundId = null;
+        if (pays)
+        {
+            if (methodFundKind == FundKind.None)
+                Add("paymentMethodId", "Số tiền thanh toán > 0 cần HTTT có quỹ.");
+            else
+                fundId = await ResolveFundAsync(request.FundId, methodFundKind, branchId, existing, Add, ct);
         }
 
         if (errors.Count > 0)
             throw new ValidationDomainException(errors, null);
+
+        // P27: a debt-increasing sale or purchase is due CreditDays after its VN date unless the request says otherwise.
+        var dueDate = request.DueDate;
+        if (dueDate is null && reason!.DebtEffect is DebtEffect.ReceivableIncrease or DebtEffect.PayableIncrease)
+            dueDate = DebtDates.DefaultDueDate(VnTime.ToVnDate(voucherAt), partner?.CreditDays);
+        return new PaymentTerms(methodFundKind, fundId, dueDate);
+    }
+
+    /// The fund of a paid amount: the requested one, which must be in the working branch, of the method's kind and
+    /// active (unless unchanged on edit), or else the branch's default fund of that kind (P9).
+    private async Task<Guid?> ResolveFundAsync(Guid? requestedId, FundKind kind, Guid branchId, StockVoucher? existing,
+        Action<string, string> add, CancellationToken ct)
+    {
+        if (requestedId is not { } fundId)
+        {
+            var defaultId = await _db.Funds.AsNoTracking()
+                .Where(f => f.BranchId == branchId && f.Kind == kind && f.IsDefault && f.IsActive)
+                .Select(f => (Guid?)f.Id)
+                .FirstOrDefaultAsync(ct);
+            if (defaultId is null)
+                add("fundId", $"Chi nhánh chưa có quỹ mặc định loại {(kind == FundKind.Bank ? "ngân hàng" : "tiền mặt")}.");
+            return defaultId;
+        }
+
+        var fund = await _db.Funds.AsNoTracking().FirstOrDefaultAsync(f => f.Id == fundId, ct);
+        if (fund is null || fund.BranchId != branchId)
+            add("fundId", "Quỹ không thuộc chi nhánh đang làm việc.");
+        else if (fund.Kind != kind)
+            add("fundId", "Quỹ không đúng loại của phương thức thanh toán.");
+        // Only a newly chosen fund must be active, so old vouchers stay editable.
+        else if (!fund.IsActive && existing?.FundId != fundId)
+            add("fundId", "Quỹ đã ngừng sử dụng.");
+        return fundId;
+    }
+
+    /// Partner rules per reason: PartnerType (Round 1 D4), then the debt side's role when the reason affects debt (P19).
+    private static void ValidatePartner(StockReason reason, Guid? partnerId, Customer? partner, Action<string, string> add)
+    {
+        switch (reason.PartnerType)
+        {
+            case PartnerType.None when partnerId.HasValue:
+                add("partnerId", "Lý do này không dùng đối tượng.");
+                return;
+            case PartnerType.Customer when partnerId is null:
+                add("partnerId", "Lý do này yêu cầu chọn khách hàng.");
+                return;
+            case PartnerType.Customer when partner is { IsCustomer: false }:
+                add("partnerId", "Đối tượng không phải khách hàng.");
+                return;
+            case PartnerType.Supplier when partnerId is null:
+                add("partnerId", "Lý do này yêu cầu chọn nhà cung cấp.");
+                return;
+            case PartnerType.Supplier when partner is { IsSupplier: false }:
+                add("partnerId", "Đối tượng không phải nhà cung cấp.");
+                return;
+        }
+
+        if (DebtEffectRules.Resolve(reason.DebtEffect) is not { } effect)
+            return;
+        if (partnerId is null)
+            add("partnerId", "Lý do này ảnh hưởng công nợ, vui lòng chọn đối tượng.");
+        else if (partner is not null && !DebtEffectRules.PartnerHasSideRole(effect.Side, partner.IsCustomer, partner.IsSupplier))
+            add("partnerId", effect.Side == DebtSide.Receivable
+                ? "Đối tượng không phải khách hàng."
+                : "Đối tượng không phải nhà cung cấp.");
     }
 
     // Exclusive upper bounds of numeric(18,2) and numeric(18,6).
@@ -757,7 +834,7 @@ public class StockVoucherService : IStockVoucherService
 
     /// Header fields, line upsert and totals from StockVoucherCalculator (never from the client).
     private async Task ApplyRequestAsync(StockVoucher voucher, UpsertStockVoucherRequest request,
-        DateTimeOffset voucherAt, InventorySettings settings, CancellationToken ct)
+        DateTimeOffset voucherAt, InventorySettings settings, PaymentTerms terms, CancellationToken ct)
     {
         var partner = request.PartnerId.HasValue
             ? await _db.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Id == request.PartnerId.Value, ct)
@@ -772,8 +849,7 @@ public class StockVoucherService : IStockVoucherService
         voucher.PartnerTaxCode = request.PartnerTaxCode ?? partner?.TaxCode;
         voucher.HandlerName = request.HandlerName;
         voucher.PaymentMethodId = request.PaymentMethodId;
-        voucher.DueDate = request.DueDate;
-        voucher.FundId = request.FundId;
+        voucher.DueDate = terms.DueDate;
         voucher.Note = request.Note;
         voucher.Freight = request.Freight;
         voucher.OrderDiscount = request.OrderDiscount;
@@ -845,7 +921,10 @@ public class StockVoucherService : IStockVoucherService
         voucher.LineDiscountTotal = computation.Totals.LineDiscountTotal;
         voucher.VatTotal = computation.Totals.VatTotal;
         voucher.Total = computation.Totals.Total;
-        voucher.PaidAmount = request.PaidAmount ?? computation.Totals.Total;
+        // P9: nothing paid → no fund.
+        voucher.PaidAmount = request.PaidAmount
+            ?? (terms.MethodFundKind != FundKind.None ? computation.Totals.Total : 0m);
+        voucher.FundId = voucher.PaidAmount > 0 ? terms.FundId : null;
     }
 
     private async Task<Dictionary<Guid, Product>> LoadProductsAsync(IEnumerable<Guid> productIds, CancellationToken ct)

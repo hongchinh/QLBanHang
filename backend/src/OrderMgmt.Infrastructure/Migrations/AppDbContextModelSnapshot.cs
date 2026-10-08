@@ -243,6 +243,148 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.ToTable("credit_limits", (string)null);
                 });
 
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.DebtEntry", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<int>("Direction")
+                        .HasColumnType("integer")
+                        .HasColumnName("direction");
+
+                    b.Property<string>("DocCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("doc_code");
+
+                    b.Property<DateOnly>("DocDate")
+                        .HasColumnType("date")
+                        .HasColumnName("doc_date");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
+                    b.Property<Guid?>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<Guid>("PartnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("partner_id");
+
+                    b.Property<DateTimeOffset>("PostedAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("posted_at");
+
+                    b.Property<int>("Side")
+                        .HasColumnType("integer")
+                        .HasColumnName("side");
+
+                    b.Property<Guid>("SourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_id");
+
+                    b.Property<int>("SourceType")
+                        .HasColumnType("integer")
+                        .HasColumnName("source_type");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_debt_entries");
+
+                    b.HasIndex("PartnerId")
+                        .HasDatabaseName("ix_debt_entries_partner_id");
+
+                    b.HasIndex("SourceType", "SourceId", "Side")
+                        .IsUnique()
+                        .HasDatabaseName("ix_debt_entries_source_type_source_id_side");
+
+                    b.HasIndex("BranchId", "PartnerId", "Side", "PostedAt")
+                        .HasDatabaseName("ix_debt_entries_branch_id_partner_id_side_posted_at");
+
+                    b.ToTable("debt_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_debt_entries_amount_positive", "amount > 0");
+                        });
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.DebtSettlement", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("BatchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("batch_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<Guid>("DecreaseEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("decrease_entry_id");
+
+                    b.Property<DateTimeOffset>("EffectiveAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("effective_at");
+
+                    b.Property<Guid>("IncreaseEntryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("increase_entry_id");
+
+                    b.Property<int>("Origin")
+                        .HasColumnType("integer")
+                        .HasColumnName("origin");
+
+                    b.HasKey("Id")
+                        .HasName("pk_debt_settlements");
+
+                    b.HasIndex("BatchId")
+                        .HasDatabaseName("ix_debt_settlements_batch_id");
+
+                    b.HasIndex("DecreaseEntryId")
+                        .HasDatabaseName("ix_debt_settlements_decrease_entry_id");
+
+                    b.HasIndex("IncreaseEntryId")
+                        .HasDatabaseName("ix_debt_settlements_increase_entry_id");
+
+                    b.ToTable("debt_settlements", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_debt_settlements_amount_positive", "amount > 0");
+                        });
+                });
+
             modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.Fund", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3150,6 +3292,40 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasConstraintName("fk_credit_limits_customers_customer_id");
 
                     b.Navigation("Customer");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.DebtEntry", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_debt_entries_branches_branch_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Catalog.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("PartnerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_debt_entries_customers_partner_id");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.DebtSettlement", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.CashDebt.DebtEntry", null)
+                        .WithMany()
+                        .HasForeignKey("DecreaseEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_debt_settlements_debt_entries_decrease_entry_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.CashDebt.DebtEntry", null)
+                        .WithMany()
+                        .HasForeignKey("IncreaseEntryId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_debt_settlements_debt_entries_increase_entry_id");
                 });
 
             modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.Fund", b =>

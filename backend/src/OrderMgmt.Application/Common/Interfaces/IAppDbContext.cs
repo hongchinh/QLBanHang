@@ -31,6 +31,8 @@ public interface IAppDbContext
     DbSet<CashReason> CashReasons { get; }
     DbSet<Fund> Funds { get; }
     DbSet<CreditLimit> CreditLimits { get; }
+    DbSet<DebtEntry> DebtEntries { get; }
+    DbSet<DebtSettlement> DebtSettlements { get; }
     DbSet<DocumentNumbering> DocumentNumberings { get; }
     DbSet<StockVoucher> StockVouchers { get; }
     DbSet<StockVoucherLine> StockVoucherLines { get; }

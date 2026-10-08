@@ -86,4 +86,6 @@ public enum StockVoucherActivityAction
     Cancelled = 3,
     Restored = 4,
     Deleted = 5,
+    SettlementRemoved = 6,
+    AutoVoucherChanged = 7,
 }

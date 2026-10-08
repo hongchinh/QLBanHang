@@ -73,3 +73,40 @@ public class CreditLimitConfiguration : IEntityTypeConfiguration<CreditLimit>
         b.HasOne<OrderMgmt.Domain.Entities.Organization.Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
     }
 }
+
+public class DebtEntryConfiguration : IEntityTypeConfiguration<DebtEntry>
+{
+    public void Configure(EntityTypeBuilder<DebtEntry> b)
+    {
+        b.ToTable("debt_entries", t => t.HasCheckConstraint("ck_debt_entries_amount_positive", "amount > 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+        b.Property(x => x.PostedAt).HasColumnType("timestamptz");
+        b.Property(x => x.DocCode).IsRequired().HasMaxLength(50);
+        b.Property(x => x.Description).HasMaxLength(500);
+
+        b.HasIndex(x => new { x.SourceType, x.SourceId, x.Side }).IsUnique();
+        b.HasIndex(x => new { x.BranchId, x.PartnerId, x.Side, x.PostedAt });
+
+        b.HasOne<OrderMgmt.Domain.Entities.Organization.Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<OrderMgmt.Domain.Entities.Catalog.Customer>().WithMany().HasForeignKey(x => x.PartnerId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class DebtSettlementConfiguration : IEntityTypeConfiguration<DebtSettlement>
+{
+    public void Configure(EntityTypeBuilder<DebtSettlement> b)
+    {
+        b.ToTable("debt_settlements", t => t.HasCheckConstraint("ck_debt_settlements_amount_positive", "amount > 0"));
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+        b.Property(x => x.EffectiveAt).HasColumnType("timestamptz");
+
+        b.HasIndex(x => x.IncreaseEntryId);
+        b.HasIndex(x => x.DecreaseEntryId);
+        b.HasIndex(x => x.BatchId);
+
+        b.HasOne<DebtEntry>().WithMany().HasForeignKey(x => x.IncreaseEntryId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne<DebtEntry>().WithMany().HasForeignKey(x => x.DecreaseEntryId).OnDelete(DeleteBehavior.Restrict);
+    }
+}

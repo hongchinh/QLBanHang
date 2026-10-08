@@ -42,3 +42,23 @@ public enum FundKind
     Cash = 1,
     Bank = 2,
 }
+
+/// Document that posted a debt entry.
+public enum DebtSourceType
+{
+    Opening = 0,
+    StockIn = 1,
+    StockOut = 2,
+    Receipt = 3,
+    Payment = 4,
+    Offset = 5,
+}
+
+/// How a settlement between an Increase and a Decrease entry was made.
+public enum SettlementOrigin
+{
+    AtVoucher = 1,
+    Manual = 2,
+    Offset = 3,
+    Auto = 4,
+}

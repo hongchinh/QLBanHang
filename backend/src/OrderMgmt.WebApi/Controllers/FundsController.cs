@@ -15,15 +15,18 @@ public class FundsController : ApiControllerBase
     private readonly IFundService _service;
     private readonly IValidator<CreateFundRequest> _createValidator;
     private readonly IValidator<UpdateFundRequest> _updateValidator;
+    private readonly IValidator<SetFundOpeningBalanceRequest> _openingBalanceValidator;
 
     public FundsController(
         IFundService service,
         IValidator<CreateFundRequest> createValidator,
-        IValidator<UpdateFundRequest> updateValidator)
+        IValidator<UpdateFundRequest> updateValidator,
+        IValidator<SetFundOpeningBalanceRequest> openingBalanceValidator)
     {
         _service = service;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
+        _openingBalanceValidator = openingBalanceValidator;
     }
 
     [HttpGet]
@@ -53,6 +56,15 @@ public class FundsController : ApiControllerBase
     {
         await _updateValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.UpdateAsync(id, request, ct));
+    }
+
+    [HttpPut("{id:guid}/opening-balance")]
+    [HasPermission(Permissions.Cash.OpeningBalance)]
+    public async Task<ActionResult<ApiResponse<FundDto>>> SetOpeningBalance(
+        Guid id, [FromBody] SetFundOpeningBalanceRequest request, CancellationToken ct)
+    {
+        await _openingBalanceValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.SetOpeningBalanceAsync(id, request, ct));
     }
 
     [HttpDelete("{id:guid}")]

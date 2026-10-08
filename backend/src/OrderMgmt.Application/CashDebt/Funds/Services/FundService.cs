@@ -1,7 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Funds.Interfaces;
 using OrderMgmt.Application.CashDebt.Funds.Models;
+using OrderMgmt.Application.CashDebt.Guards;
+using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Inventory.Interfaces;
+using OrderMgmt.Application.Organization.Branches;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
@@ -18,15 +22,22 @@ public class FundService : IFundService
     private readonly ICurrentUser _currentUser;
     private readonly ICurrentBranch _currentBranch;
     private readonly ITransactionRunner _transaction;
+    private readonly IInventoryLock _inventoryLock;
+    private readonly ICashDebtLock _cashDebtLock;
+    private readonly IFundBalanceGuard _fundGuard;
 
     public FundService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
-        ITransactionRunner transaction)
+        ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock,
+        IFundBalanceGuard fundGuard)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
         _currentBranch = currentBranch;
         _transaction = transaction;
+        _inventoryLock = inventoryLock;
+        _cashDebtLock = cashDebtLock;
+        _fundGuard = fundGuard;
     }
 
     public async Task<IReadOnlyList<FundDto>> ListAsync(FundListRequest request, CancellationToken ct = default)
@@ -90,7 +101,7 @@ public class FundService : IFundService
     {
         await _transaction.RunAsync(async c =>
         {
-            var fund = await FindAsync(id, c);
+            var fund = await LockAsync(id, c);
             var kindChanged = fund.Kind != request.Kind;
             if (kindChanged)
             {
@@ -125,7 +136,7 @@ public class FundService : IFundService
     {
         await _transaction.RunAsync(async c =>
         {
-            var fund = await FindAsync(id, c);
+            var fund = await LockAsync(id, c);
             if (fund.IsDefault
                 && await _db.Funds.AnyAsync(f => f.BranchId == fund.BranchId && f.Kind == fund.Kind && f.Id != id, c))
                 throw new ConflictException(DefaultInUseMessage);
@@ -138,12 +149,47 @@ public class FundService : IFundService
         }, ct);
     }
 
-    /// A fund that has opening money cannot be deleted or change kind. Later phases add its document references here.
-    private Task EnsureNotUsedAsync(Fund fund, CancellationToken ct)
+    public async Task<FundDto> SetOpeningBalanceAsync(Guid id, SetFundOpeningBalanceRequest request,
+        CancellationToken ct = default)
+    {
+        await _transaction.RunAsync(async c =>
+        {
+            var fund = await LockAsync(id, c);
+
+            // Read after the locks (P14): the opening balance sits at the branch opening date.
+            var branch = await _db.Branches.AsNoTracking().Where(b => b.Id == fund.BranchId)
+                .Select(b => new { b.OpeningDate, b.LockedUntil }).SingleAsync(c);
+            var openingDate = branch.OpeningDate
+                ?? throw new DomainException("OPENING_DATE_NOT_SET", "Chưa đặt ngày đầu kỳ của chi nhánh.");
+            PeriodLockGuard.EnsureNotLocked(branch.LockedUntil, new[] { openingDate });
+
+            // The opening amount precedes every movement, so the whole history is affected.
+            var capture = await _fundGuard.CaptureAsync(new[] { (fund.Id, DateTimeOffset.MinValue) }, c);
+            fund.OpeningAmount = request.Amount;
+            await _db.SaveChangesAsync(c);
+            await _fundGuard.CheckAsync(capture, request.AcknowledgeNegativeFund, c);
+        }, ct);
+        return await GetAsync(id, ct);
+    }
+
+    /// A fund that has opening money or is used by a document cannot be deleted or change kind.
+    /// Phases 06 and 07 add fund transfers and stock vouchers here.
+    private async Task EnsureNotUsedAsync(Fund fund, CancellationToken ct)
     {
         if (fund.OpeningAmount != 0)
             throw new ConflictException("Quỹ đã có số dư đầu kỳ, không thể xóa hoặc đổi loại.");
-        return Task.CompletedTask;
+        if (await _db.CashVouchers.AnyAsync(v => v.FundId == fund.Id, ct))
+            throw new ConflictException("Quỹ đã có phiếu thu/chi, không thể xóa hoặc đổi loại.");
+    }
+
+    /// Shared branch gate, then the fund key (P14), so the in-use and opening checks see every committed voucher.
+    /// Returns the tracked fund of the working branch.
+    private async Task<Fund> LockAsync(Guid id, CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        await _inventoryLock.AcquireBranchGateAsync(new[] { branchId }, exclusive: false, ct);
+        await _cashDebtLock.AcquireAsync(branchId, Array.Empty<Guid>(), new[] { id }, ct);
+        return await FindAsync(id, ct);
     }
 
     private static void EnsureDefaultIsActive(bool isDefault, bool isActive)

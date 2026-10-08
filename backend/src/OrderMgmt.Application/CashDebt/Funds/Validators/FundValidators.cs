@@ -26,3 +26,11 @@ public class UpdateFundRequestValidator : AbstractValidator<UpdateFundRequest>
         RuleFor(x => x.AccountNumber).MaximumLength(50);
     }
 }
+
+public class SetFundOpeningBalanceRequestValidator : AbstractValidator<SetFundOpeningBalanceRequest>
+{
+    public SetFundOpeningBalanceRequestValidator()
+    {
+        RuleFor(x => x.Amount).GreaterThanOrEqualTo(0).PrecisionScale(18, 2, ignoreTrailingZeros: true);
+    }
+}

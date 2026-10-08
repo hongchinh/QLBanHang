@@ -117,6 +117,7 @@ public static class DependencyInjection
         services.AddScoped<IDebtLedgerService, DebtLedgerService>();
         services.AddScoped<IDebtQueryService, DebtQueryService>();
         services.AddScoped<ICreditLimitGuard, CreditLimitGuard>();
+        services.AddScoped<IFundBalanceGuard, FundBalanceGuard>();
         services.AddScoped<IOpeningDebtService, OpeningDebtService>();
         services.AddScoped<IInventoryLedgerService, InventoryLedgerService>();
         services.AddScoped<IInventoryCostingService, InventoryCostingService>();

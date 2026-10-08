@@ -131,6 +131,38 @@ public abstract class CashDebtTestBase : InventoryTestBase
                 .Should().BeEmpty("every Opening entry belongs to a non-deleted opening debt");
         });
 
+    /// Inserts a cash voucher row straight into the DB (no ledger posting): owner admin, reason TKH / TNCC.
+    protected Task<Guid> InsertCashVoucherAsync(Guid branchId, Guid fundId, CashVoucherType type, decimal total,
+        DateTimeOffset at, DocumentStatus status = DocumentStatus.Active) =>
+        InDbAsync(async db =>
+        {
+            var reasonCode = type == CashVoucherType.Receipt ? "TKH" : "TNCC";
+            var voucher = new CashVoucher
+            {
+                Type = type,
+                Code = (type == CashVoucherType.Receipt ? "PT" : "PC") + Guid.NewGuid().ToString("N")[..8],
+                VoucherAt = at,
+                BranchId = branchId,
+                FundId = fundId,
+                ReasonId = await db.CashReasons.Where(r => r.Code == reasonCode).Select(r => r.Id).SingleAsync(),
+                Total = total,
+                Status = status,
+                OwnerUserId = await db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync(),
+            };
+            db.CashVouchers.Add(voucher);
+            await db.SaveChangesAsync();
+            return voucher.Id;
+        });
+
+    /// The seeded cash fund QTM of a branch.
+    protected Task<Guid> CashFundIdAsync(Guid branchId) =>
+        InDbAsync(db => db.Funds.Where(f => f.BranchId == branchId && f.Code == "QTM").Select(f => f.Id).SingleAsync());
+
+    /// Sets a fund's OpeningAmount straight in the DB.
+    protected Task SetFundOpeningAmountAsync(Guid fundId, decimal amount) =>
+        InDbAsync(db => db.Funds.Where(f => f.Id == fundId)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.OpeningAmount, amount)));
+
     /// Ledger-level tests post Opening entries for fresh Guids without an opening debt row (Task 4.3).
     /// Registers `sourceId` as such a source and returns it; invariant 6 exempts exactly these ids,
     /// so any other Opening entry without a row still fails.

@@ -42,3 +42,9 @@ public class UpdateFundRequest
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; }
 }
+
+public class SetFundOpeningBalanceRequest
+{
+    public decimal Amount { get; set; }
+    public bool AcknowledgeNegativeFund { get; set; }
+}

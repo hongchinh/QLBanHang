@@ -4,7 +4,6 @@ using OrderMgmt.Application.Catalog.Customers.Interfaces;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
-using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Ledger;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.Posting;
@@ -27,11 +26,11 @@ public class StockVoucherService : IStockVoucherService
     private readonly IDateTime _clock;
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryPostingService _posting;
-    private readonly IDocumentCounter _counter;
+    private readonly IDocumentCodeAllocator _codes;
     private readonly ICustomerService _customers;
 
     public StockVoucherService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch,
-        IDateTime clock, ITransactionRunner transaction, IInventoryPostingService posting, IDocumentCounter counter,
+        IDateTime clock, ITransactionRunner transaction, IInventoryPostingService posting, IDocumentCodeAllocator codes,
         ICustomerService customers)
     {
         _db = db;
@@ -40,7 +39,7 @@ public class StockVoucherService : IStockVoucherService
         _clock = clock;
         _transaction = transaction;
         _posting = posting;
-        _counter = counter;
+        _codes = codes;
         _customers = customers;
     }
 
@@ -736,51 +735,16 @@ public class StockVoucherService : IStockVoucherService
 
     // ---- Writes -----------------------------------------------------------------------------
 
-    private const int CodeBatchSize = 100;
-    private const int MaxCodeBatches = 1000;
-
     /// `peek` reads the next number without using it (form defaults); otherwise the counter is incremented.
-    /// A number whose code is already taken in the (type, branch) is skipped: after a reset-policy change the
-    /// counter of the new period can restart on codes issued under the old one (review finding). Candidates are
-    /// checked in batches; on create the counter row lock is held, so the chosen code stays free until commit.
-    private async Task<string> NextCodeAsync(StockDirection type, Guid branchId, DateTimeOffset voucherAt, bool peek,
-        CancellationToken ct)
-    {
-        var docType = DocTypeOf(type);
-        var numbering = await _db.DocumentNumberings.AsNoTracking()
-            .SingleOrDefaultAsync(n => n.DocType == docType && n.BranchId == branchId, ct)
-            ?? throw new DomainException("NUMBERING_NOT_CONFIGURED", "Chi nhánh chưa cấu hình đánh số chứng từ.");
-        var date = VnTime.ToVnDate(voucherAt);
-        var periodKey = DocumentNumberFormatter.PeriodKey(numbering.ResetPolicy, date);
-        var next = peek
-            ? await _counter.PeekNextAsync(docType, branchId, periodKey, ct)
-            : await _counter.NextAsync(docType, branchId, periodKey, ct);
-
-        for (var batch = 0; batch < MaxCodeBatches; batch++)
-        {
-            var candidates = Enumerable.Range(0, CodeBatchSize)
-                .Select(k => next + batch * CodeBatchSize + k)
-                .Select(value => (Value: value,
-                    Code: DocumentNumberFormatter.Format(numbering.Pattern, numbering.Prefix, numbering.Length, value, date)))
-                .ToList();
-            var codes = candidates.Select(c => c.Code).ToList();
+    /// Codes already used in the (type, branch) are skipped (see DocumentCodeAllocator).
+    private Task<string> NextCodeAsync(StockDirection type, Guid branchId, DateTimeOffset voucherAt, bool peek,
+        CancellationToken ct) =>
+        _codes.NextAsync(DocTypeOf(type), branchId, voucherAt, peek, async (codes, c) =>
             // Same scope as the unique index (type, branch_id, code) WHERE is_deleted = false: the query filter matches it.
-            var taken = (await _db.StockVouchers
+            (await _db.StockVouchers
                 .Where(v => v.Type == type && v.BranchId == branchId && codes.Contains(v.Code))
                 .Select(v => v.Code)
-                .ToListAsync(ct)).ToHashSet();
-
-            foreach (var (value, code) in candidates)
-            {
-                if (taken.Contains(code))
-                    continue;
-                if (!peek && value != next)
-                    await _counter.AdvanceToAsync(docType, branchId, periodKey, value, ct);
-                return code;
-            }
-        }
-        throw new ConflictException("Không tìm được số chứng từ còn trống. Vui lòng đổi mẫu đánh số.");
-    }
+                .ToListAsync(c)).ToHashSet(), ct);
 
     /// Header fields, line upsert and totals from StockVoucherCalculator (never from the client).
     private async Task ApplyRequestAsync(StockVoucher voucher, UpsertStockVoucherRequest request,

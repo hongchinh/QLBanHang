@@ -39,6 +39,7 @@ using OrderMgmt.Application.CashDebt.Settings.Interfaces;
 using OrderMgmt.Application.CashDebt.Settings.Services;
 using OrderMgmt.Application.Inventory.Costing;
 using OrderMgmt.Application.Inventory.Ledger;
+using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
 using OrderMgmt.Application.Inventory.OpeningStocks.Services;
 using OrderMgmt.Application.Inventory.PaymentMethods.Interfaces;
@@ -121,6 +122,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryCostingService, InventoryCostingService>();
         services.AddScoped<IInventoryPostingService, InventoryPostingService>();
         services.AddScoped<IInventoryRecalcService, InventoryRecalcService>();
+        services.AddScoped<IDocumentCodeAllocator, DocumentCodeAllocator>();
         services.AddScoped<IStockVoucherService, StockVoucherService>();
         services.AddScoped<IOpeningStockService, OpeningStockService>();
         services.AddScoped<IInventoryReportService, InventoryReportService>();

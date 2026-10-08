@@ -28,10 +28,11 @@ public class CashVoucherService : ICashVoucherService
     private readonly ICashDebtLock _cashDebtLock;
     private readonly IDocumentCodeAllocator _codes;
     private readonly IDebtLedgerService _ledger;
+    private readonly IDebtQueryService _debtQuery;
 
     public CashVoucherService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch, IDateTime clock,
         ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock,
-        IDocumentCodeAllocator codes, IDebtLedgerService ledger)
+        IDocumentCodeAllocator codes, IDebtLedgerService ledger, IDebtQueryService debtQuery)
     {
         _db = db;
         _currentUser = currentUser;
@@ -42,6 +43,7 @@ public class CashVoucherService : ICashVoucherService
         _cashDebtLock = cashDebtLock;
         _codes = codes;
         _ledger = ledger;
+        _debtQuery = debtQuery;
     }
 
     public Task<CashVoucherDto> GetAsync(Guid id, CancellationToken ct = default) =>
@@ -73,8 +75,9 @@ public class CashVoucherService : ICashVoucherService
             ApplyRequest(voucher, request, voucherAt, partner);
             await _db.SaveChangesAsync(c);
 
-            await _ledger.PostAsync(SourceTypeOf(voucher.Type), voucher.Id, DraftsOf(voucher, reason),
+            var entries = await _ledger.PostAsync(SourceTypeOf(voucher.Type), voucher.Id, DraftsOf(voucher, reason),
                 request.ConfirmRemoveSettlements, c);
+            await AllocateAsync(entries, request.Allocations, c);
             AddActivity(voucher, CashDocumentActivityAction.Created, "Tạo phiếu");
             await _db.SaveChangesAsync(c);
             return voucher.Id;
@@ -171,7 +174,46 @@ public class CashVoucherService : ICashVoucherService
                 Amount = l.Amount,
                 Note = l.Note,
             }).ToList(),
+            Allocations = await AllocationsOfAsync(voucher, ct),
         };
+    }
+
+    /// Every settlement of the voucher's own entry (any origin), with the other document's code and date.
+    private async Task<List<CashVoucherAllocationDto>> AllocationsOfAsync(CashVoucher voucher, CancellationToken ct)
+    {
+        var sourceType = SourceTypeOf(voucher.Type);
+        var ownIds = await _db.DebtEntries.AsNoTracking()
+            .Where(e => e.SourceType == sourceType && e.SourceId == voucher.Id)
+            .Select(e => e.Id)
+            .ToListAsync(ct);
+        if (ownIds.Count == 0)
+            return new List<CashVoucherAllocationDto>();
+
+        var settlements = await _db.DebtSettlements.AsNoTracking()
+            .Where(s => ownIds.Contains(s.IncreaseEntryId) || ownIds.Contains(s.DecreaseEntryId))
+            .Select(s => new { s.Id, s.Amount, s.Origin, OtherId = ownIds.Contains(s.IncreaseEntryId) ? s.DecreaseEntryId : s.IncreaseEntryId })
+            .ToListAsync(ct);
+        var otherIds = settlements.Select(s => s.OtherId).Distinct().ToList();
+        var others = await _db.DebtEntries.AsNoTracking()
+            .Where(e => otherIds.Contains(e.Id))
+            .ToDictionaryAsync(e => e.Id, ct);
+
+        return settlements
+            .Select(s => (Settlement: s, Entry: others[s.OtherId]))
+            .OrderBy(x => x.Entry.DocDate)
+            .ThenBy(x => x.Entry.DocCode, StringComparer.Ordinal)
+            .Select(x => new CashVoucherAllocationDto
+            {
+                SettlementId = x.Settlement.Id,
+                EntryId = x.Entry.Id,
+                SourceType = x.Entry.SourceType,
+                SourceId = x.Entry.SourceId,
+                DocCode = x.Entry.DocCode,
+                DocDate = x.Entry.DocDate,
+                Amount = x.Settlement.Amount,
+                Origin = x.Settlement.Origin,
+            })
+            .ToList();
     }
 
     // ---- Writes -----------------------------------------------------------------------------
@@ -229,6 +271,10 @@ public class CashVoucherService : ICashVoucherService
         }
         if (reason is not null)
             ValidatePartner(reason, request.PartnerId, partner, Add);
+
+        // Rule 4: an empty list is always accepted (on update it clears the AtVoucher settlements).
+        if (reason is not null && request.Allocations is { Count: > 0 } && reason.DebtEffect == DebtEffect.None)
+            Add("allocations", "Lý do này không ảnh hưởng công nợ.");
 
         if (errors.Count > 0)
             throw new ValidationDomainException(errors, null);
@@ -334,6 +380,43 @@ public class CashVoucherService : ICashVoucherService
                 voucher.VoucherAt, docDate, DebtDates.EntryDueDate(effect.Direction, docDate, null),
                 voucher.OwnerUserId, voucher.Code, voucher.Description ?? reason.Name),
         };
+    }
+
+    /// Allocation at voucher time: validates the allocations of the voucher's own entry against its open items
+    /// (P26: this voucher's own settlements count as open room) and saves them as one AtVoucher batch.
+    /// Capacity = own entry Amount − its settlements still kept.
+    private async Task AllocateAsync(IReadOnlyList<DebtEntry> ownEntries, IReadOnlyList<AllocationRequest>? allocations,
+        CancellationToken ct)
+    {
+        if (allocations is not { Count: > 0 })
+            return;
+
+        // Rule 4 guarantees a reason with debt effect, hence exactly one entry.
+        var own = ownEntries.Single();
+        var capacity = own.Amount - (await _ledger.SettledAmountsAsync(new[] { own.Id }, ct: ct))[own.Id];
+        var openItems = await _debtQuery.OpenItemsAsync(new OpenItemsQuery
+        {
+            BranchId = own.BranchId,
+            PartnerId = own.PartnerId,
+            Side = own.Side,
+            ForSourceType = own.SourceType,
+            ForSourceId = own.SourceId,
+        }, ct);
+        var open = openItems.ToDictionary(i => i.EntryId,
+            i => new OpenEntry(i.EntryId, own.BranchId, own.PartnerId, own.Side, i.Direction, i.Open, i.PostedAt));
+
+        var errors = AllocationValidator.Validate(own.BranchId, own.PartnerId, own.Side, own.Direction, capacity,
+            allocations.Select(a => new AllocationInput(a.EntryId, a.Amount)).ToList(), open);
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+
+        // The own entry fills the slot of its direction; the allocated document takes the other one.
+        var drafts = allocations
+            .Select(a => own.Direction == DebtDirection.Increase
+                ? new SettlementDraft(own.Id, a.EntryId, a.Amount)
+                : new SettlementDraft(a.EntryId, own.Id, a.Amount))
+            .ToList();
+        await _ledger.AddSettlementsAsync(drafts, SettlementOrigin.AtVoucher, Guid.NewGuid(), "allocations", ct);
     }
 
     private void AddActivity(CashVoucher voucher, CashDocumentActivityAction action, string description) =>

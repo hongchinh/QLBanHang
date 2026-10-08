@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Ledger;
+using OrderMgmt.Application.CashDebt.OpeningDebts.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Inventory.Common;
@@ -301,6 +302,25 @@ public abstract class CashDebtTestBase : InventoryTestBase
     protected Task SetFundOpeningAmountAsync(Guid fundId, decimal amount) =>
         InDbAsync(db => db.Funds.Where(f => f.Id == fundId)
             .ExecuteUpdateAsync(s => s.SetProperty(f => f.OpeningAmount, amount)));
+
+    /// Creates an opening debt through the API in the client's working branch (which needs an opening date) and
+    /// returns the row id and the id of its debt entry.
+    protected async Task<(Guid OpeningDebtId, Guid EntryId)> CreateOpeningDebtAsync(HttpClient c, Guid partnerId,
+        DebtSide side, OpeningDebtKind kind, string docNo, DateOnly docDate, decimal amount, DateOnly? dueDate = null)
+    {
+        var debt = await ReadDataAsync<OpeningDebtDto>(await c.PostAsJsonAsync("/api/opening-debts",
+            new UpsertOpeningDebtRequest
+            {
+                PartnerId = partnerId,
+                Side = side,
+                Kind = kind,
+                DocNo = docNo,
+                DocDate = docDate,
+                DueDate = dueDate,
+                Amount = amount,
+            }, TestJson.Options));
+        return (debt.Id, (await EntriesOfAsync(DebtSourceType.Opening, debt.Id)).Single().Id);
+    }
 
     /// Ledger-level tests post Opening entries for fresh Guids without an opening debt row (Task 4.3).
     /// Registers `sourceId` as such a source and returns it; invariant 6 exempts exactly these ids,

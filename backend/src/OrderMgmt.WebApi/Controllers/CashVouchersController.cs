@@ -33,4 +33,25 @@ public class CashVouchersController : ApiControllerBase
         await _upsertValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.CreateAsync(request, ct));
     }
+
+    [HttpPut("{id:guid}")]
+    public async Task<ActionResult<ApiResponse<CashVoucherDto>>> Update(
+        Guid id, [FromBody] UpsertCashVoucherRequest request, CancellationToken ct)
+    {
+        await _upsertValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.UpdateAsync(id, request, ct));
+    }
+
+    [HttpPost("{id:guid}/cancel")]
+    public async Task<ActionResult<ApiResponse<CashVoucherDto>>> Cancel(
+        Guid id, [FromBody] CashDocumentActionRequest request, CancellationToken ct)
+        => Success(await _service.CancelAsync(id, request, ct));
+
+    [HttpDelete("{id:guid}")]
+    public async Task<ActionResult<ApiResponse>> Delete(
+        Guid id, [FromQuery] CashDocumentActionRequest request, CancellationToken ct)
+    {
+        await _service.DeleteAsync(id, request, ct);
+        return Success();
+    }
 }

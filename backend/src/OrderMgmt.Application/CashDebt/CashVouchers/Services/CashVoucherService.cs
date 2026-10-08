@@ -86,6 +86,110 @@ public class CashVoucherService : ICashVoucherService
         return await LoadDtoAsync(id, ct);
     }
 
+    public async Task<CashVoucherDto> UpdateAsync(Guid id, UpsertCashVoucherRequest request, CancellationToken ct = default)
+    {
+        var voucherAt = VnTime.ToUtc(request.VoucherAt);
+
+        await _transaction.RunAsync(async c =>
+        {
+            var voucher = await LoadForWriteAsync(id, CashVoucherPermissions.Edit, request.Version, DocumentStatus.Active, c);
+            await AcquireLocksAsync(voucher.BranchId, new[] { voucher.PartnerId, request.PartnerId }.OfType<Guid>(),
+                new[] { voucher.FundId, request.FundId }, c);
+
+            var lockedUntil = await _db.Branches.Where(b => b.Id == voucher.BranchId).Select(b => b.LockedUntil).SingleAsync(c);
+            PeriodLockGuard.EnsureNotLocked(lockedUntil,
+                new[] { voucher.VoucherAt }.Concat(new[] { voucherAt }.Where(IsValidVoucherAt)));
+            var (reason, partner) = await ValidateAsync(request, voucher.BranchId, voucher, c);
+
+            // A list replaces the voucher's own AtVoucher settlements (C8); null keeps them. Every other origin stays
+            // and is subject to the shrink and partner rules of PostAsync (P10, P11).
+            var sourceType = SourceTypeOf(voucher.Type);
+            if (request.Allocations is not null)
+                await _ledger.RemoveOwnSettlementsAsync(sourceType, voucher.Id, SettlementOrigin.AtVoucher, c);
+
+            ApplyRequest(voucher, request, voucherAt, partner);
+            await _db.SaveChangesAsync(c);
+
+            var entries = await _ledger.PostAsync(sourceType, voucher.Id, DraftsOf(voucher, reason),
+                request.ConfirmRemoveSettlements, c);
+            await AllocateAsync(entries, request.Allocations, c);
+            AddActivity(voucher, CashDocumentActivityAction.Updated, "Cập nhật phiếu");
+            await _db.SaveChangesAsync(c);
+        }, ct);
+
+        return await LoadDtoAsync(id, ct);
+    }
+
+    public async Task<CashVoucherDto> CancelAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default)
+    {
+        await ChangeLifecycleAsync(id, request, CashVoucherPermissions.Cancel, DocumentStatus.Active,
+            CashDocumentActivityAction.Cancelled, "Hủy phiếu", v =>
+            {
+                v.Status = DocumentStatus.Cancelled;
+                v.CancelledAt = _clock.UtcNow;
+                v.CancelledBy = _currentUser.UserId;
+            }, ct);
+        return await LoadDtoAsync(id, ct);
+    }
+
+    // Soft delete in any status; AppDbContext cascades IsDeleted to the lines.
+    public Task DeleteAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default) =>
+        ChangeLifecycleAsync(id, request, CashVoucherPermissions.Delete, requiredStatus: null,
+            CashDocumentActivityAction.Deleted, "Xóa phiếu", v => v.IsDeleted = true, ct);
+
+    /// Cancel / delete per the steps table: locks, period lock on the stored date, then the debt entry of an Active
+    /// voucher is removed (its settlements need confirmation) before the status change.
+    private Task ChangeLifecycleAsync(Guid id, CashDocumentActionRequest request, Func<CashVoucherType, string> permission,
+        DocumentStatus? requiredStatus, CashDocumentActivityAction action, string description, Action<CashVoucher> apply,
+        CancellationToken ct) =>
+        _transaction.RunAsync(async c =>
+        {
+            var voucher = await LoadForWriteAsync(id, permission, request.Version, requiredStatus, c);
+            await AcquireLocksAsync(voucher.BranchId, new[] { voucher.PartnerId }.OfType<Guid>(), new[] { voucher.FundId }, c);
+
+            var lockedUntil = await _db.Branches.Where(b => b.Id == voucher.BranchId).Select(b => b.LockedUntil).SingleAsync(c);
+            PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucher.VoucherAt });
+
+            if (voucher.Status == DocumentStatus.Active)
+                await _ledger.RemoveSourceAsync(SourceTypeOf(voucher.Type), voucher.Id, request.ConfirmRemoveSettlements, c);
+
+            apply(voucher);
+            await _db.SaveChangesAsync(c);
+            AddActivity(voucher, action, description);
+            await _db.SaveChangesAsync(c);
+        }, ct);
+
+    /// Update, cancel and delete: permission, working branch, managed check, ownership, status and version.
+    /// `requiredStatus` null accepts any status. The header is always marked modified so the xmin check runs even
+    /// when only lines change (D29).
+    private async Task<CashVoucher> LoadForWriteAsync(Guid id, Func<CashVoucherType, string> permission, uint? version,
+        DocumentStatus? requiredStatus, CancellationToken ct)
+    {
+        var voucher = await _db.CashVouchers.Include(v => v.Lines).FirstOrDefaultAsync(v => v.Id == id, ct)
+            ?? throw new NotFoundException(nameof(CashVoucher), id);
+
+        EnsurePermission(permission(voucher.Type));
+        await EnsureWorkingBranchAsync(voucher.BranchId, ct);
+        // Automatic vouchers change only through their stock voucher (P20).
+        if (voucher.SourceStockVoucherId is not null)
+            throw new ConflictException("MANAGED_BY_STOCK_VOUCHER", "Phiếu được tạo tự động theo phiếu kho, hãy thao tác trên phiếu kho.");
+        if (voucher.OwnerUserId != _currentUser.UserId
+            && !_currentUser.HasPermission(CashVoucherPermissions.EditAll(voucher.Type)))
+            throw new ForbiddenException("Bạn chỉ được thao tác trên phiếu do mình tạo.");
+        if (requiredStatus is { } required && voucher.Status != required)
+            throw new ConflictException(required == DocumentStatus.Active
+                ? "Phiếu đã hủy, không thể thay đổi."
+                : "Phiếu chưa bị hủy.");
+        if (version is null)
+            throw new ValidationDomainException(
+                new Dictionary<string, string[]> { ["version"] = new[] { "Thiếu phiên bản dữ liệu của phiếu." } }, null);
+
+        _db.Entry(voucher).Property(v => v.Version).OriginalValue = version.Value;
+        voucher.UpdatedAt = _clock.UtcNow;
+        voucher.UpdatedBy = _currentUser.UserId;
+        return voucher;
+    }
+
     /// Write operations return the saved voucher with the permission they were authorized by, not view, so a
     /// create-only user never gets 403 for a voucher that was saved (Round 1 review finding).
     private async Task<CashVoucherDto> LoadDtoAsync(Guid id, CancellationToken ct, bool checkAccess = false)
@@ -334,7 +438,7 @@ public class CashVoucherService : ICashVoucherService
                 .Select(v => v.Code)
                 .ToListAsync(c)).ToHashSet(), ct);
 
-    /// Header fields, partner snapshot, lines (through their DbSet) and Total = Σ lines (never from the client).
+    /// Header fields, partner snapshot, lines and Total = Σ lines (never from the client).
     private void ApplyRequest(CashVoucher voucher, UpsertCashVoucherRequest request, DateTimeOffset voucherAt,
         Customer? partner)
     {
@@ -350,18 +454,36 @@ public class CashVoucherService : ICashVoucherService
         voucher.AttachedDocs = request.AttachedDocs;
         voucher.Note = request.Note;
 
+        // Upsert by line Id; a stored line left out of the request is soft-deleted.
+        var existing = voucher.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id);
+        var kept = new HashSet<Guid>();
         for (var i = 0; i < request.Lines.Count; i++)
         {
             var line = request.Lines[i];
-            _db.CashVoucherLines.Add(new CashVoucherLine
+            if (line.Id is { } lineId && existing.TryGetValue(lineId, out var entity))
             {
-                CashVoucherId = voucher.Id,
-                SortOrder = i,
-                Description = line.Description,
-                Amount = line.Amount,
-                Note = line.Note,
-            });
+                kept.Add(lineId);
+            }
+            else
+            {
+                // New child rows go through their DbSet.
+                entity = new CashVoucherLine { CashVoucherId = voucher.Id };
+                _db.CashVoucherLines.Add(entity);
+            }
+
+            entity.SortOrder = i;
+            entity.Description = line.Description;
+            entity.Amount = line.Amount;
+            entity.Note = line.Note;
         }
+
+        foreach (var removed in existing.Values.Where(l => !kept.Contains(l.Id)))
+        {
+            removed.IsDeleted = true;
+            removed.DeletedAt = _clock.UtcNow;
+            removed.DeletedBy = _currentUser.UserId;
+        }
+
         voucher.Total = request.Lines.Sum(l => l.Amount);
     }
 

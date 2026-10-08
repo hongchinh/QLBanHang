@@ -40,7 +40,19 @@ public class DebtActivityLog : IDebtActivityLog
                     Description = SettlementRemovedText(amount, other.DocCode),
                 });
                 break;
-            // Opening debts have no activity log. Receipt/Payment (Phase 05) and Offset (Phase 08) are added with their documents.
+            case DebtSourceType.Receipt:
+            case DebtSourceType.Payment:
+                _db.CashDocumentActivities.Add(new CashDocumentActivity
+                {
+                    DocumentType = entry.SourceType == DebtSourceType.Receipt ? DocumentType.Receipt : DocumentType.Payment,
+                    DocumentId = entry.SourceId,
+                    Action = CashDocumentActivityAction.SettlementRemoved,
+                    ActorUserId = _currentUser.UserId,
+                    OccurredAt = _clock.UtcNow,
+                    Description = SettlementRemovedText(amount, other.DocCode),
+                });
+                break;
+            // Opening debts have no activity log. Offset (Phase 08) is added with its document.
         }
 
         return Task.CompletedTask;

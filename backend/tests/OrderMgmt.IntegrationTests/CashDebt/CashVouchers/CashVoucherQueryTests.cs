@@ -7,6 +7,7 @@ using OrderMgmt.Application.CashDebt.CashReasons.Models;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Funds.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Inventory.Settings.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
@@ -127,6 +128,48 @@ public class CashVoucherQueryTests : CashDebtTestBase
         activities.Should().AllSatisfy(a => a.ActorName.Should().Be(AdminName));
         (await clientB.GetAsync($"/api/cash-vouchers/{r4.Id}/activities")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
         await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task List_search_matches_percent_underscore_and_backslash_literally()
+    {
+        var (_, client, cashFund) = await BranchClientAsync();
+        // An underscore in codes is a valid numbering pattern; the fresh branch has its own numbering row.
+        var numbering = await client.PutAsJsonAsync("/api/inventory/numbering/Receipt", new UpdateNumberingRequest
+        {
+            Prefix = "PT", Length = 5, ResetPolicy = NumberingResetPolicy.None, Pattern = "{KH}_{STT}",
+        });
+        numbering.StatusCode.Should().Be(HttpStatusCode.OK, await numbering.Content.ReadAsStringAsync());
+        var tk = await CashReasonIdAsync("TK");
+
+        async Task<CashVoucherDto> ReceiptAsync(string? description = null, string? personName = null,
+            string? partnerName = null)
+        {
+            var request = CashRequest(CashVoucherType.Receipt, tk, cashFund, "2026-10-05 09:00", null, 100m);
+            request.Description = description;
+            request.PersonName = personName;
+            request.PartnerName = partnerName;
+            return await CreateCashAsync(client, request);
+        }
+
+        // Every searched column holds one of the characters; a decoy matches only if % or _ acts as a wildcard.
+        var percent = await ReceiptAsync(description: "Đặt cọc 30% hợp đồng");
+        var percentDecoy = await ReceiptAsync(description: "Đặt cọc 300 nghìn");
+        var underscore = await ReceiptAsync(personName: "Le_Van_A");
+        await ReceiptAsync(personName: "LeXVan B");
+        var backslash = await ReceiptAsync(partnerName: @"Cửa hàng 24\7");
+        percentDecoy.Code.Should().Be("PT_00002");
+
+        async Task<List<Guid>> SearchIdsAsync(string search) =>
+            (await ListAsync(client, $"type=Receipt&search={Uri.EscapeDataString(search)}")).Items
+                .Select(i => i.Id).ToList();
+
+        (await SearchIdsAsync("30%")).Should().Equal(percent.Id);
+        (await SearchIdsAsync("%")).Should().Equal(percent.Id);
+        (await SearchIdsAsync("Le_Van")).Should().Equal(underscore.Id);
+        (await SearchIdsAsync("PT_00002")).Should().Equal(percentDecoy.Id);
+        (await SearchIdsAsync(@"24\7")).Should().Equal(backslash.Id);
+        (await SearchIdsAsync(@"\")).Should().Equal(backslash.Id);
     }
 
     [Fact]

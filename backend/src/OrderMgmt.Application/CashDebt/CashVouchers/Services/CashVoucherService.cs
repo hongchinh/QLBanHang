@@ -94,10 +94,10 @@ public class CashVoucherService : ICashVoucherService
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
             var pattern = $"%{EscapeLike(request.Search.Trim())}%";
-            query = query.Where(v => EF.Functions.ILike(v.Code, pattern)
-                || EF.Functions.ILike(v.PartnerName!, pattern)
-                || EF.Functions.ILike(v.PersonName!, pattern)
-                || EF.Functions.ILike(v.Description!, pattern));
+            query = query.Where(v => EF.Functions.ILike(v.Code, pattern, LikeEscape)
+                || EF.Functions.ILike(v.PartnerName!, pattern, LikeEscape)
+                || EF.Functions.ILike(v.PersonName!, pattern, LikeEscape)
+                || EF.Functions.ILike(v.Description!, pattern, LikeEscape));
         }
 
         var totalItems = await query.CountAsync(ct);
@@ -797,6 +797,11 @@ public class CashVoucherService : ICashVoucherService
         if (branchId != await _currentBranch.GetIdAsync(ct))
             throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
     }
+
+    // The escape character EscapeLike uses. Every ILike must pass it: without an escape argument Npgsql sends
+    // ESCAPE '' (no escape character), the added backslashes stay literal and a search containing %, _ or \
+    // misses the rows that contain it.
+    private const string LikeEscape = "\\";
 
     private static string EscapeLike(string input) =>
         input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");

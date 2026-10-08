@@ -276,6 +276,7 @@ public class StockVoucherService : IStockVoucherService
             .Include(v => v.Partner)
             .Include(v => v.Reason)
             .Include(v => v.PaymentMethod)
+            .Include(v => v.Fund)
             .Include(v => v.Lines).ThenInclude(l => l.Warehouse)
             .FirstOrDefaultAsync(v => v.Id == id, ct)
             ?? throw new NotFoundException(nameof(StockVoucher), id);
@@ -295,6 +296,14 @@ public class StockVoucherService : IStockVoucherService
         var lockedUntil = await _db.Branches.Where(b => b.Id == voucher.BranchId).Select(b => b.LockedUntil).FirstOrDefaultAsync(ct);
 
         var dto = ToDto(voucher, ownerName);
+        // The managed receipt/payment (P20); a soft-deleted one is hidden by the query filter.
+        var auto = await _db.CashVouchers.AsNoTracking()
+            .Where(c => c.SourceStockVoucherId == voucher.Id)
+            .Select(c => new { c.Id, c.Code, c.Type })
+            .FirstOrDefaultAsync(ct);
+        dto.AutoCashVoucherId = auto?.Id;
+        dto.AutoCashVoucherCode = auto?.Code;
+        dto.AutoCashVoucherType = auto?.Type;
         var mayAct = !IsLocked(lockedUntil, voucher.VoucherAt)
             && (voucher.OwnerUserId == _currentUser.UserId
                 || _currentUser.HasPermission(StockVoucherPermissions.EditAll(voucher.Type)));
@@ -763,6 +772,8 @@ public class StockVoucherService : IStockVoucherService
         voucher.PartnerTaxCode = request.PartnerTaxCode ?? partner?.TaxCode;
         voucher.HandlerName = request.HandlerName;
         voucher.PaymentMethodId = request.PaymentMethodId;
+        voucher.DueDate = request.DueDate;
+        voucher.FundId = request.FundId;
         voucher.Note = request.Note;
         voucher.Freight = request.Freight;
         voucher.OrderDiscount = request.OrderDiscount;
@@ -965,8 +976,13 @@ public class StockVoucherService : IStockVoucherService
         HandlerName = v.HandlerName,
         ReasonId = v.ReasonId,
         ReasonName = v.Reason?.Name,
+        ReasonDebtEffect = v.Reason?.DebtEffect ?? DebtEffect.None,
         PaymentMethodId = v.PaymentMethodId,
         PaymentMethodName = v.PaymentMethod?.Name,
+        DueDate = v.DueDate,
+        FundId = v.FundId,
+        FundCode = v.Fund?.Code,
+        FundName = v.Fund?.Name,
         Note = v.Note,
         Freight = v.Freight,
         OrderDiscount = v.OrderDiscount,

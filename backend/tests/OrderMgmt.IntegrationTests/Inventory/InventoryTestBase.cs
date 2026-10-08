@@ -281,6 +281,8 @@ public abstract class InventoryTestBase : QuotationTestBase
         Freight = v.Freight,
         OrderDiscount = v.OrderDiscount,
         PaidAmount = v.PaidAmount,
+        DueDate = v.DueDate,
+        FundId = v.FundId,
         Version = v.Version,
         Lines = v.Lines.Select(l => new UpsertStockVoucherLineRequest
         {

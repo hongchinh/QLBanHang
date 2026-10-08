@@ -172,8 +172,8 @@ public class FundService : IFundService
         return await GetAsync(id, ct);
     }
 
-    /// A fund that has opening money or is used by a document cannot be deleted or change kind.
-    /// Phases 06 and 07 add fund transfers and stock vouchers here.
+    /// A fund that has opening money or is used by a document (cash voucher, fund transfer or stock voucher)
+    /// cannot be deleted or change kind (P18).
     private async Task EnsureNotUsedAsync(Fund fund, CancellationToken ct)
     {
         if (fund.OpeningAmount != 0)
@@ -182,6 +182,8 @@ public class FundService : IFundService
             throw new ConflictException("Quỹ đã có phiếu thu/chi, không thể xóa hoặc đổi loại.");
         if (await _db.FundTransfers.AnyAsync(t => t.FromFundId == fund.Id || t.ToFundId == fund.Id, ct))
             throw new ConflictException("Quỹ đã có phiếu chuyển quỹ, không thể xóa hoặc đổi loại.");
+        if (await _db.StockVouchers.AnyAsync(v => v.FundId == fund.Id, ct))
+            throw new ConflictException("Quỹ đã có phiếu nhập/xuất kho, không thể xóa hoặc đổi loại.");
     }
 
     /// Shared branch gate, then the fund key (P14), so the in-use and opening checks see every committed voucher.

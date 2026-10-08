@@ -2474,9 +2474,17 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deleted_by");
 
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date")
+                        .HasColumnName("due_date");
+
                     b.Property<decimal>("Freight")
                         .HasColumnType("numeric(18,2)")
                         .HasColumnName("freight");
+
+                    b.Property<Guid?>("FundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("fund_id");
 
                     b.Property<decimal>("GoodsAmount")
                         .HasColumnType("numeric(18,2)")
@@ -2579,6 +2587,9 @@ namespace OrderMgmt.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_stock_vouchers");
+
+                    b.HasIndex("FundId")
+                        .HasDatabaseName("ix_stock_vouchers_fund_id");
 
                     b.HasIndex("OwnerUserId")
                         .HasDatabaseName("ix_stock_vouchers_owner_user_id");
@@ -4101,6 +4112,12 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .IsRequired()
                         .HasConstraintName("fk_stock_vouchers_branches_branch_id");
 
+                    b.HasOne("OrderMgmt.Domain.Entities.CashDebt.Fund", "Fund")
+                        .WithMany()
+                        .HasForeignKey("FundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_stock_vouchers_funds_fund_id");
+
                     b.HasOne("OrderMgmt.Domain.Entities.Identity.User", "Owner")
                         .WithMany()
                         .HasForeignKey("OwnerUserId")
@@ -4135,6 +4152,8 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasConstraintName("fk_stock_vouchers_warehouses_warehouse_id");
 
                     b.Navigation("Branch");
+
+                    b.Navigation("Fund");
 
                     b.Navigation("Owner");
 

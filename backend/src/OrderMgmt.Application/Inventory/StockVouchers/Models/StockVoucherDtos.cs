@@ -19,8 +19,13 @@ public class UpsertStockVoucherRequest
     public decimal Freight { get; set; }
     public decimal OrderDiscount { get; set; }
     public decimal? PaidAmount { get; set; }            // null → Total
+    public DateOnly? DueDate { get; set; }
+    public Guid? FundId { get; set; }
     public uint? Version { get; set; }                  // required on update
     public bool AcknowledgeNegativeStock { get; set; }
+    public bool ConfirmRemoveSettlements { get; set; }
+    public bool AcknowledgeCreditLimit { get; set; }
+    public bool AcknowledgeNegativeFund { get; set; }
     public List<UpsertStockVoucherLineRequest> Lines { get; set; } = new();
 }
 
@@ -47,6 +52,9 @@ public class StockVoucherActionRequest
 {
     public uint? Version { get; set; }
     public bool AcknowledgeNegativeStock { get; set; }
+    public bool ConfirmRemoveSettlements { get; set; }
+    public bool AcknowledgeCreditLimit { get; set; }
+    public bool AcknowledgeNegativeFund { get; set; }
 }
 
 public class StockVoucherDto
@@ -67,8 +75,16 @@ public class StockVoucherDto
     public string? HandlerName { get; set; }
     public Guid ReasonId { get; set; }
     public string? ReasonName { get; set; }
+    public DebtEffect ReasonDebtEffect { get; set; }
     public Guid? PaymentMethodId { get; set; }
     public string? PaymentMethodName { get; set; }
+    public DateOnly? DueDate { get; set; }
+    public Guid? FundId { get; set; }
+    public string? FundCode { get; set; }
+    public string? FundName { get; set; }
+    public Guid? AutoCashVoucherId { get; set; }
+    public string? AutoCashVoucherCode { get; set; }
+    public CashVoucherType? AutoCashVoucherType { get; set; }
     public string? Note { get; set; }
     public decimal Freight { get; set; }
     public decimal OrderDiscount { get; set; }

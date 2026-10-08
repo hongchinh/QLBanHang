@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.FundTransfers.Interfaces;
 using OrderMgmt.Application.CashDebt.FundTransfers.Models;
 using OrderMgmt.Application.CashDebt.Guards;
@@ -80,6 +81,136 @@ public class FundTransferService : IFundTransferService
         }, ct);
 
         return await LoadDtoAsync(id, ct);
+    }
+
+    public async Task<FundTransferDto> UpdateAsync(Guid id, UpsertFundTransferRequest request, CancellationToken ct = default)
+    {
+        var voucherAt = VnTime.ToUtc(request.VoucherAt);
+
+        await _transaction.RunAsync(async c =>
+        {
+            var transfer = await LoadForWriteAsync(id, request.Version, DocumentStatus.Active, c);
+            var oldFunds = new[] { transfer.FromFundId, transfer.ToFundId };
+            var newFunds = new[] { request.FromFundId, request.ToFundId };
+            await AcquireLocksAsync(transfer.BranchId, oldFunds.Concat(newFunds), c);
+
+            var lockedUntil = await _db.Branches.Where(b => b.Id == transfer.BranchId).Select(b => b.LockedUntil).SingleAsync(c);
+            PeriodLockGuard.EnsureNotLocked(lockedUntil,
+                new[] { transfer.VoucherAt }.Concat(new[] { voucherAt }.Where(IsValidVoucherAt)));
+            await ValidateAsync(request, transfer.BranchId, transfer, c);
+            // Every fund involved, old and new, from the earlier of the two dates: an old destination that loses the
+            // transfer is checked as well as a new or changed source.
+            var from = transfer.VoucherAt < voucherAt ? transfer.VoucherAt : voucherAt;
+            var fundCapture = await _fundGuard.CaptureAsync(oldFunds.Concat(newFunds).Select(f => (f, from)), c);
+
+            ApplyRequest(transfer, request, voucherAt);
+            await _db.SaveChangesAsync(c);
+
+            await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
+            AddActivity(transfer, CashDocumentActivityAction.Updated, "Cập nhật phiếu");
+            await _db.SaveChangesAsync(c);
+        }, ct);
+
+        return await LoadDtoAsync(id, ct);
+    }
+
+    /// Cancelling takes the amount back out of the destination fund, so that fund is the one the check can flag.
+    public async Task<FundTransferDto> CancelAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default)
+    {
+        await ChangeLifecycleAsync(id, request, DocumentStatus.Active, CashDocumentActivityAction.Cancelled, "Hủy phiếu",
+            (t, _) =>
+            {
+                t.Status = DocumentStatus.Cancelled;
+                t.CancelledAt = _clock.UtcNow;
+                t.CancelledBy = _currentUser.UserId;
+                return Task.CompletedTask;
+            }, ct);
+        return await LoadDtoAsync(id, ct);
+    }
+
+    /// Uses the cancel permission. Restoring takes the amount out of the source fund again.
+    public async Task<FundTransferDto> RestoreAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default)
+    {
+        await ChangeLifecycleAsync(id, request, DocumentStatus.Cancelled, CashDocumentActivityAction.Restored,
+            "Khôi phục phiếu", async (t, c) =>
+            {
+                await EnsureFundsExistAsync(t, c);
+                t.Status = DocumentStatus.Active;
+                t.CancelledAt = null;
+                t.CancelledBy = null;
+            }, ct);
+        return await LoadDtoAsync(id, ct);
+    }
+
+    /// Soft delete in any status; deleting an Active transfer reduces the destination fund like a cancel.
+    public Task DeleteAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default) =>
+        ChangeLifecycleAsync(id, request, requiredStatus: null, CashDocumentActivityAction.Deleted, "Xóa phiếu",
+            (t, _) =>
+            {
+                t.IsDeleted = true;
+                return Task.CompletedTask;
+            }, ct);
+
+    /// Cancel / restore / delete per the steps table without the debt calls: locks, period lock on the stored date,
+    /// capture of both funds, the operation's own steps (`apply`), save, the negative-fund check, then the activity.
+    private Task ChangeLifecycleAsync(Guid id, CashDocumentActionRequest request, DocumentStatus? requiredStatus,
+        CashDocumentActivityAction action, string description, Func<FundTransfer, CancellationToken, Task> apply,
+        CancellationToken ct) =>
+        _transaction.RunAsync(async c =>
+        {
+            var transfer = await LoadForWriteAsync(id, request.Version, requiredStatus, c);
+            var funds = new[] { transfer.FromFundId, transfer.ToFundId };
+            await AcquireLocksAsync(transfer.BranchId, funds, c);
+
+            var lockedUntil = await _db.Branches.Where(b => b.Id == transfer.BranchId).Select(b => b.LockedUntil).SingleAsync(c);
+            PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { transfer.VoucherAt });
+            var fundCapture = await _fundGuard.CaptureAsync(funds.Select(f => (f, transfer.VoucherAt)), c);
+
+            await apply(transfer, c);
+            await _db.SaveChangesAsync(c);
+            await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
+            AddActivity(transfer, action, description);
+            await _db.SaveChangesAsync(c);
+        }, ct);
+
+    /// Restore: both funds must still exist (not soft-deleted); 400 with their keys.
+    private async Task EnsureFundsExistAsync(FundTransfer transfer, CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (!await _db.Funds.AnyAsync(f => f.Id == transfer.FromFundId, ct))
+            errors["fromFundId"] = new[] { "Quỹ đi đã bị xóa." };
+        if (!await _db.Funds.AnyAsync(f => f.Id == transfer.ToFundId, ct))
+            errors["toFundId"] = new[] { "Quỹ đến đã bị xóa." };
+
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+    }
+
+    /// Update, cancel, restore and delete (the controller checks their permission): working branch, ownership,
+    /// status and version. `requiredStatus` null accepts any status. The header is always marked modified so the
+    /// xmin check runs (D29).
+    private async Task<FundTransfer> LoadForWriteAsync(Guid id, uint? version, DocumentStatus? requiredStatus,
+        CancellationToken ct)
+    {
+        var transfer = await _db.FundTransfers.FirstOrDefaultAsync(t => t.Id == id, ct)
+            ?? throw new NotFoundException(nameof(FundTransfer), id);
+
+        await EnsureWorkingBranchAsync(transfer.BranchId, ct);
+        if (transfer.OwnerUserId != _currentUser.UserId
+            && !_currentUser.HasPermission(Permissions.FundTransfers.EditAll))
+            throw new ForbiddenException("Bạn chỉ được thao tác trên phiếu do mình tạo.");
+        if (requiredStatus is { } required && transfer.Status != required)
+            throw new ConflictException(required == DocumentStatus.Active
+                ? "Phiếu đã hủy, không thể thay đổi."
+                : "Phiếu chưa bị hủy.");
+        if (version is null)
+            throw new ValidationDomainException(
+                new Dictionary<string, string[]> { ["version"] = new[] { "Thiếu phiên bản dữ liệu của phiếu." } }, null);
+
+        _db.Entry(transfer).Property(t => t.Version).OriginalValue = version.Value;
+        transfer.UpdatedAt = _clock.UtcNow;
+        transfer.UpdatedBy = _currentUser.UserId;
+        return transfer;
     }
 
     /// Write operations return the saved transfer without re-checking the branch: the write already did.

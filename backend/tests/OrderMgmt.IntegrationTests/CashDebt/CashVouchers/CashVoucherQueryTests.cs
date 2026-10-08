@@ -2,15 +2,18 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.CashDebt.CashReasons.Models;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Funds.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.Settings.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
+using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
 
@@ -261,6 +264,69 @@ public class CashVoucherQueryTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Reason_edit_and_delete_wait_for_a_voucher_save_in_flight()
+    {
+        var (branchId, client, cashFund) = await BranchClientAsync();
+
+        // A create takes its number (the counter row) after its locks and rules: while it waits there, the reason
+        // edit waits for it and then sees the reason in use.
+        var edited = await CreateReasonAsync(CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None);
+        var (create, edit) = await RaceAsync(HoldNextReceiptCode(branchId),
+            () => PostCashAsync(client, CashRequest(CashVoucherType.Receipt, edited, cashFund, "2026-10-05 09:00", null, 100m)),
+            () => PutReasonAsync(edited, CashVoucherType.Receipt, PartnerType.Any, DebtEffect.ReceivableDecrease));
+        create.Status.Should().Be(HttpStatusCode.OK, create.Error?.Message);
+        edit.Status.Should().Be(HttpStatusCode.BadRequest);
+        edit.Error!.Details!.Should().ContainKey("debtEffect");
+
+        var deleted = await CreateReasonAsync(CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None);
+        var (createOnDeleted, delete) = await RaceAsync(HoldNextReceiptCode(branchId),
+            () => PostCashAsync(client, CashRequest(CashVoucherType.Receipt, deleted, cashFund, "2026-10-05 10:00", null, 100m)),
+            () => _client.DeleteAsync($"/api/cash-reasons/{deleted}"));
+        createOnDeleted.Status.Should().Be(HttpStatusCode.OK, createOnDeleted.Error?.Message);
+        delete.StatusCode.Should().Be(HttpStatusCode.Conflict);
+
+        // An update writes the voucher row after its locks and rules: an edit of the reason it switches to waits too.
+        var switched = await CreateReasonAsync(CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None);
+        var request = CashUpdateFrom(create.Voucher!);
+        request.ReasonId = switched;
+        var (update, editSwitched) = await RaceAsync(HoldRow("cash_vouchers", create.Voucher!.Id),
+            () => PutCashAsync(client, create.Voucher!.Id, request),
+            () => PutReasonAsync(switched, CashVoucherType.Receipt, PartnerType.Any, DebtEffect.ReceivableDecrease));
+        update.Status.Should().Be(HttpStatusCode.OK, update.Error?.Message);
+        editSwitched.Status.Should().Be(HttpStatusCode.BadRequest);
+        editSwitched.Error!.Details!.Should().ContainKey("debtEffect");
+
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Voucher_save_waits_for_a_reason_edit_in_flight()
+    {
+        var (_, client, cashFund) = await BranchClientAsync();
+
+        // The reason edit writes the reason row after its in-use check: while it waits there, the create waits for
+        // it and then validates against the new debt effect, which needs a partner.
+        var edited = await CreateReasonAsync(CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None);
+        var (edit, create) = await RaceAsync(HoldRow("cash_reasons", edited),
+            () => PutReasonAsync(edited, CashVoucherType.Receipt, PartnerType.Any, DebtEffect.ReceivableDecrease),
+            () => PostCashAsync(client, CashRequest(CashVoucherType.Receipt, edited, cashFund, "2026-10-05 09:00", null, 100m)));
+        edit.Status.Should().Be(HttpStatusCode.OK, edit.Error?.Message);
+        create.Status.Should().Be(HttpStatusCode.BadRequest);
+        create.Error!.Details!.Should().ContainKey("partnerId");
+
+        var deleted = await CreateReasonAsync(CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None);
+        var (delete, createOnDeleted) = await RaceAsync(HoldRow("cash_reasons", deleted),
+            () => _client.DeleteAsync($"/api/cash-reasons/{deleted}"),
+            () => PostCashAsync(client, CashRequest(CashVoucherType.Receipt, deleted, cashFund, "2026-10-05 09:00", null, 100m)));
+        delete.StatusCode.Should().Be(HttpStatusCode.OK);
+        createOnDeleted.Status.Should().Be(HttpStatusCode.BadRequest);
+        createOnDeleted.Error!.Details!.Should().ContainKey("reasonId");
+
+        (await ListAsync(client, "type=Receipt&status=All")).Items.Should().BeEmpty();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
     public async Task Branch_with_cash_voucher_has_documents()
     {
         var (branchId, client, cashFund) = await BranchClientAsync();
@@ -333,6 +399,56 @@ public class CashVoucherQueryTests : CashDebtTestBase
 
     private Task<HttpResponseMessage> PutOpeningDateAsync(Guid branchId, DateOnly date) =>
         _client.PutAsJsonAsync($"/api/branches/{branchId}/opening-date", new SetOpeningDateRequest { OpeningDate = date });
+
+    /// Runs two requests against each other. A transaction of the test holds a row (`hold`) that `first` writes only
+    /// after its locks and checks, so `first` stops in flight there; `second` starts then, and the row is released
+    /// once `second` has finished or waits too.
+    private async Task<(TFirst First, TSecond Second)> RaceAsync<TFirst, TSecond>(Func<IServiceProvider, Task> hold,
+        Func<Task<TFirst>> first, Func<Task<TSecond>> second)
+    {
+        Task<TFirst> firstTask;
+        Task<TSecond> secondTask;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await hold(scope.ServiceProvider);
+
+            firstTask = first();
+            await WaitForBlockedAsync(firstTask, count: 1);
+            firstTask.IsCompleted.Should().BeFalse("the first request waits for the held row");
+            secondTask = second();
+            await WaitForBlockedAsync(secondTask, count: 2);
+            await transaction.RollbackAsync();
+        }
+        return (await firstTask, await secondTask);
+    }
+
+    /// Waits until `task` has finished or `count` backends of this test's database wait on a lock. Polled through
+    /// new connections: pg_stat_activity stays frozen inside a transaction.
+    private async Task WaitForBlockedAsync(Task task, int count)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(15);
+        while (!task.IsCompleted && await InDbAsync(db => db.Database.SqlQuery<int>(
+                   $"SELECT count(*)::int AS \"Value\" FROM pg_stat_activity WHERE datname = current_database() AND cardinality(pg_blocking_pids(pid)) > 0")
+                   .SingleAsync()) < count)
+        {
+            if (DateTime.UtcNow > deadline)
+                throw new TimeoutException($"Expected {count} request(s) waiting on a lock.");
+            await Task.Delay(20);
+        }
+    }
+
+    /// Takes the branch's next receipt number in the race's transaction: a create then waits on the counter row.
+    private static Func<IServiceProvider, Task> HoldNextReceiptCode(Guid branchId) => sp =>
+        sp.GetRequiredService<IDocumentCodeAllocator>().NextAsync(DocumentType.Receipt, branchId, Vn("2026-10-05 09:00"),
+            peek: false, (_, _) => Task.FromResult<IReadOnlySet<string>>(new HashSet<string>()));
+
+    /// Locks a row in the race's transaction. FOR NO KEY UPDATE: an UPDATE of the row waits, a foreign-key check
+    /// does not.
+    private static Func<IServiceProvider, Task> HoldRow(string table, Guid id) => sp =>
+        sp.GetRequiredService<AppDbContext>().Database.ExecuteSqlRawAsync(
+            "SELECT 1 FROM " + table + " WHERE id = {0} FOR NO KEY UPDATE", id);
 
     private static string NewCode(string prefix) => prefix + Guid.NewGuid().ToString("N")[..8];
 }

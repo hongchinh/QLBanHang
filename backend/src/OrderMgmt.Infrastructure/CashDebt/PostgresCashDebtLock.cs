@@ -3,7 +3,7 @@ using OrderMgmt.Infrastructure.Persistence;
 
 namespace OrderMgmt.Infrastructure.CashDebt;
 
-/// pg_advisory_xact_lock: released when the transaction ends.
+/// pg_advisory_xact_lock[_shared]: released when the transaction ends.
 public sealed class PostgresCashDebtLock : ICashDebtLock
 {
     private readonly AppDbContext _db;
@@ -15,4 +15,7 @@ public sealed class PostgresCashDebtLock : ICashDebtLock
         await AdvisoryLocks.AcquireAsync(_db, partnerIds.Select(id => $"debt-partner:{branchId:N}:{id:N}"), shared: false, ct);
         await AdvisoryLocks.AcquireAsync(_db, fundIds.Select(id => $"cash-fund:{id:N}"), shared: false, ct);
     }
+
+    public Task AcquireReasonAsync(Guid reasonId, bool exclusive, CancellationToken ct = default) =>
+        AdvisoryLocks.AcquireAsync(_db, new[] { $"cash-reason:{reasonId:N}" }, shared: !exclusive, ct);
 }

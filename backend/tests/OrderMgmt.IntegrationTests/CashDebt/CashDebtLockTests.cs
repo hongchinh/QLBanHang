@@ -66,6 +66,47 @@ public class CashDebtLockTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Reason_key_is_shared_by_voucher_saves_and_exclusive_for_reason_edits()
+    {
+        var reason = Guid.NewGuid();
+        var otherReason = Guid.NewGuid();
+
+        // Two voucher saves with the same reason do not wait for each other; an edit of it waits for both.
+        await using var a = await Session.BeginAsync(_factory.Services, shortLockTimeout: true);
+        await using var b = await Session.BeginAsync(_factory.Services, shortLockTimeout: true);
+        await a.Lock.AcquireReasonAsync(reason, exclusive: false);
+        await b.Lock.AcquireReasonAsync(reason, exclusive: false);
+
+        await using (var c = await Session.BeginAsync(_factory.Services, shortLockTimeout: true))
+        {
+            await c.Lock.AcquireReasonAsync(otherReason, exclusive: true);
+            var edit = () => c.Lock.AcquireReasonAsync(reason, exclusive: true);
+            (await edit.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be("55P03");
+            await c.Db.Database.RollbackTransactionAsync();
+        }
+
+        await a.Db.Database.CommitTransactionAsync();
+        await b.Db.Database.CommitTransactionAsync();
+
+        // A voucher save waits for an edit of its reason.
+        await using var editor = await Session.BeginAsync(_factory.Services, shortLockTimeout: true);
+        await editor.Lock.AcquireReasonAsync(reason, exclusive: true);
+
+        await using (var d = await Session.BeginAsync(_factory.Services, shortLockTimeout: true))
+        {
+            var save = () => d.Lock.AcquireReasonAsync(reason, exclusive: false);
+            (await save.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be("55P03");
+            await d.Db.Database.RollbackTransactionAsync();
+        }
+
+        await editor.Db.Database.CommitTransactionAsync();
+
+        using var scope = _factory.Services.CreateScope();
+        var outside = () => scope.ServiceProvider.GetRequiredService<ICashDebtLock>().AcquireReasonAsync(reason, exclusive: false);
+        await outside.Should().ThrowAsync<InvalidOperationException>();
+    }
+
+    [Fact]
     public async Task One_lock_per_key_and_requires_transaction()
     {
         var branchId = Guid.NewGuid();

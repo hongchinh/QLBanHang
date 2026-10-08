@@ -235,7 +235,7 @@ public class CashVoucherService : ICashVoucherService
         var id = await _transaction.RunAsync(async c =>
         {
             var partnerIds = request.PartnerId is { } partnerId ? new[] { partnerId } : Array.Empty<Guid>();
-            await AcquireLocksAsync(branchId, partnerIds, new[] { request.FundId }, c);
+            await AcquireLocksAsync(branchId, partnerIds, new[] { request.FundId }, request.ReasonId, c);
 
             var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
             PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucherAt }.Where(IsValidVoucherAt));
@@ -273,7 +273,7 @@ public class CashVoucherService : ICashVoucherService
         {
             var voucher = await LoadForWriteAsync(id, CashVoucherPermissions.Edit, request.Version, DocumentStatus.Active, c);
             await AcquireLocksAsync(voucher.BranchId, new[] { voucher.PartnerId, request.PartnerId }.OfType<Guid>(),
-                new[] { voucher.FundId, request.FundId }, c);
+                new[] { voucher.FundId, request.FundId }, request.ReasonId, c);
 
             var lockedUntil = await _db.Branches.Where(b => b.Id == voucher.BranchId).Select(b => b.LockedUntil).SingleAsync(c);
             PeriodLockGuard.EnsureNotLocked(lockedUntil,
@@ -351,7 +351,10 @@ public class CashVoucherService : ICashVoucherService
         _transaction.RunAsync(async c =>
         {
             var voucher = await LoadForWriteAsync(id, permission, request.Version, requiredStatus, c);
-            await AcquireLocksAsync(voucher.BranchId, new[] { voucher.PartnerId }.OfType<Guid>(), new[] { voucher.FundId }, c);
+            // No reason key: the voucher already holds its reason in use (P19), so the reason keeps its type, partner
+            // type and debt effect and cannot be deleted.
+            await AcquireLocksAsync(voucher.BranchId, new[] { voucher.PartnerId }.OfType<Guid>(), new[] { voucher.FundId },
+                reasonId: null, c);
 
             var lockedUntil = await _db.Branches.Where(b => b.Id == voucher.BranchId).Select(b => b.LockedUntil).SingleAsync(c);
             PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucher.VoucherAt });
@@ -544,17 +547,20 @@ public class CashVoucherService : ICashVoucherService
 
     // ---- Writes -----------------------------------------------------------------------------
 
-    /// The shared branch gate, then the partner and fund keys (P14).
+    /// The shared branch gate, then the partner and fund keys (P14), then the shared key of the reason the voucher is
+    /// saved with: a reason edit or delete takes it exclusively, so its in-use check waits for this save (P19).
     private async Task AcquireLocksAsync(Guid branchId, IEnumerable<Guid> partnerIds, IEnumerable<Guid> fundIds,
-        CancellationToken ct)
+        Guid? reasonId, CancellationToken ct)
     {
         await _inventoryLock.AcquireBranchGateAsync(new[] { branchId }, exclusive: false, ct);
         await _cashDebtLock.AcquireAsync(branchId, partnerIds.Distinct(), fundIds.Distinct(), ct);
+        if (reasonId is { } id)
+            await _cashDebtLock.AcquireReasonAsync(id, exclusive: false, ct);
     }
 
     /// Business rules 1–3 and 5 (Phase 05 save rules), the voucher date range and the Total limit, collected into
-    /// one 400. `existing` is null on create. Runs after the locks, so the references it reads cannot change before
-    /// the save.
+    /// one 400. `existing` is null on create. Runs after the locks: the fund key and the shared reason key keep the
+    /// fund and the reason from being edited or deleted before the save commits.
     private async Task<(CashReason Reason, Customer? Partner)> ValidateAsync(UpsertCashVoucherRequest request,
         Guid branchId, CashVoucher? existing, CancellationToken ct)
     {

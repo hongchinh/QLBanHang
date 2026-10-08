@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.CashReasons.Interfaces;
 using OrderMgmt.Application.CashDebt.CashReasons.Models;
 using OrderMgmt.Application.CashDebt.Common;
+using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.CashDebt;
@@ -14,12 +15,17 @@ public class CashReasonService : ICashReasonService
     private readonly IAppDbContext _db;
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
+    private readonly ITransactionRunner _transaction;
+    private readonly ICashDebtLock _cashDebtLock;
 
-    public CashReasonService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser)
+    public CashReasonService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ITransactionRunner transaction,
+        ICashDebtLock cashDebtLock)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
+        _transaction = transaction;
+        _cashDebtLock = cashDebtLock;
     }
 
     public async Task<IReadOnlyList<CashReasonDto>> ListAsync(CashVoucherType? type, bool includeAuto, CancellationToken ct = default)
@@ -63,51 +69,58 @@ public class CashReasonService : ICashReasonService
 
     public async Task<CashReasonDto> UpdateAsync(Guid id, UpdateCashReasonRequest request, CancellationToken ct = default)
     {
-        var reason = await FindAsync(id, ct);
-
-        if (reason.IsAuto)
-            throw new ConflictException("Lý do tự động không được sửa.");
-        if (reason.IsSystem && (reason.Type != request.Type || reason.PartnerType != request.PartnerType))
-            throw new ConflictException("Lý do hệ thống không được đổi loại phiếu hoặc loại đối tượng.");
-
-        EnsureCombination(request.Type, request.PartnerType, request.DebtEffect);
-
-        // Vouchers already saved with this reason were validated and posted against these fields (P19).
-        var typeChanged = reason.Type != request.Type;
-        var partnerTypeChanged = reason.PartnerType != request.PartnerType;
-        var debtEffectChanged = reason.DebtEffect != request.DebtEffect;
-        if ((typeChanged || partnerTypeChanged || debtEffectChanged) && await IsUsedAsync(id, ct))
+        var saved = await _transaction.RunAsync(async c =>
         {
-            var errors = new Dictionary<string, string[]>();
-            if (typeChanged)
-                errors["type"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi loại phiếu." };
-            if (partnerTypeChanged)
-                errors["partnerType"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi loại đối tượng." };
-            if (debtEffectChanged)
-                errors["debtEffect"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi ảnh hưởng công nợ." };
-            throw new ValidationDomainException(errors, null);
-        }
+            var reason = await LockAsync(id, c);
 
-        reason.Name = request.Name.Trim();
-        reason.Type = request.Type;
-        reason.PartnerType = request.PartnerType;
-        reason.DebtEffect = request.DebtEffect;
-        await _db.SaveChangesAsync(ct);
-        return ToDto(reason);
+            if (reason.IsAuto)
+                throw new ConflictException("Lý do tự động không được sửa.");
+            if (reason.IsSystem && (reason.Type != request.Type || reason.PartnerType != request.PartnerType))
+                throw new ConflictException("Lý do hệ thống không được đổi loại phiếu hoặc loại đối tượng.");
+
+            EnsureCombination(request.Type, request.PartnerType, request.DebtEffect);
+
+            // Vouchers already saved with this reason were validated and posted against these fields (P19).
+            var typeChanged = reason.Type != request.Type;
+            var partnerTypeChanged = reason.PartnerType != request.PartnerType;
+            var debtEffectChanged = reason.DebtEffect != request.DebtEffect;
+            if ((typeChanged || partnerTypeChanged || debtEffectChanged) && await IsUsedAsync(id, c))
+            {
+                var errors = new Dictionary<string, string[]>();
+                if (typeChanged)
+                    errors["type"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi loại phiếu." };
+                if (partnerTypeChanged)
+                    errors["partnerType"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi loại đối tượng." };
+                if (debtEffectChanged)
+                    errors["debtEffect"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi ảnh hưởng công nợ." };
+                throw new ValidationDomainException(errors, null);
+            }
+
+            reason.Name = request.Name.Trim();
+            reason.Type = request.Type;
+            reason.PartnerType = request.PartnerType;
+            reason.DebtEffect = request.DebtEffect;
+            await _db.SaveChangesAsync(c);
+            return reason;
+        }, ct);
+        return ToDto(saved);
     }
 
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
-        var reason = await FindAsync(id, ct);
-        if (reason.IsSystem)
-            throw new ConflictException("Không thể xóa lý do hệ thống.");
-        if (await IsUsedAsync(id, ct))
-            throw new ConflictException("Lý do đã được dùng trên phiếu thu/chi, không thể xóa.");
+        await _transaction.RunAsync(async c =>
+        {
+            var reason = await LockAsync(id, c);
+            if (reason.IsSystem)
+                throw new ConflictException("Không thể xóa lý do hệ thống.");
+            if (await IsUsedAsync(id, c))
+                throw new ConflictException("Lý do đã được dùng trên phiếu thu/chi, không thể xóa.");
 
-        reason.IsDeleted = true;
-        reason.DeletedAt = _clock.UtcNow;
-        reason.DeletedBy = _currentUser.UserId;
-        await _db.SaveChangesAsync(ct);
+            reason.IsDeleted = true;
+            reason.DeletedAt = _clock.UtcNow;
+            reason.DeletedBy = _currentUser.UserId;
+            await _db.SaveChangesAsync(c);
+        }, ct);
     }
 
     /// Collects every broken combination rule (P19) into one validation error.
@@ -125,6 +138,15 @@ public class CashReasonService : ICashReasonService
     /// Used by a non-deleted cash voucher (any status); the query filter skips deleted ones.
     private Task<bool> IsUsedAsync(Guid id, CancellationToken ct) =>
         _db.CashVouchers.AnyAsync(v => v.ReasonId == id, ct);
+
+    /// The exclusive reason key, then the tracked reason. A voucher save holds the key shared from before it reads the
+    /// reason until it commits, so the in-use check sees every voucher saved with the reason, and a voucher save that
+    /// starts meanwhile reads the reason only after this edit commits.
+    private async Task<CashReason> LockAsync(Guid id, CancellationToken ct)
+    {
+        await _cashDebtLock.AcquireReasonAsync(id, exclusive: true, ct);
+        return await FindAsync(id, ct);
+    }
 
     private async Task<CashReason> FindAsync(Guid id, CancellationToken ct) =>
         await _db.CashReasons.FirstOrDefaultAsync(r => r.Id == id, ct)

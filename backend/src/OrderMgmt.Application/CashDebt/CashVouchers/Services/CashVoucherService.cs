@@ -8,6 +8,7 @@ using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
+using OrderMgmt.Application.Organization.Branches;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.CashDebt;
@@ -57,12 +58,9 @@ public class CashVoucherService : ICashVoucherService
             var partnerIds = request.PartnerId is { } partnerId ? new[] { partnerId } : Array.Empty<Guid>();
             await AcquireLocksAsync(branchId, partnerIds, new[] { request.FundId }, c);
 
-            var reason = await _db.CashReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == request.ReasonId, c)
-                ?? throw new NotFoundException(nameof(CashReason), request.ReasonId);
-            var partner = request.PartnerId is { } requestedPartnerId
-                ? await _db.Customers.AsNoTracking().FirstOrDefaultAsync(p => p.Id == requestedPartnerId, c)
-                    ?? throw new NotFoundException(nameof(Customer), requestedPartnerId)
-                : null;
+            var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
+            PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucherAt });
+            var (reason, partner) = await ValidateAsync(request, branchId, existing: null, c);
 
             var voucher = new CashVoucher
             {
@@ -184,6 +182,81 @@ public class CashVoucherService : ICashVoucherService
     {
         await _inventoryLock.AcquireBranchGateAsync(new[] { branchId }, exclusive: false, ct);
         await _cashDebtLock.AcquireAsync(branchId, partnerIds.Distinct(), fundIds.Distinct(), ct);
+    }
+
+    /// Business rules 1–3 and 5 (Phase 05 save rules), collected into one 400. `existing` is null on create.
+    /// Runs after the locks, so the references it reads cannot change before the save.
+    private async Task<(CashReason Reason, Customer? Partner)> ValidateAsync(UpsertCashVoucherRequest request,
+        Guid branchId, CashVoucher? existing, CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>();
+        void Add(string key, string message) => errors.TryAdd(key, new[] { message });
+
+        if (existing is not null && existing.Type != request.Type)
+            Add("type", "Không được đổi loại phiếu.");
+
+        var reason = await _db.CashReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == request.ReasonId, ct);
+        if (reason is null)
+            Add("reasonId", "Lý do không tồn tại.");
+        else if (reason.Type != request.Type)
+            Add("reasonId", "Lý do không đúng loại phiếu.");
+        else if (reason.IsAuto)
+            Add("reasonId", "Lý do này chỉ dùng cho phiếu tự động.");
+
+        var fund = await _db.Funds.AsNoTracking().FirstOrDefaultAsync(f => f.Id == request.FundId, ct);
+        if (fund is null || fund.BranchId != branchId)
+            Add("fundId", "Quỹ không thuộc chi nhánh đang làm việc.");
+        // Only a newly chosen fund must be active, so old vouchers stay editable.
+        else if (!fund.IsActive && existing?.FundId != request.FundId)
+            Add("fundId", "Quỹ đã ngừng sử dụng.");
+
+        Customer? partner = null;
+        if (request.PartnerId is { } partnerId)
+        {
+            partner = await _db.Customers.AsNoTracking().FirstOrDefaultAsync(p => p.Id == partnerId, ct);
+            if (partner is null)
+                Add("partnerId", "Đối tượng không tồn tại.");
+            else if (partner.Status != CustomerStatus.Active && existing?.PartnerId != request.PartnerId)
+                Add("partnerId", "Đối tượng đã ngừng hoạt động.");
+        }
+        if (reason is not null)
+            ValidatePartner(reason, request.PartnerId, partner, Add);
+
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+        return (reason!, partner);
+    }
+
+    /// Partner rules per reason: PartnerType (Round 1 D4), then the debt side's role when the reason affects debt (P19).
+    private static void ValidatePartner(CashReason reason, Guid? partnerId, Customer? partner, Action<string, string> add)
+    {
+        switch (reason.PartnerType)
+        {
+            case PartnerType.None when partnerId.HasValue:
+                add("partnerId", "Lý do này không dùng đối tượng.");
+                return;
+            case PartnerType.Customer when partnerId is null:
+                add("partnerId", "Lý do này yêu cầu chọn khách hàng.");
+                return;
+            case PartnerType.Customer when partner is { IsCustomer: false }:
+                add("partnerId", "Đối tượng không phải khách hàng.");
+                return;
+            case PartnerType.Supplier when partnerId is null:
+                add("partnerId", "Lý do này yêu cầu chọn nhà cung cấp.");
+                return;
+            case PartnerType.Supplier when partner is { IsSupplier: false }:
+                add("partnerId", "Đối tượng không phải nhà cung cấp.");
+                return;
+        }
+
+        if (DebtEffectRules.Resolve(reason.DebtEffect) is not { } effect)
+            return;
+        if (partnerId is null)
+            add("partnerId", "Lý do này ảnh hưởng công nợ, vui lòng chọn đối tượng.");
+        else if (partner is not null && !DebtEffectRules.PartnerHasSideRole(effect.Side, partner.IsCustomer, partner.IsSupplier))
+            add("partnerId", effect.Side == DebtSide.Receivable
+                ? "Đối tượng không phải khách hàng."
+                : "Đối tượng không phải nhà cung cấp.");
     }
 
     /// `peek` reads the next number without using it (form defaults); otherwise the counter is incremented.

@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
@@ -13,10 +14,12 @@ namespace OrderMgmt.WebApi.Controllers;
 public class CashVouchersController : ApiControllerBase
 {
     private readonly ICashVoucherService _service;
+    private readonly IValidator<UpsertCashVoucherRequest> _upsertValidator;
 
-    public CashVouchersController(ICashVoucherService service)
+    public CashVouchersController(ICashVoucherService service, IValidator<UpsertCashVoucherRequest> upsertValidator)
     {
         _service = service;
+        _upsertValidator = upsertValidator;
     }
 
     [HttpGet("{id:guid}")]
@@ -26,5 +29,8 @@ public class CashVouchersController : ApiControllerBase
     [HttpPost]
     public async Task<ActionResult<ApiResponse<CashVoucherDto>>> Create(
         [FromBody] UpsertCashVoucherRequest request, CancellationToken ct)
-        => Success(await _service.CreateAsync(request, ct));
+    {
+        await _upsertValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.CreateAsync(request, ct));
+    }
 }

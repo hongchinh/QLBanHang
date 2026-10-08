@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Organization.Branches;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
@@ -31,13 +32,8 @@ public class DebtLedgerService : IDebtLedgerService
         if (drafts.GroupBy(d => d.Side).Any(g => g.Count() > 1))
             throw new ArgumentException("A source has at most one debt entry draft per side.", nameof(drafts));
 
-        var existing = await _db.DebtEntries
-            .Where(e => e.SourceType == sourceType && e.SourceId == sourceId)
-            .ToListAsync(ct);
+        var (existing, settlements) = await LoadSourceAsync(sourceType, sourceId, ct);
         var existingIds = existing.Select(e => e.Id).ToList();
-        var settlements = await _db.DebtSettlements
-            .Where(s => existingIds.Contains(s.IncreaseEntryId) || existingIds.Contains(s.DecreaseEntryId))
-            .ToListAsync(ct);
 
         // 1. Evaluate both sides before changing anything (P11), collecting the settlements a shrink would drop.
         var pending = new List<DebtSettlement>();
@@ -112,20 +108,77 @@ public class DebtLedgerService : IDebtLedgerService
         return result;
     }
 
-    public Task RemoveSourceAsync(DebtSourceType sourceType, Guid sourceId, bool confirmRemoveSettlements,
-        CancellationToken ct = default) =>
-        throw new NotImplementedException("Implemented in Phase 04 Task 4.4.");
+    public async Task RemoveSourceAsync(DebtSourceType sourceType, Guid sourceId, bool confirmRemoveSettlements,
+        CancellationToken ct = default)
+    {
+        var (existing, settlements) = await LoadSourceAsync(sourceType, sourceId, ct);
+        if (existing.Count == 0)
+            return;
 
-    public Task RemoveOwnSettlementsAsync(DebtSourceType sourceType, Guid sourceId, SettlementOrigin origin,
-        CancellationToken ct = default) =>
-        throw new NotImplementedException("Implemented in Phase 04 Task 4.4.");
+        var entries = await WithCounterpartsAsync(existing, settlements, ct);
+        if (settlements.Count > 0 && !confirmRemoveSettlements)
+            throw SettlementsWillBeRemoved(settlements, existing.Select(e => e.Id).ToList(), entries);
 
-    /// Inserts only for now; the validation rules come with Phase 04 Task 4.4.
+        await RemoveCoreAsync(settlements, entries, ct);
+        _db.DebtEntries.RemoveRange(existing);
+        await _db.SaveChangesAsync(ct);
+    }
+
+    public async Task RemoveOwnSettlementsAsync(DebtSourceType sourceType, Guid sourceId, SettlementOrigin origin,
+        CancellationToken ct = default)
+    {
+        var (_, settlements) = await LoadSourceAsync(sourceType, sourceId, ct);
+        var own = settlements.Where(s => s.Origin == origin).ToList();
+        if (own.Count == 0)
+            return;
+
+        _db.DebtSettlements.RemoveRange(own);
+        await _db.SaveChangesAsync(ct);
+    }
+
     public async Task<IReadOnlyList<DebtSettlement>> AddSettlementsAsync(IReadOnlyList<SettlementDraft> drafts,
         SettlementOrigin origin, Guid batchId, string errorKeyPrefix, CancellationToken ct = default)
     {
+        if (drafts.Count == 0)
+            return Array.Empty<DebtSettlement>();
+
         var ids = drafts.SelectMany(d => new[] { d.IncreaseEntryId, d.DecreaseEntryId }).Distinct().ToList();
         var entries = await _db.DebtEntries.Where(e => ids.Contains(e.Id)).ToDictionaryAsync(e => e.Id, ct);
+
+        // 1. Pairs and amounts, collecting every error. Open = Amount − existing settlements − earlier items.
+        var settled = (await SettledAmountsAsync(entries.Keys, ct: ct)).ToDictionary(x => x.Key, x => x.Value);
+        var errors = new Dictionary<string, string[]>();
+        for (var i = 0; i < drafts.Count; i++)
+        {
+            var draft = drafts[i];
+            var key = $"{errorKeyPrefix}[{i}]";
+            var increase = entries.GetValueOrDefault(draft.IncreaseEntryId);
+            var decrease = entries.GetValueOrDefault(draft.DecreaseEntryId);
+            var pairError = PairError(increase, decrease);
+            if (pairError is { } pe)
+                errors[$"{key}.{pe.Field}"] = new[] { pe.Message };
+
+            if (draft.Amount <= 0)
+            {
+                errors[$"{key}.amount"] = new[] { "Số tiền đối trừ phải lớn hơn 0." };
+                continue;
+            }
+
+            if (pairError is not null)
+                continue;
+
+            if (settled[increase!.Id] + draft.Amount > increase.Amount || settled[decrease!.Id] + draft.Amount > decrease.Amount)
+            {
+                errors[$"{key}.amount"] = new[] { "Số tiền đối trừ vượt quá số còn lại của chứng từ." };
+                continue;
+            }
+
+            settled[increase.Id] += draft.Amount;
+            settled[decrease.Id] += draft.Amount;
+        }
+
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
 
         var now = _clock.UtcNow;
         var added = drafts.Select(d => new DebtSettlement
@@ -139,18 +192,82 @@ public class DebtLedgerService : IDebtLedgerService
             CreatedAt = now,
             CreatedBy = _currentUser.UserId,
         }).ToList();
+
+        // 2. Period lock on EffectiveAt; LockedUntil is read once for the branches involved.
+        var branchIds = entries.Values.Select(e => e.BranchId).Distinct().ToList();
+        var lockedUntil = await _db.Branches.IgnoreQueryFilters()
+            .Where(b => branchIds.Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, b => b.LockedUntil, ct);
+        foreach (var group in added.GroupBy(s => entries[s.IncreaseEntryId].BranchId))
+            PeriodLockGuard.EnsureNotLocked(lockedUntil.GetValueOrDefault(group.Key), group.Select(s => s.EffectiveAt));
+
         _db.DebtSettlements.AddRange(added);
         await _db.SaveChangesAsync(ct);
         return added;
     }
 
-    public Task<IReadOnlyList<RemovedSettlement>> RemoveSettlementsAsync(IReadOnlyCollection<Guid> settlementIds,
-        CancellationToken ct = default) =>
-        throw new NotImplementedException("Implemented in Phase 04 Task 4.4.");
+    public async Task<IReadOnlyList<RemovedSettlement>> RemoveSettlementsAsync(IReadOnlyCollection<Guid> settlementIds,
+        CancellationToken ct = default)
+    {
+        var ids = settlementIds.Distinct().ToList();
+        var settlements = await _db.DebtSettlements.Where(s => ids.Contains(s.Id)).ToListAsync(ct);
+        var missing = ids.Except(settlements.Select(s => s.Id)).ToList();
+        if (missing.Count > 0)
+            throw new NotFoundException(nameof(DebtSettlement), missing[0]);
 
-    public Task<IReadOnlyDictionary<Guid, decimal>> SettledAmountsAsync(IEnumerable<Guid> entryIds,
-        SettlementOrigin? excludeOrigin = null, CancellationToken ct = default) =>
-        throw new NotImplementedException("Implemented in Phase 04 Task 4.4.");
+        var entries = await WithCounterpartsAsync(Array.Empty<DebtEntry>(), settlements, ct);
+        var removed = await RemoveCoreAsync(settlements, entries, ct);
+        await _db.SaveChangesAsync(ct);
+        return removed;
+    }
+
+    public async Task<IReadOnlyDictionary<Guid, decimal>> SettledAmountsAsync(IEnumerable<Guid> entryIds,
+        SettlementOrigin? excludeOrigin = null, CancellationToken ct = default)
+    {
+        var ids = entryIds.Distinct().ToList();
+        var query = _db.DebtSettlements.Where(s => ids.Contains(s.IncreaseEntryId) || ids.Contains(s.DecreaseEntryId));
+        if (excludeOrigin is { } excluded)
+            query = query.Where(s => s.Origin != excluded);
+        var rows = await query.Select(s => new { s.IncreaseEntryId, s.DecreaseEntryId, s.Amount }).ToListAsync(ct);
+
+        // Every requested id is present; an entry without settlements has 0.
+        var result = ids.ToDictionary(id => id, _ => 0m);
+        foreach (var row in rows)
+        {
+            if (result.ContainsKey(row.IncreaseEntryId))
+                result[row.IncreaseEntryId] += row.Amount;
+            if (result.ContainsKey(row.DecreaseEntryId))
+                result[row.DecreaseEntryId] += row.Amount;
+        }
+
+        return result;
+    }
+
+    /// The first slot holds an Increase entry and the second a Decrease entry of the same branch, partner and side.
+    private static (string Field, string Message)? PairError(DebtEntry? increase, DebtEntry? decrease)
+    {
+        if (increase is null || increase.Direction != DebtDirection.Increase)
+            return ("increaseEntryId", "Chứng từ ghi tăng công nợ không hợp lệ.");
+        if (decrease is null || decrease.Direction != DebtDirection.Decrease)
+            return ("decreaseEntryId", "Chứng từ ghi giảm công nợ không hợp lệ.");
+        if (decrease.BranchId != increase.BranchId || decrease.PartnerId != increase.PartnerId || decrease.Side != increase.Side)
+            return ("decreaseEntryId", "Hai chứng từ phải cùng chi nhánh, đối tượng và loại công nợ.");
+        return null;
+    }
+
+    /// The source's entries and every settlement touching them (tracked).
+    private async Task<(List<DebtEntry> Entries, List<DebtSettlement> Settlements)> LoadSourceAsync(
+        DebtSourceType sourceType, Guid sourceId, CancellationToken ct)
+    {
+        var entries = await _db.DebtEntries
+            .Where(e => e.SourceType == sourceType && e.SourceId == sourceId)
+            .ToListAsync(ct);
+        var ids = entries.Select(e => e.Id).ToList();
+        var settlements = await _db.DebtSettlements
+            .Where(s => ids.Contains(s.IncreaseEntryId) || ids.Contains(s.DecreaseEntryId))
+            .ToListAsync(ct);
+        return (entries, settlements);
+    }
 
     /// Removes settlements (no save) and logs SettlementRemoved on the documents of both entries.
     /// `entries` must hold both entries of every settlement.

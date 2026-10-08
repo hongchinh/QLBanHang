@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.Catalog.Customers.Interfaces;
+using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Common;
@@ -10,6 +12,7 @@ using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Organization.Branches;
+using OrderMgmt.Application.Sales.Quotations.Helpers;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.CashDebt;
@@ -31,10 +34,12 @@ public class CashVoucherService : ICashVoucherService
     private readonly IDebtLedgerService _ledger;
     private readonly IDebtQueryService _debtQuery;
     private readonly IFundBalanceGuard _fundGuard;
+    private readonly ICustomerService _customers;
 
     public CashVoucherService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch, IDateTime clock,
         ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock,
-        IDocumentCodeAllocator codes, IDebtLedgerService ledger, IDebtQueryService debtQuery, IFundBalanceGuard fundGuard)
+        IDocumentCodeAllocator codes, IDebtLedgerService ledger, IDebtQueryService debtQuery, IFundBalanceGuard fundGuard,
+        ICustomerService customers)
     {
         _db = db;
         _currentUser = currentUser;
@@ -47,6 +52,175 @@ public class CashVoucherService : ICashVoucherService
         _ledger = ledger;
         _debtQuery = debtQuery;
         _fundGuard = fundGuard;
+        _customers = customers;
+    }
+
+    public async Task<CashVoucherListResult> ListAsync(CashVoucherListRequest request, CancellationToken ct = default)
+    {
+        EnsurePermission(CashVoucherPermissions.View(request.Type));
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        // IgnoreQueryFilters keeps vouchers whose fund, reason, partner or owner was soft-deleted later (as in
+        // LoadDtoAsync); the vouchers' own soft-delete filter is applied by hand.
+        var query = _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+            .Where(v => !v.IsDeleted && v.BranchId == branchId && v.Type == request.Type);
+
+        // VN dates as UTC ranges (D27).
+        if (request.From is { } from)
+        {
+            var start = VnTime.StartOfDay(from);
+            query = query.Where(v => v.VoucherAt >= start);
+        }
+        if (request.To is { } to)
+        {
+            var end = VnTime.StartOfNextDay(to);
+            query = query.Where(v => v.VoucherAt < end);
+        }
+        if (request.FundId is { } fundId)
+            query = query.Where(v => v.FundId == fundId);
+        if (request.ReasonId is { } reasonId)
+            query = query.Where(v => v.ReasonId == reasonId);
+        if (request.PartnerId is { } partnerId)
+            query = query.Where(v => v.PartnerId == partnerId);
+        if (request.Status != DocumentStatusFilter.All)
+        {
+            var status = (DocumentStatus)request.Status;
+            query = query.Where(v => v.Status == status);
+        }
+
+        var ownerIds = OwnerIdListParser.Parse(request.OwnerIds);
+        if (ownerIds.Count > 0)
+            query = query.Where(v => ownerIds.Contains(v.OwnerUserId));
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var pattern = $"%{EscapeLike(request.Search.Trim())}%";
+            query = query.Where(v => EF.Functions.ILike(v.Code, pattern)
+                || EF.Functions.ILike(v.PartnerName!, pattern)
+                || EF.Functions.ILike(v.PersonName!, pattern)
+                || EF.Functions.ILike(v.Description!, pattern));
+        }
+
+        var totalItems = await query.CountAsync(ct);
+        var totalAmount = await query.SumAsync(v => v.Total, ct);
+        var items = await query
+            .OrderByDescending(v => v.VoucherAt)
+            .ThenByDescending(v => v.Code)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(v => new CashVoucherListItemDto
+            {
+                Id = v.Id,
+                Type = v.Type,
+                Code = v.Code,
+                VoucherAt = v.VoucherAt,
+                FundCode = v.Fund!.Code,
+                FundName = v.Fund.Name,
+                ReasonName = v.Reason!.Name,
+                PartnerCode = v.Partner != null ? v.Partner.Code : null,
+                PartnerName = v.PartnerName,
+                PersonName = v.PersonName,
+                Description = v.Description,
+                Total = v.Total,
+                Status = v.Status,
+                OwnerUserId = v.OwnerUserId,
+                OwnerName = v.Owner != null ? v.Owner.FullName : null,
+                SourceStockVoucherId = v.SourceStockVoucherId,
+                SourceStockVoucherCode = v.SourceStockVoucher != null ? v.SourceStockVoucher.Code : null,
+                IsManaged = v.SourceStockVoucherId != null,
+            })
+            .ToListAsync(ct);
+
+        return new CashVoucherListResult
+        {
+            Items = items,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalItems = totalItems,
+            TotalAmount = totalAmount,
+        };
+    }
+
+    /// Form defaults: NextCode is a peek and does not use a number; the branch's default cash fund; TKH / TNCC.
+    public async Task<CashVoucherDefaultsDto> GetDefaultsAsync(CashVoucherType type, CancellationToken ct = default)
+    {
+        EnsurePermission(CashVoucherPermissions.Create(type));
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var now = _clock.UtcNow;
+        var reasonCode = type == CashVoucherType.Receipt ? "TKH" : "TNCC";
+
+        return new CashVoucherDefaultsDto
+        {
+            NextCode = await NextCodeAsync(type, branchId, now, peek: true, ct),
+            VoucherAt = now,
+            FundId = await _db.Funds.AsNoTracking()
+                .Where(f => f.BranchId == branchId && f.Kind == FundKind.Cash && f.IsDefault && f.IsActive)
+                .Select(f => (Guid?)f.Id)
+                .FirstOrDefaultAsync(ct),
+            ReasonId = await _db.CashReasons.AsNoTracking()
+                .Where(r => r.Code == reasonCode && r.Type == type && !r.IsAuto)
+                .Select(r => (Guid?)r.Id)
+                .FirstOrDefaultAsync(ct),
+        };
+    }
+
+    /// Partner picker. With a reason (form): its partner type narrowed by the side role of its debt effect (P19),
+    /// active partners only. Without one (list filter): any role, inactive partners included.
+    public async Task<List<CustomerSearchItemDto>> SearchPartnersAsync(CashVoucherType type, string? keyword, int limit,
+        Guid? reasonId, CancellationToken ct = default)
+    {
+        EnsurePermission(CashVoucherPermissions.View(type));
+        var partnerType = PartnerType.Any;
+        if (reasonId is { } id)
+        {
+            var reason = await _db.CashReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == id, ct);
+            if (reason is null || reason.Type != type)
+                throw new ValidationDomainException(new Dictionary<string, string[]>
+                {
+                    ["reasonId"] = new[] { reason is null ? "Lý do không tồn tại." : "Lý do không đúng loại phiếu." },
+                }, null);
+            partnerType = reason.PartnerType;
+            if (partnerType == PartnerType.Any && DebtEffectRules.Resolve(reason.DebtEffect) is { } effect)
+                partnerType = effect.Side == DebtSide.Receivable ? PartnerType.Customer : PartnerType.Supplier;
+        }
+
+        return await _customers.SearchAsync(new CustomerSearchRequest
+        {
+            Keyword = keyword ?? string.Empty,
+            Limit = limit,
+            ActiveOnly = reasonId.HasValue,
+        }, partnerType, ct);
+    }
+
+    public async Task<IReadOnlyList<CashDocumentActivityDto>> ListActivitiesAsync(Guid id, CancellationToken ct = default)
+    {
+        var voucher = await _db.CashVouchers.AsNoTracking()
+            .Where(v => v.Id == id)
+            .Select(v => new { v.Type, v.BranchId })
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException(nameof(CashVoucher), id);
+
+        EnsurePermission(CashVoucherPermissions.View(voucher.Type));
+        await EnsureWorkingBranchAsync(voucher.BranchId, ct);
+
+        var documentType = DocTypeOf(voucher.Type);
+        return await _db.CashDocumentActivities.AsNoTracking()
+            .Where(a => a.DocumentType == documentType && a.DocumentId == id)
+            .OrderByDescending(a => a.OccurredAt)
+            .Select(a => new CashDocumentActivityDto
+            {
+                Id = a.Id,
+                Action = a.Action,
+                ActorUserId = a.ActorUserId,
+                ActorName = a.ActorUserId == null
+                    ? "Hệ thống"
+                    : _db.Users.IgnoreQueryFilters()
+                        .Where(u => u.Id == a.ActorUserId)
+                        .Select(u => u.FullName)
+                        .FirstOrDefault() ?? "Người dùng không xác định",
+                OccurredAt = a.OccurredAt,
+                Description = a.Description,
+            })
+            .ToListAsync(ct);
     }
 
     public Task<CashVoucherDto> GetAsync(Guid id, CancellationToken ct = default) =>
@@ -623,6 +797,9 @@ public class CashVoucherService : ICashVoucherService
         if (branchId != await _currentBranch.GetIdAsync(ct))
             throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
     }
+
+    private static string EscapeLike(string input) =>
+        input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
     private static DocumentType DocTypeOf(CashVoucherType type) =>
         type == CashVoucherType.Receipt ? DocumentType.Receipt : DocumentType.Payment;

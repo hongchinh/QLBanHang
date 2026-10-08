@@ -72,6 +72,22 @@ public class CashReasonService : ICashReasonService
 
         EnsureCombination(request.Type, request.PartnerType, request.DebtEffect);
 
+        // Vouchers already saved with this reason were validated and posted against these fields (P19).
+        var typeChanged = reason.Type != request.Type;
+        var partnerTypeChanged = reason.PartnerType != request.PartnerType;
+        var debtEffectChanged = reason.DebtEffect != request.DebtEffect;
+        if ((typeChanged || partnerTypeChanged || debtEffectChanged) && await IsUsedAsync(id, ct))
+        {
+            var errors = new Dictionary<string, string[]>();
+            if (typeChanged)
+                errors["type"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi loại phiếu." };
+            if (partnerTypeChanged)
+                errors["partnerType"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi loại đối tượng." };
+            if (debtEffectChanged)
+                errors["debtEffect"] = new[] { "Lý do đã được dùng trên phiếu thu/chi, không được đổi ảnh hưởng công nợ." };
+            throw new ValidationDomainException(errors, null);
+        }
+
         reason.Name = request.Name.Trim();
         reason.Type = request.Type;
         reason.PartnerType = request.PartnerType;
@@ -85,6 +101,8 @@ public class CashReasonService : ICashReasonService
         var reason = await FindAsync(id, ct);
         if (reason.IsSystem)
             throw new ConflictException("Không thể xóa lý do hệ thống.");
+        if (await IsUsedAsync(id, ct))
+            throw new ConflictException("Lý do đã được dùng trên phiếu thu/chi, không thể xóa.");
 
         reason.IsDeleted = true;
         reason.DeletedAt = _clock.UtcNow;
@@ -103,6 +121,10 @@ public class CashReasonService : ICashReasonService
         if (errors.Count > 0)
             throw new ValidationDomainException(errors, null);
     }
+
+    /// Used by a non-deleted cash voucher (any status); the query filter skips deleted ones.
+    private Task<bool> IsUsedAsync(Guid id, CancellationToken ct) =>
+        _db.CashVouchers.AnyAsync(v => v.ReasonId == id, ct);
 
     private async Task<CashReason> FindAsync(Guid id, CancellationToken ct) =>
         await _db.CashReasons.FirstOrDefaultAsync(r => r.Id == id, ct)

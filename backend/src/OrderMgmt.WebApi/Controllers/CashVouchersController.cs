@@ -1,9 +1,11 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.WebApi.Controllers;
 
@@ -15,16 +17,46 @@ public class CashVouchersController : ApiControllerBase
 {
     private readonly ICashVoucherService _service;
     private readonly IValidator<UpsertCashVoucherRequest> _upsertValidator;
+    private readonly IValidator<CashVoucherListRequest> _listValidator;
 
-    public CashVouchersController(ICashVoucherService service, IValidator<UpsertCashVoucherRequest> upsertValidator)
+    public CashVouchersController(ICashVoucherService service, IValidator<UpsertCashVoucherRequest> upsertValidator,
+        IValidator<CashVoucherListRequest> listValidator)
     {
         _service = service;
         _upsertValidator = upsertValidator;
+        _listValidator = listValidator;
     }
+
+    [HttpGet]
+    public async Task<ActionResult<ApiResponse<CashVoucherListResult>>> List(
+        [FromQuery] CashVoucherListRequest request, CancellationToken ct)
+    {
+        await _listValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.ListAsync(request, ct));
+    }
+
+    [HttpGet("defaults")]
+    public async Task<ActionResult<ApiResponse<CashVoucherDefaultsDto>>> GetDefaults(
+        [FromQuery] CashVoucherType type, CancellationToken ct)
+        => Success(await _service.GetDefaultsAsync(type, ct));
+
+    [HttpGet("partners")]
+    public async Task<ActionResult<ApiResponse<List<CustomerSearchItemDto>>>> SearchPartners(
+        [FromQuery] CashVoucherType type,
+        [FromQuery] string? keyword = null,
+        [FromQuery] int limit = 20,
+        [FromQuery] Guid? reasonId = null,
+        CancellationToken ct = default)
+        => Success(await _service.SearchPartnersAsync(type, keyword, limit, reasonId, ct));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<CashVoucherDto>>> Get(Guid id, CancellationToken ct)
         => Success(await _service.GetAsync(id, ct));
+
+    [HttpGet("{id:guid}/activities")]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<CashDocumentActivityDto>>>> ListActivities(
+        Guid id, CancellationToken ct)
+        => Success(await _service.ListActivitiesAsync(id, ct));
 
     [HttpPost]
     public async Task<ActionResult<ApiResponse<CashVoucherDto>>> Create(

@@ -1,7 +1,21 @@
 using FluentValidation;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
+using OrderMgmt.Application.Common.Validators;
+using OrderMgmt.Application.Sales.Quotations.Helpers;
 
 namespace OrderMgmt.Application.CashDebt.CashVouchers.Validators;
+
+public class CashVoucherListRequestValidator : PageRequestValidator<CashVoucherListRequest>
+{
+    public CashVoucherListRequestValidator()
+    {
+        RuleFor(x => x.Type).IsInEnum();
+        RuleFor(x => x.Status).IsInEnum();
+        RuleFor(x => x.OwnerIds)
+            .Must(OwnerIdListParser.IsValid)
+            .WithMessage("Danh sách người tạo chứa giá trị không phải Guid hợp lệ.");
+    }
+}
 
 /// Shape only (column limits of cash_vouchers / cash_voucher_lines). Reason, fund, partner, type and allocation
 /// rules live in CashVoucherService.

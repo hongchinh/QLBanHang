@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.CashDebt.CashVouchers.Models;
@@ -104,4 +105,62 @@ public class CashVoucherAllocationDto
     public DateOnly DocDate { get; set; }
     public decimal Amount { get; set; }
     public SettlementOrigin Origin { get; set; }
+}
+
+public class CashVoucherListRequest : PageRequest
+{
+    public CashVoucherType Type { get; set; }
+    public DateOnly? From { get; set; }
+    public DateOnly? To { get; set; }
+    public Guid? FundId { get; set; }
+    public Guid? ReasonId { get; set; }
+    public Guid? PartnerId { get; set; }
+    public DocumentStatusFilter Status { get; set; } = DocumentStatusFilter.Active;
+    public string? OwnerIds { get; set; }               // comma-separated, like stock vouchers
+}
+
+public class CashVoucherListItemDto
+{
+    public Guid Id { get; set; }
+    public CashVoucherType Type { get; set; }
+    public string Code { get; set; } = default!;
+    public DateTimeOffset VoucherAt { get; set; }
+    public string FundCode { get; set; } = default!;
+    public string FundName { get; set; } = default!;
+    public string ReasonName { get; set; } = default!;
+    public string? PartnerCode { get; set; }
+    public string? PartnerName { get; set; }
+    public string? PersonName { get; set; }
+    public string? Description { get; set; }
+    public decimal Total { get; set; }
+    public DocumentStatus Status { get; set; }
+    public Guid OwnerUserId { get; set; }
+    public string? OwnerName { get; set; }
+    public Guid? SourceStockVoucherId { get; set; }
+    public string? SourceStockVoucherCode { get; set; }
+    public bool IsManaged { get; set; }
+}
+
+/// `TotalAmount` = Σ Total of the whole filtered set, not only the page.
+public class CashVoucherListResult : PagedResult<CashVoucherListItemDto>
+{
+    public decimal TotalAmount { get; set; }
+}
+
+public class CashVoucherDefaultsDto
+{
+    public string NextCode { get; set; } = default!;    // peek: the counter is not used
+    public DateTimeOffset VoucherAt { get; set; }
+    public Guid? FundId { get; set; }                   // default Cash fund of the working branch
+    public Guid? ReasonId { get; set; }                 // TKH (receipt) or TNCC (payment)
+}
+
+public class CashDocumentActivityDto
+{
+    public Guid Id { get; set; }
+    public CashDocumentActivityAction Action { get; set; }
+    public Guid? ActorUserId { get; set; }
+    public string? ActorName { get; set; }
+    public DateTimeOffset OccurredAt { get; set; }
+    public string Description { get; set; } = default!;
 }

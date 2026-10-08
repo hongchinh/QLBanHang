@@ -59,7 +59,7 @@ public class CashVoucherService : ICashVoucherService
             await AcquireLocksAsync(branchId, partnerIds, new[] { request.FundId }, c);
 
             var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
-            PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucherAt });
+            PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucherAt }.Where(IsValidVoucherAt));
             var (reason, partner) = await ValidateAsync(request, branchId, existing: null, c);
 
             var voucher = new CashVoucher
@@ -184,8 +184,9 @@ public class CashVoucherService : ICashVoucherService
         await _cashDebtLock.AcquireAsync(branchId, partnerIds.Distinct(), fundIds.Distinct(), ct);
     }
 
-    /// Business rules 1–3 and 5 (Phase 05 save rules), collected into one 400. `existing` is null on create.
-    /// Runs after the locks, so the references it reads cannot change before the save.
+    /// Business rules 1–3 and 5 (Phase 05 save rules), the voucher date range and the Total limit, collected into
+    /// one 400. `existing` is null on create. Runs after the locks, so the references it reads cannot change before
+    /// the save.
     private async Task<(CashReason Reason, Customer? Partner)> ValidateAsync(UpsertCashVoucherRequest request,
         Guid branchId, CashVoucher? existing, CancellationToken ct)
     {
@@ -194,6 +195,13 @@ public class CashVoucherService : ICashVoucherService
 
         if (existing is not null && existing.Type != request.Type)
             Add("type", "Không được đổi loại phiếu.");
+
+        if (!IsValidVoucherAt(VnTime.ToUtc(request.VoucherAt)))
+            Add("voucherAt", "Ngày chứng từ không hợp lệ.");
+
+        // Each line fits numeric(18,2) (shape validator); their sum is the voucher Total and the debt amount.
+        if (request.Lines.Sum(l => l.Amount) >= MaxMoney)
+            Add("lines", "Tổng tiền phiếu quá lớn.");
 
         var reason = await _db.CashReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == request.ReasonId, ct);
         if (reason is null)
@@ -226,6 +234,16 @@ public class CashVoucherService : ICashVoucherService
             throw new ValidationDomainException(errors, null);
         return (reason!, partner);
     }
+
+    private static readonly DateTimeOffset MinVoucherAt = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
+    // Exclusive upper bound of numeric(18,2).
+    private const decimal MaxMoney = 10_000_000_000_000_000m;
+
+    /// Same range as stock vouchers. An out-of-range date is reported by the rules (400 `voucherAt`), so the period
+    /// lock check skips it: VnTime cannot convert dates near DateTimeOffset.MaxValue.
+    private bool IsValidVoucherAt(DateTimeOffset voucherAt) =>
+        voucherAt >= MinVoucherAt && voucherAt <= _clock.UtcNow.AddYears(1);
 
     /// Partner rules per reason: PartnerType (Round 1 D4), then the debt side's role when the reason affects debt (P19).
     private static void ValidatePartner(CashReason reason, Guid? partnerId, Customer? partner, Action<string, string> add)

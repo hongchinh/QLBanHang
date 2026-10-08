@@ -12,7 +12,8 @@ using Xunit;
 
 namespace OrderMgmt.IntegrationTests.CashDebt.CashVouchers;
 
-/// Business rules 1–3 and 5 (reason, fund, partner, type), the shape validator and the period lock on create.
+/// Business rules 1–3 and 5 (reason, fund, partner, type), the voucher date and total limits, the shape validator
+/// and the period lock on create.
 [Collection(nameof(PostgresCollection))]
 public class CashVoucherValidationTests : CashDebtTestBase
 {
@@ -138,6 +139,43 @@ public class CashVoucherValidationTests : CashDebtTestBase
         var blankDescription = CashRequest(CashVoucherType.Receipt, reasonId, fundId, "2026-10-05 09:00", null, 100m);
         blankDescription.Lines[0].Description = " ";
         AssertFieldError(await PostCashAsync(client, blankDescription), "lines[0].description");
+
+        // Each line fits numeric(18,2) but their sum (cash_vouchers.total, the debt amount) would not.
+        var totalTooLarge = await PostCashAsync(client, CashRequest(CashVoucherType.Receipt, reasonId, fundId,
+            "2026-10-05 09:00", null, 9_000_000_000_000_000m, 9_000_000_000_000_000m));
+        AssertFieldError(totalTooLarge, "lines");
+
+        await AssertNoVouchersAsync(branchId);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task VoucherAt_range()
+    {
+        var (branchId, client, fundId) = await BranchClientAsync();
+        var reasonId = await CashReasonIdAsync("TK");
+        var outOfRange = new[]
+        {
+            default, // voucherAt left out of the request
+            new DateTimeOffset(1999, 12, 31, 16, 59, 59, TimeSpan.Zero),
+            DateTimeOffset.UtcNow.AddYears(1).AddDays(1),
+            DateTimeOffset.MaxValue,
+        };
+
+        foreach (var at in outOfRange)
+        {
+            var request = CashRequest(CashVoucherType.Receipt, reasonId, fundId, "2026-10-05 09:00", null, 100_000m);
+            request.VoucherAt = at;
+            AssertFieldError(await PostCashAsync(client, request), "voucherAt");
+        }
+
+        // A period lock does not turn an unrepresentable VN date into a 500.
+        var lockResponse = await _client.PutAsJsonAsync($"/api/branches/{branchId}/lock",
+            new SetPeriodLockRequest { LockedUntil = new DateOnly(2026, 10, 5) });
+        lockResponse.StatusCode.Should().Be(HttpStatusCode.OK, await lockResponse.Content.ReadAsStringAsync());
+        var maxValue = CashRequest(CashVoucherType.Receipt, reasonId, fundId, "2026-10-06 09:00", null, 100_000m);
+        maxValue.VoucherAt = DateTimeOffset.MaxValue;
+        AssertFieldError(await PostCashAsync(client, maxValue), "voucherAt");
 
         await AssertNoVouchersAsync(branchId);
         await AssertCashDebtInvariantsAsync();

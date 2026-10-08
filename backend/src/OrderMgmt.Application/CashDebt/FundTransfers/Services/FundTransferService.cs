@@ -9,6 +9,7 @@ using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Organization.Branches;
+using OrderMgmt.Application.Sales.Quotations.Helpers;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.CashDebt;
@@ -43,6 +44,120 @@ public class FundTransferService : IFundTransferService
         _cashDebtLock = cashDebtLock;
         _codes = codes;
         _fundGuard = fundGuard;
+    }
+
+    public async Task<FundTransferListResult> ListAsync(FundTransferListRequest request, CancellationToken ct = default)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        // IgnoreQueryFilters keeps transfers whose fund or owner was soft-deleted later (as in LoadDtoAsync); the
+        // transfers' own soft-delete filter is applied by hand.
+        var query = _db.FundTransfers.IgnoreQueryFilters().AsNoTracking()
+            .Where(t => !t.IsDeleted && t.BranchId == branchId);
+
+        // VN dates as UTC ranges (D27).
+        if (request.From is { } from)
+        {
+            var start = VnTime.StartOfDay(from);
+            query = query.Where(t => t.VoucherAt >= start);
+        }
+        if (request.To is { } to)
+        {
+            var end = VnTime.StartOfNextDay(to);
+            query = query.Where(t => t.VoucherAt < end);
+        }
+        if (request.FundId is { } fundId)
+            query = query.Where(t => t.FromFundId == fundId || t.ToFundId == fundId);
+        if (request.Status != DocumentStatusFilter.All)
+        {
+            var status = (DocumentStatus)request.Status;
+            query = query.Where(t => t.Status == status);
+        }
+
+        var ownerIds = OwnerIdListParser.Parse(request.OwnerIds);
+        if (ownerIds.Count > 0)
+            query = query.Where(t => ownerIds.Contains(t.OwnerUserId));
+
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var pattern = $"%{EscapeLike(request.Search.Trim())}%";
+            query = query.Where(t => EF.Functions.ILike(t.Code, pattern, LikeEscape)
+                || EF.Functions.ILike(t.Description!, pattern, LikeEscape));
+        }
+
+        var totalItems = await query.CountAsync(ct);
+        var totalAmount = await query.SumAsync(t => t.Amount, ct);
+        var items = await query
+            .OrderByDescending(t => t.VoucherAt)
+            .ThenByDescending(t => t.Code)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .Select(t => new FundTransferListItemDto
+            {
+                Id = t.Id,
+                Code = t.Code,
+                VoucherAt = t.VoucherAt,
+                FromFundCode = t.FromFund!.Code,
+                FromFundName = t.FromFund.Name,
+                ToFundCode = t.ToFund!.Code,
+                ToFundName = t.ToFund.Name,
+                Amount = t.Amount,
+                Description = t.Description,
+                Status = t.Status,
+                OwnerUserId = t.OwnerUserId,
+                OwnerName = t.Owner != null ? t.Owner.FullName : null,
+            })
+            .ToListAsync(ct);
+
+        return new FundTransferListResult
+        {
+            Items = items,
+            Page = request.Page,
+            PageSize = request.PageSize,
+            TotalItems = totalItems,
+            TotalAmount = totalAmount,
+        };
+    }
+
+    /// Form defaults: NextCode is a peek and does not use a number.
+    public async Task<FundTransferDefaultsDto> GetDefaultsAsync(CancellationToken ct = default)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var now = _clock.UtcNow;
+        return new FundTransferDefaultsDto
+        {
+            NextCode = await NextCodeAsync(branchId, now, peek: true, ct),
+            VoucherAt = now,
+        };
+    }
+
+    /// Newest first.
+    public async Task<IReadOnlyList<CashDocumentActivityDto>> ListActivitiesAsync(Guid id, CancellationToken ct = default)
+    {
+        var branchId = await _db.FundTransfers.AsNoTracking()
+            .Where(t => t.Id == id)
+            .Select(t => (Guid?)t.BranchId)
+            .FirstOrDefaultAsync(ct)
+            ?? throw new NotFoundException(nameof(FundTransfer), id);
+        await EnsureWorkingBranchAsync(branchId, ct);
+
+        return await _db.CashDocumentActivities.AsNoTracking()
+            .Where(a => a.DocumentType == DocumentType.FundTransfer && a.DocumentId == id)
+            .OrderByDescending(a => a.OccurredAt)
+            .Select(a => new CashDocumentActivityDto
+            {
+                Id = a.Id,
+                Action = a.Action,
+                ActorUserId = a.ActorUserId,
+                ActorName = a.ActorUserId == null
+                    ? "Hệ thống"
+                    : _db.Users.IgnoreQueryFilters()
+                        .Where(u => u.Id == a.ActorUserId)
+                        .Select(u => u.FullName)
+                        .FirstOrDefault() ?? "Người dùng không xác định",
+                OccurredAt = a.OccurredAt,
+                Description = a.Description,
+            })
+            .ToListAsync(ct);
     }
 
     public Task<FundTransferDto> GetAsync(Guid id, CancellationToken ct = default) =>
@@ -363,4 +478,12 @@ public class FundTransferService : IFundTransferService
         if (branchId != await _currentBranch.GetIdAsync(ct))
             throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
     }
+
+    // The escape character EscapeLike uses. Every ILike must pass it: without an escape argument Npgsql sends
+    // ESCAPE '' (no escape character), the added backslashes stay literal and a search containing %, _ or \
+    // misses the rows that contain it.
+    private const string LikeEscape = "\\";
+
+    private static string EscapeLike(string input) =>
+        input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }

@@ -6,6 +6,9 @@ namespace OrderMgmt.Application.CashDebt.FundTransfers.Interfaces;
 /// Fund transfers (phiếu chuyển quỹ) of the working branch. The controller checks the fund_transfers.* permissions.
 public interface IFundTransferService
 {
+    Task<FundTransferListResult> ListAsync(FundTransferListRequest request, CancellationToken ct = default);
+    Task<FundTransferDefaultsDto> GetDefaultsAsync(CancellationToken ct = default);
+    Task<IReadOnlyList<CashDocumentActivityDto>> ListActivitiesAsync(Guid id, CancellationToken ct = default);
     Task<FundTransferDto> GetAsync(Guid id, CancellationToken ct = default);
     Task<FundTransferDto> CreateAsync(UpsertFundTransferRequest request, CancellationToken ct = default);
     Task<FundTransferDto> UpdateAsync(Guid id, UpsertFundTransferRequest request, CancellationToken ct = default);

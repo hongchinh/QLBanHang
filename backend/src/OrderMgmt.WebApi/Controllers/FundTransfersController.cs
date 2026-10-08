@@ -16,12 +16,35 @@ public class FundTransfersController : ApiControllerBase
 {
     private readonly IFundTransferService _service;
     private readonly IValidator<UpsertFundTransferRequest> _upsertValidator;
+    private readonly IValidator<FundTransferListRequest> _listValidator;
 
-    public FundTransfersController(IFundTransferService service, IValidator<UpsertFundTransferRequest> upsertValidator)
+    public FundTransfersController(IFundTransferService service, IValidator<UpsertFundTransferRequest> upsertValidator,
+        IValidator<FundTransferListRequest> listValidator)
     {
         _service = service;
         _upsertValidator = upsertValidator;
+        _listValidator = listValidator;
     }
+
+    [HttpGet]
+    [HasPermission(Permissions.FundTransfers.View)]
+    public async Task<ActionResult<ApiResponse<FundTransferListResult>>> List(
+        [FromQuery] FundTransferListRequest request, CancellationToken ct)
+    {
+        await _listValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.ListAsync(request, ct));
+    }
+
+    [HttpGet("defaults")]
+    [HasPermission(Permissions.FundTransfers.View)]
+    public async Task<ActionResult<ApiResponse<FundTransferDefaultsDto>>> GetDefaults(CancellationToken ct)
+        => Success(await _service.GetDefaultsAsync(ct));
+
+    [HttpGet("{id:guid}/activities")]
+    [HasPermission(Permissions.FundTransfers.View)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<CashDocumentActivityDto>>>> ListActivities(
+        Guid id, CancellationToken ct)
+        => Success(await _service.ListActivitiesAsync(id, ct));
 
     [HttpGet("{id:guid}")]
     [HasPermission(Permissions.FundTransfers.View)]

@@ -1,6 +1,6 @@
 # Phase 06 — Fund transfer API
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

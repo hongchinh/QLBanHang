@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Common;
+using OrderMgmt.Application.CashDebt.FundTransfers.Models;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Models;
 using OrderMgmt.Application.Common.Interfaces;
@@ -233,15 +234,55 @@ public abstract class CashDebtTestBase : InventoryTestBase
             $"/api/cash-vouchers/{id}?version={r.Version}&confirmRemoveSettlements={r.ConfirmRemoveSettlements}"
             + $"&acknowledgeNegativeFund={r.AcknowledgeNegativeFund}"));
 
-    private static async Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> ReadCashResponseAsync(
-        HttpResponseMessage response)
+    private static Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> ReadCashResponseAsync(
+        HttpResponseMessage response) =>
+        ReadDocumentResponseAsync<CashVoucherDto>(response);
+
+    /// Status, data and error of a document endpoint; a success without a body (DELETE) carries no data.
+    private static async Task<(HttpStatusCode Status, T? Data, ApiError? Error)> ReadDocumentResponseAsync<T>(
+        HttpResponseMessage response) where T : class
     {
         var body = await response.Content.ReadAsStringAsync();
         var parsed = string.IsNullOrEmpty(body)
             ? null
-            : System.Text.Json.JsonSerializer.Deserialize<ApiResponse<CashVoucherDto>>(body, TestJson.Options);
+            : System.Text.Json.JsonSerializer.Deserialize<ApiResponse<T>>(body, TestJson.Options);
         return (response.StatusCode, parsed?.Data, parsed?.Error);
     }
+
+    /// A fund transfer request at VN time `at` (via Vn).
+    protected static UpsertFundTransferRequest TransferRequest(Guid from, Guid to, decimal amount, string at) => new()
+    {
+        VoucherAt = Vn(at),
+        FromFundId = from,
+        ToFundId = to,
+        Amount = amount,
+    };
+
+    protected static async Task<(HttpStatusCode Status, FundTransferDto? Transfer, ApiError? Error)> PostTransferAsync(
+        HttpClient c, UpsertFundTransferRequest r) =>
+        await ReadDocumentResponseAsync<FundTransferDto>(await c.PostAsJsonAsync("/api/fund-transfers", r));
+
+    protected static async Task<(HttpStatusCode Status, FundTransferDto? Transfer, ApiError? Error)> GetTransferAsync(
+        HttpClient c, Guid id) =>
+        await ReadDocumentResponseAsync<FundTransferDto>(await c.GetAsync($"/api/fund-transfers/{id}"));
+
+    protected static async Task<(HttpStatusCode Status, FundTransferDto? Transfer, ApiError? Error)> PutTransferAsync(
+        HttpClient c, Guid id, UpsertFundTransferRequest r) =>
+        await ReadDocumentResponseAsync<FundTransferDto>(await c.PutAsJsonAsync($"/api/fund-transfers/{id}", r));
+
+    protected static async Task<(HttpStatusCode Status, FundTransferDto? Transfer, ApiError? Error)> CancelTransferAsync(
+        HttpClient c, Guid id, CashDocumentActionRequest r) =>
+        await ReadDocumentResponseAsync<FundTransferDto>(await c.PostAsJsonAsync($"/api/fund-transfers/{id}/cancel", r));
+
+    protected static async Task<(HttpStatusCode Status, FundTransferDto? Transfer, ApiError? Error)> RestoreTransferAsync(
+        HttpClient c, Guid id, CashDocumentActionRequest r) =>
+        await ReadDocumentResponseAsync<FundTransferDto>(await c.PostAsJsonAsync($"/api/fund-transfers/{id}/restore", r));
+
+    /// DELETE sends the action request in the query string; a success carries no transfer.
+    protected static async Task<(HttpStatusCode Status, FundTransferDto? Transfer, ApiError? Error)> DeleteTransferAsync(
+        HttpClient c, Guid id, CashDocumentActionRequest r) =>
+        await ReadDocumentResponseAsync<FundTransferDto>(await c.DeleteAsync(
+            $"/api/fund-transfers/{id}?version={r.Version}&acknowledgeNegativeFund={r.AcknowledgeNegativeFund}"));
 
     /// An update request that resends the stored voucher unchanged (line ids and version included, allocations null).
     protected static UpsertCashVoucherRequest CashUpdateFrom(CashVoucherDto v) => new()

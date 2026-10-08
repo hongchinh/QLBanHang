@@ -35,6 +35,8 @@ using OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Services;
 using OrderMgmt.Application.CashDebt.Funds.Interfaces;
 using OrderMgmt.Application.CashDebt.Funds.Services;
+using OrderMgmt.Application.CashDebt.FundTransfers.Interfaces;
+using OrderMgmt.Application.CashDebt.FundTransfers.Services;
 using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.CashDebt.Settings.Interfaces;
@@ -122,6 +124,7 @@ public static class DependencyInjection
         services.AddScoped<IFundBalanceGuard, FundBalanceGuard>();
         services.AddScoped<IOpeningDebtService, OpeningDebtService>();
         services.AddScoped<ICashVoucherService, CashVoucherService>();
+        services.AddScoped<IFundTransferService, FundTransferService>();
         services.AddScoped<IInventoryLedgerService, InventoryLedgerService>();
         services.AddScoped<IInventoryCostingService, InventoryCostingService>();
         services.AddScoped<IInventoryPostingService, InventoryPostingService>();

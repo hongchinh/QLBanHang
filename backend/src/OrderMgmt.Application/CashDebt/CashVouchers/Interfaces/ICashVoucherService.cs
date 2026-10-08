@@ -9,5 +9,6 @@ public interface ICashVoucherService
     Task<CashVoucherDto> CreateAsync(UpsertCashVoucherRequest request, CancellationToken ct = default);
     Task<CashVoucherDto> UpdateAsync(Guid id, UpsertCashVoucherRequest request, CancellationToken ct = default);
     Task<CashVoucherDto> CancelAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default);
+    Task<CashVoucherDto> RestoreAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default);
 }

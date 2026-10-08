@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Common;
+using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.Common.Interfaces;
@@ -29,10 +30,11 @@ public class CashVoucherService : ICashVoucherService
     private readonly IDocumentCodeAllocator _codes;
     private readonly IDebtLedgerService _ledger;
     private readonly IDebtQueryService _debtQuery;
+    private readonly IFundBalanceGuard _fundGuard;
 
     public CashVoucherService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch, IDateTime clock,
         ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock,
-        IDocumentCodeAllocator codes, IDebtLedgerService ledger, IDebtQueryService debtQuery)
+        IDocumentCodeAllocator codes, IDebtLedgerService ledger, IDebtQueryService debtQuery, IFundBalanceGuard fundGuard)
     {
         _db = db;
         _currentUser = currentUser;
@@ -44,6 +46,7 @@ public class CashVoucherService : ICashVoucherService
         _codes = codes;
         _ledger = ledger;
         _debtQuery = debtQuery;
+        _fundGuard = fundGuard;
     }
 
     public Task<CashVoucherDto> GetAsync(Guid id, CancellationToken ct = default) =>
@@ -63,6 +66,7 @@ public class CashVoucherService : ICashVoucherService
             var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
             PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucherAt }.Where(IsValidVoucherAt));
             var (reason, partner) = await ValidateAsync(request, branchId, existing: null, c);
+            var fundCapture = await _fundGuard.CaptureAsync(new[] { (request.FundId, voucherAt) }, c);
 
             var voucher = new CashVoucher
             {
@@ -78,6 +82,7 @@ public class CashVoucherService : ICashVoucherService
             var entries = await _ledger.PostAsync(SourceTypeOf(voucher.Type), voucher.Id, DraftsOf(voucher, reason),
                 request.ConfirmRemoveSettlements, c);
             await AllocateAsync(entries, request.Allocations, c);
+            await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, CashDocumentActivityAction.Created, "Tạo phiếu");
             await _db.SaveChangesAsync(c);
             return voucher.Id;
@@ -100,6 +105,9 @@ public class CashVoucherService : ICashVoucherService
             PeriodLockGuard.EnsureNotLocked(lockedUntil,
                 new[] { voucher.VoucherAt }.Concat(new[] { voucherAt }.Where(IsValidVoucherAt)));
             var (reason, partner) = await ValidateAsync(request, voucher.BranchId, voucher, c);
+            // Both funds from the earlier of the two dates: the old fund loses the voucher, the new one gains it.
+            var from = voucher.VoucherAt < voucherAt ? voucher.VoucherAt : voucherAt;
+            var fundCapture = await _fundGuard.CaptureAsync(new[] { (voucher.FundId, from), (request.FundId, from) }, c);
 
             // A list replaces the voucher's own AtVoucher settlements (C8); null keeps them. Every other origin stays
             // and is subject to the shrink and partner rules of PostAsync (P10, P11).
@@ -113,6 +121,7 @@ public class CashVoucherService : ICashVoucherService
             var entries = await _ledger.PostAsync(sourceType, voucher.Id, DraftsOf(voucher, reason),
                 request.ConfirmRemoveSettlements, c);
             await AllocateAsync(entries, request.Allocations, c);
+            await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, CashDocumentActivityAction.Updated, "Cập nhật phiếu");
             await _db.SaveChangesAsync(c);
         }, ct);
@@ -123,8 +132,9 @@ public class CashVoucherService : ICashVoucherService
     public async Task<CashVoucherDto> CancelAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default)
     {
         await ChangeLifecycleAsync(id, request, CashVoucherPermissions.Cancel, DocumentStatus.Active,
-            CashDocumentActivityAction.Cancelled, "Hủy phiếu", v =>
+            CashDocumentActivityAction.Cancelled, "Hủy phiếu", async (v, c) =>
             {
+                await _ledger.RemoveSourceAsync(SourceTypeOf(v.Type), v.Id, request.ConfirmRemoveSettlements, c);
                 v.Status = DocumentStatus.Cancelled;
                 v.CancelledAt = _clock.UtcNow;
                 v.CancelledBy = _currentUser.UserId;
@@ -132,16 +142,38 @@ public class CashVoucherService : ICashVoucherService
         return await LoadDtoAsync(id, ct);
     }
 
+    /// Uses the cancel permission. The debt entry is posted again; its old settlements do not come back.
+    public async Task<CashVoucherDto> RestoreAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default)
+    {
+        await ChangeLifecycleAsync(id, request, CashVoucherPermissions.Cancel, DocumentStatus.Cancelled,
+            CashDocumentActivityAction.Restored, "Khôi phục phiếu", async (v, c) =>
+            {
+                var reason = await EnsureReferencesExistAsync(v, c);
+                v.Status = DocumentStatus.Active;
+                v.CancelledAt = null;
+                v.CancelledBy = null;
+                await _db.SaveChangesAsync(c);
+                await _ledger.PostAsync(SourceTypeOf(v.Type), v.Id, DraftsOf(v, reason), request.ConfirmRemoveSettlements, c);
+            }, ct);
+        return await LoadDtoAsync(id, ct);
+    }
+
     // Soft delete in any status; AppDbContext cascades IsDeleted to the lines.
     public Task DeleteAsync(Guid id, CashDocumentActionRequest request, CancellationToken ct = default) =>
         ChangeLifecycleAsync(id, request, CashVoucherPermissions.Delete, requiredStatus: null,
-            CashDocumentActivityAction.Deleted, "Xóa phiếu", v => v.IsDeleted = true, ct);
+            CashDocumentActivityAction.Deleted, "Xóa phiếu", async (v, c) =>
+            {
+                // Only an Active voucher has a debt entry; removing its settlements needs confirmation.
+                if (v.Status == DocumentStatus.Active)
+                    await _ledger.RemoveSourceAsync(SourceTypeOf(v.Type), v.Id, request.ConfirmRemoveSettlements, c);
+                v.IsDeleted = true;
+            }, ct);
 
-    /// Cancel / delete per the steps table: locks, period lock on the stored date, then the debt entry of an Active
-    /// voucher is removed (its settlements need confirmation) before the status change.
+    /// Cancel / restore / delete per the steps table: locks, period lock on the stored date, fund capture, the
+    /// operation's own steps (`apply`), save, the negative-fund check on the voucher's fund, then the activity.
     private Task ChangeLifecycleAsync(Guid id, CashDocumentActionRequest request, Func<CashVoucherType, string> permission,
-        DocumentStatus? requiredStatus, CashDocumentActivityAction action, string description, Action<CashVoucher> apply,
-        CancellationToken ct) =>
+        DocumentStatus? requiredStatus, CashDocumentActivityAction action, string description,
+        Func<CashVoucher, CancellationToken, Task> apply, CancellationToken ct) =>
         _transaction.RunAsync(async c =>
         {
             var voucher = await LoadForWriteAsync(id, permission, request.Version, requiredStatus, c);
@@ -149,15 +181,31 @@ public class CashVoucherService : ICashVoucherService
 
             var lockedUntil = await _db.Branches.Where(b => b.Id == voucher.BranchId).Select(b => b.LockedUntil).SingleAsync(c);
             PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucher.VoucherAt });
+            var fundCapture = await _fundGuard.CaptureAsync(new[] { (voucher.FundId, voucher.VoucherAt) }, c);
 
-            if (voucher.Status == DocumentStatus.Active)
-                await _ledger.RemoveSourceAsync(SourceTypeOf(voucher.Type), voucher.Id, request.ConfirmRemoveSettlements, c);
-
-            apply(voucher);
+            await apply(voucher, c);
             await _db.SaveChangesAsync(c);
+            await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, action, description);
             await _db.SaveChangesAsync(c);
         }, ct);
+
+    /// Restore: the reason, fund and partner must still exist (not soft-deleted); 400 with their keys.
+    private async Task<CashReason> EnsureReferencesExistAsync(CashVoucher voucher, CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>();
+        var reason = await _db.CashReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == voucher.ReasonId, ct);
+        if (reason is null)
+            errors["reasonId"] = new[] { "Lý do đã bị xóa." };
+        if (!await _db.Funds.AnyAsync(f => f.Id == voucher.FundId, ct))
+            errors["fundId"] = new[] { "Quỹ đã bị xóa." };
+        if (voucher.PartnerId is { } partnerId && !await _db.Customers.AnyAsync(p => p.Id == partnerId, ct))
+            errors["partnerId"] = new[] { "Đối tượng đã bị xóa." };
+
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+        return reason!;
+    }
 
     /// Update, cancel and delete: permission, working branch, managed check, ownership, status and version.
     /// `requiredStatus` null accepts any status. The header is always marked modified so the xmin check runs even

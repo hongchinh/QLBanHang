@@ -47,6 +47,11 @@ public class CashVouchersController : ApiControllerBase
         Guid id, [FromBody] CashDocumentActionRequest request, CancellationToken ct)
         => Success(await _service.CancelAsync(id, request, ct));
 
+    [HttpPost("{id:guid}/restore")]
+    public async Task<ActionResult<ApiResponse<CashVoucherDto>>> Restore(
+        Guid id, [FromBody] CashDocumentActionRequest request, CancellationToken ct)
+        => Success(await _service.RestoreAsync(id, request, ct));
+
     [HttpDelete("{id:guid}")]
     public async Task<ActionResult<ApiResponse>> Delete(
         Guid id, [FromQuery] CashDocumentActionRequest request, CancellationToken ct)

@@ -180,6 +180,8 @@ public class FundService : IFundService
             throw new ConflictException("Quỹ đã có số dư đầu kỳ, không thể xóa hoặc đổi loại.");
         if (await _db.CashVouchers.AnyAsync(v => v.FundId == fund.Id, ct))
             throw new ConflictException("Quỹ đã có phiếu thu/chi, không thể xóa hoặc đổi loại.");
+        if (await _db.FundTransfers.AnyAsync(t => t.FromFundId == fund.Id || t.ToFundId == fund.Id, ct))
+            throw new ConflictException("Quỹ đã có phiếu chuyển quỹ, không thể xóa hoặc đổi loại.");
     }
 
     /// Shared branch gate, then the fund key (P14), so the in-use and opening checks see every committed voucher.

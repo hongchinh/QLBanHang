@@ -756,6 +756,122 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.ToTable("funds", (string)null);
                 });
 
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.FundTransfer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("amount");
+
+                    b.Property<Guid>("BranchId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("branch_id");
+
+                    b.Property<DateTimeOffset?>("CancelledAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("cancelled_at");
+
+                    b.Property<Guid?>("CancelledBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("cancelled_by");
+
+                    b.Property<string>("Code")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("code");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid?>("CreatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_by");
+
+                    b.Property<DateTimeOffset?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("deleted_at");
+
+                    b.Property<Guid?>("DeletedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("deleted_by");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid>("FromFundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("from_fund_id");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_deleted");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)")
+                        .HasColumnName("note");
+
+                    b.Property<Guid>("OwnerUserId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_user_id");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer")
+                        .HasColumnName("status");
+
+                    b.Property<Guid>("ToFundId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("to_fund_id");
+
+                    b.Property<DateTimeOffset?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<Guid?>("UpdatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("updated_by");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateTimeOffset>("VoucherAt")
+                        .HasColumnType("timestamptz")
+                        .HasColumnName("voucher_at");
+
+                    b.HasKey("Id")
+                        .HasName("pk_fund_transfers");
+
+                    b.HasIndex("OwnerUserId")
+                        .HasDatabaseName("ix_fund_transfers_owner_user_id");
+
+                    b.HasIndex("BranchId", "Code")
+                        .IsUnique()
+                        .HasDatabaseName("ix_fund_transfers_branch_id_code")
+                        .HasFilter("is_deleted = false");
+
+                    b.HasIndex("FromFundId", "VoucherAt")
+                        .HasDatabaseName("ix_fund_transfers_from_fund_id_voucher_at");
+
+                    b.HasIndex("ToFundId", "VoucherAt")
+                        .HasDatabaseName("ix_fund_transfers_to_fund_id_voucher_at");
+
+                    b.ToTable("fund_transfers", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_fund_transfers_distinct_funds", "from_fund_id <> to_fund_id");
+                        });
+                });
+
             modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.OpeningDebt", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3769,6 +3885,43 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasConstraintName("fk_funds_branches_branch_id");
 
                     b.Navigation("Branch");
+                });
+
+            modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.FundTransfer", b =>
+                {
+                    b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", null)
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_fund_transfers_branches_branch_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.CashDebt.Fund", "FromFund")
+                        .WithMany()
+                        .HasForeignKey("FromFundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_fund_transfers_funds_from_fund_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.Identity.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_fund_transfers_users_owner_user_id");
+
+                    b.HasOne("OrderMgmt.Domain.Entities.CashDebt.Fund", "ToFund")
+                        .WithMany()
+                        .HasForeignKey("ToFundId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_fund_transfers_funds_to_fund_id");
+
+                    b.Navigation("FromFund");
+
+                    b.Navigation("Owner");
+
+                    b.Navigation("ToFund");
                 });
 
             modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.OpeningDebt", b =>

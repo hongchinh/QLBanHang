@@ -296,6 +296,27 @@ public abstract class CashDebtTestBase : InventoryTestBase
             return voucher.Id;
         });
 
+    /// Inserts a fund transfer row straight into the DB (owner admin); the code is random unless given.
+    protected Task<Guid> InsertFundTransferAsync(Guid branchId, Guid fromFundId, Guid toFundId, decimal amount,
+        DateTimeOffset at, DocumentStatus status = DocumentStatus.Active, string? code = null) =>
+        InDbAsync(async db =>
+        {
+            var transfer = new FundTransfer
+            {
+                Code = code ?? "CQ" + Guid.NewGuid().ToString("N")[..8],
+                VoucherAt = at,
+                BranchId = branchId,
+                FromFundId = fromFundId,
+                ToFundId = toFundId,
+                Amount = amount,
+                Status = status,
+                OwnerUserId = await db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync(),
+            };
+            db.FundTransfers.Add(transfer);
+            await db.SaveChangesAsync();
+            return transfer.Id;
+        });
+
     /// The seeded cash fund QTM of a branch.
     protected Task<Guid> CashFundIdAsync(Guid branchId) =>
         InDbAsync(db => db.Funds.Where(f => f.BranchId == branchId && f.Code == "QTM").Select(f => f.Id).SingleAsync());

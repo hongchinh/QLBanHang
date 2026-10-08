@@ -171,6 +171,36 @@ public class CashVoucherLineConfiguration : IEntityTypeConfiguration<CashVoucher
     }
 }
 
+public class FundTransferConfiguration : IEntityTypeConfiguration<FundTransfer>
+{
+    public void Configure(EntityTypeBuilder<FundTransfer> b)
+    {
+        b.ToTable("fund_transfers",
+            t => t.HasCheckConstraint("ck_fund_transfers_distinct_funds", "from_fund_id <> to_fund_id"));
+        b.HasKey(x => x.Id);
+
+        b.Property(x => x.Code).IsRequired().HasMaxLength(50);
+        b.Property(x => x.VoucherAt).HasColumnType("timestamptz");
+        b.Property(x => x.Amount).HasColumnType("numeric(18,2)");
+        b.Property(x => x.Description).HasMaxLength(500);
+        b.Property(x => x.Note).HasMaxLength(2000);
+        b.Property(x => x.CancelledAt).HasColumnType("timestamptz");
+
+        // Npgsql maps a uint row version to the xmin system column (no DDL is emitted for it).
+        b.Property(x => x.Version).IsRowVersion();
+
+        b.HasOne<OrderMgmt.Domain.Entities.Organization.Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.FromFund).WithMany().HasForeignKey(x => x.FromFundId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.ToFund).WithMany().HasForeignKey(x => x.ToFundId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
+
+        b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("is_deleted = false");
+        b.HasIndex(x => new { x.FromFundId, x.VoucherAt });
+        b.HasIndex(x => new { x.ToFundId, x.VoucherAt });
+        b.HasQueryFilter(x => !x.IsDeleted);
+    }
+}
+
 public class CashDocumentActivityConfiguration : IEntityTypeConfiguration<CashDocumentActivity>
 {
     public void Configure(EntityTypeBuilder<CashDocumentActivity> b)

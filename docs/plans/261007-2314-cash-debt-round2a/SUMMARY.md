@@ -126,7 +126,7 @@ Round 1 rules still apply unchanged: D25 (test database), D26 (test depth), D27 
 - [x] Phase 02 — Catalogs: cash reasons, funds, fund kind, reason debt effect, credit days & limits (L) — `phase-02-catalogs.md`
 - [x] Phase 03 — Pure calculators (M) — `phase-03-pure-calculators.md`
 - [x] Phase 04 — Debt ledger, locks, guards, opening debts & fund opening balance (XL) — `phase-04-debt-ledger-and-guards.md`
-- [ ] Phase 05 — Cash voucher API (XL) — `phase-05-cash-voucher-api.md`
+- [x] Phase 05 — Cash voucher API (XL) — `phase-05-cash-voucher-api.md`
 - [ ] Phase 06 — Fund transfer API (M) — `phase-06-fund-transfer-api.md`
 - [ ] Phase 07 — Stock voucher integration & automatic vouchers (XL) — `phase-07-stock-voucher-integration.md`
 - [ ] Phase 08 — Matching & debt offset API (L) — `phase-08-matching-and-offset-api.md`

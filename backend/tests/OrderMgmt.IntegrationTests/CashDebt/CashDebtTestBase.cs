@@ -13,6 +13,7 @@ using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
+using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.IntegrationTests.Fixtures;
 using OrderMgmt.IntegrationTests.Inventory;
 
@@ -330,6 +331,30 @@ public abstract class CashDebtTestBase : InventoryTestBase
     {
         _ledgerOnlyOpeningSources.Add(sourceId);
         return sourceId;
+    }
+
+    /// Runs two requests against each other. A transaction of the test holds a row (`hold`) that `first` writes only
+    /// after its locks and checks, so `first` stops in flight there; `second` starts then, and the row is released
+    /// once `second` has finished or waits too.
+    protected async Task<(TFirst First, TSecond Second)> RaceAsync<TFirst, TSecond>(Func<IServiceProvider, Task> hold,
+        Func<Task<TFirst>> first, Func<Task<TSecond>> second)
+    {
+        Task<TFirst> firstTask;
+        Task<TSecond> secondTask;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await hold(scope.ServiceProvider);
+
+            firstTask = first();
+            await WaitForBlockedAsync(firstTask, count: 1);
+            firstTask.IsCompleted.Should().BeFalse("the first request waits for the held row");
+            secondTask = second();
+            await WaitForBlockedAsync(secondTask, count: 2);
+            await transaction.RollbackAsync();
+        }
+        return (await firstTask, await secondTask);
     }
 
     /// Waits until `task` has finished or `count` backends of this test's database wait on a lock. Polled through

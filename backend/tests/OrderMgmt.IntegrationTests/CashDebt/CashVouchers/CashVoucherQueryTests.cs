@@ -399,30 +399,6 @@ public class CashVoucherQueryTests : CashDebtTestBase
     private Task<HttpResponseMessage> PutOpeningDateAsync(Guid branchId, DateOnly date) =>
         _client.PutAsJsonAsync($"/api/branches/{branchId}/opening-date", new SetOpeningDateRequest { OpeningDate = date });
 
-    /// Runs two requests against each other. A transaction of the test holds a row (`hold`) that `first` writes only
-    /// after its locks and checks, so `first` stops in flight there; `second` starts then, and the row is released
-    /// once `second` has finished or waits too.
-    private async Task<(TFirst First, TSecond Second)> RaceAsync<TFirst, TSecond>(Func<IServiceProvider, Task> hold,
-        Func<Task<TFirst>> first, Func<Task<TSecond>> second)
-    {
-        Task<TFirst> firstTask;
-        Task<TSecond> secondTask;
-        await using (var scope = _factory.Services.CreateAsyncScope())
-        {
-            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            await using var transaction = await db.Database.BeginTransactionAsync();
-            await hold(scope.ServiceProvider);
-
-            firstTask = first();
-            await WaitForBlockedAsync(firstTask, count: 1);
-            firstTask.IsCompleted.Should().BeFalse("the first request waits for the held row");
-            secondTask = second();
-            await WaitForBlockedAsync(secondTask, count: 2);
-            await transaction.RollbackAsync();
-        }
-        return (await firstTask, await secondTask);
-    }
-
     /// Locks a row in the race's transaction. FOR NO KEY UPDATE: an UPDATE of the row waits, a foreign-key check
     /// does not.
     private static Func<IServiceProvider, Task> HoldRow(string table, Guid id) => sp =>

@@ -69,3 +69,28 @@ public enum OpeningDebtKind
     Debt = 1,
     Prepayment = 2,
 }
+
+/// Status of a cash voucher, fund transfer or debt offset voucher (P13).
+public enum DocumentStatus
+{
+    Active = 1,
+    Cancelled = 9,
+}
+
+public enum DocumentStatusFilter
+{
+    All = 0,
+    Active = 1,
+    Cancelled = 9,
+}
+
+/// Activity of a cash document (receipt, payment, fund transfer, debt offset).
+public enum CashDocumentActivityAction
+{
+    Created = 1,
+    Updated = 2,
+    Cancelled = 3,
+    Restored = 4,
+    Deleted = 5,
+    SettlementRemoved = 6,
+}

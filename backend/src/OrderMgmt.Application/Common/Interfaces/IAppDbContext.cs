@@ -34,6 +34,9 @@ public interface IAppDbContext
     DbSet<DebtEntry> DebtEntries { get; }
     DbSet<DebtSettlement> DebtSettlements { get; }
     DbSet<OpeningDebt> OpeningDebts { get; }
+    DbSet<CashVoucher> CashVouchers { get; }
+    DbSet<CashVoucherLine> CashVoucherLines { get; }
+    DbSet<CashDocumentActivity> CashDocumentActivities { get; }
     DbSet<DocumentNumbering> DocumentNumberings { get; }
     DbSet<StockVoucher> StockVouchers { get; }
     DbSet<StockVoucherLine> StockVoucherLines { get; }

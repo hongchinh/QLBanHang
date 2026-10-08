@@ -121,6 +121,27 @@ public class FundOpeningBalanceTests : CashDebtTestBase
         (await client.DeleteAsync($"/api/funds/{bank.Id}")).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Fact]
+    public async Task Clearing_branch_opening_date_with_fund_opening_balance_is_409()
+    {
+        var (branchId, client) = await BranchClientAsync("E", Oct1);
+        var fundId = await CashFundIdAsync(branchId);
+        (await PutAsync(client, fundId, 1_000m)).Status.Should().Be(HttpStatusCode.OK);
+
+        // The fund opening balance sits at the branch opening date (P8), so the date cannot be cleared.
+        var blocked = await PutOpeningDateAsync(branchId, null);
+        blocked.Status.Should().Be(HttpStatusCode.Conflict);
+        blocked.Error!.Code.Should().Be("OPENING_DATA_EXISTS");
+        (await InDbAsync(db => db.Branches.Where(b => b.Id == branchId).Select(b => b.OpeningDate).SingleAsync()))
+            .Should().Be(Oct1);
+
+        // Without opening money the date can be cleared.
+        (await PutAsync(client, fundId, 0m)).Status.Should().Be(HttpStatusCode.OK);
+        var cleared = await PutOpeningDateAsync(branchId, null);
+        cleared.Status.Should().Be(HttpStatusCode.OK, cleared.Error?.Message);
+        cleared.Branch!.OpeningDate.Should().BeNull();
+    }
+
     /// A fresh branch (opening date set straight in the DB when given) and an admin client working in it.
     private async Task<(Guid BranchId, HttpClient Client)> BranchClientAsync(string tag, DateOnly? openingDate)
     {
@@ -141,6 +162,18 @@ public class FundOpeningBalanceTests : CashDebtTestBase
         var parsed = string.IsNullOrEmpty(body)
             ? null
             : JsonSerializer.Deserialize<ApiResponse<FundDto>>(body, TestJson.Options);
+        return (response.StatusCode, parsed?.Data, parsed?.Error);
+    }
+
+    private async Task<(HttpStatusCode Status, BranchDto? Branch, ApiError? Error)> PutOpeningDateAsync(
+        Guid branchId, DateOnly? date)
+    {
+        var response = await _client.PutAsJsonAsync($"/api/branches/{branchId}/opening-date",
+            new SetOpeningDateRequest { OpeningDate = date });
+        var body = await response.Content.ReadAsStringAsync();
+        var parsed = string.IsNullOrEmpty(body)
+            ? null
+            : JsonSerializer.Deserialize<ApiResponse<BranchDto>>(body, TestJson.Options);
         return (response.StatusCode, parsed?.Data, parsed?.Error);
     }
 }

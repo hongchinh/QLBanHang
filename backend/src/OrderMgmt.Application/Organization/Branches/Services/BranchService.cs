@@ -163,6 +163,10 @@ public class BranchService : IBranchService
             var hasOpeningDebts = await _db.OpeningDebts.AnyAsync(o => o.BranchId == id, c);
             if (newDate is null && hasOpeningDebts)
                 throw new ConflictException("OPENING_DATA_EXISTS", "Chi nhánh đã có công nợ đầu kỳ, không xóa được ngày đầu kỳ.");
+            // The fund opening balance has no date of its own: it sits at the branch opening date (P8), so a move
+            // needs no repost.
+            if (newDate is null && await _db.Funds.AnyAsync(f => f.BranchId == id && f.OpeningAmount != 0, c))
+                throw new ConflictException("OPENING_DATA_EXISTS", "Chi nhánh đã có số dư đầu kỳ của quỹ, không xóa được ngày đầu kỳ.");
 
             branch.OpeningDate = newDate;
             await _db.SaveChangesAsync(c);

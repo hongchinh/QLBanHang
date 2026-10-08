@@ -1,9 +1,13 @@
+using System.Net;
+using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
@@ -129,7 +133,137 @@ public abstract class CashDebtTestBase : InventoryTestBase
                             && !_ledgerOnlyOpeningSources.Contains(e.SourceId))
                 .Select(e => e.DocCode)
                 .Should().BeEmpty("every Opening entry belongs to a non-deleted opening debt");
+
+            // 7. Cash vouchers: Total = Σ non-deleted lines; an Active, non-deleted voucher whose reason affects debt
+            // has exactly one matching entry; every other voucher (no debt effect, Cancelled or deleted) has none.
+            var vouchers = await db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+                .Select(v => new
+                {
+                    v.Id, v.Type, v.Code, v.BranchId, v.PartnerId, v.VoucherAt, v.Total, v.Status, v.IsDeleted,
+                    v.Reason!.DebtEffect,
+                    LineTotal = v.Lines.Where(l => !l.IsDeleted).Sum(l => l.Amount),
+                })
+                .ToListAsync();
+            foreach (var v in vouchers)
+            {
+                var own = entries.Values.Where(e => e.SourceType == CashSourceType(v.Type) && e.SourceId == v.Id).ToList();
+                if (!v.IsDeleted)
+                    v.Total.Should().Be(v.LineTotal, $"Total of cash voucher {v.Code} is the sum of its lines");
+
+                if (v.IsDeleted || v.Status != DocumentStatus.Active || DebtEffectRules.Resolve(v.DebtEffect) is not { } effect)
+                {
+                    own.Should().BeEmpty($"cash voucher {v.Code} posts no debt");
+                    continue;
+                }
+                own.Should().ContainSingle($"cash voucher {v.Code} has one entry")
+                    .Which.Should().BeEquivalentTo(new
+                    {
+                        effect.Side,
+                        effect.Direction,
+                        Amount = v.Total,
+                        PartnerId = v.PartnerId,
+                        v.BranchId,
+                        PostedAt = v.VoucherAt,
+                    }, $"entry of cash voucher {v.Code}");
+            }
         });
+
+    private static DebtSourceType CashSourceType(CashVoucherType type) =>
+        type == CashVoucherType.Receipt ? DebtSourceType.Receipt : DebtSourceType.Payment;
+
+    protected Task<Guid> CashReasonIdAsync(string code) =>
+        InDbAsync(db => db.CashReasons.Where(r => r.Code == code).Select(r => r.Id).SingleAsync());
+
+    /// A fund of the branch (default: the main branch) by code.
+    protected Task<Guid> FundIdAsync(string code, Guid? branchId = null) =>
+        InDbAsync(db => db.Funds.Where(f => f.BranchId == (branchId ?? MainBranchId) && f.Code == code)
+            .Select(f => f.Id).SingleAsync());
+
+    /// A cash voucher request at VN time `at` (via Vn) with one line per amount ("Dòng 1", "Dòng 2" …).
+    protected static UpsertCashVoucherRequest CashRequest(CashVoucherType type, Guid reasonId, Guid fundId, string at,
+        Guid? partnerId, params decimal[] lineAmounts) => new()
+    {
+        Type = type,
+        VoucherAt = Vn(at),
+        FundId = fundId,
+        ReasonId = reasonId,
+        PartnerId = partnerId,
+        Lines = lineAmounts.Select((amount, i) => new UpsertCashVoucherLineRequest
+        {
+            Description = $"Dòng {i + 1}",
+            Amount = amount,
+        }).ToList(),
+    };
+
+    protected static async Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> PostCashAsync(
+        HttpClient c, UpsertCashVoucherRequest r) =>
+        await ReadCashResponseAsync(await c.PostAsJsonAsync("/api/cash-vouchers", r));
+
+    /// Creates a cash voucher through the API and asserts 200.
+    protected async Task<CashVoucherDto> CreateCashAsync(HttpClient c, UpsertCashVoucherRequest r)
+    {
+        var (status, voucher, error) = await PostCashAsync(c, r);
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        return voucher!;
+    }
+
+    protected static async Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> GetCashAsync(
+        HttpClient c, Guid id) =>
+        await ReadCashResponseAsync(await c.GetAsync($"/api/cash-vouchers/{id}"));
+
+    protected static async Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> PutCashAsync(
+        HttpClient c, Guid id, UpsertCashVoucherRequest r) =>
+        await ReadCashResponseAsync(await c.PutAsJsonAsync($"/api/cash-vouchers/{id}", r));
+
+    protected static async Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> CancelCashAsync(
+        HttpClient c, Guid id, CashDocumentActionRequest r) =>
+        await ReadCashResponseAsync(await c.PostAsJsonAsync($"/api/cash-vouchers/{id}/cancel", r));
+
+    protected static async Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> RestoreCashAsync(
+        HttpClient c, Guid id, CashDocumentActionRequest r) =>
+        await ReadCashResponseAsync(await c.PostAsJsonAsync($"/api/cash-vouchers/{id}/restore", r));
+
+    /// DELETE sends the action request in the query string; a success carries no voucher.
+    protected static async Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> DeleteCashAsync(
+        HttpClient c, Guid id, CashDocumentActionRequest r) =>
+        await ReadCashResponseAsync(await c.DeleteAsync(
+            $"/api/cash-vouchers/{id}?version={r.Version}&confirmRemoveSettlements={r.ConfirmRemoveSettlements}"
+            + $"&acknowledgeNegativeFund={r.AcknowledgeNegativeFund}"));
+
+    private static async Task<(HttpStatusCode Status, CashVoucherDto? Voucher, ApiError? Error)> ReadCashResponseAsync(
+        HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadAsStringAsync();
+        var parsed = string.IsNullOrEmpty(body)
+            ? null
+            : System.Text.Json.JsonSerializer.Deserialize<ApiResponse<CashVoucherDto>>(body, TestJson.Options);
+        return (response.StatusCode, parsed?.Data, parsed?.Error);
+    }
+
+    /// An update request that resends the stored voucher unchanged (line ids and version included, allocations null).
+    protected static UpsertCashVoucherRequest CashUpdateFrom(CashVoucherDto v) => new()
+    {
+        Type = v.Type,
+        VoucherAt = v.VoucherAt,
+        FundId = v.FundId,
+        ReasonId = v.ReasonId,
+        PartnerId = v.PartnerId,
+        PartnerName = v.PartnerName,
+        PartnerAddress = v.PartnerAddress,
+        PartnerTaxCode = v.PartnerTaxCode,
+        PersonName = v.PersonName,
+        Description = v.Description,
+        AttachedDocs = v.AttachedDocs,
+        Note = v.Note,
+        Version = v.Version,
+        Lines = v.Lines.OrderBy(l => l.SortOrder).Select(l => new UpsertCashVoucherLineRequest
+        {
+            Id = l.Id,
+            Description = l.Description,
+            Amount = l.Amount,
+            Note = l.Note,
+        }).ToList(),
+    };
 
     /// Inserts a cash voucher row straight into the DB: owner admin, no partner, one line of `total`.
     /// Uses the DebtEffect=None reasons TK / CK so the row needs no debt entry and stays valid business data.

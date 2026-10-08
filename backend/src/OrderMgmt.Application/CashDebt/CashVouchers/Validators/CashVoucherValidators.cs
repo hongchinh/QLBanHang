@@ -35,5 +35,13 @@ public class UpsertCashVoucherRequestValidator : AbstractValidator<UpsertCashVou
             .Must(allocations => allocations!.Count <= MaxAllocations)
             .When(x => x.Allocations is not null)
             .WithMessage($"Tối đa {MaxAllocations} dòng đối trừ.");
+        // debt_settlements.amount is numeric(18,2): an unrounded amount would be rounded on insert and could
+        // over-settle an entry (or reach 0 and break the positive check), so reject it here like line amounts.
+        RuleForEach(x => x.Allocations).ChildRules(allocation =>
+        {
+            allocation.RuleFor(a => a.Amount).Cascade(CascadeMode.Stop)
+                .GreaterThan(0).WithMessage("Số tiền đối trừ phải lớn hơn 0.")
+                .PrecisionScale(18, 2, true).WithMessage("Số tiền tối đa 16 chữ số phần nguyên và 2 chữ số thập phân.");
+        });
     }
 }

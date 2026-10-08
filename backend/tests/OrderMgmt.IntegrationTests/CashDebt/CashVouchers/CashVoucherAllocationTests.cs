@@ -145,6 +145,46 @@ public class CashVoucherAllocationTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Allocation_amounts_must_fit_numeric_18_2()
+    {
+        var (branchId, client, fundId) = await BranchClientAsync();
+        var tkh = await CashReasonIdAsync("TKH");
+        var customerId = await CreatePartnerAsync(NewCode("KH"), isCustomer: true, isSupplier: false);
+        var hd1 = await CreateOpeningDebtAsync(client, customerId, DebtSide.Receivable, OpeningDebtKind.Debt, "HD1",
+            new DateOnly(2026, 9, 10), 1_000m);
+        var hd2 = await CreateOpeningDebtAsync(client, customerId, DebtSide.Receivable, OpeningDebtKind.Debt, "HD2",
+            new DateOnly(2026, 9, 15), 1_000m);
+
+        UpsertCashVoucherRequest Receipt(decimal total, params (Guid EntryId, decimal Amount)[] items)
+        {
+            var r = CashRequest(CashVoucherType.Receipt, tkh, fundId, "2026-10-05 09:00", customerId, total);
+            r.Allocations = items.Select(i => new AllocationRequest { EntryId = i.EntryId, Amount = i.Amount }).ToList();
+            return r;
+        }
+
+        // Σ is exactly 1,000, but numeric(18,2) would store 500.01 + 500.00 and over-settle the receipt.
+        var split = await PostCashAsync(client, Receipt(1_000m, (hd1.EntryId, 500.005m), (hd2.EntryId, 499.995m)));
+        AssertFieldError(split, "allocations[0].amount");
+        split.Error!.Details.Should().ContainKey("allocations[1].amount");
+
+        // Would round to 0.00 and break ck_debt_settlements_amount_positive.
+        AssertFieldError(await PostCashAsync(client, Receipt(1_000m, (hd1.EntryId, 0.004m))), "allocations[0].amount");
+
+        // Beyond 16 integer digits (and Σ would overflow decimal).
+        AssertFieldError(await PostCashAsync(client,
+            Receipt(1_000m, (hd1.EntryId, 5e28m), (hd2.EntryId, 5e28m))), "allocations[0].amount");
+
+        // Zero or negative.
+        AssertFieldError(await PostCashAsync(client, Receipt(1_000m, (hd1.EntryId, 0m))), "allocations[0].amount");
+
+        (await InDbAsync(db => db.CashVouchers.IgnoreQueryFilters().CountAsync(v => v.BranchId == branchId)))
+            .Should().Be(0, "every rejected save rolls back");
+        foreach (var entryId in new[] { hd1.EntryId, hd2.EntryId })
+            (await SettlementsOfAsync(entryId)).Should().BeEmpty();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
     public async Task Refund_payment_allocates_against_prepayment()
     {
         var (branchId, client, fundId) = await BranchClientAsync();

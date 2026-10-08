@@ -131,12 +131,13 @@ public abstract class CashDebtTestBase : InventoryTestBase
                 .Should().BeEmpty("every Opening entry belongs to a non-deleted opening debt");
         });
 
-    /// Inserts a cash voucher row straight into the DB (no ledger posting): owner admin, reason TKH / TNCC.
+    /// Inserts a cash voucher row straight into the DB: owner admin, no partner, one line of `total`.
+    /// Uses the DebtEffect=None reasons TK / CK so the row needs no debt entry and stays valid business data.
     protected Task<Guid> InsertCashVoucherAsync(Guid branchId, Guid fundId, CashVoucherType type, decimal total,
         DateTimeOffset at, DocumentStatus status = DocumentStatus.Active) =>
         InDbAsync(async db =>
         {
-            var reasonCode = type == CashVoucherType.Receipt ? "TKH" : "TNCC";
+            var reasonCode = type == CashVoucherType.Receipt ? "TK" : "CK";
             var voucher = new CashVoucher
             {
                 Type = type,
@@ -150,6 +151,10 @@ public abstract class CashDebtTestBase : InventoryTestBase
                 OwnerUserId = await db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync(),
             };
             db.CashVouchers.Add(voucher);
+            db.CashVoucherLines.Add(new CashVoucherLine
+            {
+                CashVoucherId = voucher.Id, SortOrder = 0, Description = "Dòng 1", Amount = total,
+            });
             await db.SaveChangesAsync();
             return voucher.Id;
         });

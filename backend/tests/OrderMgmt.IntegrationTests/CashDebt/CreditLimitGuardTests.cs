@@ -22,8 +22,6 @@ public class CreditLimitGuardTests : CashDebtTestBase
 
     public CreditLimitGuardTests(PostgresFixture pg) : base(pg) { }
 
-    protected override bool PostsSyntheticOpeningEntries => true;
-
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
@@ -146,14 +144,14 @@ public class CreditLimitGuardTests : CashDebtTestBase
             var guard = sp.GetRequiredService<ICreditLimitGuard>();
             var before = await guard.CaptureAsync(draft.BranchId, draft.PartnerId, ct);
             await sp.GetRequiredService<IDebtLedgerService>()
-                .PostAsync(DebtSourceType.Opening, Guid.NewGuid(), new[] { draft }, false, ct);
+                .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(Guid.NewGuid()), new[] { draft }, false, ct);
             await guard.CheckAsync(draft.BranchId, draft.PartnerId, before, acknowledge, ct);
             return before;
         });
 
     private Task PostAsync(DebtEntryDraft draft) =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .PostAsync(DebtSourceType.Opening, Guid.NewGuid(), new[] { draft }, false, ct));
+            .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(Guid.NewGuid()), new[] { draft }, false, ct));
 
     private Task<decimal> BalanceAsync() =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtQueryService>()

@@ -14,6 +14,9 @@ namespace OrderMgmt.IntegrationTests.CashDebt;
 
 public abstract class CashDebtTestBase : InventoryTestBase
 {
+    // Opening sources posted straight to the ledger by this test, with no opening debt row (see LedgerOnlyOpeningSource).
+    private readonly HashSet<Guid> _ledgerOnlyOpeningSources = new();
+
     protected CashDebtTestBase(PostgresFixture pg) : base(pg) { }
 
     /// Runs `work` in a new scope inside ITransactionRunner (copied from InventoryEngineTestBase: the class chains differ).
@@ -119,17 +122,21 @@ public abstract class CashDebtTestBase : InventoryTestBase
                     }, $"entry of opening debt {row.DocNo}");
             }
 
-            // 6. Every Opening entry belongs to a non-deleted opening debt.
-            if (!PostsSyntheticOpeningEntries)
-            {
-                var rowIds = openingDebts.Select(o => o.Id).ToHashSet();
-                entries.Values.Where(e => e.SourceType == DebtSourceType.Opening && !rowIds.Contains(e.SourceId))
-                    .Select(e => e.DocCode)
-                    .Should().BeEmpty("every Opening entry belongs to a non-deleted opening debt");
-            }
+            // 6. Every Opening entry belongs to a non-deleted opening debt, except the ledger-only sources this test posted.
+            var rowIds = openingDebts.Select(o => o.Id).ToHashSet();
+            entries.Values
+                .Where(e => e.SourceType == DebtSourceType.Opening && !rowIds.Contains(e.SourceId)
+                            && !_ledgerOnlyOpeningSources.Contains(e.SourceId))
+                .Select(e => e.DocCode)
+                .Should().BeEmpty("every Opening entry belongs to a non-deleted opening debt");
         });
 
     /// Ledger-level tests post Opening entries for fresh Guids without an opening debt row (Task 4.3).
-    /// They return true, which skips only invariant 6 (every Opening entry has a row).
-    protected virtual bool PostsSyntheticOpeningEntries => false;
+    /// Registers `sourceId` as such a source and returns it; invariant 6 exempts exactly these ids,
+    /// so any other Opening entry without a row still fails.
+    protected Guid LedgerOnlyOpeningSource(Guid sourceId)
+    {
+        _ledgerOnlyOpeningSources.Add(sourceId);
+        return sourceId;
+    }
 }

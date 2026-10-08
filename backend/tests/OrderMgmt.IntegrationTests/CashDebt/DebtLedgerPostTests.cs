@@ -24,8 +24,6 @@ public class DebtLedgerPostTests : CashDebtTestBase
 
     public DebtLedgerPostTests(PostgresFixture pg) : base(pg) { }
 
-    protected override bool PostsSyntheticOpeningEntries => true;
-
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
@@ -177,6 +175,19 @@ public class DebtLedgerPostTests : CashDebtTestBase
         await AssertCashDebtInvariantsAsync();
     }
 
+    [Fact]
+    public async Task Invariants_reject_an_opening_entry_without_a_row_that_is_not_ledger_only()
+    {
+        await InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
+            .PostAsync(DebtSourceType.Opening, Guid.NewGuid(),
+                new[] { Draft(_partnerId, R, Inc, 100m, "2026-10-01 08:00", _xCode) }, false, ct));
+
+        var assert = () => AssertCashDebtInvariantsAsync();
+
+        (await assert.Should().ThrowAsync<Exception>())
+            .Which.Message.Should().Contain("every Opening entry belongs to a non-deleted opening debt");
+    }
+
     /// X = R+ 1,000 @10-01, Y = R− 400 @10-03, settled 400 (Manual).
     private async Task<(Guid X, Guid Y, Guid SettlementId)> SettledPairAsync()
     {
@@ -196,7 +207,7 @@ public class DebtLedgerPostTests : CashDebtTestBase
 
     private Task<IReadOnlyList<DebtEntry>> PostAsync(Guid sourceId, bool confirm, params DebtEntryDraft[] drafts) =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .PostAsync(DebtSourceType.Opening, sourceId, drafts, confirm, ct));
+            .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(sourceId), drafts, confirm, ct));
 
     private Task<DebtSettlement> SettlementOf(Guid settlementId) =>
         InDbAsync(db => db.DebtSettlements.AsNoTracking().SingleAsync(s => s.Id == settlementId));

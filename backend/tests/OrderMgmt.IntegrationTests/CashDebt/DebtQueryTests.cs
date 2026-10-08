@@ -21,8 +21,6 @@ public class DebtQueryTests : CashDebtTestBase
 
     public DebtQueryTests(PostgresFixture pg) : base(pg) { }
 
-    protected override bool PostsSyntheticOpeningEntries => true;
-
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
@@ -133,8 +131,10 @@ public class DebtQueryTests : CashDebtTestBase
     private async Task<Guid> EntryAsync(DebtEntryDraft draft, DebtSourceType sourceType = DebtSourceType.Opening,
         Guid? sourceId = null)
     {
+        var source = sourceId ?? Guid.NewGuid();
+        if (sourceType == DebtSourceType.Opening) LedgerOnlyOpeningSource(source);
         var entries = await InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .PostAsync(sourceType, sourceId ?? Guid.NewGuid(), new[] { draft }, false, ct));
+            .PostAsync(sourceType, source, new[] { draft }, false, ct));
         return entries.Single().Id;
     }
 

@@ -141,6 +141,29 @@ public class CashVoucherUpdateTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Repeated_line_id_is_rejected()
+    {
+        var (_, client, fundId) = await BranchClientAsync();
+        var customerId = await CreatePartnerAsync(NewCode("KH"), isCustomer: true, isSupplier: false);
+        var voucher = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TKH"),
+            fundId, "2026-10-05 09:00", customerId, 1_000m));
+
+        // The same stored line twice: Total would be 1,700 while the stored line keeps only 700.
+        var request = CashUpdateFrom(voucher);
+        request.Lines.Add(new UpsertCashVoucherLineRequest { Id = voucher.Lines[0].Id, Description = "Trùng", Amount = 700m });
+        var (status, _, error) = await PutCashAsync(client, voucher.Id, request);
+
+        status.Should().Be(HttpStatusCode.BadRequest);
+        error!.Details.Should().ContainKey("lines[1].id").And.NotContainKey("lines[0].id");
+        var (_, stored, _) = await GetCashAsync(client, voucher.Id);
+        stored!.Total.Should().Be(1_000m);
+        stored.Lines.Should().ContainSingle().Which.Amount.Should().Be(1_000m);
+        (await EntriesOfAsync(DebtSourceType.Receipt, voucher.Id)).Should().ContainSingle()
+            .Which.Amount.Should().Be(1_000m);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
     public async Task Allocations_null_keeps_existing_and_list_replaces_only_at_voucher()
     {
         var (_, client, fundId) = await BranchClientAsync();

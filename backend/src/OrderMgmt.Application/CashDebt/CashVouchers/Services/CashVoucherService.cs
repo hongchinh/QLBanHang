@@ -349,6 +349,13 @@ public class CashVoucherService : ICashVoucherService
         if (request.Lines.Sum(l => l.Amount) >= MaxMoney)
             Add("lines", "Tổng tiền phiếu quá lớn.");
 
+        // A line Id sent twice would update one stored line twice (same message as stock vouchers).
+        for (var i = 0; i < request.Lines.Count; i++)
+        {
+            if (request.Lines[i].Id is { } repeatedId && request.Lines.Take(i).Any(l => l.Id == repeatedId))
+                Add($"lines[{i}].id", "Dòng hàng bị trùng.");
+        }
+
         var reason = await _db.CashReasons.AsNoTracking().FirstOrDefaultAsync(r => r.Id == request.ReasonId, ct);
         if (reason is null)
             Add("reasonId", "Lý do không tồn tại.");
@@ -457,6 +464,7 @@ public class CashVoucherService : ICashVoucherService
         // Upsert by line Id; a stored line left out of the request is soft-deleted.
         var existing = voucher.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id);
         var kept = new HashSet<Guid>();
+        var current = new HashSet<CashVoucherLine>();
         for (var i = 0; i < request.Lines.Count; i++)
         {
             var line = request.Lines[i];
@@ -475,6 +483,7 @@ public class CashVoucherService : ICashVoucherService
             entity.Description = line.Description;
             entity.Amount = line.Amount;
             entity.Note = line.Note;
+            current.Add(entity);
         }
 
         foreach (var removed in existing.Values.Where(l => !kept.Contains(l.Id)))
@@ -484,7 +493,8 @@ public class CashVoucherService : ICashVoucherService
             removed.DeletedBy = _currentUser.UserId;
         }
 
-        voucher.Total = request.Lines.Sum(l => l.Amount);
+        // From the line entities (each counted once), so Total always equals the stored lines.
+        voucher.Total = current.Sum(l => l.Amount);
     }
 
     /// One entry when the reason affects debt (save rules, "Debt draft for a manual voucher"); none otherwise.

@@ -301,6 +301,8 @@ public class CashVoucherUpdateTests : CashDebtTestBase
     public async Task Managed_voucher_is_read_only()
     {
         var adminId = await InDbAsync(db => db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync());
+        var fundId = await CashFundIdAsync(MainBranchId);
+        // Paid 1,000 through QTM, like the automatic receipt below (invariant 9).
         var stockVoucher = new StockVoucher
         {
             Type = StockDirection.Out,
@@ -309,6 +311,8 @@ public class CashVoucherUpdateTests : CashDebtTestBase
             BranchId = MainBranchId,
             WarehouseId = DefaultWarehouseId,
             ReasonId = await ReasonIdAsync("XKH"),
+            PaidAmount = 1_000m,
+            FundId = fundId,
             OwnerUserId = adminId,
             Status = StockVoucherStatus.Active,
         };
@@ -317,8 +321,7 @@ public class CashVoucherUpdateTests : CashDebtTestBase
             db.StockVouchers.Add(stockVoucher);
             await db.SaveChangesAsync();
         });
-        var id = await InsertCashVoucherAsync(MainBranchId, await CashFundIdAsync(MainBranchId), CashVoucherType.Receipt,
-            1_000m, Vn("2026-10-05 08:00"));
+        var id = await InsertCashVoucherAsync(MainBranchId, fundId, CashVoucherType.Receipt, 1_000m, Vn("2026-10-05 08:00"));
         await InDbAsync(db => db.CashVouchers.Where(v => v.Id == id)
             .ExecuteUpdateAsync(s => s.SetProperty(v => v.SourceStockVoucherId, stockVoucher.Id)));
 

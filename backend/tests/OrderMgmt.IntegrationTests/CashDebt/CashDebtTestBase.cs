@@ -140,11 +140,15 @@ public abstract class CashDebtTestBase : InventoryTestBase
 
             // 7. Cash vouchers: Total = Σ non-deleted lines; an Active, non-deleted voucher whose reason affects debt
             // has exactly one matching entry; every other voucher (no debt effect, Cancelled or deleted) has none.
+            // An automatic voucher takes the side of its stock voucher's reason and the opposite direction (P20).
             var vouchers = await db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
                 .Select(v => new
                 {
-                    v.Id, v.Type, v.Code, v.BranchId, v.PartnerId, v.VoucherAt, v.Total, v.Status, v.IsDeleted,
+                    v.Id, v.Type, v.Code, v.BranchId, v.PartnerId, v.VoucherAt, v.FundId, v.Total, v.Status, v.IsDeleted,
+                    v.SourceStockVoucherId,
                     v.Reason!.DebtEffect,
+                    // The reason of the stock voucher that manages an automatic voucher, else null.
+                    SourceDebtEffect = v.SourceStockVoucher != null ? (DebtEffect?)v.SourceStockVoucher.Reason!.DebtEffect : null,
                     LineTotal = v.Lines.Where(l => !l.IsDeleted).Sum(l => l.Amount),
                 })
                 .ToListAsync();
@@ -154,7 +158,10 @@ public abstract class CashDebtTestBase : InventoryTestBase
                 if (!v.IsDeleted)
                     v.Total.Should().Be(v.LineTotal, $"Total of cash voucher {v.Code} is the sum of its lines");
 
-                if (v.IsDeleted || v.Status != DocumentStatus.Active || DebtEffectRules.Resolve(v.DebtEffect) is not { } effect)
+                var effect = DebtEffectRules.Resolve(v.SourceDebtEffect ?? v.DebtEffect);
+                if (v.SourceDebtEffect is not null && effect is { } stock)
+                    effect = (stock.Side, DebtEffectRules.Opposite(stock.Direction));
+                if (v.IsDeleted || v.Status != DocumentStatus.Active || effect is null)
                 {
                     own.Should().BeEmpty($"cash voucher {v.Code} posts no debt");
                     continue;
@@ -162,8 +169,8 @@ public abstract class CashDebtTestBase : InventoryTestBase
                 own.Should().ContainSingle($"cash voucher {v.Code} has one entry")
                     .Which.Should().BeEquivalentTo(new
                     {
-                        effect.Side,
-                        effect.Direction,
+                        effect.Value.Side,
+                        effect.Value.Direction,
                         Amount = v.Total,
                         PartnerId = v.PartnerId,
                         v.BranchId,
@@ -205,6 +212,57 @@ public abstract class CashDebtTestBase : InventoryTestBase
                             && !stockSources.Contains((e.SourceType, e.SourceId)))
                 .Select(e => e.DocCode)
                 .Should().BeEmpty("every stock entry belongs to an Active, non-deleted stock voucher whose reason affects debt");
+
+            // 9. Automatic vouchers (P20, P3): a non-deleted stock voucher with PaidAmount > 0 has exactly one
+            // non-deleted automatic voucher that follows it; every non-deleted automatic voucher has such a source.
+            var stockRows = await db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+                .Select(v => new
+                {
+                    v.Id, v.Type, v.Code, v.BranchId, v.PartnerId, v.VoucherAt, v.FundId, v.PaidAmount, v.Status, v.IsDeleted,
+                })
+                .ToDictionaryAsync(v => v.Id);
+            var autoVouchers = vouchers.Where(v => v.SourceStockVoucherId is not null && !v.IsDeleted).ToList();
+            foreach (var s in stockRows.Values.Where(s => !s.IsDeleted && s.PaidAmount > 0))
+            {
+                autoVouchers.Where(a => a.SourceStockVoucherId == s.Id)
+                    .Should().ContainSingle($"stock voucher {s.Code} has one automatic voucher")
+                    .Which.Should().BeEquivalentTo(new
+                    {
+                        Status = s.Status == StockVoucherStatus.Active ? DocumentStatus.Active : DocumentStatus.Cancelled,
+                        Total = s.PaidAmount,
+                        s.FundId,
+                        s.VoucherAt,
+                        s.PartnerId,
+                        s.BranchId,
+                        Type = DebtEffectRules.AutoVoucherType(s.Type),
+                    }, $"automatic voucher of stock voucher {s.Code}");
+            }
+            foreach (var a in autoVouchers)
+            {
+                var source = stockRows[a.SourceStockVoucherId!.Value];
+                source.IsDeleted.Should().BeFalse($"the source of automatic voucher {a.Code} is not deleted");
+                source.PaidAmount.Should().BePositive($"the source of automatic voucher {a.Code} has a paid amount");
+
+                // Both Active: the Auto settlement between the two entries is AutoAmount of the current rows.
+                if (a.Status != DocumentStatus.Active || source.Status != StockVoucherStatus.Active)
+                    continue;
+                var stockSourceType = source.Type == StockDirection.In ? DebtSourceType.StockIn : DebtSourceType.StockOut;
+                var stockEntry = entries.Values.SingleOrDefault(e => e.SourceType == stockSourceType && e.SourceId == source.Id);
+                var autoEntry = entries.Values.SingleOrDefault(e => e.SourceType == CashSourceType(a.Type) && e.SourceId == a.Id);
+                if (stockEntry is null || autoEntry is null)
+                    continue;
+                decimal OpenExcludingAuto(DebtEntry entry) => entry.Amount - settlements
+                    .Where(s => s.Origin != SettlementOrigin.Auto
+                                && (s.IncreaseEntryId == entry.Id || s.DecreaseEntryId == entry.Id))
+                    .Sum(s => s.Amount);
+                settlements
+                    .Where(s => s.Origin == SettlementOrigin.Auto
+                                && ((s.IncreaseEntryId == stockEntry.Id && s.DecreaseEntryId == autoEntry.Id)
+                                    || (s.IncreaseEntryId == autoEntry.Id && s.DecreaseEntryId == stockEntry.Id)))
+                    .Sum(s => s.Amount)
+                    .Should().Be(DebtSettlementMath.AutoAmount(source.PaidAmount, OpenExcludingAuto(stockEntry),
+                        OpenExcludingAuto(autoEntry)), $"Auto settlement between {source.Code} and {a.Code}");
+            }
         });
 
     private static DebtSourceType CashSourceType(CashVoucherType type) =>

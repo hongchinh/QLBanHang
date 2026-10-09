@@ -25,6 +25,7 @@ using OrderMgmt.Application.Branding.Interfaces;
 using OrderMgmt.Application.Branding.Services;
 using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Notifications.Services;
+using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.CashReasons.Interfaces;
 using OrderMgmt.Application.CashDebt.CashReasons.Services;
 using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
@@ -125,6 +126,7 @@ public static class DependencyInjection
         services.AddScoped<IOpeningDebtService, OpeningDebtService>();
         services.AddScoped<ICashVoucherService, CashVoucherService>();
         services.AddScoped<IFundTransferService, FundTransferService>();
+        services.AddScoped<IAutoCashVoucherService, AutoCashVoucherService>();
         services.AddScoped<IInventoryLedgerService, InventoryLedgerService>();
         services.AddScoped<IInventoryCostingService, InventoryCostingService>();
         services.AddScoped<IInventoryPostingService, InventoryPostingService>();

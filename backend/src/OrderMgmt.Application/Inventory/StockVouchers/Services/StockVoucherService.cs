@@ -2,6 +2,7 @@ using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Catalog.Customers.Interfaces;
 using OrderMgmt.Application.Catalog.Customers.Models;
+using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
@@ -34,10 +35,11 @@ public class StockVoucherService : IStockVoucherService
     private readonly ICustomerService _customers;
     private readonly ICashDebtLock _cashDebtLock;
     private readonly IDebtLedgerService _ledger;
+    private readonly IAutoCashVoucherService _auto;
 
     public StockVoucherService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch,
         IDateTime clock, ITransactionRunner transaction, IInventoryPostingService posting, IDocumentCodeAllocator codes,
-        ICustomerService customers, ICashDebtLock cashDebtLock, IDebtLedgerService ledger)
+        ICustomerService customers, ICashDebtLock cashDebtLock, IDebtLedgerService ledger, IAutoCashVoucherService auto)
     {
         _db = db;
         _currentUser = currentUser;
@@ -49,6 +51,7 @@ public class StockVoucherService : IStockVoucherService
         _customers = customers;
         _cashDebtLock = cashDebtLock;
         _ledger = ledger;
+        _auto = auto;
     }
 
     public async Task<StockVoucherListResult> ListAsync(StockVoucherListRequest request, CancellationToken ct = default)
@@ -386,6 +389,7 @@ public class StockVoucherService : IStockVoucherService
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
             await PostDebtAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
+            await _auto.SyncAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             AddActivity(voucher, StockVoucherActivityAction.Created, "Tạo phiếu");
@@ -419,6 +423,7 @@ public class StockVoucherService : IStockVoucherService
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
             await PostDebtAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
+            await _auto.SyncAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             AddActivity(voucher, StockVoucherActivityAction.Updated, "Cập nhật phiếu");
@@ -457,9 +462,10 @@ public class StockVoucherService : IStockVoucherService
         ChangeLifecycleAsync(id, request, StockVoucherPermissions.Delete, StockVoucherActivityAction.Deleted, "Xóa phiếu",
             v => v.IsDeleted = true, ct);
 
-    /// Cancel / delete: steps 1, 2 (stored date), 4, 7 (empty list), 8, 9; the debt entry is removed after the lines.
+    /// Cancel / delete: steps 1, 2 (stored date), 4, 7 (empty list), 8, 9; the debt entry is removed after the lines,
+    /// then the automatic voucher follows (cancelled or soft-deleted).
     /// Restore: the same steps, reposting the stored lines as they are (no re-validation, no re-snapshot), then the
-    /// debt entry like a save.
+    /// debt entry and the automatic voucher like a save.
     private Task ChangeLifecycleAsync(Guid id, StockVoucherActionRequest request, Func<StockDirection, string> permission,
         StockVoucherActivityAction action, string description, Action<StockVoucher> apply, CancellationToken ct) =>
         _transaction.RunAsync(async c =>
@@ -480,16 +486,13 @@ public class StockVoucherService : IStockVoucherService
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c, removeAll: !restore);
+            // A reason in use keeps its debt effect and cannot be deleted (P19); a restore reads it under its key.
+            var reason = await _db.StockReasons.AsNoTracking().SingleAsync(r => r.Id == voucher.ReasonId, c);
             if (restore)
-            {
-                // Read under its key; a reason in use keeps its debt effect and cannot be deleted (P19).
-                var reason = await _db.StockReasons.AsNoTracking().SingleAsync(r => r.Id == voucher.ReasonId, c);
                 await PostDebtAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
-            }
             else
-            {
                 await RemoveDebtAsync(voucher, request.ConfirmRemoveSettlements, c);
-            }
+            await _auto.SyncAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             AddActivity(voucher, action, description);

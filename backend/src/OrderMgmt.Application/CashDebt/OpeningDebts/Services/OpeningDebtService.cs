@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
@@ -26,9 +27,11 @@ public class OpeningDebtService : IOpeningDebtService
     private readonly IInventoryLock _inventoryLock;
     private readonly ICashDebtLock _cashDebtLock;
     private readonly IDebtLedgerService _ledger;
+    private readonly IAutoCashVoucherService _auto;
 
     public OpeningDebtService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
-        ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock, IDebtLedgerService ledger)
+        ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock, IDebtLedgerService ledger,
+        IAutoCashVoucherService auto)
     {
         _db = db;
         _clock = clock;
@@ -38,6 +41,7 @@ public class OpeningDebtService : IOpeningDebtService
         _inventoryLock = inventoryLock;
         _cashDebtLock = cashDebtLock;
         _ledger = ledger;
+        _auto = auto;
     }
 
     public async Task<OpeningDebtListResult> ListAsync(OpeningDebtListRequest request, CancellationToken ct = default)
@@ -111,11 +115,15 @@ public class OpeningDebtService : IOpeningDebtService
             var openingDate = await OpeningDateAsync(branchId, c);
             await ValidateAsync(request, openingDate, c);
 
+            // A confirmed shrink drops the row's settlements: a stock voucher among the entries they join gets its Auto
+            // settlement recomputed.
+            var counterparts = await _ledger.CounterpartEntryIdsAsync(DebtSourceType.Opening, row.Id, c);
             Apply(row, request);
             await _db.SaveChangesAsync(c);
 
             await _ledger.PostAsync(DebtSourceType.Opening, row.Id, new[] { Draft(row, openingDate) },
                 request.ConfirmRemoveSettlements, c);
+            await _auto.RecomputeAutoAsync(counterparts, c);
         }, ct);
 
         return await GetAsync(id, ct);
@@ -129,7 +137,9 @@ public class OpeningDebtService : IOpeningDebtService
             var row = await LockRowAsync(branchId, id, newPartnerId: null, c);
             await OpeningDateAsync(branchId, c);
 
+            var counterparts = await _ledger.CounterpartEntryIdsAsync(DebtSourceType.Opening, row.Id, c);
             await _ledger.RemoveSourceAsync(DebtSourceType.Opening, row.Id, confirmRemoveSettlements, c);
+            await _auto.RecomputeAutoAsync(counterparts, c);
             row.IsDeleted = true;
             row.DeletedAt = _clock.UtcNow;
             row.DeletedBy = _currentUser.UserId;

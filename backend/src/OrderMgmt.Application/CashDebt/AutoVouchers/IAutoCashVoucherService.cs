@@ -18,4 +18,13 @@ public interface IAutoCashVoucherService
     /// Logs a CashDocumentActivity on the automatic voucher and, when it is created or deleted, AutoVoucherChanged on
     /// the stock voucher.
     Task SyncAsync(StockVoucher voucher, StockReason reason, bool confirmRemoveSettlements, CancellationToken ct = default);
+
+    /// Sets the Auto settlement of every non-deleted, Active stock voucher with PaidAmount > 0 whose own entry or
+    /// automatic voucher's entry is among `entryIds` (both entries existing) to DebtSettlementMath.AutoAmount of the
+    /// current rows (none when 0), replacing it in place (batch = the stock voucher); writes no activity.
+    /// A write that may remove settlements reads the entries they join first (the ledger's CounterpartEntryIdsAsync)
+    /// and calls this after its own new settlements, so Auto takes only what is left; saves.
+    /// Locks: a settlement joins entries of one branch, partner and side, so the partner key the caller holds for the
+    /// removed settlements covers these stock vouchers too. Settlements move no money, so no fund key is needed.
+    Task RecomputeAutoAsync(IEnumerable<Guid> entryIds, CancellationToken ct = default);
 }

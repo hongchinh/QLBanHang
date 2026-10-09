@@ -119,7 +119,8 @@ public class AutoCashVoucherService : IAutoCashVoucherService
 
         var entries = await _ledger.PostAsync(SourceTypeOf(type), auto.Id, DraftsOf(auto, reason),
             confirmRemoveSettlements, ct);
-        await SettleAsync(voucher, entries, ct);
+        if (entries.Count > 0)
+            await SettleAsync(voucher, entries.Single(), ct);
 
         AddActivity(auto, voucher, action);
         if (action == CashDocumentActivityAction.Created)
@@ -145,14 +146,58 @@ public class AutoCashVoucherService : IAutoCashVoucherService
         };
     }
 
-    /// The Auto settlement between the stock voucher's entry and the automatic voucher's entry (P20), batch = the stock
-    /// voucher. The stock voucher removed its own Auto settlements before posting its entry (P21).
-    private async Task SettleAsync(StockVoucher voucher, IReadOnlyList<DebtEntry> autoEntries, CancellationToken ct)
+    public async Task RecomputeAutoAsync(IEnumerable<Guid> entryIds, CancellationToken ct = default)
     {
-        if (autoEntries.Count == 0)
+        var ids = entryIds.Distinct().ToList();
+        if (ids.Count == 0)
             return;
 
-        var autoEntry = autoEntries.Single();
+        // The stock vouchers behind these entries: as the source of a stock entry, or as the manager of the automatic
+        // voucher that is the source of a receipt or payment entry.
+        var sources = await _db.DebtEntries.Where(e => ids.Contains(e.Id))
+            .Select(e => new { e.SourceType, e.SourceId })
+            .ToListAsync(ct);
+        var cashIds = sources.Where(s => s.SourceType is DebtSourceType.Receipt or DebtSourceType.Payment)
+            .Select(s => s.SourceId)
+            .ToList();
+        var managers = await _db.CashVouchers
+            .Where(v => cashIds.Contains(v.Id) && v.SourceStockVoucherId != null)
+            .Select(v => v.SourceStockVoucherId!.Value)
+            .ToListAsync(ct);
+        var stockIds = sources.Where(s => s.SourceType is DebtSourceType.StockIn or DebtSourceType.StockOut)
+            .Select(s => s.SourceId)
+            .Concat(managers)
+            .Distinct()
+            .ToList();
+
+        // Non-deleted (query filter), Active and paid: the stock vouchers that hold an Auto settlement (P20).
+        var vouchers = await _db.StockVouchers.AsNoTracking()
+            .Where(v => stockIds.Contains(v.Id) && v.Status == StockVoucherStatus.Active && v.PaidAmount > 0)
+            .OrderBy(v => v.Id)
+            .ToListAsync(ct);
+        foreach (var voucher in vouchers)
+        {
+            var auto = await _db.CashVouchers.AsNoTracking()
+                .Where(v => v.SourceStockVoucherId == voucher.Id && v.Status == DocumentStatus.Active)
+                .Select(v => new { v.Id, v.Type })
+                .FirstOrDefaultAsync(ct);
+            if (auto is null)
+                continue;
+
+            var autoSource = SourceTypeOf(auto.Type);
+            // None when the stock reason has no debt effect.
+            var autoEntry = await _db.DebtEntries
+                .FirstOrDefaultAsync(e => e.SourceType == autoSource && e.SourceId == auto.Id, ct);
+            if (autoEntry is not null)
+                await SettleAsync(voucher, autoEntry, ct);
+        }
+    }
+
+    /// The Auto settlement between the stock voucher's entry and the automatic voucher's entry (P20), batch = the stock
+    /// voucher: DebtSettlementMath.AutoAmount of the current rows, replacing the one in place when it differs. On a
+    /// save the stock voucher removed it before posting its entry (P21), so it is simply added.
+    private async Task SettleAsync(StockVoucher voucher, DebtEntry autoEntry, CancellationToken ct)
+    {
         var stockSource = voucher.Type == StockDirection.In ? DebtSourceType.StockIn : DebtSourceType.StockOut;
         // None when the stock voucher's total is 0.
         var stockEntry = await _db.DebtEntries.FirstOrDefaultAsync(e => e.SourceType == stockSource
@@ -160,9 +205,18 @@ public class AutoCashVoucherService : IAutoCashVoucherService
         if (stockEntry is null)
             return;
 
+        var current = await _db.DebtSettlements
+            .Where(s => s.Origin == SettlementOrigin.Auto
+                        && (s.IncreaseEntryId == stockEntry.Id || s.DecreaseEntryId == stockEntry.Id))
+            .SumAsync(s => s.Amount, ct);
         var settled = await _ledger.SettledAmountsAsync(new[] { stockEntry.Id, autoEntry.Id }, SettlementOrigin.Auto, ct);
         var amount = DebtSettlementMath.AutoAmount(voucher.PaidAmount,
             stockEntry.Amount - settled[stockEntry.Id], autoEntry.Amount - settled[autoEntry.Id]);
+        if (amount == current)
+            return;
+
+        if (current > 0)
+            await _ledger.RemoveOwnSettlementsAsync(stockSource, voucher.Id, SettlementOrigin.Auto, ct);
         if (amount <= 0)
             return;
 

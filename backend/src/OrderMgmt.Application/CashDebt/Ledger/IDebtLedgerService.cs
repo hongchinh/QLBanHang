@@ -31,4 +31,9 @@ public interface IDebtLedgerService
     /// Σ settlement amounts per entry, optionally excluding one origin.
     Task<IReadOnlyDictionary<Guid, decimal>> SettledAmountsAsync(IEnumerable<Guid> entryIds,
         SettlementOrigin? excludeOrigin = null, CancellationToken ct = default);
+
+    /// Ids of the entries settled against the source's entries (the other entry of each settlement). A write that may
+    /// remove those settlements reads them first, then passes them to IAutoCashVoucherService.RecomputeAutoAsync.
+    Task<IReadOnlyList<Guid>> CounterpartEntryIdsAsync(DebtSourceType sourceType, Guid sourceId,
+        CancellationToken ct = default);
 }

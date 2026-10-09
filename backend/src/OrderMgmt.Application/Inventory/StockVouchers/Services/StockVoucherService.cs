@@ -1038,11 +1038,16 @@ public class StockVoucherService : IStockVoucherService
     /// Other settlements of the stock entry and of the automatic entry need one confirmation (P10). Without it, a 422
     /// from the stock entry is held while the steps go on as confirmed, so that the 422 also lists the automatic
     /// entry's settlements; throwing it then rolls the transaction back.
+    /// The entries those settlements joined may belong to other stock vouchers, whose Auto settlements are then
+    /// recomputed (this voucher's own is set by SyncAsync).
     private async Task SyncDebtAsync(StockVoucher voucher, StockReason reason, bool remove, bool confirmRemoveSettlements,
         CancellationToken ct)
     {
         var sourceType = DebtSourceOf(voucher.Type);
         await _ledger.RemoveOwnSettlementsAsync(sourceType, voucher.Id, SettlementOrigin.Auto, ct);
+        // Read once the own Auto settlement is gone, so this voucher's own entries are not among them (only a Manual
+        // settlement between the two could bring them back, and recomputing this voucher again changes nothing).
+        var counterparts = await CounterpartEntryIdsAsync(voucher, sourceType, ct);
 
         Task PostOrRemoveAsync(bool confirm) => remove
             ? _ledger.RemoveSourceAsync(sourceType, voucher.Id, confirm, ct)
@@ -1071,6 +1076,22 @@ public class StockVoucherService : IStockVoucherService
 
         if (stockRemovals is not null)
             throw stockRemovals;
+
+        await _auto.RecomputeAutoAsync(counterparts, ct);
+    }
+
+    /// The entries settled against the voucher's stock entry or its automatic voucher's entry.
+    private async Task<IReadOnlyList<Guid>> CounterpartEntryIdsAsync(StockVoucher voucher, DebtSourceType sourceType,
+        CancellationToken ct)
+    {
+        var ids = (await _ledger.CounterpartEntryIdsAsync(sourceType, voucher.Id, ct)).ToList();
+        var auto = await _db.CashVouchers.Where(v => v.SourceStockVoucherId == voucher.Id)
+            .Select(v => new { v.Id, v.Type })
+            .FirstOrDefaultAsync(ct);
+        if (auto is not null)
+            ids.AddRange(await _ledger.CounterpartEntryIdsAsync(
+                auto.Type == CashVoucherType.Receipt ? DebtSourceType.Receipt : DebtSourceType.Payment, auto.Id, ct));
+        return ids;
     }
 
     /// The stock draft: one entry when the reason affects debt and the total is positive, none otherwise.

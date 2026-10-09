@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Ledger;
+using OrderMgmt.Application.CashDebt.OpeningDebts.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -299,22 +300,201 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         await AssertCashDebtInvariantsAsync();
     }
 
+    [Fact]
+    public async Task Cancelling_a_receipt_recomputes_the_auto_settlement()
+    {
+        var customer = await NewCustomerAsync();
+        var (sale, receipt) = await PaidSaleCoveredByReceiptAsync(customer);
+
+        // The sale is open 3,000 again and its automatic receipt open 1,000: Auto = min(1,000, 3,000, 1,000).
+        var (status, _, error) = await CancelCashAsync(_branchClient, receipt.Id,
+            new CashDocumentActionRequest { Version = receipt.Version, ConfirmRemoveSettlements = true });
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        await AssertAutoSettlementAsync(sale, 1_000m);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Deleting_or_editing_a_receipt_recomputes_the_auto_settlement()
+    {
+        var customer = await NewCustomerAsync();
+
+        // Delete.
+        var (deletedSale, deleted) = await PaidSaleCoveredByReceiptAsync(customer);
+        var (deleteStatus, _, deleteError) = await DeleteCashAsync(_branchClient, deleted.Id,
+            new CashDocumentActionRequest { Version = deleted.Version, ConfirmRemoveSettlements = true });
+        deleteStatus.Should().Be(HttpStatusCode.OK, deleteError?.Message);
+        await AssertAutoSettlementAsync(deletedSale, 1_000m);
+        await AssertCashDebtInvariantsAsync();
+
+        // An edit that lowers the allocation to 1,000: Auto takes what is left after it, min(1,000, 2,000, 1,000).
+        var (loweredSale, lowered) = await PaidSaleCoveredByReceiptAsync(customer);
+        var loweredEntry = (await EntriesOfAsync(DebtSourceType.StockOut, loweredSale.Id)).Single();
+        var lower = CashUpdateFrom(lowered);
+        lower.Allocations = new List<AllocationRequest> { new() { EntryId = loweredEntry.Id, Amount = 1_000m } };
+        var (lowerStatus, _, lowerError) = await PutCashAsync(_branchClient, lowered.Id, lower);
+        lowerStatus.Should().Be(HttpStatusCode.OK, lowerError?.Message);
+        await AssertAutoSettlementAsync(loweredSale, 1_000m);
+        await AssertCashDebtInvariantsAsync();
+
+        // An edit below the allocation, confirmed: the allocation goes and Auto takes the room.
+        var (shrunkSale, shrunk) = await PaidSaleCoveredByReceiptAsync(customer);
+        var shrink = CashUpdateFrom(shrunk);
+        shrink.Lines[0].Amount = 2_500m;
+        shrink.ConfirmRemoveSettlements = true;
+        var (shrinkStatus, _, shrinkError) = await PutCashAsync(_branchClient, shrunk.Id, shrink);
+        shrinkStatus.Should().Be(HttpStatusCode.OK, shrinkError?.Message);
+        await AssertAutoSettlementAsync(shrunkSale, 1_000m);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Removing_settlements_through_a_stock_voucher_recomputes_another_auto_settlement()
+    {
+        var customer = await NewCustomerAsync();
+
+        // A customer return (R− 3,000) matched to the sale; the sale then records 1,000 paid (Auto 0).
+        var sale = await CreateSaleAsync(customer, 3, 1_000, paid: 0);
+        var customerReturn = await CreateStockAsync(StockDirection.In, "NTL", customer, 3, 1_000, paid: 0);
+        await MatchManuallyAsync((await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single().Id,
+            (await EntriesOfAsync(DebtSourceType.StockIn, customerReturn.Id)).Single().Id, 3_000m);
+        sale = await PayAsync(sale, 1_000);
+        await AssertAutoSettlementAsync(sale, 0m);
+
+        // Cancelling the return frees the sale's entry.
+        var (status, _, error) = await ActionAsync(customerReturn.Id, "cancel",
+            new StockVoucherActionRequest { Version = customerReturn.Version, ConfirmRemoveSettlements = true });
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        await AssertAutoSettlementAsync(sale, 1_000m);
+        await AssertCashDebtInvariantsAsync();
+
+        // Another sale's automatic receipt (open 2,000 of an overpayment) matched to a third sale, which records
+        // 1,000 paid (Auto 0); shrinking that overpayment below the match frees the third sale's entry.
+        var prepaid = await CreateSaleAsync(customer, 3, 1_000, paid: 5_000);
+        var third = await CreateSaleAsync(customer, 2, 1_000, paid: 0);
+        await MatchManuallyAsync((await EntriesOfAsync(DebtSourceType.StockOut, third.Id)).Single().Id,
+            (await EntriesOfAsync(DebtSourceType.Receipt, prepaid.AutoCashVoucherId!.Value)).Single().Id, 2_000m);
+        third = await PayAsync(third, 1_000);
+        await AssertAutoSettlementAsync(third, 0m);
+
+        var shrink = UpdateRequestFrom(prepaid);
+        shrink.PaidAmount = 1_000;
+        shrink.ConfirmRemoveSettlements = true;
+        var (shrinkStatus, _, shrinkError) = await PutVoucherAsync(_branchClient, prepaid.Id, shrink);
+        shrinkStatus.Should().Be(HttpStatusCode.OK, shrinkError?.Message);
+        await AssertAutoSettlementAsync(prepaid, 1_000m);
+        await AssertAutoSettlementAsync(third, 1_000m);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Removing_an_opening_debt_settlement_recomputes_the_auto_settlement()
+    {
+        var customer = await NewCustomerAsync();
+
+        // A prepayment carried over (R− 3,000) matched to the sale; the sale then records 1,000 paid (Auto 0).
+        async Task<(StockVoucherDto Sale, Guid OpeningDebtId)> PrepaidSaleAsync(string docNo)
+        {
+            var prepayment = await CreateOpeningDebtAsync(_branchClient, customer, DebtSide.Receivable,
+                OpeningDebtKind.Prepayment, docNo, new DateOnly(2026, 9, 20), 3_000m);
+            var sale = await CreateSaleAsync(customer, 3, 1_000, paid: 0);
+            await MatchManuallyAsync((await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single().Id,
+                prepayment.EntryId, 3_000m);
+            sale = await PayAsync(sale, 1_000);
+            await AssertAutoSettlementAsync(sale, 0m);
+            return (sale, prepayment.OpeningDebtId);
+        }
+
+        var (deletedSale, deletedId) = await PrepaidSaleAsync("TT1");
+        var deleted = await _branchClient.DeleteAsync($"/api/opening-debts/{deletedId}?confirmRemoveSettlements=true");
+        deleted.StatusCode.Should().Be(HttpStatusCode.OK, await deleted.Content.ReadAsStringAsync());
+        await AssertAutoSettlementAsync(deletedSale, 1_000m);
+        await AssertCashDebtInvariantsAsync();
+
+        var (shrunkSale, shrunkId) = await PrepaidSaleAsync("TT2");
+        var shrunk = await _branchClient.PutAsJsonAsync($"/api/opening-debts/{shrunkId}", new UpsertOpeningDebtRequest
+        {
+            PartnerId = customer,
+            Side = DebtSide.Receivable,
+            Kind = OpeningDebtKind.Prepayment,
+            DocNo = "TT2",
+            DocDate = new DateOnly(2026, 9, 20),
+            Amount = 2_500m,
+            ConfirmRemoveSettlements = true,
+        }, TestJson.Options);
+        shrunk.StatusCode.Should().Be(HttpStatusCode.OK, await shrunk.Content.ReadAsStringAsync());
+        await AssertAutoSettlementAsync(shrunkSale, 1_000m);
+        await AssertCashDebtInvariantsAsync();
+    }
+
     private Task<Guid> NewCustomerAsync() =>
         CreatePartnerAsync("KH-" + Guid.NewGuid().ToString("N")[..8], isCustomer: true, isSupplier: false);
 
     /// A sale (XBH) of one untracked line at 10-05 09:00 in the test branch; paid in cash (TM, QTM) when `paid` > 0.
-    private async Task<StockVoucherDto> CreateSaleAsync(Guid customerId, decimal quantity, decimal unitPrice, decimal paid)
+    private Task<StockVoucherDto> CreateSaleAsync(Guid customerId, decimal quantity, decimal unitPrice, decimal paid) =>
+        CreateStockAsync(StockDirection.Out, "XBH", customerId, quantity, unitPrice, paid);
+
+    /// A voucher of one untracked line at 10-05 09:00 in the test branch; paid in cash (TM, QTM) when `paid` > 0.
+    private async Task<StockVoucherDto> CreateStockAsync(StockDirection type, string reasonCode, Guid partnerId,
+        decimal quantity, decimal unitPrice, decimal paid)
     {
         var product = await CreateInventoryProductAsync("SP-" + Guid.NewGuid().ToString("N")[..8], track: false);
-        var request = VoucherRequest(StockDirection.Out, await ReasonIdAsync("XBH"), "2026-10-05 09:00",
+        var request = VoucherRequest(type, await ReasonIdAsync(reasonCode), "2026-10-05 09:00",
             LineRequest(product, quantity, unitPrice));
         request.WarehouseId = _warehouseId;
-        request.PartnerId = customerId;
+        request.PartnerId = partnerId;
         request.PaymentMethodId = paid > 0 ? _cashMethodId : null;
         request.PaidAmount = paid;
         var (status, voucher, error) = await PostVoucherAsync(_branchClient, request);
         status.Should().Be(HttpStatusCode.OK, error?.Message);
         return voucher!;
+    }
+
+    /// Edits the stock voucher to `paid` in cash (TM, QTM); asserts 200.
+    private async Task<StockVoucherDto> PayAsync(StockVoucherDto voucher, decimal paid)
+    {
+        var request = UpdateRequestFrom(voucher);
+        request.PaymentMethodId = _cashMethodId;
+        request.PaidAmount = paid;
+        var (status, paidVoucher, error) = await PutVoucherAsync(_branchClient, voucher.Id, request);
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        return paidVoucher!;
+    }
+
+    /// XBH 3,000 fully allocated by a manual receipt of 3,000 (AtVoucher), then edited to paid 1,000: the automatic
+    /// receipt finds no room on the sale, so it has no Auto settlement (P20).
+    private async Task<(StockVoucherDto Sale, CashVoucherDto Receipt)> PaidSaleCoveredByReceiptAsync(Guid customerId)
+    {
+        var sale = await CreateSaleAsync(customerId, 3, 1_000, paid: 0);
+        var stockEntry = (await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single();
+        var receipt = await CreateReceiptAsync(customerId, 3_000m, (stockEntry.Id, 3_000m));
+        sale = await PayAsync(sale, 1_000);
+        await AssertAutoSettlementAsync(sale, 0m);
+        await AssertCashDebtInvariantsAsync();
+        return (sale, receipt);
+    }
+
+    /// The Auto settlement (batch = the stock voucher) between its entry and its automatic voucher's entry.
+    private async Task AssertAutoSettlementAsync(StockVoucherDto voucher, decimal expected)
+    {
+        var stockEntry = (await EntriesOfAsync(voucher.Type == StockDirection.In ? DebtSourceType.StockIn
+            : DebtSourceType.StockOut, voucher.Id)).Single();
+        var autoEntry = (await EntriesOfAsync(voucher.Type == StockDirection.In ? DebtSourceType.Payment
+            : DebtSourceType.Receipt, voucher.AutoCashVoucherId!.Value)).Single();
+        var auto = (await SettlementsOfAsync(stockEntry.Id)).Where(s => s.Origin == SettlementOrigin.Auto).ToList();
+        if (expected == 0)
+        {
+            auto.Should().BeEmpty($"{voucher.Code} has no Auto settlement");
+            return;
+        }
+
+        auto.Should().ContainSingle($"{voucher.Code} has one Auto settlement").Which.Should().BeEquivalentTo(new
+        {
+            IncreaseEntryId = stockEntry.Direction == DebtDirection.Increase ? stockEntry.Id : autoEntry.Id,
+            DecreaseEntryId = stockEntry.Direction == DebtDirection.Increase ? autoEntry.Id : stockEntry.Id,
+            Amount = expected,
+            BatchId = voucher.Id,
+        });
     }
 
     /// A manual receipt (TKH) of `amount` at 10-05 10:00 into QTM, allocated at voucher time (AtVoucher).

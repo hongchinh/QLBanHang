@@ -246,6 +246,25 @@ public class DebtLedgerService : IDebtLedgerService
         return result;
     }
 
+    public async Task<IReadOnlyList<Guid>> CounterpartEntryIdsAsync(DebtSourceType sourceType, Guid sourceId,
+        CancellationToken ct = default)
+    {
+        var own = await _db.DebtEntries
+            .Where(e => e.SourceType == sourceType && e.SourceId == sourceId)
+            .Select(e => e.Id)
+            .ToListAsync(ct);
+        if (own.Count == 0)
+            return Array.Empty<Guid>();
+
+        var pairs = await _db.DebtSettlements
+            .Where(s => own.Contains(s.IncreaseEntryId) || own.Contains(s.DecreaseEntryId))
+            .Select(s => new { s.IncreaseEntryId, s.DecreaseEntryId })
+            .ToListAsync(ct);
+        return pairs.Select(p => own.Contains(p.IncreaseEntryId) ? p.DecreaseEntryId : p.IncreaseEntryId)
+            .Distinct()
+            .ToList();
+    }
+
     /// The first slot holds an Increase entry and the second a Decrease entry of the same branch, partner and side.
     private static (string Field, string Message)? PairError(DebtEntry? increase, DebtEntry? decrease)
     {

@@ -170,6 +170,41 @@ public abstract class CashDebtTestBase : InventoryTestBase
                         PostedAt = v.VoucherAt,
                     }, $"entry of cash voucher {v.Code}");
             }
+
+            // 8. Stock vouchers: a non-deleted Active voucher whose reason affects debt and whose Total > 0 has exactly
+            // one matching entry; no other stock entry exists.
+            var stockVouchers = await db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+                .Where(v => !v.IsDeleted && v.Status == StockVoucherStatus.Active && v.Total > 0
+                            && v.Reason!.DebtEffect != DebtEffect.None)
+                .Select(v => new
+                {
+                    v.Id, v.Type, v.Code, v.BranchId, v.PartnerId, v.VoucherAt, v.DueDate, v.Total, v.Reason!.DebtEffect,
+                })
+                .ToListAsync();
+            var stockSources = new HashSet<(DebtSourceType, Guid)>();
+            foreach (var v in stockVouchers)
+            {
+                var sourceType = v.Type == StockDirection.In ? DebtSourceType.StockIn : DebtSourceType.StockOut;
+                stockSources.Add((sourceType, v.Id));
+                var effect = DebtEffectRules.Resolve(v.DebtEffect)!.Value;
+                entries.Values.Where(e => e.SourceType == sourceType && e.SourceId == v.Id)
+                    .Should().ContainSingle($"stock voucher {v.Code} has one entry")
+                    .Which.Should().BeEquivalentTo(new
+                    {
+                        effect.Side,
+                        effect.Direction,
+                        Amount = v.Total,
+                        PartnerId = v.PartnerId,
+                        v.BranchId,
+                        PostedAt = v.VoucherAt,
+                        DueDate = DebtDates.EntryDueDate(effect.Direction, VnTime.ToVnDate(v.VoucherAt), v.DueDate),
+                    }, $"entry of stock voucher {v.Code}");
+            }
+            entries.Values
+                .Where(e => e.SourceType is DebtSourceType.StockIn or DebtSourceType.StockOut
+                            && !stockSources.Contains((e.SourceType, e.SourceId)))
+                .Select(e => e.DocCode)
+                .Should().BeEmpty("every stock entry belongs to an Active, non-deleted stock voucher whose reason affects debt");
         });
 
     private static DebtSourceType CashSourceType(CashVoucherType type) =>

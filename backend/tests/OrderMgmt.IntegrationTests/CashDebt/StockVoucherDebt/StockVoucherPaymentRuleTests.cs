@@ -2,7 +2,9 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.CashDebt.Funds.Models;
+using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Entities.Inventory;
@@ -185,6 +187,34 @@ public class StockVoucherPaymentRuleTests : CashDebtTestBase
 
         request.PartnerId = await NewCustomerAsync();
         await PostOkAsync(request);
+    }
+
+    [Fact]
+    public async Task Fund_deactivated_while_the_save_waits_for_its_key_is_rejected()
+    {
+        var customer = await NewCustomerAsync();
+        var qtm2 = (await ReadDataAsync<FundDto>(await _branchClient.PostAsJsonAsync("/api/funds", new CreateFundRequest
+        {
+            Code = "QTM2", Name = "Quỹ tiền mặt 2", Kind = FundKind.Cash, IsActive = true,
+        }))).Id;
+        var request = await SaleRequestAsync(customer, 1, 100_000);
+        request.PaymentMethodId = await PaymentMethodIdAsync("TM");
+        request.FundId = qtm2;
+
+        // The test holds the fund key: the fund edit waits on it first, then the sale (validated while QTM2 was still
+        // active) queues behind the edit and re-checks the fund once it has the key.
+        var (deactivate, sale) = await RaceAsync(
+            sp => sp.GetRequiredService<ICashDebtLock>().AcquireAsync(_branchId, Array.Empty<Guid>(), new[] { qtm2 }),
+            () => _branchClient.PutAsJsonAsync($"/api/funds/{qtm2}", new UpdateFundRequest
+            {
+                Name = "Quỹ tiền mặt 2", Kind = FundKind.Cash, IsDefault = false, IsActive = false,
+            }),
+            () => PostVoucherAsync(_branchClient, request));
+
+        deactivate.StatusCode.Should().Be(HttpStatusCode.OK, await deactivate.Content.ReadAsStringAsync());
+        sale.Status.Should().Be(HttpStatusCode.BadRequest, sale.Error?.Message);
+        sale.Error!.Details!["fundId"].Should().Equal("Quỹ đã ngừng sử dụng.");
+        (await InDbAsync(db => db.StockVouchers.AnyAsync(v => v.BranchId == _branchId))).Should().BeFalse();
     }
 
     private Task<Guid> NewCustomerAsync() =>

@@ -112,14 +112,15 @@ public class DebtSettlementTests : CashDebtTestBase
     [Fact]
     public async Task Remove_settlements_logs_activity_on_both_stock_vouchers()
     {
+        // The stock vouchers post their own entries: a customer return (NTL) R− 150 and a sale (XBH) R+ 200.
         var productId = await CreateInventoryProductAsync("SV" + _suffix);
-        var stockIn = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-01 08:00", LineRequest(productId, 10, 100));
-        var stockOut = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-02 08:00", LineRequest(productId, 2, 100));
+        var stockIn = await CreateVoucherAsync(_client, StockDirection.In, "NTL", "2026-10-01 08:00",
+            r => r.PartnerId = _partnerId, LineRequest(productId, 10, 15));
+        var stockOut = await CreateVoucherAsync(_client, StockDirection.Out, "XBH", "2026-10-02 08:00",
+            r => r.PartnerId = _partnerId, LineRequest(productId, 2, 100));
 
-        var outEntry = await EntryAsync(Draft(_partnerId, R, Inc, 200m, "2026-10-02 08:00", stockOut.Code),
-            DebtSourceType.StockOut, stockOut.Id);
-        var inEntry = await EntryAsync(Draft(_partnerId, R, Dec, 150m, "2026-10-01 08:00", stockIn.Code),
-            DebtSourceType.StockIn, stockIn.Id);
+        var outEntry = (await EntriesOfAsync(DebtSourceType.StockOut, stockOut.Id)).Single().Id;
+        var inEntry = (await EntriesOfAsync(DebtSourceType.StockIn, stockIn.Id)).Single().Id;
         var settlement = (await SettleAsync(SettlementOrigin.Manual, new SettlementDraft(outEntry, inEntry, 150m))).Single();
 
         var removed = await InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()

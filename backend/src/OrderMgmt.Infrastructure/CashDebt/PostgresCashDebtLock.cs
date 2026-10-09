@@ -18,4 +18,7 @@ public sealed class PostgresCashDebtLock : ICashDebtLock
 
     public Task AcquireReasonAsync(Guid reasonId, bool exclusive, CancellationToken ct = default) =>
         AdvisoryLocks.AcquireAsync(_db, new[] { $"cash-reason:{reasonId:N}" }, shared: !exclusive, ct);
+
+    public Task AcquireStockReasonAsync(Guid reasonId, bool exclusive, CancellationToken ct = default) =>
+        AdvisoryLocks.AcquireAsync(_db, new[] { $"stock-reason:{reasonId:N}" }, shared: !exclusive, ct);
 }

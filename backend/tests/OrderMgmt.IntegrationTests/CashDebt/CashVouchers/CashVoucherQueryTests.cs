@@ -2,7 +2,6 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.CashDebt.CashReasons.Models;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
@@ -12,7 +11,6 @@ using OrderMgmt.Application.Inventory.Settings.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
-using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
 
@@ -398,12 +396,6 @@ public class CashVoucherQueryTests : CashDebtTestBase
 
     private Task<HttpResponseMessage> PutOpeningDateAsync(Guid branchId, DateOnly date) =>
         _client.PutAsJsonAsync($"/api/branches/{branchId}/opening-date", new SetOpeningDateRequest { OpeningDate = date });
-
-    /// Locks a row in the race's transaction. FOR NO KEY UPDATE: an UPDATE of the row waits, a foreign-key check
-    /// does not.
-    private static Func<IServiceProvider, Task> HoldRow(string table, Guid id) => sp =>
-        sp.GetRequiredService<AppDbContext>().Database.ExecuteSqlRawAsync(
-            "SELECT 1 FROM " + table + " WHERE id = {0} FOR NO KEY UPDATE", id);
 
     private static string NewCode(string prefix) => prefix + Guid.NewGuid().ToString("N")[..8];
 }

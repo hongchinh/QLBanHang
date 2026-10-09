@@ -274,7 +274,7 @@ public abstract class CashDebtTestBase : InventoryTestBase
         ReadDocumentResponseAsync<CashVoucherDto>(response);
 
     /// Status, data and error of a document endpoint; a success without a body (DELETE) carries no data.
-    private static async Task<(HttpStatusCode Status, T? Data, ApiError? Error)> ReadDocumentResponseAsync<T>(
+    protected static async Task<(HttpStatusCode Status, T? Data, ApiError? Error)> ReadDocumentResponseAsync<T>(
         HttpResponseMessage response) where T : class
     {
         var body = await response.Content.ReadAsStringAsync();
@@ -468,6 +468,12 @@ public abstract class CashDebtTestBase : InventoryTestBase
             await Task.Delay(20);
         }
     }
+
+    /// Locks a row in the race's transaction. FOR NO KEY UPDATE: an UPDATE of the row waits, a foreign-key check
+    /// does not.
+    protected static Func<IServiceProvider, Task> HoldRow(string table, Guid id) => sp =>
+        sp.GetRequiredService<AppDbContext>().Database.ExecuteSqlRawAsync(
+            "SELECT 1 FROM " + table + " WHERE id = {0} FOR NO KEY UPDATE", id);
 
     /// Takes the branch's next `docType` number in the transaction that holds a race: a create of that type then
     /// waits on the counter row, the last lock of its save (P14).

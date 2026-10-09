@@ -453,7 +453,7 @@ public class StockVoucherSettlementTests : CashDebtTestBase
             await LockBranchAsync(null);
         }
 
-        await ResaveRecomputesAutoAsync(sale, 1_000m);
+        await UnlockRecomputedAutoAsync(sale, 1_000m);
     }
 
     [Fact]
@@ -485,17 +485,44 @@ public class StockVoucherSettlementTests : CashDebtTestBase
             await LockBranchAsync(null);
         }
 
-        await ResaveRecomputesAutoAsync(sale, 1_000m);
+        await UnlockRecomputedAutoAsync(sale, 1_000m);
     }
 
-    /// Once the period is open again, saving the stock voucher unchanged recomputes its Auto settlement (SyncAsync)
-    /// and the strict invariant holds.
-    private async Task ResaveRecomputesAutoAsync(StockVoucherDto voucher, decimal expectedAuto)
+    [Fact]
+    public async Task Moving_the_lock_earlier_recomputes_only_the_reopened_auto_settlements()
     {
-        var current = await GetVoucherAsync(_branchClient, voucher.Id);
-        var (status, _, error) = await PutVoucherAsync(_branchClient, voucher.Id, UpdateRequestFrom(current));
-        status.Should().Be(HttpStatusCode.OK, error?.Message);
-        await AssertAutoSettlementAsync(current, expectedAuto);
+        var customer = await NewCustomerAsync();
+        // The sale (10-05, paid 1,000, Auto 0) is covered by a receipt dated 10-20.
+        var (sale, receipt) = await PaidSaleCoveredByReceiptAsync(customer, receiptAt: "2026-10-20 10:00");
+
+        await LockBranchAsync(new DateOnly(2026, 10, 10));
+        try
+        {
+            var (status, _, error) = await CancelCashAsync(_branchClient, receipt.Id,
+                new CashDocumentActionRequest { Version = receipt.Version, ConfirmRemoveSettlements = true });
+            status.Should().Be(HttpStatusCode.OK, error?.Message);
+
+            // 10-05 is still locked: the sale's Auto settlement stays as it is.
+            await LockBranchAsync(new DateOnly(2026, 10, 5));
+            await AssertAutoSettlementAsync(sale, 0m);
+            await AssertCashDebtInvariantsAsync();
+
+            // 10-05 reopens: moving the lock recomputes it, with no other write; the strict invariant holds.
+            await LockBranchAsync(new DateOnly(2026, 10, 4));
+            await AssertAutoSettlementAsync(sale, 1_000m);
+            await AssertCashDebtInvariantsAsync();
+        }
+        finally
+        {
+            await LockBranchAsync(null);
+        }
+    }
+
+    /// Unlocking reopened the stock voucher's period, so the unlock itself recomputed its Auto settlement
+    /// (BranchService.SetLockAsync): the strict invariant holds with no further write.
+    private async Task UnlockRecomputedAutoAsync(StockVoucherDto voucher, decimal expectedAuto)
+    {
+        await AssertAutoSettlementAsync(voucher, expectedAuto);
         await AssertCashDebtInvariantsAsync();
     }
 

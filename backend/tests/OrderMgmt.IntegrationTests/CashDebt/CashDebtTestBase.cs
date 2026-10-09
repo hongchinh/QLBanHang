@@ -266,7 +266,8 @@ public abstract class CashDebtTestBase : InventoryTestBase
                     OpenExcludingAuto(autoEntry));
                 // User decision 2026-10-09 (brainstorm section-02 §5, "Khóa sổ"): a write in an open period that frees
                 // room on these entries leaves an Auto settlement dated in a locked period unchanged, so the pair may
-                // hold less than AutoAmount until its stock voucher is saved again after unlocking. Strict otherwise.
+                // hold less than AutoAmount while its date stays locked; moving the lock earlier or unlocking
+                // recomputes it (BranchService.SetLockAsync). Strict for every pair after LockedUntil.
                 if (lockedUntil[source.BranchId] is { } locked
                     && VnTime.ToVnDate(DebtDates.EffectiveAt(stockEntry.PostedAt, autoEntry.PostedAt)) <= locked)
                     auto.Should().BeLessThanOrEqualTo(autoAmount,

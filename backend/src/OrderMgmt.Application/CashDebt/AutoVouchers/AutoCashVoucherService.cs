@@ -177,8 +177,9 @@ public class AutoCashVoucherService : IAutoCashVoucherService
             .Where(v => stockIds.Contains(v.Id) && v.Status == StockVoucherStatus.Active && v.PaidAmount > 0)
             .OrderBy(v => v.Id)
             .ToListAsync(ct);
-        // Read after the caller's locks: its branch gate (shared) waits for SetLockAsync, and these vouchers are in
-        // the caller's branch (a settlement joins entries of one branch).
+        // Read after the caller's locks: its branch gate (shared) waits for SetLockAsync, which itself calls this under
+        // the exclusive gate (RecomputeReopenedAsync), and these vouchers are in the caller's branch (a settlement joins
+        // entries of one branch).
         var branchIds = vouchers.Select(v => v.BranchId).Distinct().ToList();
         var lockedUntil = await _db.Branches.IgnoreQueryFilters()
             .Where(b => branchIds.Contains(b.Id))
@@ -201,13 +202,46 @@ public class AutoCashVoucherService : IAutoCashVoucherService
         }
     }
 
+    public async Task RecomputeReopenedAsync(Guid branchId, DateOnly? lockedUntil, DateOnly previousLockedUntil,
+        CancellationToken ct = default)
+    {
+        if (lockedUntil is { } next && next >= previousLockedUntil)
+            return;
+
+        // An Auto pair sits at its stock voucher's date (the stock entry and the automatic voucher's entry are both
+        // posted at VoucherAt), so the stock entries of the reopened days find every pair that may have been skipped.
+        var until = VnTime.StartOfNextDay(previousLockedUntil);
+        var reopened = _db.DebtEntries.Where(e => e.BranchId == branchId
+            && (e.SourceType == DebtSourceType.StockIn || e.SourceType == DebtSourceType.StockOut)
+            && e.PostedAt < until);
+        if (lockedUntil is { } stillLocked)
+        {
+            var from = VnTime.StartOfNextDay(stillLocked);
+            reopened = reopened.Where(e => e.PostedAt >= from);
+        }
+        // Only a pair holding less than min(PaidAmount, stock entry Amount) can be off: one left unchanged in a locked
+        // period only ever falls short of AutoAmount (the ledger never settles beyond an entry's open amount, and the
+        // stock voucher itself cannot be saved there), and AutoAmount never exceeds that minimum.
+        var stale = await reopened
+            .Join(_db.StockVouchers.Where(v => v.Status == StockVoucherStatus.Active && v.PaidAmount > 0),
+                e => e.SourceId, v => v.Id, (e, v) => new { e.Id, e.Amount, v.PaidAmount })
+            .Where(x => (_db.DebtSettlements
+                    .Where(s => s.Origin == SettlementOrigin.Auto
+                                && (s.IncreaseEntryId == x.Id || s.DecreaseEntryId == x.Id))
+                    .Sum(s => (decimal?)s.Amount) ?? 0m)
+                < (x.PaidAmount < x.Amount ? x.PaidAmount : x.Amount))
+            .Select(x => x.Id)
+            .ToListAsync(ct);
+        await RecomputeAutoAsync(stale, ct);
+    }
+
     /// The Auto settlement between the stock voucher's entry and the automatic voucher's entry (P20), batch = the stock
     /// voucher: DebtSettlementMath.AutoAmount of the current rows, replacing the one in place when it differs. On a
     /// save the stock voucher removed it before posting its entry (P21), so it is simply added.
     /// When the pair is dated on or before `lockedUntil` (the branch's LockedUntil, VN date), the settlement is left
     /// exactly as it is (user decision 2026-10-09, brainstorm section-02 §5 "Khóa sổ"): a write in an open period
-    /// never changes a settlement in a locked one, and is never refused because of it. The stock voucher's next save
-    /// after unlocking recomputes it (SyncAsync).
+    /// never changes a settlement in a locked one, and is never refused because of it. RecomputeReopenedAsync
+    /// recomputes it when the period reopens.
     private async Task SettleAsync(StockVoucher voucher, DebtEntry autoEntry, DateOnly? lockedUntil, CancellationToken ct)
     {
         var stockSource = voucher.Type == StockDirection.In ? DebtSourceType.StockIn : DebtSourceType.StockOut;

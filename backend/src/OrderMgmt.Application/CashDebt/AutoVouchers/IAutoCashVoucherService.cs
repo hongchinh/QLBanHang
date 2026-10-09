@@ -23,11 +23,20 @@ public interface IAutoCashVoucherService
     /// automatic voucher's entry is among `entryIds` (both entries existing) to DebtSettlementMath.AutoAmount of the
     /// current rows (none when 0), replacing it in place (batch = the stock voucher); writes no activity.
     /// An Auto settlement dated on or before the branch's LockedUntil is left unchanged (user decision 2026-10-09,
-    /// brainstorm section-02 §5): the open-period write goes through, and the stock voucher's next save after
-    /// unlocking recomputes it.
+    /// brainstorm section-02 §5): the open-period write goes through, and RecomputeReopenedAsync recomputes it when
+    /// its period reopens.
     /// A write that may remove settlements reads the entries they join first (the ledger's CounterpartEntryIdsAsync)
     /// and calls this after its own new settlements, so Auto takes only what is left; saves.
     /// Locks: a settlement joins entries of one branch, partner and side, so the partner key the caller holds for the
     /// removed settlements covers these stock vouchers too. Settlements move no money, so no fund key is needed.
     Task RecomputeAutoAsync(IEnumerable<Guid> entryIds, CancellationToken ct = default);
+
+    /// The branch's LockedUntil moved from `previousLockedUntil` to the earlier `lockedUntil` (null = unlocked), already
+    /// saved: recomputes, as RecomputeAutoAsync does, the Auto settlements dated in the reopened days
+    /// (lockedUntil, previousLockedUntil] that it may have left unchanged, so every open-period pair holds
+    /// DebtSettlementMath.AutoAmount again; saves. Does nothing when the lock did not move earlier.
+    /// Locks: BranchService.SetLockAsync calls it under the exclusive branch gate, which waits for every cash, debt
+    /// and stock write of the branch, so no partner or fund key is needed.
+    Task RecomputeReopenedAsync(Guid branchId, DateOnly? lockedUntil, DateOnly previousLockedUntil,
+        CancellationToken ct = default);
 }

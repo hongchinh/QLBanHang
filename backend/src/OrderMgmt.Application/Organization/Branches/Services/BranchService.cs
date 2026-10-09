@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
@@ -24,10 +25,11 @@ public class BranchService : IBranchService
     private readonly IInventoryLock _inventoryLock;
     private readonly IOpeningStockService _openingStock;
     private readonly IOpeningDebtService _openingDebt;
+    private readonly IAutoCashVoucherService _autoVouchers;
 
     public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
         ITransactionRunner transaction, IInventoryLock inventoryLock, IOpeningStockService openingStock,
-        IOpeningDebtService openingDebt)
+        IOpeningDebtService openingDebt, IAutoCashVoucherService autoVouchers)
     {
         _db = db;
         _clock = clock;
@@ -37,6 +39,7 @@ public class BranchService : IBranchService
         _inventoryLock = inventoryLock;
         _openingStock = openingStock;
         _openingDebt = openingDebt;
+        _autoVouchers = autoVouchers;
     }
 
     public async Task<MyBranchesDto> GetMyBranchesAsync(CancellationToken ct = default)
@@ -135,8 +138,13 @@ public class BranchService : IBranchService
         {
             await _inventoryLock.AcquireBranchGateAsync(new[] { id }, exclusive: true, c);
             var branch = await FindAsync(id, c);
+            var previous = branch.LockedUntil;
             branch.LockedUntil = request.LockedUntil;
             await _db.SaveChangesAsync(c);
+            // Auto settlements that open-period writes left unchanged while their days were locked (user decision
+            // 2026-10-09) are recomputed once those days reopen, so every open-period pair holds AutoAmount again.
+            if (previous is { } old)
+                await _autoVouchers.RecomputeReopenedAsync(id, request.LockedUntil, old, c);
             return ToDto(branch);
         }, ct);
     }

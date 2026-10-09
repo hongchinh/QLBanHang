@@ -4,6 +4,7 @@ using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Numbering;
+using OrderMgmt.Application.Organization.Branches;
 using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Enums;
@@ -119,8 +120,9 @@ public class AutoCashVoucherService : IAutoCashVoucherService
 
         var entries = await _ledger.PostAsync(SourceTypeOf(type), auto.Id, DraftsOf(auto, reason),
             confirmRemoveSettlements, ct);
+        // The save checked the voucher's date against the period lock, and the Auto pair is dated at it.
         if (entries.Count > 0)
-            await SettleAsync(voucher, entries.Single(), ct);
+            await SettleAsync(voucher, entries.Single(), lockedUntil: null, ct);
 
         AddActivity(auto, voucher, action);
         if (action == CashDocumentActivityAction.Created)
@@ -175,6 +177,12 @@ public class AutoCashVoucherService : IAutoCashVoucherService
             .Where(v => stockIds.Contains(v.Id) && v.Status == StockVoucherStatus.Active && v.PaidAmount > 0)
             .OrderBy(v => v.Id)
             .ToListAsync(ct);
+        // Read after the caller's locks: its branch gate (shared) waits for SetLockAsync, and these vouchers are in
+        // the caller's branch (a settlement joins entries of one branch).
+        var branchIds = vouchers.Select(v => v.BranchId).Distinct().ToList();
+        var lockedUntil = await _db.Branches.IgnoreQueryFilters()
+            .Where(b => branchIds.Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, b => b.LockedUntil, ct);
         foreach (var voucher in vouchers)
         {
             var auto = await _db.CashVouchers.AsNoTracking()
@@ -189,20 +197,27 @@ public class AutoCashVoucherService : IAutoCashVoucherService
             var autoEntry = await _db.DebtEntries
                 .FirstOrDefaultAsync(e => e.SourceType == autoSource && e.SourceId == auto.Id, ct);
             if (autoEntry is not null)
-                await SettleAsync(voucher, autoEntry, ct);
+                await SettleAsync(voucher, autoEntry, lockedUntil.GetValueOrDefault(voucher.BranchId), ct);
         }
     }
 
     /// The Auto settlement between the stock voucher's entry and the automatic voucher's entry (P20), batch = the stock
     /// voucher: DebtSettlementMath.AutoAmount of the current rows, replacing the one in place when it differs. On a
     /// save the stock voucher removed it before posting its entry (P21), so it is simply added.
-    private async Task SettleAsync(StockVoucher voucher, DebtEntry autoEntry, CancellationToken ct)
+    /// When the pair is dated on or before `lockedUntil` (the branch's LockedUntil, VN date), the settlement is left
+    /// exactly as it is (user decision 2026-10-09, brainstorm section-02 §5 "Khóa sổ"): a write in an open period
+    /// never changes a settlement in a locked one, and is never refused because of it. The stock voucher's next save
+    /// after unlocking recomputes it (SyncAsync).
+    private async Task SettleAsync(StockVoucher voucher, DebtEntry autoEntry, DateOnly? lockedUntil, CancellationToken ct)
     {
         var stockSource = voucher.Type == StockDirection.In ? DebtSourceType.StockIn : DebtSourceType.StockOut;
         // None when the stock voucher's total is 0.
         var stockEntry = await _db.DebtEntries.FirstOrDefaultAsync(e => e.SourceType == stockSource
             && e.SourceId == voucher.Id && e.Side == autoEntry.Side, ct);
         if (stockEntry is null)
+            return;
+        // The EffectiveAt of the current Auto settlement and of a new one alike.
+        if (PeriodLockGuard.IsLocked(lockedUntil, DebtDates.EffectiveAt(stockEntry.PostedAt, autoEntry.PostedAt)))
             return;
 
         var current = await _db.DebtSettlements

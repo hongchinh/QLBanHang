@@ -222,6 +222,8 @@ public abstract class CashDebtTestBase : InventoryTestBase
                 })
                 .ToDictionaryAsync(v => v.Id);
             var autoVouchers = vouchers.Where(v => v.SourceStockVoucherId is not null && !v.IsDeleted).ToList();
+            var lockedUntil = await db.Branches.IgnoreQueryFilters().AsNoTracking()
+                .ToDictionaryAsync(b => b.Id, b => b.LockedUntil);
             foreach (var s in stockRows.Values.Where(s => !s.IsDeleted && s.PaidAmount > 0))
             {
                 autoVouchers.Where(a => a.SourceStockVoucherId == s.Id)
@@ -255,13 +257,22 @@ public abstract class CashDebtTestBase : InventoryTestBase
                     .Where(s => s.Origin != SettlementOrigin.Auto
                                 && (s.IncreaseEntryId == entry.Id || s.DecreaseEntryId == entry.Id))
                     .Sum(s => s.Amount);
-                settlements
+                var auto = settlements
                     .Where(s => s.Origin == SettlementOrigin.Auto
                                 && ((s.IncreaseEntryId == stockEntry.Id && s.DecreaseEntryId == autoEntry.Id)
                                     || (s.IncreaseEntryId == autoEntry.Id && s.DecreaseEntryId == stockEntry.Id)))
-                    .Sum(s => s.Amount)
-                    .Should().Be(DebtSettlementMath.AutoAmount(source.PaidAmount, OpenExcludingAuto(stockEntry),
-                        OpenExcludingAuto(autoEntry)), $"Auto settlement between {source.Code} and {a.Code}");
+                    .Sum(s => s.Amount);
+                var autoAmount = DebtSettlementMath.AutoAmount(source.PaidAmount, OpenExcludingAuto(stockEntry),
+                    OpenExcludingAuto(autoEntry));
+                // User decision 2026-10-09 (brainstorm section-02 §5, "Khóa sổ"): a write in an open period that frees
+                // room on these entries leaves an Auto settlement dated in a locked period unchanged, so the pair may
+                // hold less than AutoAmount until its stock voucher is saved again after unlocking. Strict otherwise.
+                if (lockedUntil[source.BranchId] is { } locked
+                    && VnTime.ToVnDate(DebtDates.EffectiveAt(stockEntry.PostedAt, autoEntry.PostedAt)) <= locked)
+                    auto.Should().BeLessThanOrEqualTo(autoAmount,
+                        $"Auto settlement between {source.Code} and {a.Code} (locked period)");
+                else
+                    auto.Should().Be(autoAmount, $"Auto settlement between {source.Code} and {a.Code}");
             }
         });
 

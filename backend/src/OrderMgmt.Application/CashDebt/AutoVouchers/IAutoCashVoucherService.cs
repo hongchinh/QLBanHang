@@ -22,6 +22,9 @@ public interface IAutoCashVoucherService
     /// Sets the Auto settlement of every non-deleted, Active stock voucher with PaidAmount > 0 whose own entry or
     /// automatic voucher's entry is among `entryIds` (both entries existing) to DebtSettlementMath.AutoAmount of the
     /// current rows (none when 0), replacing it in place (batch = the stock voucher); writes no activity.
+    /// An Auto settlement dated on or before the branch's LockedUntil is left unchanged (user decision 2026-10-09,
+    /// brainstorm section-02 §5): the open-period write goes through, and the stock voucher's next save after
+    /// unlocking recomputes it.
     /// A write that may remove settlements reads the entries they join first (the ledger's CounterpartEntryIdsAsync)
     /// and calls this after its own new settlements, so Auto takes only what is left; saves.
     /// Locks: a settlement joins entries of one branch, partner and side, so the partner key the caller holds for the

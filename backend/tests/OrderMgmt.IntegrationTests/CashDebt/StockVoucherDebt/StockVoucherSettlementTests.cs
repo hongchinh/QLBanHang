@@ -7,6 +7,7 @@ using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
+using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -427,6 +428,85 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         await AssertCashDebtInvariantsAsync();
     }
 
+    [Fact]
+    public async Task Cancelling_a_receipt_leaves_a_locked_auto_settlement_unchanged()
+    {
+        var customer = await NewCustomerAsync();
+        // The sale (10-05) is covered by a receipt dated 10-20, then records 1,000 paid (Auto 0).
+        var (sale, receipt) = await PaidSaleCoveredByReceiptAsync(customer, receiptAt: "2026-10-20 10:00");
+
+        // Brainstorm section-02 §5, user decision 2026-10-09: the receipt is in the open period, so cancelling it
+        // succeeds; the sale's Auto settlement (10-05) is in the locked period and stays as it is.
+        await LockBranchAsync(new DateOnly(2026, 10, 10));
+        try
+        {
+            var (status, cancelled, error) = await CancelCashAsync(_branchClient, receipt.Id,
+                new CashDocumentActionRequest { Version = receipt.Version, ConfirmRemoveSettlements = true });
+            status.Should().Be(HttpStatusCode.OK, error?.Message);
+            cancelled!.Status.Should().Be(DocumentStatus.Cancelled);
+            (await SettlementsOfAsync((await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single().Id))
+                .Should().BeEmpty("the receipt's allocation is gone and the locked Auto settlement is not added");
+            await AssertCashDebtInvariantsAsync();
+        }
+        finally
+        {
+            await LockBranchAsync(null);
+        }
+
+        await ResaveRecomputesAutoAsync(sale, 1_000m);
+    }
+
+    [Fact]
+    public async Task Cancelling_a_customer_return_leaves_a_locked_auto_settlement_unchanged()
+    {
+        var customer = await NewCustomerAsync();
+        // A customer return dated 10-20 (R− 3,000) matched to the 10-05 sale, which then records 1,000 paid (Auto 0).
+        var sale = await CreateSaleAsync(customer, 3, 1_000, paid: 0);
+        var customerReturn = await CreateStockAsync(StockDirection.In, "NTL", customer, 3, 1_000, paid: 0,
+            at: "2026-10-20 09:00");
+        await MatchManuallyAsync((await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single().Id,
+            (await EntriesOfAsync(DebtSourceType.StockIn, customerReturn.Id)).Single().Id, 3_000m);
+        sale = await PayAsync(sale, 1_000);
+        await AssertAutoSettlementAsync(sale, 0m);
+
+        await LockBranchAsync(new DateOnly(2026, 10, 10));
+        try
+        {
+            var (status, cancelled, error) = await ActionAsync(customerReturn.Id, "cancel",
+                new StockVoucherActionRequest { Version = customerReturn.Version, ConfirmRemoveSettlements = true });
+            status.Should().Be(HttpStatusCode.OK, error?.Message);
+            cancelled!.Status.Should().Be(StockVoucherStatus.Cancelled);
+            (await SettlementsOfAsync((await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single().Id))
+                .Should().BeEmpty("the return's match is gone and the locked Auto settlement is not added");
+            await AssertCashDebtInvariantsAsync();
+        }
+        finally
+        {
+            await LockBranchAsync(null);
+        }
+
+        await ResaveRecomputesAutoAsync(sale, 1_000m);
+    }
+
+    /// Once the period is open again, saving the stock voucher unchanged recomputes its Auto settlement (SyncAsync)
+    /// and the strict invariant holds.
+    private async Task ResaveRecomputesAutoAsync(StockVoucherDto voucher, decimal expectedAuto)
+    {
+        var current = await GetVoucherAsync(_branchClient, voucher.Id);
+        var (status, _, error) = await PutVoucherAsync(_branchClient, voucher.Id, UpdateRequestFrom(current));
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        await AssertAutoSettlementAsync(current, expectedAuto);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    /// PUT /api/branches/{test branch}/lock; null unlocks.
+    private async Task LockBranchAsync(DateOnly? lockedUntil)
+    {
+        var response = await _client.PutAsJsonAsync($"/api/branches/{_branchId}/lock",
+            new SetPeriodLockRequest { LockedUntil = lockedUntil });
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+    }
+
     private Task<Guid> NewCustomerAsync() =>
         CreatePartnerAsync("KH-" + Guid.NewGuid().ToString("N")[..8], isCustomer: true, isSupplier: false);
 
@@ -434,13 +514,13 @@ public class StockVoucherSettlementTests : CashDebtTestBase
     private Task<StockVoucherDto> CreateSaleAsync(Guid customerId, decimal quantity, decimal unitPrice, decimal paid) =>
         CreateStockAsync(StockDirection.Out, "XBH", customerId, quantity, unitPrice, paid);
 
-    /// A voucher of one untracked line at 10-05 09:00 in the test branch; paid in cash (TM, QTM) when `paid` > 0.
+    /// A voucher of one untracked line at `at` (default 10-05 09:00) in the test branch; paid in cash (TM, QTM) when
+    /// `paid` > 0.
     private async Task<StockVoucherDto> CreateStockAsync(StockDirection type, string reasonCode, Guid partnerId,
-        decimal quantity, decimal unitPrice, decimal paid)
+        decimal quantity, decimal unitPrice, decimal paid, string at = "2026-10-05 09:00")
     {
         var product = await CreateInventoryProductAsync("SP-" + Guid.NewGuid().ToString("N")[..8], track: false);
-        var request = VoucherRequest(type, await ReasonIdAsync(reasonCode), "2026-10-05 09:00",
-            LineRequest(product, quantity, unitPrice));
+        var request = VoucherRequest(type, await ReasonIdAsync(reasonCode), at, LineRequest(product, quantity, unitPrice));
         request.WarehouseId = _warehouseId;
         request.PartnerId = partnerId;
         request.PaymentMethodId = paid > 0 ? _cashMethodId : null;
@@ -461,13 +541,14 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         return paidVoucher!;
     }
 
-    /// XBH 3,000 fully allocated by a manual receipt of 3,000 (AtVoucher), then edited to paid 1,000: the automatic
-    /// receipt finds no room on the sale, so it has no Auto settlement (P20).
-    private async Task<(StockVoucherDto Sale, CashVoucherDto Receipt)> PaidSaleCoveredByReceiptAsync(Guid customerId)
+    /// XBH 3,000 fully allocated by a manual receipt of 3,000 (AtVoucher) at `receiptAt` (default 10-05 10:00), then
+    /// edited to paid 1,000: the automatic receipt finds no room on the sale, so it has no Auto settlement (P20).
+    private async Task<(StockVoucherDto Sale, CashVoucherDto Receipt)> PaidSaleCoveredByReceiptAsync(Guid customerId,
+        string receiptAt = "2026-10-05 10:00")
     {
         var sale = await CreateSaleAsync(customerId, 3, 1_000, paid: 0);
         var stockEntry = (await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single();
-        var receipt = await CreateReceiptAsync(customerId, 3_000m, (stockEntry.Id, 3_000m));
+        var receipt = await CreateReceiptAtAsync(customerId, receiptAt, 3_000m, (stockEntry.Id, 3_000m));
         sale = await PayAsync(sale, 1_000);
         await AssertAutoSettlementAsync(sale, 0m);
         await AssertCashDebtInvariantsAsync();
@@ -498,11 +579,16 @@ public class StockVoucherSettlementTests : CashDebtTestBase
     }
 
     /// A manual receipt (TKH) of `amount` at 10-05 10:00 into QTM, allocated at voucher time (AtVoucher).
-    private async Task<CashVoucherDto> CreateReceiptAsync(Guid customerId, decimal amount,
+    private Task<CashVoucherDto> CreateReceiptAsync(Guid customerId, decimal amount,
+        params (Guid EntryId, decimal Amount)[] allocations) =>
+        CreateReceiptAtAsync(customerId, "2026-10-05 10:00", amount, allocations);
+
+    /// A manual receipt (TKH) of `amount` at VN time `at` into QTM, allocated at voucher time (AtVoucher).
+    private async Task<CashVoucherDto> CreateReceiptAtAsync(Guid customerId, string at, decimal amount,
         params (Guid EntryId, decimal Amount)[] allocations)
     {
-        var request = CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TKH"), _cashFundId,
-            "2026-10-05 10:00", customerId, amount);
+        var request = CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TKH"), _cashFundId, at, customerId,
+            amount);
         request.Allocations = allocations.Select(a => new AllocationRequest { EntryId = a.EntryId, Amount = a.Amount })
             .ToList();
         return await CreateCashAsync(_branchClient, request);

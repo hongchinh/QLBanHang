@@ -388,8 +388,7 @@ public class StockVoucherService : IStockVoucherService
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
-            await PostDebtAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
-            await _auto.SyncAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
+            await SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             AddActivity(voucher, StockVoucherActivityAction.Created, "Tạo phiếu");
@@ -422,8 +421,7 @@ public class StockVoucherService : IStockVoucherService
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
-            await PostDebtAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
-            await _auto.SyncAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
+            await SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             AddActivity(voucher, StockVoucherActivityAction.Updated, "Cập nhật phiếu");
@@ -488,11 +486,7 @@ public class StockVoucherService : IStockVoucherService
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c, removeAll: !restore);
             // A reason in use keeps its debt effect and cannot be deleted (P19); a restore reads it under its key.
             var reason = await _db.StockReasons.AsNoTracking().SingleAsync(r => r.Id == voucher.ReasonId, c);
-            if (restore)
-                await PostDebtAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
-            else
-                await RemoveDebtAsync(voucher, request.ConfirmRemoveSettlements, c);
-            await _auto.SyncAsync(voucher, reason, request.ConfirmRemoveSettlements, c);
+            await SyncDebtAsync(voucher, reason, remove: !restore, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             AddActivity(voucher, action, description);
@@ -1038,22 +1032,45 @@ public class StockVoucherService : IStockVoucherService
             await _cashDebtLock.AcquireStockReasonAsync(reasonId, exclusive: false, ct);
     }
 
-    /// Save steps 11–12: the voucher's own Auto settlements go first (no confirmation), then its entry is upserted in
-    /// place, or removed when the reason has no debt effect or the total is 0 (P11, P21).
-    private async Task PostDebtAsync(StockVoucher voucher, StockReason reason, bool confirmRemoveSettlements,
+    /// Save steps 11–13 (cancel / delete step 7): the voucher's own Auto settlements go first (no confirmation), then
+    /// its entry is upserted in place, or removed when the reason has no debt effect or the total is 0 (P11, P21), or
+    /// on cancel / delete (`remove`); then the automatic voucher follows (SyncAsync).
+    /// Other settlements of the stock entry and of the automatic entry need one confirmation (P10). Without it, a 422
+    /// from the stock entry is held while the steps go on as confirmed, so that the 422 also lists the automatic
+    /// entry's settlements; throwing it then rolls the transaction back.
+    private async Task SyncDebtAsync(StockVoucher voucher, StockReason reason, bool remove, bool confirmRemoveSettlements,
         CancellationToken ct)
     {
         var sourceType = DebtSourceOf(voucher.Type);
         await _ledger.RemoveOwnSettlementsAsync(sourceType, voucher.Id, SettlementOrigin.Auto, ct);
-        await _ledger.PostAsync(sourceType, voucher.Id, DebtDraftsOf(voucher, reason), confirmRemoveSettlements, ct);
-    }
 
-    /// Cancel / delete step 7: the own Auto settlements, then the entry; other settlements need confirmation (P10).
-    private async Task RemoveDebtAsync(StockVoucher voucher, bool confirmRemoveSettlements, CancellationToken ct)
-    {
-        var sourceType = DebtSourceOf(voucher.Type);
-        await _ledger.RemoveOwnSettlementsAsync(sourceType, voucher.Id, SettlementOrigin.Auto, ct);
-        await _ledger.RemoveSourceAsync(sourceType, voucher.Id, confirmRemoveSettlements, ct);
+        Task PostOrRemoveAsync(bool confirm) => remove
+            ? _ledger.RemoveSourceAsync(sourceType, voucher.Id, confirm, ct)
+            : _ledger.PostAsync(sourceType, voucher.Id, DebtDraftsOf(voucher, reason), confirm, ct);
+
+        ConfirmationRequiredException? stockRemovals = null;
+        try
+        {
+            await PostOrRemoveAsync(confirmRemoveSettlements);
+        }
+        catch (ConfirmationRequiredException e) when (e.Code == DebtLedgerService.SettlementsWillBeRemovedCode)
+        {
+            stockRemovals = e;
+            await PostOrRemoveAsync(confirm: true);
+        }
+
+        try
+        {
+            await _auto.SyncAsync(voucher, reason, confirmRemoveSettlements, ct);
+        }
+        catch (ConfirmationRequiredException e) when (stockRemovals is not null
+                                                      && e.Code == DebtLedgerService.SettlementsWillBeRemovedCode)
+        {
+            throw DebtLedgerService.MergeSettlementRemovals(stockRemovals, e);
+        }
+
+        if (stockRemovals is not null)
+            throw stockRemovals;
     }
 
     /// The stock draft: one entry when the reason affects debt and the total is positive, none otherwise.

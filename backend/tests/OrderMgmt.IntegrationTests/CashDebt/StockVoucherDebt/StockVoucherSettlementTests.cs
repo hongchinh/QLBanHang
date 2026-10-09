@@ -234,6 +234,71 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         await AssertCashDebtInvariantsAsync();
     }
 
+    [Fact]
+    public async Task Confirmation_lists_settlements_of_both_entries()
+    {
+        var customer = await NewCustomerAsync();
+        var debt = await CreateOpeningDebtAsync(_branchClient, customer, DebtSide.Receivable, OpeningDebtKind.Debt, "HD1",
+            new DateOnly(2026, 9, 20), 2_000m);
+        // PX00001 3,000: a manual receipt PT00001 pays 1,000 of it, then the sale itself records 5,000 paid (PT00002):
+        // Auto 2,000, and 2,000 of the automatic receipt's open 3,000 is matched to the opening debt.
+        var sale = await CreateSaleAsync(customer, 3, 1_000, paid: 0);
+        var stockEntry = (await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single();
+        var receipt = await CreateReceiptAsync(customer, 1_000m, (stockEntry.Id, 1_000m));
+        var paid = UpdateRequestFrom(sale);
+        paid.PaymentMethodId = _cashMethodId;
+        paid.PaidAmount = 5_000;
+        var (paidStatus, paidSale, paidError) = await PutVoucherAsync(_branchClient, sale.Id, paid);
+        paidStatus.Should().Be(HttpStatusCode.OK, paidError?.Message);
+        var autoId = paidSale!.AutoCashVoucherId!.Value;
+        paidSale.AutoCashVoucherCode.Should().Be("PT00002");
+        var autoEntry = (await EntriesOfAsync(DebtSourceType.Receipt, autoId)).Single();
+        await MatchManuallyAsync(debt.EntryId, autoEntry.Id, 2_000m);
+        await AssertCashDebtInvariantsAsync();
+
+        // Both entries lose a foreign settlement: one 422 lists them all, keyed by the other document.
+        var expected = new Dictionary<string, string[]>
+        {
+            ["PT00001"] = new[] { DebtActivityLog.SettlementRemovedText(1_000m, "PX00001") },
+            ["HD1"] = new[] { DebtActivityLog.SettlementRemovedText(2_000m, "PT00002") },
+        };
+        var (cancelStatus, _, cancelError) = await ActionAsync(sale.Id, "cancel",
+            new StockVoucherActionRequest { Version = paidSale.Version });
+        cancelStatus.Should().Be(HttpStatusCode.UnprocessableEntity);
+        cancelError!.Code.Should().Be(Removed);
+        cancelError.Details.Should().BeEquivalentTo(expected);
+
+        var shrink = UpdateRequestFrom(paidSale);
+        shrink.Lines[0].Quantity = 1;
+        shrink.Lines[0].UnitPrice = 500;
+        shrink.PaidAmount = 500;
+        var (status, _, error) = await PutVoucherAsync(_branchClient, sale.Id, shrink);
+        status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        error!.Code.Should().Be(Removed);
+        error.Details.Should().BeEquivalentTo(expected);
+        (await SettlementsOfAsync(debt.EntryId)).Should().ContainSingle("a rejected save changes nothing");
+
+        shrink.ConfirmRemoveSettlements = true;
+        var (confirmedStatus, _, confirmedError) = await PutVoucherAsync(_branchClient, sale.Id, shrink);
+        confirmedStatus.Should().Be(HttpStatusCode.OK, confirmedError?.Message);
+        (await SettlementsOfAsync(debt.EntryId)).Should().BeEmpty();
+        (await SettlementsOfAsync((await EntriesOfAsync(DebtSourceType.Receipt, receipt.Id)).Single().Id))
+            .Should().BeEmpty();
+        (await SettlementsOfAsync(stockEntry.Id)).Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            DecreaseEntryId = autoEntry.Id,
+            Amount = 500m,
+            Origin = SettlementOrigin.Auto,
+        });
+        (await StockActivitiesAsync(sale.Id, StockVoucherActivityAction.SettlementRemoved))
+            .Should().Equal(DebtActivityLog.SettlementRemovedText(1_000m, "PT00001"));
+        (await CashActivitiesAsync(receipt.Id, CashDocumentActivityAction.SettlementRemoved))
+            .Should().Equal(DebtActivityLog.SettlementRemovedText(1_000m, "PX00001"));
+        (await CashActivitiesAsync(autoId, CashDocumentActivityAction.SettlementRemoved))
+            .Should().Equal(DebtActivityLog.SettlementRemovedText(2_000m, "HD1"));
+        await AssertCashDebtInvariantsAsync();
+    }
+
     private Task<Guid> NewCustomerAsync() =>
         CreatePartnerAsync("KH-" + Guid.NewGuid().ToString("N")[..8], isCustomer: true, isSupplier: false);
 

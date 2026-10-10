@@ -502,9 +502,9 @@ public abstract class CashDebtTestBase : InventoryTestBase
 
     /// Runs two requests against each other. A transaction of the test holds a row (`hold`) that `first` writes only
     /// after its locks and checks, so `first` stops in flight there; `second` starts then, and the row is released
-    /// once `second` has finished or waits too.
+    /// once `second` has finished or waits too. `whileBlocked` runs just before that release (e.g. KeyWaitersAsync).
     protected async Task<(TFirst First, TSecond Second)> RaceAsync<TFirst, TSecond>(Func<IServiceProvider, Task> hold,
-        Func<Task<TFirst>> first, Func<Task<TSecond>> second)
+        Func<Task<TFirst>> first, Func<Task<TSecond>> second, Func<Task>? whileBlocked = null)
     {
         Task<TFirst> firstTask;
         Task<TSecond> secondTask;
@@ -519,6 +519,8 @@ public abstract class CashDebtTestBase : InventoryTestBase
             firstTask.IsCompleted.Should().BeFalse("the first request waits for the held row");
             secondTask = second();
             await WaitForBlockedAsync(secondTask, count: 2);
+            if (whileBlocked is not null)
+                await whileBlocked();
             await transaction.RollbackAsync();
         }
         return (await firstTask, await secondTask);
@@ -538,6 +540,17 @@ public abstract class CashDebtTestBase : InventoryTestBase
             await Task.Delay(20);
         }
     }
+
+    /// Backends of this test's database waiting on the advisory lock pg_advisory_xact_lock(hashtextextended(key, 0)).
+    /// pg_locks shows a bigint key as objsubid 1 with its high and low 32 bits in classid and objid.
+    protected Task<int> KeyWaitersAsync(string key) => InDbAsync(db => db.Database.SqlQuery<int>(
+            $"SELECT count(*)::int AS \"Value\" FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND objsubid = 1 AND database = (SELECT oid FROM pg_database WHERE datname = current_database()) AND ((classid::bigint << 32) | objid::bigint) = hashtextextended({key}, 0)")
+        .SingleAsync());
+
+    // The advisory keys of PostgresCashDebtLock (P14).
+    protected static string PartnerKey(Guid branchId, Guid partnerId) => $"debt-partner:{branchId:N}:{partnerId:N}";
+
+    protected static string FundKey(Guid fundId) => $"cash-fund:{fundId:N}";
 
     /// Locks a row in the race's transaction. FOR NO KEY UPDATE: an UPDATE of the row waits, a foreign-key check
     /// does not.

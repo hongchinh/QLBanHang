@@ -188,17 +188,6 @@ public class CashVoucherConcurrencyTests : CashDebtTestBase
         return (await Task.WhenAll(requests), waiters);
     }
 
-    /// Backends of this test's database waiting on the advisory lock pg_advisory_xact_lock(hashtextextended(key, 0)).
-    /// pg_locks shows a bigint key as objsubid 1 with its high and low 32 bits in classid and objid.
-    private Task<int> KeyWaitersAsync(string key) => InDbAsync(db => db.Database.SqlQuery<int>(
-            $"SELECT count(*)::int AS \"Value\" FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND objsubid = 1 AND database = (SELECT oid FROM pg_database WHERE datname = current_database()) AND ((classid::bigint << 32) | objid::bigint) = hashtextextended({key}, 0)")
-        .SingleAsync());
-
-    // The advisory keys of PostgresCashDebtLock (P14).
-    private static string PartnerKey(Guid branchId, Guid partnerId) => $"debt-partner:{branchId:N}:{partnerId:N}";
-
-    private static string FundKey(Guid fundId) => $"cash-fund:{fundId:N}";
-
     /// An admin client working in the branch (a clone: logins are rate-limited).
     private HttpClient ClientIn(Guid branchId)
     {

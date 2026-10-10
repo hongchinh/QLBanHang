@@ -275,6 +275,49 @@ public abstract class CashDebtTestBase : InventoryTestBase
                 else
                     auto.Should().Be(autoAmount, $"Auto settlement between {source.Code} and {a.Code}");
             }
+
+            // 10. Debt offsets (P23): an Active, non-deleted offset has exactly an R− and a P− entry of its Amount, each
+            // fully settled by Offset settlements; a cancelled or deleted offset has none, and no other Offset entry
+            // exists.
+            var offsets = await db.DebtOffsetVouchers.IgnoreQueryFilters().AsNoTracking()
+                .Select(o => new { o.Id, o.Code, o.BranchId, o.PartnerId, o.VoucherAt, o.Amount, o.Status, o.IsDeleted })
+                .ToListAsync();
+            var activeOffsets = new HashSet<Guid>();
+            foreach (var o in offsets)
+            {
+                var own = entries.Values.Where(e => e.SourceType == DebtSourceType.Offset && e.SourceId == o.Id).ToList();
+                if (o.IsDeleted || o.Status != DocumentStatus.Active)
+                {
+                    own.Should().BeEmpty($"cancelled or deleted offset {o.Code} has no entry");
+                    continue;
+                }
+
+                activeOffsets.Add(o.Id);
+                own.Select(e => e.Side).Should().BeEquivalentTo(new[] { DebtSide.Receivable, DebtSide.Payable },
+                    $"offset {o.Code} has an R− and a P− entry");
+                foreach (var entry in own)
+                {
+                    entry.Should().BeEquivalentTo(new
+                    {
+                        Direction = DebtDirection.Decrease,
+                        o.Amount,
+                        o.BranchId,
+                        o.PartnerId,
+                        PostedAt = o.VoucherAt,
+                        DocCode = o.Code,
+                    }, $"{entry.Side} entry of offset {o.Code}");
+                    var touching = settlements.Where(s => s.IncreaseEntryId == entry.Id || s.DecreaseEntryId == entry.Id)
+                        .ToList();
+                    touching.Should().OnlyContain(s => s.Origin == SettlementOrigin.Offset,
+                        $"{entry.Side} entry of offset {o.Code} is settled only by its Offset settlements");
+                    touching.Sum(s => s.Amount).Should().Be(o.Amount,
+                        $"{entry.Side} entry of offset {o.Code} is fully settled");
+                }
+            }
+            entries.Values
+                .Where(e => e.SourceType == DebtSourceType.Offset && !activeOffsets.Contains(e.SourceId))
+                .Select(e => e.DocCode)
+                .Should().BeEmpty("every Offset entry belongs to an Active, non-deleted offset");
         });
 
     private static DebtSourceType CashSourceType(CashVoucherType type) =>

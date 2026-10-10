@@ -38,6 +38,7 @@ public interface IAppDbContext
     DbSet<CashVoucherLine> CashVoucherLines { get; }
     DbSet<CashDocumentActivity> CashDocumentActivities { get; }
     DbSet<FundTransfer> FundTransfers { get; }
+    DbSet<DebtOffsetVoucher> DebtOffsetVouchers { get; }
     DbSet<DocumentNumbering> DocumentNumberings { get; }
     DbSet<StockVoucher> StockVouchers { get; }
     DbSet<StockVoucherLine> StockVoucherLines { get; }

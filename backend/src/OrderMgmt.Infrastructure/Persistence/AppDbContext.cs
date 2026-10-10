@@ -53,6 +53,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<CashVoucherLine> CashVoucherLines => Set<CashVoucherLine>();
     public DbSet<CashDocumentActivity> CashDocumentActivities => Set<CashDocumentActivity>();
     public DbSet<FundTransfer> FundTransfers => Set<FundTransfer>();
+    public DbSet<DebtOffsetVoucher> DebtOffsetVouchers => Set<DebtOffsetVoucher>();
     public DbSet<DocumentNumbering> DocumentNumberings => Set<DocumentNumbering>();
     public DbSet<StockVoucher> StockVouchers => Set<StockVoucher>();
     public DbSet<StockVoucherLine> StockVoucherLines => Set<StockVoucherLine>();

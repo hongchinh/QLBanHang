@@ -34,6 +34,8 @@ using OrderMgmt.Application.CashDebt.CreditLimits.Interfaces;
 using OrderMgmt.Application.CashDebt.CreditLimits.Services;
 using OrderMgmt.Application.CashDebt.Debt.Interfaces;
 using OrderMgmt.Application.CashDebt.Debt.Services;
+using OrderMgmt.Application.CashDebt.DebtOffsets.Interfaces;
+using OrderMgmt.Application.CashDebt.DebtOffsets.Services;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Services;
 using OrderMgmt.Application.CashDebt.Funds.Interfaces;
@@ -130,6 +132,7 @@ public static class DependencyInjection
         services.AddScoped<IFundTransferService, FundTransferService>();
         services.AddScoped<IAutoCashVoucherService, AutoCashVoucherService>();
         services.AddScoped<IDebtService, DebtService>();
+        services.AddScoped<IDebtOffsetService, DebtOffsetService>();
         services.AddScoped<IInventoryLedgerService, InventoryLedgerService>();
         services.AddScoped<IInventoryCostingService, InventoryCostingService>();
         services.AddScoped<IInventoryPostingService, InventoryPostingService>();

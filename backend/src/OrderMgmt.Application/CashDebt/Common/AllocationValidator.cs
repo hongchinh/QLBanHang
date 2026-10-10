@@ -15,10 +15,11 @@ public static class AllocationValidator
 
     /// Validates allocations of a voucher's own entry (branch, partner, side, ownDirection) against open entries.
     /// capacity = own entry Amount − Σ settlements of the own entry that are kept (Manual/Offset/other).
-    /// Returns camelCase error keys; empty when valid.
+    /// Returns camelCase error keys under `keyPrefix` ("allocations[0].amount", "allocations"); empty when valid.
     public static Dictionary<string, string[]> Validate(
         Guid branchId, Guid partnerId, DebtSide side, DebtDirection ownDirection, decimal capacity,
-        IReadOnlyList<AllocationInput> allocations, IReadOnlyDictionary<Guid, OpenEntry> entries)
+        IReadOnlyList<AllocationInput> allocations, IReadOnlyDictionary<Guid, OpenEntry> entries,
+        string keyPrefix = "allocations")
     {
         var errors = new Dictionary<string, string[]>();
         var seen = new HashSet<Guid>();
@@ -34,7 +35,7 @@ public static class AllocationValidator
                     ? $"Vượt số còn lại {entry.Open.ToString("N0", Vi)}."
                     : null;
             if (amountError is not null)
-                errors[$"allocations[{i}].amount"] = new[] { amountError };
+                errors[$"{keyPrefix}[{i}].amount"] = new[] { amountError };
 
             var isDuplicate = !seen.Add(allocation.EntryId);
             var entryError = entry is null
@@ -47,11 +48,11 @@ public static class AllocationValidator
                             ? "Chứng từ bị chọn hai lần."
                             : null;
             if (entryError is not null)
-                errors[$"allocations[{i}].entryId"] = new[] { entryError };
+                errors[$"{keyPrefix}[{i}].entryId"] = new[] { entryError };
         }
 
         if (allocations.Sum(a => a.Amount) > capacity)
-            errors["allocations"] = new[]
+            errors[keyPrefix] = new[]
             {
                 $"Tổng phân bổ vượt số tiền còn lại của phiếu ({capacity.ToString("N0", Vi)}).",
             };

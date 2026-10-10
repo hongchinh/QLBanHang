@@ -195,12 +195,12 @@ public class BranchService : IBranchService
         }, ct);
     }
 
-    // Non-deleted documents of any status (the query filters skip deleted ones). Phase 08 adds its document table
-    // here.
+    // Non-deleted documents of any status (the query filters skip deleted ones).
     private async Task<bool> HasDocumentsAsync(Guid branchId, CancellationToken ct) =>
         await _db.StockVouchers.AnyAsync(v => v.BranchId == branchId, ct)
         || await _db.CashVouchers.AnyAsync(v => v.BranchId == branchId, ct)
-        || await _db.FundTransfers.AnyAsync(t => t.BranchId == branchId, ct);
+        || await _db.FundTransfers.AnyAsync(t => t.BranchId == branchId, ct)
+        || await _db.DebtOffsetVouchers.AnyAsync(o => o.BranchId == branchId, ct);
 
     private async Task<Branch> FindAsync(Guid id, CancellationToken ct) =>
         await _db.Branches.FirstOrDefaultAsync(b => b.Id == id, ct)

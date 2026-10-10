@@ -52,7 +52,18 @@ public class DebtActivityLog : IDebtActivityLog
                     Description = SettlementRemovedText(amount, other.DocCode),
                 });
                 break;
-            // Opening debts have no activity log. Offset (Phase 08) is added with its document.
+            case DebtSourceType.Offset:
+                _db.CashDocumentActivities.Add(new CashDocumentActivity
+                {
+                    DocumentType = DocumentType.DebtOffset,
+                    DocumentId = entry.SourceId,
+                    Action = CashDocumentActivityAction.SettlementRemoved,
+                    ActorUserId = _currentUser.UserId,
+                    OccurredAt = _clock.UtcNow,
+                    Description = SettlementRemovedText(amount, other.DocCode),
+                });
+                break;
+            // Opening debts have no activity log.
         }
 
         return Task.CompletedTask;

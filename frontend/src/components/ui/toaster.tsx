@@ -35,6 +35,15 @@ export function Toaster() {
                 {t.description}
               </ToastPrimitive.Description>
             )}
+            {t.action && (
+              <ToastPrimitive.Action
+                altText={t.action.label}
+                onClick={t.action.onClick}
+                className="text-sm font-medium underline underline-offset-2"
+              >
+                {t.action.label}
+              </ToastPrimitive.Action>
+            )}
           </div>
           <ToastPrimitive.Close
             aria-label="Đóng"

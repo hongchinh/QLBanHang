@@ -22,6 +22,8 @@ import { StockReasonListPage } from '@/pages/stock-reasons/stock-reason-list-pag
 import { PaymentMethodListPage } from '@/pages/payment-methods/payment-method-list-page';
 // Round 2A: 10.4 cash reasons
 import { CashReasonListPage } from '@/pages/cash-reasons/cash-reason-list-page';
+// Round 2A: 10.5 funds
+import { FundListPage } from '@/pages/funds/fund-list-page';
 import { QuotationListPage } from '@/pages/quotations/quotation-list-page';
 import { QuotationFormPage } from '@/pages/quotations/quotation-form-page';
 import { StockVoucherFormPage } from '@/pages/stock-vouchers/stock-voucher-form-page';
@@ -223,6 +225,16 @@ export function App() {
                   element={
                     <ProtectedRoute permission="cash.catalogs.manage">
                       <CashReasonListPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Round 2A: 10.5 funds */}
+                <Route
+                  path="funds"
+                  element={
+                    // Either permission (route rule); the page hides the actions the user lacks.
+                    <ProtectedRoute anyPermission={['cash.catalogs.manage', 'cash.opening_balance']}>
+                      <FundListPage />
                     </ProtectedRoute>
                   }
                 />

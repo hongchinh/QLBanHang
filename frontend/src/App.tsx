@@ -20,6 +20,8 @@ import { ProductGroupListPage } from '@/pages/product-groups/product-group-list-
 import { WarehouseListPage } from '@/pages/warehouses/warehouse-list-page';
 import { StockReasonListPage } from '@/pages/stock-reasons/stock-reason-list-page';
 import { PaymentMethodListPage } from '@/pages/payment-methods/payment-method-list-page';
+// Round 2A: 10.4 cash reasons
+import { CashReasonListPage } from '@/pages/cash-reasons/cash-reason-list-page';
 import { QuotationListPage } from '@/pages/quotations/quotation-list-page';
 import { QuotationFormPage } from '@/pages/quotations/quotation-form-page';
 import { StockVoucherFormPage } from '@/pages/stock-vouchers/stock-voucher-form-page';
@@ -212,6 +214,15 @@ export function App() {
                   element={
                     <ProtectedRoute permission="inventory.catalogs.manage">
                       <PaymentMethodListPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Round 2A: 10.4 cash reasons */}
+                <Route
+                  path="cash-reasons"
+                  element={
+                    <ProtectedRoute permission="cash.catalogs.manage">
+                      <CashReasonListPage />
                     </ProtectedRoute>
                   }
                 />

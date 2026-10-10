@@ -78,3 +78,69 @@ describe('visibleNavGroups', () => {
     expect(paths(['inventory.settings'], 'Setting')).toContain('/settings');
   });
 });
+
+// Round 2A: P5 ACCOUNTANT defaults, cash and debt part.
+const ACCOUNTANT_CASH_PERMS: Permission[] = [
+  'receipts.view', 'receipts.create',
+  'payments.view', 'payments.create',
+  'fund_transfers.view', 'fund_transfers.create',
+  'debt.matching',
+  'debt_offset.view', 'debt_offset.create',
+  'debt.opening_balance',
+  'cash.opening_balance', 'cash.catalogs.manage', 'cash.settings',
+  'credit_limit.manage',
+  'debt.partner_summary',
+  'reports.debt', 'reports.cash',
+];
+
+describe('cash and debt navigation', () => {
+  const CASH_GROUP = 'Tiền & Công nợ';
+
+  it('cash group shows items by permission', () => {
+    expect(paths(['receipts.view'], CASH_GROUP)).toEqual(['/receipts']);
+    expect(groupsFor(SALES_PERMS).find((g) => g.label === CASH_GROUP)).toBeUndefined();
+    expect(groupsFor(WAREHOUSE_PERMS).find((g) => g.label === CASH_GROUP)).toBeUndefined();
+
+    const groups = groupsFor([...WAREHOUSE_PERMS, ...ACCOUNTANT_CASH_PERMS]);
+    const labels = groups.map((g) => g.label);
+    expect(labels.indexOf(CASH_GROUP)).toBe(labels.indexOf('Kho') + 1);
+    expect(paths(ACCOUNTANT_CASH_PERMS, CASH_GROUP)).toEqual([
+      '/receipts',
+      '/payments',
+      '/fund-transfers',
+      '/debt/matching',
+      '/debt/offsets',
+      '/debt/opening',
+      '/reports/debt-balance',
+      '/reports/debt-ledger',
+      '/reports/cash-book',
+    ]);
+    expect(groups.find((g) => g.label === CASH_GROUP)?.items.map((i) => i.label)).toEqual([
+      'Phiếu thu',
+      'Phiếu chi',
+      'Chuyển quỹ',
+      'Đối trừ chứng từ',
+      'Bù trừ công nợ',
+      'Nợ đầu kỳ',
+      'Số dư công nợ',
+      'Sổ chi tiết công nợ',
+      'Sổ quỹ',
+    ]);
+  });
+
+  it('chức năng group lists cash catalogs', () => {
+    expect(paths(ACCOUNTANT_CASH_PERMS, 'Chức năng')).toEqual(
+      expect.arrayContaining(['/cash-reasons', '/funds', '/credit-limits']),
+    );
+    // The QR page has no permission, so it is always listed.
+    const catalogs = (perms: Permission[]) =>
+      paths(perms, 'Chức năng').filter((p) => p !== '/qr-thanh-toan');
+    expect(catalogs(['cash.catalogs.manage'])).toEqual(['/cash-reasons', '/funds']);
+    expect(catalogs(['cash.opening_balance'])).toEqual(['/funds']);
+    expect(catalogs(['credit_limit.manage'])).toEqual(['/credit-limits']);
+    for (const path of ['/cash-reasons', '/funds', '/credit-limits']) {
+      expect(paths(SALES_PERMS, 'Chức năng')).not.toContain(path);
+      expect(paths(WAREHOUSE_PERMS, 'Chức năng')).not.toContain(path);
+    }
+  });
+});

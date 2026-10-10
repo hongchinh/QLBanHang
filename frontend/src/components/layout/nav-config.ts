@@ -18,6 +18,16 @@ import {
   ClipboardList,
   Boxes,
   ScrollText,
+  HandCoins,
+  Banknote,
+  ArrowLeftRight,
+  Link2,
+  Scale,
+  History,
+  BookOpen,
+  BookText,
+  Landmark,
+  Gauge,
 } from 'lucide-react';
 import type { Permission, Role } from '@/lib/permissions';
 import type { SidebarNavGroup, SidebarNavItem } from './sidebar/sidebar';
@@ -47,6 +57,14 @@ const navGroups: NavGroup[] = [
       { to: '/warehouses', label: 'Kho', icon: Warehouse, permission: 'inventory.catalogs.manage' },
       { to: '/stock-reasons', label: 'Lý do nhập xuất', icon: ListChecks, permission: 'inventory.catalogs.manage' },
       { to: '/payment-methods', label: 'Hình thức thanh toán', icon: Wallet, permission: 'inventory.catalogs.manage' },
+      { to: '/cash-reasons', label: 'Lý do thu/chi', icon: ListChecks, permission: 'cash.catalogs.manage' },
+      {
+        to: '/funds',
+        label: 'Quỹ',
+        icon: Landmark,
+        anyPermission: ['cash.catalogs.manage', 'cash.opening_balance'],
+      },
+      { to: '/credit-limits', label: 'Hạn mức nợ', icon: Gauge, permission: 'credit_limit.manage' },
     ],
   },
   {
@@ -57,6 +75,20 @@ const navGroups: NavGroup[] = [
       { to: '/inventory/opening-stock', label: 'Tồn đầu kỳ', icon: ClipboardList, permission: 'inventory.opening_stock' },
       { to: '/inventory/stock-on-hand', label: 'Tồn kho', icon: Boxes, permission: 'reports.inventory' },
       { to: '/inventory/stock-card', label: 'Thẻ kho', icon: ScrollText, permission: 'reports.inventory' },
+    ],
+  },
+  {
+    label: 'Tiền & Công nợ',
+    items: [
+      { to: '/receipts', label: 'Phiếu thu', icon: HandCoins, permission: 'receipts.view' },
+      { to: '/payments', label: 'Phiếu chi', icon: Banknote, permission: 'payments.view' },
+      { to: '/fund-transfers', label: 'Chuyển quỹ', icon: ArrowLeftRight, permission: 'fund_transfers.view' },
+      { to: '/debt/matching', label: 'Đối trừ chứng từ', icon: Link2, permission: 'debt.matching' },
+      { to: '/debt/offsets', label: 'Bù trừ công nợ', icon: Scale, permission: 'debt_offset.view' },
+      { to: '/debt/opening', label: 'Nợ đầu kỳ', icon: History, permission: 'debt.opening_balance' },
+      { to: '/reports/debt-balance', label: 'Số dư công nợ', icon: BookOpen, permission: 'reports.debt' },
+      { to: '/reports/debt-ledger', label: 'Sổ chi tiết công nợ', icon: BookText, permission: 'reports.debt' },
+      { to: '/reports/cash-book', label: 'Sổ quỹ', icon: Wallet, permission: 'reports.cash' },
     ],
   },
   {

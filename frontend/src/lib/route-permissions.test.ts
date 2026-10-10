@@ -170,3 +170,41 @@ describe('PERMISSIONS', () => {
     }
   });
 });
+
+describe('cash and debt routes', () => {
+  function expectRule(path: string, permission: string) {
+    expect(canAccessRoute(path, [], [])).toBe(false);
+    expect(canAccessRoute(path, SALES_PERMS, ['SALES'])).toBe(false);
+    expect(canAccessRoute(path, [permission], [])).toBe(true);
+  }
+
+  it('cash routes require their permissions', () => {
+    expectRule('/receipts', 'receipts.view');
+    expectRule('/receipts/new', 'receipts.create');
+    expect(canAccessRoute('/receipts/new', ['receipts.view'], [])).toBe(false);
+    expectRule('/receipts/abc-123', 'receipts.view');
+    expectRule('/payments', 'payments.view');
+    expectRule('/payments/new', 'payments.create');
+    expectRule('/payments/abc-123', 'payments.view');
+    expectRule('/fund-transfers', 'fund_transfers.view');
+    expectRule('/fund-transfers/new', 'fund_transfers.create');
+    expectRule('/fund-transfers/abc-123', 'fund_transfers.view');
+    expectRule('/debt/offsets', 'debt_offset.view');
+    expectRule('/debt/offsets/new', 'debt_offset.create');
+    expectRule('/debt/offsets/abc-123', 'debt_offset.view');
+    expectRule('/debt/matching', 'debt.matching');
+    expect(canAccessRoute('/debt/matching', ['debt_offset.view'], [])).toBe(false);
+    expectRule('/debt/opening', 'debt.opening_balance');
+    expectRule('/reports/debt-balance', 'reports.debt');
+    expectRule('/reports/debt-ledger', 'reports.debt');
+    expectRule('/reports/cash-book', 'reports.cash');
+    expect(canAccessRoute('/reports/cash-book', ['reports.debt'], [])).toBe(false);
+    expectRule('/cash-reasons', 'cash.catalogs.manage');
+    expectRule('/funds', 'cash.catalogs.manage');
+    expectRule('/funds', 'cash.opening_balance');
+    expect(canAccessRoute('/funds', ['credit_limit.manage'], [])).toBe(false);
+    expectRule('/credit-limits', 'credit_limit.manage');
+    expectRule('/settings/cash', 'cash.settings');
+    expect(canAccessRoute('/settings/cash', ['inventory.settings'], [])).toBe(false);
+  });
+});

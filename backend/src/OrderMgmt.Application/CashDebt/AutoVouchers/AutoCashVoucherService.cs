@@ -210,10 +210,14 @@ public class AutoCashVoucherService : IAutoCashVoucherService
 
         // An Auto pair sits at its stock voucher's date (the stock entry and the automatic voucher's entry are both
         // posted at VoucherAt), so the stock entries of the reopened days find every pair that may have been skipped.
-        var until = VnTime.StartOfNextDay(previousLockedUntil);
         var reopened = _db.DebtEntries.Where(e => e.BranchId == branchId
-            && (e.SourceType == DebtSourceType.StockIn || e.SourceType == DebtSourceType.StockOut)
-            && e.PostedAt < until);
+            && (e.SourceType == DebtSourceType.StockIn || e.SourceType == DebtSourceType.StockOut));
+        // A lock at DateOnly.MaxValue (stored before SetLockAsync refused year 9999) has no next day: no upper bound.
+        if (previousLockedUntil != DateOnly.MaxValue)
+        {
+            var until = VnTime.StartOfNextDay(previousLockedUntil);
+            reopened = reopened.Where(e => e.PostedAt < until);
+        }
         if (lockedUntil is { } stillLocked)
         {
             var from = VnTime.StartOfNextDay(stillLocked);

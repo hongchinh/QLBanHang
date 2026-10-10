@@ -518,6 +518,92 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         }
     }
 
+    [Fact]
+    public async Task Moving_the_lock_later_changes_no_auto_settlement()
+    {
+        var customer = await NewCustomerAsync();
+        var (sale, receipt) = await PaidSaleCoveredByReceiptAsync(customer, receiptAt: "2026-10-20 10:00");
+
+        await LockBranchAsync(new DateOnly(2026, 10, 10));
+        try
+        {
+            var (status, _, error) = await CancelCashAsync(_branchClient, receipt.Id,
+                new CashDocumentActionRequest { Version = receipt.Version, ConfirmRemoveSettlements = true });
+            status.Should().Be(HttpStatusCode.OK, error?.Message);
+
+            // A later lock reopens nothing: the sale's Auto settlement (10-05) stays as it is.
+            await LockBranchAsync(new DateOnly(2026, 10, 15));
+            await AssertAutoSettlementAsync(sale, 0m);
+            await AssertCashDebtInvariantsAsync();
+        }
+        finally
+        {
+            await LockBranchAsync(null);
+        }
+
+        await UnlockRecomputedAutoAsync(sale, 1_000m);
+    }
+
+    [Fact]
+    public async Task Clearing_a_lock_when_there_was_none_is_a_no_op()
+    {
+        var customer = await NewCustomerAsync();
+        var sale = await CreateSaleAsync(customer, 3, 1_000, paid: 1_000);
+        await AssertAutoSettlementAsync(sale, 1_000m);
+        // An Auto settlement gone behind the service's back: only a recompute would add it again.
+        var stockEntry = (await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single();
+        await InDbAsync(db => db.DebtSettlements.Where(s => s.IncreaseEntryId == stockEntry.Id).ExecuteDeleteAsync());
+
+        // No previous lock: nothing reopens, so nothing is recomputed.
+        await LockBranchAsync(null);
+        await AssertAutoSettlementAsync(sale, 0m);
+
+        // A real reopening recomputes it, and the strict invariant holds again.
+        await LockBranchAsync(new DateOnly(2026, 10, 10));
+        await LockBranchAsync(null);
+        await UnlockRecomputedAutoAsync(sale, 1_000m);
+    }
+
+    [Theory]
+    [InlineData("9999-12-31")]
+    [InlineData("9999-01-01")]
+    public async Task A_lock_in_year_9999_is_rejected(string date)
+    {
+        var response = await _client.PutAsJsonAsync($"/api/branches/{_branchId}/lock",
+            new SetPeriodLockRequest { LockedUntil = DateOnly.Parse(date, System.Globalization.CultureInfo.InvariantCulture) });
+        var (status, _, error) = await ReadDocumentResponseAsync<BranchDto>(response);
+        status.Should().Be(HttpStatusCode.BadRequest);
+        error!.Details.Should().ContainKey("lockedUntil");
+        (await InDbAsync(db => db.Branches.Where(b => b.Id == _branchId).Select(b => b.LockedUntil).SingleAsync()))
+            .Should().BeNull("a rejected lock changes nothing");
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Clearing_a_lock_at_the_maximum_date_recomputes_the_reopened_auto_settlements()
+    {
+        var customer = await NewCustomerAsync();
+        var (sale, receipt) = await PaidSaleCoveredByReceiptAsync(customer, receiptAt: "2026-10-20 10:00");
+        await LockBranchAsync(new DateOnly(2026, 10, 10));
+        try
+        {
+            var (status, _, error) = await CancelCashAsync(_branchClient, receipt.Id,
+                new CashDocumentActionRequest { Version = receipt.Version, ConfirmRemoveSettlements = true });
+            status.Should().Be(HttpStatusCode.OK, error?.Message);
+
+            // A lock stored at DateOnly.MaxValue before the API refused year 9999.
+            await InDbAsync(db => db.Branches.Where(b => b.Id == _branchId)
+                .ExecuteUpdateAsync(s => s.SetProperty(b => b.LockedUntil, DateOnly.MaxValue)));
+            await AssertAutoSettlementAsync(sale, 0m);
+        }
+        finally
+        {
+            await LockBranchAsync(null);
+        }
+
+        await UnlockRecomputedAutoAsync(sale, 1_000m);
+    }
+
     /// Unlocking reopened the stock voucher's period, so the unlock itself recomputed its Auto settlement
     /// (BranchService.SetLockAsync): the strict invariant holds with no further write.
     private async Task UnlockRecomputedAutoAsync(StockVoucherDto voucher, decimal expectedAuto)

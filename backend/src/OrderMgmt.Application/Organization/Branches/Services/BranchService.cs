@@ -132,6 +132,14 @@ public class BranchService : IBranchService
 
     public async Task<BranchDto> SetLockAsync(Guid id, SetPeriodLockRequest request, CancellationToken ct = default)
     {
+        // Year 9999 has no usable "next day" (VnTime.StartOfNextDay of DateOnly.MaxValue overflows), so such a lock
+        // could never be moved earlier or cleared again.
+        if (request.LockedUntil is { Year: 9999 })
+            throw new ValidationDomainException(new Dictionary<string, string[]>
+            {
+                ["lockedUntil"] = new[] { "Ngày khóa sổ không hợp lệ." },
+            }, null);
+
         // The exclusive gate waits for in-flight postings of the branch, and postings read LockedUntil after
         // taking the shared gate, so no voucher lands in a period that was just locked (D30, review finding).
         return await _transaction.RunAsync(async c =>

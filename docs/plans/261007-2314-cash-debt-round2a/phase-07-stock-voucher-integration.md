@@ -1,6 +1,6 @@
 # Phase 07 — Stock voucher integration & automatic vouchers
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** XL
 
 ## Objective

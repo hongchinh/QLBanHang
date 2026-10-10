@@ -20,7 +20,7 @@ using OrderMgmt.IntegrationTests.Inventory;
 
 namespace OrderMgmt.IntegrationTests.CashDebt;
 
-public abstract class CashDebtTestBase : InventoryTestBase
+public abstract partial class CashDebtTestBase : InventoryTestBase
 {
     // Opening sources posted straight to the ledger by this test, with no opening debt row (see LedgerOnlyOpeningSource).
     private readonly HashSet<Guid> _ledgerOnlyOpeningSources = new();

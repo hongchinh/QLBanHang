@@ -129,7 +129,7 @@ Round 1 rules still apply unchanged: D25 (test database), D26 (test depth), D27 
 - [x] Phase 05 — Cash voucher API (XL) — `phase-05-cash-voucher-api.md`
 - [x] Phase 06 — Fund transfer API (M) — `phase-06-fund-transfer-api.md`
 - [x] Phase 07 — Stock voucher integration & automatic vouchers (XL) — `phase-07-stock-voucher-integration.md`
-- [ ] Phase 08 — Matching & debt offset API (L) — `phase-08-matching-and-offset-api.md`
+- [x] Phase 08 — Matching & debt offset API (L) — `phase-08-matching-and-offset-api.md`
 - [ ] Phase 09 — Reports API & invariant replay (L) — `phase-09-reports-api.md`
 - [ ] Phase 10 — Frontend foundations, catalogs & settings (L) — `phase-10-frontend-foundations-catalogs.md`
 - [ ] Phase 11 — Frontend cash vouchers, fund transfers & stock voucher form (XL) — `phase-11-frontend-vouchers.md`

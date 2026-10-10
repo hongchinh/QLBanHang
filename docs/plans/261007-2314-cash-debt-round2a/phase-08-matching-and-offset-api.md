@@ -1,6 +1,6 @@
 # Phase 08 — Matching & debt offset API
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

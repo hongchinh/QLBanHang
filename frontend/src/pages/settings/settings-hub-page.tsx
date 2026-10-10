@@ -3,6 +3,7 @@ import {
   Building2,
   Calculator,
   Hash,
+  HandCoins,
   Lock,
   Settings,
   SlidersHorizontal,
@@ -16,7 +17,9 @@ import { useAuthStore } from '@/stores/auth-store';
 
 const INVENTORY_CARDS: {
   to: string;
-  permission: Permission;
+  permission?: Permission;
+  // Shown when the user has at least one of these.
+  anyPermission?: Permission[];
   icon: LucideIcon;
   title: string;
   description: string;
@@ -37,10 +40,10 @@ const INVENTORY_CARDS: {
   },
   {
     to: '/settings/numbering',
-    permission: 'inventory.settings',
+    anyPermission: ['inventory.settings', 'cash.settings'],
     icon: Hash,
     title: 'Đánh số chứng từ',
-    description: 'Ký hiệu, độ dài và mẫu số phiếu nhập, xuất kho.',
+    description: 'Ký hiệu, độ dài và mẫu số phiếu kho, thu chi, chuyển quỹ, bù trừ công nợ.',
   },
   {
     to: '/settings/inventory',
@@ -55,6 +58,13 @@ const INVENTORY_CARDS: {
     icon: Calculator,
     title: 'Tính lại giá vốn',
     description: 'Tính lại giá vốn bình quân từ một kỳ đến nay.',
+  },
+  {
+    to: '/settings/cash',
+    permission: 'cash.settings',
+    icon: HandCoins,
+    title: 'Cấu hình tiền & công nợ',
+    description: 'Chính sách khi vượt hạn mức nợ và khi chi âm quỹ.',
   },
 ];
 
@@ -115,7 +125,11 @@ export function SettingsHubPage() {
           </Link>
         )}
 
-        {INVENTORY_CARDS.filter((c) => hasPermission(c.permission)).map(({ to, icon: Icon, title, description }) => (
+        {INVENTORY_CARDS.filter(
+          (c) =>
+            (!c.permission || hasPermission(c.permission)) &&
+            (!c.anyPermission || c.anyPermission.some((p) => hasPermission(p))),
+        ).map(({ to, icon: Icon, title, description }) => (
           <Link key={to} to={to} className="block">
             <Card className="h-full transition hover:border-primary">
               <CardHeader>

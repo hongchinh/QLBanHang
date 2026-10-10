@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { CASH_DOCUMENT_TYPE_LABELS } from '@/features/cash-common/labels';
 import { useNumbering, useUpdateNumbering } from '@/features/inventory-settings/hooks';
 import type {
   DocumentNumbering,
@@ -12,11 +13,24 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
+import type { Permission } from '@/lib/permissions';
 import { toast } from '@/lib/use-toast';
+import { useAuthStore } from '@/stores/auth-store';
 
 const DOC_TYPE_LABELS: Record<DocumentType, string> = {
   StockIn: 'Phiếu nhập kho',
   StockOut: 'Phiếu xuất kho',
+  ...CASH_DOCUMENT_TYPE_LABELS,
+};
+
+// The permission the server requires to edit each type's numbering (P7).
+const DOC_TYPE_PERMISSIONS: Record<DocumentType, Permission> = {
+  StockIn: 'inventory.settings',
+  StockOut: 'inventory.settings',
+  Receipt: 'cash.settings',
+  Payment: 'cash.settings',
+  FundTransfer: 'cash.settings',
+  DebtOffset: 'cash.settings',
 };
 
 const RESET_POLICIES: { value: NumberingResetPolicy; label: string }[] = [
@@ -27,12 +41,14 @@ const RESET_POLICIES: { value: NumberingResetPolicy; label: string }[] = [
 
 export function NumberingSettingsPage() {
   const { data, isLoading, isError, error } = useNumbering();
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const editable = (data ?? []).filter((n) => hasPermission(DOC_TYPE_PERMISSIONS[n.docType]));
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-2xl font-bold">Đánh số chứng từ</h1>
-        <p className="text-sm text-muted-foreground">Mẫu số phiếu nhập, xuất kho của chi nhánh làm việc</p>
+        <p className="text-sm text-muted-foreground">Mẫu số chứng từ của chi nhánh làm việc</p>
       </div>
 
       {isError && (
@@ -43,7 +59,7 @@ export function NumberingSettingsPage() {
       {isLoading && <div className="text-sm text-muted-foreground">Đang tải...</div>}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {(data ?? []).map((n) => (
+        {editable.map((n) => (
           <NumberingCard key={n.docType} initial={n} />
         ))}
       </div>

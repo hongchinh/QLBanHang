@@ -45,7 +45,9 @@ const RULES: RouteRule[] = [
   { pattern: /^\/settings\/quotation$/, permission: 'system.manage_settings' },
   { pattern: /^\/settings\/branches$/, permission: 'branches.manage' },
   { pattern: /^\/settings\/period-lock$/, permission: 'period_lock.manage' },
-  { pattern: /^\/settings\/(inventory|numbering)$/, permission: 'inventory.settings' },
+  { pattern: /^\/settings\/inventory$/, permission: 'inventory.settings' },
+  // Each numbering card needs its own permission (StockIn/StockOut vs the cash types, P7).
+  { pattern: /^\/settings\/numbering$/, anyPermission: ['inventory.settings', 'cash.settings'] },
   { pattern: /^\/settings\/recalc-cost$/, permission: 'inventory.recalc_cost' },
   // Round 2A: cash and debt. Voucher detail pages stay readable with *.view.
   ...listNewDetail('receipts', 'receipts.view', 'receipts.create', 'receipts.view'),

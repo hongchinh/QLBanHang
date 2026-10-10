@@ -1,17 +1,26 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BranchesPage } from './branches-page';
 import type { Branch, MyBranches } from '@/features/branches/types';
 import { useBranchStore } from '@/stores/branch-store';
+import { toast } from '@/lib/use-toast';
 
 const createMock = vi.fn();
 const deleteMock = vi.fn();
+const setOpeningDateMock = vi.fn();
 const BRANCHES: Branch[] = [
-  { id: 'b1', code: 'CN01', name: 'Chi nhánh chính', address: '1 Lê Lợi', lockedUntil: '2026-09-30' },
-  { id: 'b2', code: 'CN02', name: 'Chi nhánh 2', address: null, lockedUntil: null },
+  {
+    id: 'b1',
+    code: 'CN01',
+    name: 'Chi nhánh chính',
+    address: '1 Lê Lợi',
+    lockedUntil: '2026-09-30',
+    openingDate: '2026-01-01',
+  },
+  { id: 'b2', code: 'CN02', name: 'Chi nhánh 2', address: null, lockedUntil: null, openingDate: null },
 ];
 
 vi.mock('@/features/branches/hooks', () => ({
@@ -19,6 +28,7 @@ vi.mock('@/features/branches/hooks', () => ({
   useCreateBranch: () => ({ mutateAsync: createMock, isPending: false }),
   useUpdateBranch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteBranch: () => ({ mutate: deleteMock, isPending: false }),
+  useSetBranchOpeningDate: () => ({ mutateAsync: setOpeningDateMock, isPending: false }),
 }));
 
 const ME_AFTER_DELETE: MyBranches = {
@@ -61,6 +71,8 @@ describe('BranchesPage', () => {
     createMock.mockReset().mockResolvedValue({});
     deleteMock.mockReset().mockImplementation((_id: string, opts: { onSuccess: () => void }) => opts.onSuccess());
     meMock.mockReset().mockResolvedValue(ME_AFTER_DELETE);
+    setOpeningDateMock.mockReset().mockResolvedValue(BRANCHES[1]);
+    vi.mocked(toast).mockReset();
     localStorage.clear();
     useBranchStore.setState({ workingBranchId: 'b2' });
   });
@@ -112,5 +124,46 @@ describe('BranchesPage', () => {
     expect(deleteMock).toHaveBeenCalledWith('b1', expect.anything());
     expect(meMock).not.toHaveBeenCalled();
     expect(useBranchStore.getState().workingBranchId).toBe('b2');
+  });
+
+  it('sets the opening date', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByRole('columnheader', { name: 'Ngày đầu kỳ' })).toBeInTheDocument();
+    expect(screen.getByText('01/01/2026')).toBeInTheDocument();
+
+    await user.click(screen.getAllByRole('button', { name: 'Đặt ngày đầu kỳ' })[1]);
+    const dialog = await screen.findByRole('dialog');
+    const input = within(dialog).getByLabelText('Ngày đầu kỳ');
+    expect(input).toHaveValue('');
+    fireEvent.change(input, { target: { value: '2026-10-01' } });
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+
+    await waitFor(() => expect(setOpeningDateMock).toHaveBeenCalledWith({ id: 'b2', openingDate: '2026-10-01' }));
+    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('shows the conflict message', async () => {
+    const message = 'Chi nhánh đã có chứng từ, không đổi được ngày đầu kỳ.';
+    setOpeningDateMock.mockReset().mockRejectedValue({
+      isAxiosError: true,
+      message: 'Request failed with status code 409',
+      response: { status: 409, data: { success: false, error: { code: 'BRANCH_HAS_DOCUMENTS', message } } },
+    });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getAllByRole('button', { name: 'Đặt ngày đầu kỳ' })[0]);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByLabelText('Ngày đầu kỳ')).toHaveValue('2026-01-01');
+    fireEvent.change(within(dialog).getByLabelText('Ngày đầu kỳ'), { target: { value: '2026-02-01' } });
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+
+    await waitFor(() =>
+      expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive', description: message })),
+    );
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 });

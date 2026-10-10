@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
 import { branchesApi } from '@/features/branches/api';
 import { useBranches, useDeleteBranch } from '@/features/branches/hooks';
 import { branchKeys } from '@/features/branches/keys';
@@ -14,7 +14,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { useBranchStore } from '@/stores/branch-store';
-import { BranchFormDialog } from './branch-form-dialog';
+import { BranchFormDialog, BranchOpeningDateDialog } from './branch-form-dialog';
 
 // `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
 function formatDateOnly(value?: string | null): string {
@@ -27,6 +27,7 @@ export function BranchesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Branch | undefined>();
   const [pendingDelete, setPendingDelete] = useState<Branch | null>(null);
+  const [openingDateTarget, setOpeningDateTarget] = useState<Branch | null>(null);
 
   const { data, isLoading, isError, error } = useBranches();
   const remove = useDeleteBranch();
@@ -66,10 +67,23 @@ export function BranchesPage() {
         cell: ({ row }) => formatDateOnly(row.original.lockedUntil),
       },
       {
+        header: 'Ngày đầu kỳ',
+        accessorKey: 'openingDate',
+        cell: ({ row }) => formatDateOnly(row.original.openingDate),
+      },
+      {
         id: 'actions',
         header: '',
         cell: ({ row }) => (
           <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Đặt ngày đầu kỳ"
+              onClick={() => setOpeningDateTarget(row.original)}
+            >
+              <CalendarDays className="h-4 w-4 text-slate-600" />
+            </Button>
             <Button
               variant="ghost"
               size="icon"
@@ -171,6 +185,8 @@ export function BranchesPage() {
       </Card>
 
       <BranchFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editTarget} />
+
+      <BranchOpeningDateDialog branch={openingDateTarget} onClose={() => setOpeningDateTarget(null)} />
 
       <ConfirmDialog
         open={!!pendingDelete}

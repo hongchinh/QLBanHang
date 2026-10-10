@@ -39,6 +39,8 @@ import { PeriodLockPage } from '@/pages/settings/period-lock-page';
 import { InventorySettingsPage } from '@/pages/settings/inventory-settings-page';
 import { NumberingSettingsPage } from '@/pages/settings/numbering-settings-page';
 import { RecalcCostPage } from '@/pages/settings/recalc-cost-page';
+// Round 2A: 10.8 cash settings
+import { CashSettingsPage } from '@/pages/settings/cash-settings-page';
 import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
 import { StockOnHandPage } from '@/pages/inventory/stock-on-hand-page';
 import { StockCardPage } from '@/pages/inventory/stock-card-page';
@@ -391,7 +393,7 @@ export function App() {
                 <Route
                   path="settings/numbering"
                   element={
-                    <ProtectedRoute permission="inventory.settings">
+                    <ProtectedRoute anyPermission={['inventory.settings', 'cash.settings']}>
                       <NumberingSettingsPage />
                     </ProtectedRoute>
                   }
@@ -402,6 +404,15 @@ export function App() {
                     // The optional product picker also needs products.view (hidden without it).
                     <ProtectedRoute permission="inventory.recalc_cost">
                       <RecalcCostPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Round 2A: 10.8 cash settings */}
+                <Route
+                  path="settings/cash"
+                  element={
+                    <ProtectedRoute permission="cash.settings">
+                      <CashSettingsPage />
                     </ProtectedRoute>
                   }
                 />

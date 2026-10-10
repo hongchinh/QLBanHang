@@ -4,7 +4,8 @@ export type CostingPeriod = 'Month' | 'Quarter' | 'Year';
 export type CostingScope = 'Branch' | 'Warehouse';
 export type NegativeStockPolicy = 'Allow' | 'Warn' | 'Block';
 export type DefaultDateMode = 'Now' | 'PreviousVoucher';
-export type DocumentType = 'StockIn' | 'StockOut';
+// StockIn/StockOut numbering needs inventory.settings; the four cash types need cash.settings (P7).
+export type DocumentType = 'StockIn' | 'StockOut' | 'Receipt' | 'Payment' | 'FundTransfer' | 'DebtOffset';
 export type NumberingResetPolicy = 'None' | 'Monthly' | 'Yearly';
 
 export interface InventorySettings {

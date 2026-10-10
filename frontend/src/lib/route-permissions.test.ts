@@ -124,9 +124,11 @@ describe('inventory routes', () => {
     expectRule('/settings/period-lock', 'period_lock.manage');
   });
 
-  it('/settings/inventory và /settings/numbering cần inventory.settings', () => {
+  it('/settings/inventory cần inventory.settings; /settings/numbering cần inventory.settings hoặc cash.settings', () => {
     expectRule('/settings/inventory', 'inventory.settings');
+    expect(canAccessRoute('/settings/inventory', ['cash.settings'], [])).toBe(false);
     expectRule('/settings/numbering', 'inventory.settings');
+    expectRule('/settings/numbering', 'cash.settings');
   });
 
   it('/settings/recalc-cost cần inventory.recalc_cost', () => {

@@ -9,5 +9,7 @@ export const branchesApi = {
   remove: (id: string) => apiDelete(`/branches/${id}`),
   setLock: (id: string, lockedUntil: string | null) =>
     apiPut<Branch>(`/branches/${id}/lock`, { lockedUntil }),
+  setOpeningDate: (id: string, openingDate: string | null) =>
+    apiPut<Branch>(`/branches/${id}/opening-date`, { openingDate }),
   me: () => apiGet<MyBranches>('/me/branches'),
 };

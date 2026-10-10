@@ -14,11 +14,16 @@ public class CashDebtReportsController : ApiControllerBase
 {
     private readonly ICashDebtReportService _service;
     private readonly IValidator<DebtBalanceReportRequest> _debtBalanceValidator;
+    private readonly IValidator<DebtLedgerReportRequest> _debtLedgerValidator;
 
-    public CashDebtReportsController(ICashDebtReportService service, IValidator<DebtBalanceReportRequest> debtBalanceValidator)
+    public CashDebtReportsController(
+        ICashDebtReportService service,
+        IValidator<DebtBalanceReportRequest> debtBalanceValidator,
+        IValidator<DebtLedgerReportRequest> debtLedgerValidator)
     {
         _service = service;
         _debtBalanceValidator = debtBalanceValidator;
+        _debtLedgerValidator = debtLedgerValidator;
     }
 
     [HttpGet("debt-balance")]
@@ -28,5 +33,14 @@ public class CashDebtReportsController : ApiControllerBase
     {
         await _debtBalanceValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.GetDebtBalanceAsync(request, ct));
+    }
+
+    [HttpGet("debt-ledger")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtLedgerReportDto>>> DebtLedger(
+        [FromQuery] DebtLedgerReportRequest request, CancellationToken ct)
+    {
+        await _debtLedgerValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetDebtLedgerAsync(request, ct));
     }
 }

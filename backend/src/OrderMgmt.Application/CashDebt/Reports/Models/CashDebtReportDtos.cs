@@ -43,3 +43,51 @@ public class DebtBalanceRowDto
     public decimal ClosingDebit { get; set; }
     public decimal ClosingCredit { get; set; }
 }
+
+/// Sổ chi tiết công nợ of one partner and side. Same window rule as the balance report.
+public class DebtLedgerReportRequest
+{
+    public DebtSide Side { get; set; }
+    public Guid PartnerId { get; set; }
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+}
+
+/// Opening and closing are split into Dư Nợ / Dư Có with DebtBalanceSign.Split (P24).
+public class DebtLedgerReportDto
+{
+    public DebtSide Side { get; set; }
+    public Guid PartnerId { get; set; }
+    public string PartnerCode { get; set; } = default!;
+    public string PartnerName { get; set; } = default!;
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+    public decimal OpeningBalance { get; set; }
+    public decimal OpeningDebit { get; set; }
+    public decimal OpeningCredit { get; set; }
+
+    /// Period entries ordered by PostedAt, SourceType, DocCode.
+    public List<DebtLedgerRowDto> Rows { get; set; } = new();
+
+    public decimal TotalIncrease { get; set; }
+    public decimal TotalDecrease { get; set; }
+    public decimal ClosingBalance { get; set; }
+    public decimal ClosingDebit { get; set; }
+    public decimal ClosingCredit { get; set; }
+}
+
+public class DebtLedgerRowDto
+{
+    public Guid EntryId { get; set; }
+    public DateTimeOffset PostedAt { get; set; }
+    public DateOnly DocDate { get; set; }
+    public string DocCode { get; set; } = default!;
+    public DebtSourceType SourceType { get; set; }
+    public Guid SourceId { get; set; }
+    public string? Description { get; set; }
+    public decimal Increase { get; set; }
+    public decimal Decrease { get; set; }
+
+    /// Balance after this row: the opening balance plus Σ Increase − Σ Decrease up to and including it.
+    public decimal RunningBalance { get; set; }
+}

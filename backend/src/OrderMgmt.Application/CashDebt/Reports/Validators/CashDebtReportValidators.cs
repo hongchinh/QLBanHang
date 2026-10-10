@@ -15,6 +15,18 @@ public class DebtBalanceReportRequestValidator : AbstractValidator<DebtBalanceRe
     }
 }
 
+public class DebtLedgerReportRequestValidator : AbstractValidator<DebtLedgerReportRequest>
+{
+    public DebtLedgerReportRequestValidator()
+    {
+        RuleFor(x => x.Side).IsInEnum().WithMessage("Vui lòng chọn loại công nợ.");
+        RuleFor(x => x.PartnerId).NotEmpty().WithMessage("Vui lòng chọn đối tượng.");
+        RuleFor(x => x.From).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Từ ngày không hợp lệ.");
+        RuleFor(x => x.To).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Đến ngày không hợp lệ.");
+        RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From).WithMessage("Đến ngày phải sau hoặc bằng từ ngày.");
+    }
+}
+
 /// Date range a report accepts; a missing date binds to DateOnly.MinValue and fails it.
 internal static class ReportDates
 {

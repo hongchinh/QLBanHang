@@ -4,6 +4,8 @@ using OrderMgmt.Application.CashDebt.Reports.Interfaces;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Domain.Common;
+using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.CashDebt.Reports.Services;
@@ -118,6 +120,82 @@ public class CashDebtReportService : ICashDebtReportService
                 ClosingDebit = rows.Sum(r => r.ClosingDebit),
                 ClosingCredit = rows.Sum(r => r.ClosingCredit),
             },
+        };
+    }
+
+    /// One REPEATABLE READ snapshot, so the opening balance and the rows see the same ledger.
+    public Task<DebtLedgerReportDto> GetDebtLedgerAsync(DebtLedgerReportRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildDebtLedgerAsync(request, c), ct);
+
+    private async Task<DebtLedgerReportDto> BuildDebtLedgerAsync(DebtLedgerReportRequest request, CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var start = VnTime.ToUtc(VnTime.StartOfDay(request.From));
+        var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.To));
+
+        // Soft-deleted partners keep their ledger rows, so their ledger can still be read.
+        var partner = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.Id == request.PartnerId)
+            .Select(c => new { c.Code, c.Name })
+            .SingleOrDefaultAsync(ct)
+            ?? throw new NotFoundException(nameof(Customer), request.PartnerId);
+
+        var entries = _db.DebtEntries.AsNoTracking()
+            .Where(e => e.BranchId == branchId && e.PartnerId == request.PartnerId && e.Side == request.Side);
+
+        // Same window rule as the balance report (P29): Opening entries are opening balance in every window.
+        var openingBalance = await entries
+            .Where(e => e.PostedAt < start || e.SourceType == DebtSourceType.Opening)
+            .SumAsync(e => e.Direction == DebtDirection.Increase ? e.Amount : -e.Amount, ct);
+        var periodEntries = await entries
+            .Where(e => e.SourceType != DebtSourceType.Opening && e.PostedAt >= start && e.PostedAt < end)
+            .ToListAsync(ct);
+
+        var running = openingBalance;
+        var rows = new List<DebtLedgerRowDto>();
+        foreach (var e in periodEntries
+                     .OrderBy(e => e.PostedAt)
+                     .ThenBy(e => e.SourceType)
+                     .ThenBy(e => e.DocCode, StringComparer.Ordinal)
+                     .ThenBy(e => e.Id))
+        {
+            var increase = e.Direction == DebtDirection.Increase ? e.Amount : 0m;
+            var decrease = e.Direction == DebtDirection.Decrease ? e.Amount : 0m;
+            running += increase - decrease;
+            rows.Add(new DebtLedgerRowDto
+            {
+                EntryId = e.Id,
+                PostedAt = e.PostedAt,
+                DocDate = e.DocDate,
+                DocCode = e.DocCode,
+                SourceType = e.SourceType,
+                SourceId = e.SourceId,
+                Description = e.Description,
+                Increase = increase,
+                Decrease = decrease,
+                RunningBalance = running,
+            });
+        }
+
+        var (openingDebit, openingCredit) = DebtBalanceSign.Split(request.Side, openingBalance);
+        var (closingDebit, closingCredit) = DebtBalanceSign.Split(request.Side, running);
+        return new DebtLedgerReportDto
+        {
+            Side = request.Side,
+            PartnerId = request.PartnerId,
+            PartnerCode = partner.Code,
+            PartnerName = partner.Name,
+            From = request.From,
+            To = request.To,
+            OpeningBalance = openingBalance,
+            OpeningDebit = openingDebit,
+            OpeningCredit = openingCredit,
+            Rows = rows,
+            TotalIncrease = rows.Sum(r => r.Increase),
+            TotalDecrease = rows.Sum(r => r.Decrease),
+            ClosingBalance = running,
+            ClosingDebit = closingDebit,
+            ClosingCredit = closingCredit,
         };
     }
 

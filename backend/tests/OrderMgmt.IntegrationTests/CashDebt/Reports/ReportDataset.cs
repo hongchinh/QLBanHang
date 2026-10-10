@@ -158,25 +158,25 @@ public abstract partial class CashDebtTestBase
             };
         }
 
-        private static async Task SetOpeningDateAsync(CashDebtTestBase t, Guid branchId, DateOnly date)
+        public static async Task SetOpeningDateAsync(CashDebtTestBase t, Guid branchId, DateOnly date)
         {
             var response = await t._client.PutAsJsonAsync($"/api/branches/{branchId}/opening-date",
                 new SetOpeningDateRequest { OpeningDate = date });
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         }
 
-        private static async Task SetFundOpeningAsync(HttpClient client, Guid fundId, decimal amount)
+        public static async Task SetFundOpeningAsync(HttpClient client, Guid fundId, decimal amount)
         {
             var response = await client.PutAsJsonAsync($"/api/funds/{fundId}/opening-balance",
                 new SetFundOpeningBalanceRequest { Amount = amount });
             response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         }
 
-        private static Task<Guid> PaymentMethodIdAsync(CashDebtTestBase t, string code) =>
+        public static Task<Guid> PaymentMethodIdAsync(CashDebtTestBase t, string code) =>
             t.InDbAsync(db => db.PaymentMethods.Where(m => m.Code == code).Select(m => m.Id).SingleAsync());
 
         /// A one-line stock voucher (untracked product, quantity 1 × amount) in the client's branch; asserts 200.
-        private static async Task<Application.Inventory.StockVouchers.Models.StockVoucherDto> PostStockAsync(
+        public static async Task<Application.Inventory.StockVouchers.Models.StockVoucherDto> PostStockAsync(
             CashDebtTestBase t, HttpClient client, StockDirection type, string reasonCode, string at, Guid warehouseId,
             Guid partnerId, decimal amount, Guid? paymentMethodId, decimal paid)
         {

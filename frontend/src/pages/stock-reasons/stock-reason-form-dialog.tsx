@@ -1,15 +1,17 @@
 import { useEffect } from 'react';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useCreateStockReason, useUpdateStockReason } from '@/features/stock-reasons/hooks';
 import {
   PARTNER_TYPE_LABELS,
+  STOCK_DEBT_EFFECTS,
   STOCK_DIRECTION_LABELS,
   type PartnerType,
   type StockDirection,
   type StockReason,
 } from '@/features/stock-reasons/types';
+import { DEBT_EFFECT_LABELS } from '@/features/cash-common/labels';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,6 +29,7 @@ const editSchema = z.object({
   name: z.string().trim().min(1, 'Tên lý do không được để trống').max(255, 'Tối đa 255 ký tự'),
   direction: z.enum(['In', 'Out']),
   partnerType: z.enum(['None', 'Customer', 'Supplier', 'Any']),
+  debtEffect: z.enum(['None', 'ReceivableDecrease', 'ReceivableIncrease', 'PayableDecrease', 'PayableIncrease']),
 });
 
 const createSchema = editSchema.extend({
@@ -59,9 +62,21 @@ export function StockReasonFormDialog({ open, onOpenChange, initial }: Props) {
 
   const isPending = create.isPending || update.isPending;
   const errors = form.formState.errors;
+  const direction = useWatch({ control: form.control, name: 'direction' });
+  const debtEffects = STOCK_DEBT_EFFECTS[direction];
+
+  // A direction change drops a debt effect the new direction does not allow.
+  useEffect(() => {
+    if (!debtEffects.includes(form.getValues('debtEffect'))) form.setValue('debtEffect', 'None');
+  }, [debtEffects, form]);
 
   const onSubmit = async (values: FormValues) => {
-    const body = { name: values.name.trim(), direction: values.direction, partnerType: values.partnerType };
+    const body = {
+      name: values.name.trim(),
+      direction: values.direction,
+      partnerType: values.partnerType,
+      debtEffect: values.debtEffect,
+    };
     try {
       if (initial) {
         await update.mutateAsync({ id: initial.id, data: body });
@@ -72,7 +87,7 @@ export function StockReasonFormDialog({ open, onOpenChange, initial }: Props) {
       }
       onOpenChange(false);
     } catch (err) {
-      applyApiFieldErrors(err, form.setError, ['code', 'name', 'direction', 'partnerType']);
+      applyApiFieldErrors(err, form.setError, ['code', 'name', 'direction', 'partnerType', 'debtEffect']);
       toast({ variant: 'destructive', title: 'Không thể lưu', description: formatApiErrorDetails(err) });
     }
   };
@@ -137,7 +152,29 @@ export function StockReasonFormDialog({ open, onOpenChange, initial }: Props) {
                   </Select>
                 )}
               />
+              {errors.partnerType && <p className="text-sm text-destructive">{errors.partnerType.message}</p>}
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="debtEffect">Ảnh hưởng công nợ</Label>
+            <Controller
+              control={form.control}
+              name="debtEffect"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger id="debtEffect" aria-label="Ảnh hưởng công nợ">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {debtEffects.map((e) => (
+                      <SelectItem key={e} value={e}>{DEBT_EFFECT_LABELS[e]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.debtEffect && <p className="text-sm text-destructive">{errors.debtEffect.message}</p>}
           </div>
           {locked && (
             <p className="text-xs text-muted-foreground">
@@ -165,5 +202,6 @@ function toDefaults(item?: StockReason): FormValues {
     name: item?.name ?? '',
     direction: item?.direction ?? 'In',
     partnerType: item?.partnerType ?? 'Any',
+    debtEffect: item?.debtEffect ?? 'None',
   };
 }

@@ -157,6 +157,7 @@ export function CustomerFormFields({
                 )}
               />
             </div>
+            <Field label="Số ngày được nợ" name="creditDays" type="number" form={form} />
             <Field label="Người liên hệ" name="contactPerson" form={form} className="md:col-span-2" />
             <Field
               label="Địa chỉ công ty"
@@ -296,6 +297,7 @@ function toFormDefaults(role: PartnerRole, customer?: Customer): CustomerFormVal
     // The screen's own role is always on.
     isCustomer: role === 'customer' || (customer?.isCustomer ?? false),
     isSupplier: role === 'supplier' || (customer?.isSupplier ?? false),
+    creditDays: customer?.creditDays ?? '',
   };
 }
 
@@ -310,7 +312,8 @@ interface FieldProps {
     | 'contactPerson'
     | 'phoneNumber'
     | 'email'
-    | 'note';
+    | 'note'
+    | 'creditDays';
   type?: string;
   hint?: string;
   className?: string;
@@ -329,7 +332,11 @@ function Field({ label, name, type = 'text', hint, className, multiline, form }:
         <Input id={name} type={type} {...form.register(name)} />
       )}
       {hint && !error && <p className="text-xs text-muted-foreground">{hint}</p>}
-      {error && <p className="text-sm text-destructive">{String(error.message)}</p>}
+      {error && (
+        <p className="text-sm text-destructive" data-testid={`${name}-error`}>
+          {String(error.message)}
+        </p>
+      )}
     </div>
   );
 }

@@ -225,6 +225,7 @@ export interface StockVoucherActionRequest {
 export interface PartnerSearchItem extends CustomerSearchItem {
   isCustomer: boolean;
   isSupplier: boolean;
+  creditDays?: number | null;
 }
 
 export type { StockDirection };

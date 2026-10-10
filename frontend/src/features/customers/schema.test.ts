@@ -53,6 +53,20 @@ describe('customerSchema', () => {
     }
   });
 
+  it('credit days is an optional whole number in 0..3650', () => {
+    const parse = (creditDays: unknown) => customerSchema.safeParse({ name: 'ACME', group: 'Company', creditDays });
+
+    expect(parse('').success).toBe(true);
+    expect(parse('').data?.creditDays).toBeUndefined();
+    expect(parse('0').data?.creditDays).toBe(0);
+    expect(parse(3650).data?.creditDays).toBe(3650);
+    expect(parse(-1).success).toBe(false);
+    expect(parse(3651).success).toBe(false);
+    const fraction = parse('1.5');
+    expect(fraction.success).toBe(false);
+    if (!fraction.success) expect(fraction.error.issues[0].message).toBe('Phải là số nguyên');
+  });
+
   it('rejects unknown group', () => {
     const result = customerSchema.safeParse({
       name: 'ACME',

@@ -1,3 +1,5 @@
+import type { DebtEffect } from '@/features/cash-common/types';
+
 export type StockDirection = 'In' | 'Out';
 export type PartnerType = 'None' | 'Customer' | 'Supplier' | 'Any';
 
@@ -19,8 +21,15 @@ export interface StockReason {
   name: string;
   direction: StockDirection;
   partnerType: PartnerType;
+  debtEffect: DebtEffect;
   isSystem: boolean;
 }
+
+// DebtEffectRules (P19): the debt effects a stock reason of each direction may carry.
+export const STOCK_DEBT_EFFECTS: Record<StockDirection, DebtEffect[]> = {
+  In: ['None', 'PayableIncrease', 'ReceivableDecrease'],
+  Out: ['None', 'ReceivableIncrease', 'PayableDecrease'],
+};
 
 export interface StockReasonListParams {
   direction?: StockDirection;
@@ -31,10 +40,12 @@ export interface CreateStockReasonRequest {
   name: string;
   direction: StockDirection;
   partnerType: PartnerType;
+  debtEffect: DebtEffect;
 }
 
 export interface UpdateStockReasonRequest {
   name: string;
   direction: StockDirection;
   partnerType: PartnerType;
+  debtEffect: DebtEffect;
 }

@@ -10,7 +10,7 @@ public sealed record FundCaptureItem(Guid FundId, DateTimeOffset From, RunningBa
 /// Callers hold the fund locks (P14) from capture to check.
 public interface IFundBalanceGuard
 {
-    /// Movements per P17: OpeningAmount, then Active non-deleted cash vouchers (Phase 06 adds fund transfers).
+    /// Movements per P17: OpeningAmount, then Active non-deleted cash vouchers and fund transfers (FundMovementQuery).
     Task<IReadOnlyList<BalanceMovement>> MovementsAsync(Guid fundId, CancellationToken ct = default);
 
     /// Same fund listed twice → the earlier From wins.

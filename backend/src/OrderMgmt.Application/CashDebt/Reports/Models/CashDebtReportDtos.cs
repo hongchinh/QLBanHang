@@ -91,3 +91,72 @@ public class DebtLedgerRowDto
     /// Balance after this row: the opening balance plus Σ Increase − Σ Decrease up to and including it.
     public decimal RunningBalance { get; set; }
 }
+
+/// Sổ quỹ. FundId set → that fund only (it must match Kind unless Kind is All); otherwise every fund of the working
+/// branch matching Kind, active or not. The fund's OpeningAmount is always opening balance (P29).
+public class CashBookReportRequest
+{
+    public FundKindFilter Kind { get; set; } = FundKindFilter.All;
+    public Guid? FundId { get; set; }
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+}
+
+/// GrandOpening = Σ Opening and GrandClosing = Σ Closing. GrandIn / GrandOut leave out a transfer whose two funds are
+/// both selected (P25), so GrandOpening + GrandIn − GrandOut == GrandClosing.
+public class CashBookReportDto
+{
+    public FundKindFilter Kind { get; set; }
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+
+    /// One group per selected fund, ordered by Kind and Code.
+    public List<CashBookGroupDto> Groups { get; set; } = new();
+
+    public decimal GrandOpening { get; set; }
+    public decimal GrandIn { get; set; }
+    public decimal GrandOut { get; set; }
+    public decimal GrandClosing { get; set; }
+}
+
+/// One fund. Opening = OpeningAmount + the movements before StartOfDay(From) (P17); the rows always include the
+/// fund's transfer halves, so its running balance reconciles (P25).
+public class CashBookGroupDto
+{
+    public Guid FundId { get; set; }
+    public string FundCode { get; set; } = default!;
+    public string FundName { get; set; } = default!;
+    public FundKind FundKind { get; set; }
+    public string? BankName { get; set; }
+    public string? AccountNumber { get; set; }
+    public decimal Opening { get; set; }
+
+    /// Ordered by At, inflows before outflows, then code.
+    public List<CashBookRowDto> Rows { get; set; } = new();
+
+    public decimal TotalIn { get; set; }
+    public decimal TotalOut { get; set; }
+    public decimal Closing { get; set; }
+}
+
+public class CashBookRowDto
+{
+    public DateTimeOffset At { get; set; }
+    public CashBookSourceType SourceType { get; set; }
+    public Guid SourceId { get; set; }
+    public string? ReceiptCode { get; set; }
+    public string? PaymentCode { get; set; }
+    public string? TransferCode { get; set; }
+
+    /// Partner name snapshot, else the person name.
+    public string? PartnerOrPerson { get; set; }
+
+    /// Receipt/payment: Description, else the reason name. Transfer: Description, else "Chuyển quỹ {from} → {to}".
+    public string? Description { get; set; }
+
+    public decimal In { get; set; }
+    public decimal Out { get; set; }
+
+    /// Balance after this row: the group opening plus Σ In − Σ Out up to and including it.
+    public decimal Running { get; set; }
+}

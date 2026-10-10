@@ -1,10 +1,12 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
+using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Reports.Interfaces;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Common;
+using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
 
@@ -198,6 +200,124 @@ public class CashDebtReportService : ICashDebtReportService
             ClosingCredit = closingCredit,
         };
     }
+
+    /// One REPEATABLE READ snapshot, so the funds and their movements are read from the same state.
+    public Task<CashBookReportDto> GetCashBookAsync(CashBookReportRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildCashBookAsync(request, c), ct);
+
+    private async Task<CashBookReportDto> BuildCashBookAsync(CashBookReportRequest request, CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var start = VnTime.ToUtc(VnTime.StartOfDay(request.From));
+        var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.To));
+        FundKind? kind = request.Kind switch
+        {
+            FundKindFilter.Cash => FundKind.Cash,
+            FundKindFilter.Bank => FundKind.Bank,
+            _ => null,
+        };
+
+        var funds = _db.Funds.AsNoTracking().Where(f => f.BranchId == branchId);
+        if (request.FundId is { } fundId)
+        {
+            var fundKind = await funds.Where(f => f.Id == fundId).Select(f => (FundKind?)f.Kind).SingleOrDefaultAsync(ct)
+                ?? throw new NotFoundException(nameof(Fund), fundId);
+            if (kind is not null && fundKind != kind)
+                throw new ValidationDomainException(
+                    new Dictionary<string, string[]> { ["fundId"] = new[] { "Quỹ không đúng loại quỹ đã chọn." } }, null);
+            funds = funds.Where(f => f.Id == fundId);
+        }
+        else if (kind is not null)
+        {
+            funds = funds.Where(f => f.Kind == kind);
+        }
+
+        // Active or not: an inactive fund keeps its history.
+        var selected = (await funds
+                .Select(f => new { f.Id, f.Code, f.Name, f.Kind, f.BankName, f.AccountNumber })
+                .ToListAsync(ct))
+            .OrderBy(f => f.Kind)
+            .ThenBy(f => f.Code, StringComparer.Ordinal)
+            .ToList();
+        var selectedIds = selected.Select(f => f.Id).ToHashSet();
+        var movements = await FundMovementQuery.LoadAsync(_db, selectedIds, ct);
+
+        var groups = new List<CashBookGroupDto>();
+        decimal grandIn = 0m, grandOut = 0m;
+        foreach (var fund in selected)
+        {
+            var fundMovements = movements[fund.Id];
+            // P29: the opening amount is opening balance in every window, whatever the report's dates.
+            var opening = fundMovements
+                .Where(m => m.Kind == FundMovementKind.Opening || m.At < start)
+                .Sum(m => m.Delta);
+
+            var running = opening;
+            var rows = new List<CashBookRowDto>();
+            foreach (var m in fundMovements.Where(m => m.Kind != FundMovementKind.Opening && m.At >= start && m.At < end))
+            {
+                var @in = m.Delta > 0 ? m.Delta : 0m;
+                var @out = m.Delta < 0 ? -m.Delta : 0m;
+                running += m.Delta;
+                rows.Add(new CashBookRowDto
+                {
+                    At = m.At,
+                    SourceType = SourceTypeOf(m.Kind),
+                    SourceId = m.SourceId,
+                    ReceiptCode = m.Kind == FundMovementKind.Receipt ? m.Code : null,
+                    PaymentCode = m.Kind == FundMovementKind.Payment ? m.Code : null,
+                    TransferCode = m.Kind is FundMovementKind.TransferIn or FundMovementKind.TransferOut ? m.Code : null,
+                    PartnerOrPerson = m.PartnerOrPerson,
+                    Description = m.Description,
+                    In = @in,
+                    Out = @out,
+                    Running = running,
+                });
+
+                // P25: a transfer between two selected funds cancels out in the grand totals.
+                if (m.OtherFundId is { } other && selectedIds.Contains(other))
+                    continue;
+                grandIn += @in;
+                grandOut += @out;
+            }
+
+            groups.Add(new CashBookGroupDto
+            {
+                FundId = fund.Id,
+                FundCode = fund.Code,
+                FundName = fund.Name,
+                FundKind = fund.Kind,
+                BankName = fund.BankName,
+                AccountNumber = fund.AccountNumber,
+                Opening = opening,
+                Rows = rows,
+                TotalIn = rows.Sum(r => r.In),
+                TotalOut = rows.Sum(r => r.Out),
+                Closing = running,
+            });
+        }
+
+        return new CashBookReportDto
+        {
+            Kind = request.Kind,
+            From = request.From,
+            To = request.To,
+            Groups = groups,
+            GrandOpening = groups.Sum(g => g.Opening),
+            GrandIn = grandIn,
+            GrandOut = grandOut,
+            GrandClosing = groups.Sum(g => g.Closing),
+        };
+    }
+
+    private static CashBookSourceType SourceTypeOf(FundMovementKind kind) => kind switch
+    {
+        FundMovementKind.Receipt => CashBookSourceType.Receipt,
+        FundMovementKind.Payment => CashBookSourceType.Payment,
+        FundMovementKind.TransferIn => CashBookSourceType.TransferIn,
+        FundMovementKind.TransferOut => CashBookSourceType.TransferOut,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "The opening amount is not a cash book row."),
+    };
 
     private static string EscapeLike(string input) =>
         input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");

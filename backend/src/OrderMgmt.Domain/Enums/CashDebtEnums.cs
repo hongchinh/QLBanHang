@@ -94,3 +94,20 @@ public enum CashDocumentActivityAction
     Deleted = 5,
     SettlementRemoved = 6,
 }
+
+/// Row of the cash book (Sổ quỹ): a receipt, a payment, or one half of a fund transfer.
+public enum CashBookSourceType
+{
+    Receipt = 1,
+    Payment = 2,
+    TransferIn = 3,
+    TransferOut = 4,
+}
+
+/// Which funds the cash book covers.
+public enum FundKindFilter
+{
+    All = 0,
+    Cash = 1,
+    Bank = 2,
+}

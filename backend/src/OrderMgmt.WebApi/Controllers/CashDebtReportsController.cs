@@ -15,15 +15,18 @@ public class CashDebtReportsController : ApiControllerBase
     private readonly ICashDebtReportService _service;
     private readonly IValidator<DebtBalanceReportRequest> _debtBalanceValidator;
     private readonly IValidator<DebtLedgerReportRequest> _debtLedgerValidator;
+    private readonly IValidator<CashBookReportRequest> _cashBookValidator;
 
     public CashDebtReportsController(
         ICashDebtReportService service,
         IValidator<DebtBalanceReportRequest> debtBalanceValidator,
-        IValidator<DebtLedgerReportRequest> debtLedgerValidator)
+        IValidator<DebtLedgerReportRequest> debtLedgerValidator,
+        IValidator<CashBookReportRequest> cashBookValidator)
     {
         _service = service;
         _debtBalanceValidator = debtBalanceValidator;
         _debtLedgerValidator = debtLedgerValidator;
+        _cashBookValidator = cashBookValidator;
     }
 
     [HttpGet("debt-balance")]
@@ -42,5 +45,14 @@ public class CashDebtReportsController : ApiControllerBase
     {
         await _debtLedgerValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.GetDebtLedgerAsync(request, ct));
+    }
+
+    [HttpGet("cash-book")]
+    [HasPermission(Permissions.Reports.Cash)]
+    public async Task<ActionResult<ApiResponse<CashBookReportDto>>> CashBook(
+        [FromQuery] CashBookReportRequest request, CancellationToken ct)
+    {
+        await _cashBookValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetCashBookAsync(request, ct));
     }
 }

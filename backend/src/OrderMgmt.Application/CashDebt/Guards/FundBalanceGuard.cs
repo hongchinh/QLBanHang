@@ -4,7 +4,6 @@ using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Common;
-using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.CashDebt.Guards;
 
@@ -19,34 +18,12 @@ public class FundBalanceGuard : IFundBalanceGuard
         _db = db;
     }
 
+    /// The same source as the cash book (FundMovementQuery), already in P17 order.
     public async Task<IReadOnlyList<BalanceMovement>> MovementsAsync(Guid fundId, CancellationToken ct = default)
     {
-        var openingAmount = await _db.Funds.IgnoreQueryFilters().AsNoTracking()
-            .Where(f => f.Id == fundId)
-            .Select(f => f.OpeningAmount)
-            .SingleAsync(ct);
-        var vouchers = await _db.CashVouchers.AsNoTracking()
-            .Where(v => v.FundId == fundId && v.Status == DocumentStatus.Active)
-            .Select(v => new { v.VoucherAt, v.Type, v.Code, v.Total })
-            .ToListAsync(ct);
-        var transfers = await _db.FundTransfers.AsNoTracking()
-            .Where(t => (t.FromFundId == fundId || t.ToFundId == fundId) && t.Status == DocumentStatus.Active)
-            .Select(t => new { t.VoucherAt, t.FromFundId, t.Code, t.Amount })
-            .ToListAsync(ct);
-
-        // The opening amount precedes every document, whatever its date (P17, P29).
-        var movements = new List<BalanceMovement> { new(DateTimeOffset.MinValue, 0, string.Empty, openingAmount) };
-        movements.AddRange(vouchers.Select(v => v.Type == CashVoucherType.Receipt
-            ? new BalanceMovement(v.VoucherAt, 0, v.Code, v.Total)
-            : new BalanceMovement(v.VoucherAt, 1, v.Code, -v.Total)));
-        // A transfer leaves its source fund and enters its destination fund (the two always differ).
-        movements.AddRange(transfers.Select(t => t.FromFundId == fundId
-            ? new BalanceMovement(t.VoucherAt, 1, t.Code, -t.Amount)
-            : new BalanceMovement(t.VoucherAt, 0, t.Code, t.Amount)));
-        return movements
-            .OrderBy(m => m.At)
-            .ThenBy(m => m.Order)
-            .ThenBy(m => m.Code, StringComparer.Ordinal)
+        var movements = await FundMovementQuery.LoadAsync(_db, new[] { fundId }, ct);
+        return movements[fundId]
+            .Select(m => new BalanceMovement(m.At, m.Order, m.Code, m.Delta))
             .ToList();
     }
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
@@ -125,20 +126,33 @@ public class CashDebtInvariantReplayTests : CashDebtTestBase
         snapshotA.Entries["#4 sale:Receivable"].Should().Be((3_500m, 1_500m));
         snapshotA.Entries["#4 auto receipt:Receivable"].Should().Be((1_500m, 1_500m));
         snapshotA.Entries["#5 receipt:Receivable"].Should().Be((4_000m, 4_000m));
+        snapshotA.EntryDates["#4 sale:Receivable"].Should().StartWith("posted 2026-10-02 02:00:00.000000 doc 2026-10-02");
+        snapshotA.EntryDates["#4 auto receipt:Receivable"].Should()
+            .StartWith("posted 2026-10-02 02:00:00.000000 doc 2026-10-02");
+        snapshotA.Daily["2026-10-04 fund NH01"].Should().StartWith("opening 20000 in 0 out 5000 closing 15000");
+        snapshotA.Daily["2026-10-04 fund QTM"].Should().StartWith("opening 11500 in 5000 out 0 closing 16500");
 
         await AssertCashDebtInvariantsAsync();
     }
 
+    /// EntryDates, Settlements and Daily carry the dates, so a back-dated edit that leaves a PostedAt, DocDate,
+    /// EffectiveAt or fund movement at its old date inside October fails the comparison.
     private sealed record ReplaySnapshot(
         Dictionary<string, decimal> Balances,
         Dictionary<string, (decimal Amount, decimal Settled)> Entries,
-        Dictionary<string, decimal> FundClosings);
+        Dictionary<string, decimal> FundClosings,
+        Dictionary<string, string> EntryDates,
+        List<string> Settlements,
+        Dictionary<string, string> Daily);
 
     private sealed record FinalStateIds(Guid BranchId, Guid Kh1Id, Guid Ncc1Id, Guid QtmId, Guid Nh01Id,
         Dictionary<Guid, string> Sources);
 
-    /// Per (partner, side): the balance; per debt entry (keyed by document role and side): Amount and Σ settled;
-    /// per fund: the closing of the cash book (kind=All, 10-01..10-31). Every entry of the branch must have a role.
+    /// Per (partner, side): the balance; per debt entry (keyed by document role and side): Amount, Σ settled,
+    /// PostedAt, DocDate and DueDate; per settlement: its two entries' roles, Amount and EffectiveAt (Origin is left
+    /// out: the re-allocation is Manual in A, AtVoucher in B); per fund: the closing of the cash book (kind=All,
+    /// 10-01..10-31); per October day: the single-day cash book (each fund's opening, rows, totals, closing) and the
+    /// single-day debt-balance report of both sides. Every entry of the branch must have a role.
     private async Task<ReplaySnapshot> SnapshotAsync(HttpClient client, Guid branchId, Dictionary<Guid, string> partners,
         Dictionary<Guid, string> funds, Dictionary<Guid, string> sources)
     {
@@ -173,7 +187,47 @@ public class CashDebtInvariantReplayTests : CashDebtTestBase
         cashBook.Groups.Select(g => g.FundId).Should().BeEquivalentTo(funds.Keys);
         var fundClosings = cashBook.Groups.ToDictionary(g => funds[g.FundId], g => g.Closing);
 
-        return new ReplaySnapshot(balances, entrySnapshot, fundClosings);
+        var entryDates = entries.ToDictionary(
+            e => $"{sources[e.SourceId]}:{e.Side}",
+            e => $"posted {Utc(e.PostedAt)} doc {Day(e.DocDate)} due {(e.DueDate is { } due ? Day(due) : "-")}");
+        var roleOfEntry = entries.ToDictionary(e => e.Id, e => $"{sources[e.SourceId]}:{e.Side}");
+        var settlementSnapshot = settlements
+            .Select(s => $"{roleOfEntry[s.IncreaseEntryId]} <- {roleOfEntry[s.DecreaseEntryId]}: "
+                + $"{Money(s.Amount)} at {Utc(s.EffectiveAt)}")
+            .OrderBy(x => x, StringComparer.Ordinal)
+            .ToList();
+
+        var daily = new Dictionary<string, string>();
+        for (var day = new DateOnly(2026, 10, 1); day <= new DateOnly(2026, 10, 31); day = day.AddDays(1))
+        {
+            var window = $"from={Day(day)}&to={Day(day)}";
+            var dayBook = await ReadDataAsync<CashBookReportDto>(
+                await client.GetAsync($"/api/reports/cash-book?kind=All&{window}"));
+            foreach (var group in dayBook.Groups)
+            {
+                var rows = string.Join("; ", group.Rows.Select(r =>
+                    $"{Utc(r.At)} {r.SourceType} in {Money(r.In)} out {Money(r.Out)} running {Money(r.Running)}"));
+                daily[$"{Day(day)} fund {funds[group.FundId]}"] =
+                    $"opening {Money(group.Opening)} in {Money(group.TotalIn)} out {Money(group.TotalOut)} "
+                    + $"closing {Money(group.Closing)} [{rows}]";
+            }
+
+            foreach (var side in new[] { DebtSide.Receivable, DebtSide.Payable })
+            {
+                var dayDebt = await ReadDataAsync<DebtBalanceReportDto>(
+                    await client.GetAsync($"/api/reports/debt-balance?side={side}&{window}"));
+                dayDebt.Rows.Where(r => !partners.ContainsKey(r.PartnerId!.Value)).Should()
+                    .BeEmpty("only the dataset's partners have debt in the branch");
+                foreach (var row in dayDebt.Rows)
+                {
+                    daily[$"{Day(day)} debt {side} {partners[row.PartnerId!.Value]}"] = DebtRow(row);
+                }
+
+                daily[$"{Day(day)} debt {side} totals"] = DebtRow(dayDebt.Totals);
+            }
+        }
+
+        return new ReplaySnapshot(balances, entrySnapshot, fundClosings, entryDates, settlementSnapshot, daily);
     }
 
     /// Branch C: the dataset's opening data (rows 1–3), then the final state of scenario A entered in date order.
@@ -247,6 +301,17 @@ public class CashDebtInvariantReplayTests : CashDebtTestBase
             [receipt11.Id] = "#11 receipt",
         });
     }
+
+    private static string Utc(DateTimeOffset at) =>
+        at.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss.ffffff", CultureInfo.InvariantCulture);
+
+    private static string Day(DateOnly date) => date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    private static string Money(decimal amount) => amount.ToString("0.####", CultureInfo.InvariantCulture);
+
+    private static string DebtRow(DebtBalanceRowDto row) =>
+        $"opening {Money(row.OpeningDebit)}/{Money(row.OpeningCredit)} increase {Money(row.Increase)} "
+        + $"decrease {Money(row.Decrease)} closing {Money(row.ClosingDebit)}/{Money(row.ClosingCredit)}";
 
     private HttpClient BranchClient(Guid branchId)
     {

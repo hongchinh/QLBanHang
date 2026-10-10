@@ -17,10 +17,11 @@ const MODULE_LABEL: Record<PermissionModule, string> = {
   catalog: 'Danh mục',
   sales: 'Bán hàng',
   inventory: 'Kho',
+  cash: 'Tiền & Công nợ',
   report: 'Báo cáo',
 };
 
-const MODULE_ORDER: PermissionModule[] = ['system', 'catalog', 'sales', 'inventory', 'report'];
+const MODULE_ORDER: PermissionModule[] = ['system', 'catalog', 'sales', 'inventory', 'cash', 'report'];
 
 interface Props {
   roles: RoleListItem[];

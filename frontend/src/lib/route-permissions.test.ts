@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PERMISSIONS } from './permissions';
 import { canAccessRoute } from './route-permissions';
 
 const SALES_PERMS = [
@@ -153,5 +154,19 @@ describe('rules mirror App.tsx guards', () => {
     expect(canAccessRoute('/settings/quotation', ['system.manage_settings'], [])).toBe(true);
     expect(canAccessRoute('/reports/sales-revenue/u1', [], [])).toBe(false);
     expect(canAccessRoute('/reports/sales-revenue/u1', ['reports.revenue'], [])).toBe(true);
+  });
+});
+
+describe('PERMISSIONS', () => {
+  it('PERMISSIONS includes every round 2A code', () => {
+    const codes: readonly string[] = PERMISSIONS;
+    for (const code of [
+      'receipts.view',
+      'debt.partner_summary',
+      'reports.cash',
+      'credit_limit.manage',
+    ]) {
+      expect(codes).toContain(code);
+    }
   });
 });

@@ -23,8 +23,17 @@ const MODULE_LABEL: Record<PermissionModule, string> = {
   catalog: 'Danh mục',
   sales: 'Bán hàng',
   inventory: 'Kho',
+  cash: 'Tiền & Công nợ',
   report: 'Báo cáo',
 };
+
+const MODULE_ORDER: PermissionModule[] = ['system', 'catalog', 'sales', 'inventory', 'cash', 'report'];
+
+// Known modules follow MODULE_ORDER; modules the frontend doesn't know yet go last.
+function moduleRank(module: PermissionModule) {
+  const index = MODULE_ORDER.indexOf(module);
+  return index === -1 ? MODULE_ORDER.length : index;
+}
 
 const RESERVED_CODES = new Set(['ADMIN', 'SALES', 'ACCOUNTANT', 'WAREHOUSE', 'MANAGER']);
 
@@ -58,7 +67,9 @@ export function RoleCreateDialog({ open, onOpenChange, permissions }: Props) {
       list.push(p);
       map.set(p.module, list);
     }
-    return Array.from(map.entries()).sort(([a], [b]) => a.localeCompare(b));
+    return Array.from(map.entries()).sort(
+      ([a], [b]) => moduleRank(a) - moduleRank(b) || a.localeCompare(b),
+    );
   }, [permissions]);
 
   const form = useForm<Values>({
@@ -136,7 +147,7 @@ export function RoleCreateDialog({ open, onOpenChange, permissions }: Props) {
             <div className="border rounded-md max-h-72 overflow-auto divide-y">
               {grouped.map(([module, perms]) => (
                 <div key={module} className="p-2">
-                  <div className="font-medium text-sm mb-1">{MODULE_LABEL[module]}</div>
+                  <div className="font-medium text-sm mb-1">{MODULE_LABEL[module] ?? module}</div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-1">
                     {perms.map((p) => (
                       <label

@@ -143,4 +143,9 @@ describe('cash and debt navigation', () => {
       expect(paths(WAREHOUSE_PERMS, 'Chức năng')).not.toContain(path);
     }
   });
+
+  it('only cash.settings shows Cấu hình hệ thống', () => {
+    expect(paths(['cash.settings'], 'Setting')).toContain('/settings');
+    expect(paths(ACCOUNTANT_CASH_PERMS, 'Setting')).toContain('/settings');
+  });
 });

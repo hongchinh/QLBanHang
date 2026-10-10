@@ -114,6 +114,7 @@ const navGroups: NavGroup[] = [
           'period_lock.manage',
           'inventory.settings',
           'inventory.recalc_cost',
+          'cash.settings',
         ],
       },
       { to: '/admin/users', label: 'Quản lý người dùng', icon: Users2, permission: 'user_settings.manage' },

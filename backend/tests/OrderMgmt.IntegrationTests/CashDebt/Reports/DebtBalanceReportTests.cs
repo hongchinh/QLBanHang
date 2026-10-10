@@ -170,6 +170,36 @@ public class DebtBalanceReportTests : CashDebtTestBase
             .Rows.Select(r => r.PartnerId).Should().Equal(ids.Ncc1Id);
     }
 
+    /// P29: Opening entries are opening balance in every window, even one that ends before the opening date,
+    /// so one period's closing is always the next period's opening.
+    [Fact]
+    public async Task Opening_entries_count_in_windows_before_the_opening_date()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+        // A receipt dated before the branch opening date (10-01).
+        await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TKH"), ids.QtmId,
+            "2026-09-25 09:00", ids.Kh1Id, 300m));
+
+        var september = await GetBalanceAsync(client, "side=Receivable&from=2026-09-01&to=2026-09-30");
+        september.Rows.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            PartnerId = (Guid?)ids.Kh1Id,
+            OpeningDebit = 4_000m, OpeningCredit = 0m, Increase = 0m, Decrease = 300m, ClosingDebit = 3_700m, ClosingCredit = 0m,
+        });
+
+        var october = await GetBalanceAsync(client, "side=Receivable&from=2026-10-01&to=2026-10-31");
+        october.Rows.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            OpeningDebit = 3_700m, OpeningCredit = 0m, Increase = 3_000m, Decrease = 5_500m, ClosingDebit = 1_200m, ClosingCredit = 0m,
+        });
+
+        // The September closing agrees with the ledger balance at the start of 10-01.
+        (await BalanceAsync(ids.MainBranchId, ids.Kh1Id, DebtSide.Receivable,
+                VnTime.StartOfNextDay(new DateOnly(2026, 9, 30))))
+            .Should().Be(3_700m);
+    }
+
     [Fact]
     public async Task Filters_and_permission()
     {

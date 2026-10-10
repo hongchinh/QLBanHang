@@ -38,7 +38,7 @@ public class CashDebtReportService : ICashDebtReportService
         // Soft-deleted partners keep their ledger rows, so they stay in the report.
         var partners = _db.Customers.IgnoreQueryFilters().AsNoTracking();
         var entries = _db.DebtEntries.AsNoTracking()
-            .Where(e => e.BranchId == branchId && e.Side == request.Side && e.PostedAt < end);
+            .Where(e => e.BranchId == branchId && e.Side == request.Side);
         if (request.PartnerId is { } partnerId)
             entries = entries.Where(e => e.PartnerId == partnerId);
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -49,7 +49,8 @@ public class CashDebtReportService : ICashDebtReportService
                     || EF.Functions.ILike(EF.Functions.Unaccent(c.Name), EF.Functions.Unaccent(pattern), LikeEscape))));
         }
 
-        // P29: Opening entries are opening balance even when they sit inside the window.
+        // P29: Opening entries are opening balance in every window, whatever their PostedAt (no upper bound),
+        // so a window ending before the opening date still carries them and its closing is the next opening.
         var opening = await entries
             .Where(e => e.PostedAt < start || e.SourceType == DebtSourceType.Opening)
             .GroupBy(e => e.PartnerId)
@@ -60,7 +61,7 @@ public class CashDebtReportService : ICashDebtReportService
             })
             .ToDictionaryAsync(x => x.PartnerId, x => x.Balance, ct);
         var period = await entries
-            .Where(e => e.PostedAt >= start && e.SourceType != DebtSourceType.Opening)
+            .Where(e => e.SourceType != DebtSourceType.Opening && e.PostedAt >= start && e.PostedAt < end)
             .GroupBy(e => e.PartnerId)
             .Select(g => new
             {

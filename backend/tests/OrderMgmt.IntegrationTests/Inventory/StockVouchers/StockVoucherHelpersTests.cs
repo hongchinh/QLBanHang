@@ -60,6 +60,8 @@ public class StockVoucherHelpersTests : InventoryTestBase
             r.WarehouseId = kho02;
             r.PartnerId = supplier;
             r.PaymentMethodId = ck;
+            // The automatic payment overdraws the new, empty bank fund (P17): acknowledged.
+            r.AcknowledgeNegativeFund = true;
         }, LineRequest(p, 1, 10_000));
 
         (await GetDefaultsAsync(_client, "type=In")).Should().BeEquivalentTo(new

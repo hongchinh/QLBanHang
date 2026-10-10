@@ -4,6 +4,7 @@ using OrderMgmt.Application.Catalog.Customers.Interfaces;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.Common;
+using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.Common.Interfaces;
@@ -36,10 +37,13 @@ public class StockVoucherService : IStockVoucherService
     private readonly ICashDebtLock _cashDebtLock;
     private readonly IDebtLedgerService _ledger;
     private readonly IAutoCashVoucherService _auto;
+    private readonly ICreditLimitGuard _creditGuard;
+    private readonly IFundBalanceGuard _fundGuard;
 
     public StockVoucherService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch,
         IDateTime clock, ITransactionRunner transaction, IInventoryPostingService posting, IDocumentCodeAllocator codes,
-        ICustomerService customers, ICashDebtLock cashDebtLock, IDebtLedgerService ledger, IAutoCashVoucherService auto)
+        ICustomerService customers, ICashDebtLock cashDebtLock, IDebtLedgerService ledger, IAutoCashVoucherService auto,
+        ICreditLimitGuard creditGuard, IFundBalanceGuard fundGuard)
     {
         _db = db;
         _currentUser = currentUser;
@@ -52,6 +56,8 @@ public class StockVoucherService : IStockVoucherService
         _cashDebtLock = cashDebtLock;
         _ledger = ledger;
         _auto = auto;
+        _creditGuard = creditGuard;
+        _fundGuard = fundGuard;
     }
 
     public async Task<StockVoucherListResult> ListAsync(StockVoucherListRequest request, CancellationToken ct = default)
@@ -375,6 +381,8 @@ public class StockVoucherService : IStockVoucherService
             // Read after the shared branch gate, so a concurrent period lock change is serialized (review finding).
             await EnsureNotLockedAsync(branchId, new[] { voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
+            var credit = await CaptureCreditAsync(branchId, reason, request.PartnerId, c);
+            var fundCapture = await CaptureFundsAsync(new[] { (terms.FundId, voucherAt) }, c);
 
             var voucher = new StockVoucher
             {
@@ -391,6 +399,8 @@ public class StockVoucherService : IStockVoucherService
             await SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
+            await CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);
+            await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, StockVoucherActivityAction.Created, "Tạo phiếu");
             await _db.SaveChangesAsync(c);
             return voucher.Id;
@@ -416,6 +426,10 @@ public class StockVoucherService : IStockVoucherService
             var reason = await EnsureReferencesStillExistAsync(request, voucher.BranchId, voucher, terms, c);
             await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt, voucherAt }, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
+            var credit = await CaptureCreditAsync(voucher.BranchId, reason, request.PartnerId, c);
+            // Both funds from the earlier of the two dates: the old fund loses the automatic voucher, the new one gains it.
+            var from = voucher.VoucherAt < voucherAt ? voucher.VoucherAt : voucherAt;
+            var fundCapture = await CaptureFundsAsync(new[] { (voucher.FundId, from), (terms.FundId, from) }, c);
 
             await ApplyRequestAsync(voucher, request, voucherAt, settings, terms, reason, c);
             await _db.SaveChangesAsync(c);
@@ -424,6 +438,8 @@ public class StockVoucherService : IStockVoucherService
             await SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
+            await CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);
+            await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, StockVoucherActivityAction.Updated, "Cập nhật phiếu");
             await _db.SaveChangesAsync(c);
         }, ct);
@@ -461,9 +477,10 @@ public class StockVoucherService : IStockVoucherService
             v => v.IsDeleted = true, ct);
 
     /// Cancel / delete: steps 1, 2 (stored date), 4, 7 (empty list), 8, 9; the debt entry is removed after the lines,
-    /// then the automatic voucher follows (cancelled or soft-deleted).
+    /// then the automatic voucher follows (cancelled or soft-deleted), then the fund check (its money leaves the fund
+    /// or comes back).
     /// Restore: the same steps, reposting the stored lines as they are (no re-validation, no re-snapshot), then the
-    /// debt entry and the automatic voucher like a save.
+    /// debt entry and the automatic voucher like a save, then the credit and fund checks (save steps 15, 16).
     private Task ChangeLifecycleAsync(Guid id, StockVoucherActionRequest request, Func<StockDirection, string> permission,
         StockVoucherActivityAction action, string description, Action<StockVoucher> apply, CancellationToken ct) =>
         _transaction.RunAsync(async c =>
@@ -479,16 +496,22 @@ public class StockVoucherService : IStockVoucherService
             if (restore)
                 await EnsureRestorableAsync(voucher, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
+            // A reason in use keeps its debt effect and cannot be deleted (P19); a restore reads it under its key.
+            var reason = await _db.StockReasons.AsNoTracking().SingleAsync(r => r.Id == voucher.ReasonId, c);
+            // The plan's cancel / delete flow has a fund check only; a restore follows the create flow, credit check
+            // included (step 7 condition: a sale back on the receivable).
+            var credit = restore ? await CaptureCreditAsync(voucher.BranchId, reason, voucher.PartnerId, c) : null;
+            var fundCapture = await CaptureFundsAsync(new[] { (voucher.FundId, voucher.VoucherAt) }, c);
 
             apply(voucher);
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c, removeAll: !restore);
-            // A reason in use keeps its debt effect and cannot be deleted (P19); a restore reads it under its key.
-            var reason = await _db.StockReasons.AsNoTracking().SingleAsync(r => r.Id == voucher.ReasonId, c);
             await SyncDebtAsync(voucher, reason, remove: !restore, request.ConfirmRemoveSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
+            await CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);
+            await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, action, description);
             await _db.SaveChangesAsync(c);
         }, ct);
@@ -1110,6 +1133,30 @@ public class StockVoucherService : IStockVoucherService
                 voucher.OwnerUserId, voucher.Code, reason.Name),
         };
     }
+
+    /// The customer's receivable balance before the save (save step 7), read after the partner keys. Captured only when
+    /// the reason raises the receivable and a partner is set; null otherwise, and the credit check is skipped.
+    private sealed record CreditCapture(Guid BranchId, Guid PartnerId, decimal Before);
+
+    private async Task<CreditCapture?> CaptureCreditAsync(Guid branchId, StockReason reason, Guid? partnerId,
+        CancellationToken ct)
+    {
+        if (reason.DebtEffect != DebtEffect.ReceivableIncrease || partnerId is not { } id)
+            return null;
+        return new CreditCapture(branchId, id, await _creditGuard.CaptureAsync(branchId, id, ct));
+    }
+
+    /// Save step 15 (C12, P10): after the debt entry and the automatic voucher's entry are posted.
+    private Task CheckCreditAsync(CreditCapture? capture, bool acknowledge, CancellationToken ct) =>
+        capture is null
+            ? Task.CompletedTask
+            : _creditGuard.CheckAsync(capture.BranchId, capture.PartnerId, capture.Before, acknowledge, ct);
+
+    /// Save step 8: the funds the automatic voucher leaves or enters, held under their keys since step 3. A fund it
+    /// ends up not touching keeps its running balance, so capturing it is harmless.
+    private Task<FundCapture> CaptureFundsAsync(IEnumerable<(Guid? FundId, DateTimeOffset From)> funds,
+        CancellationToken ct) =>
+        _fundGuard.CaptureAsync(funds.Where(f => f.FundId is not null).Select(f => (f.FundId!.Value, f.From)), ct);
 
     /// D35: CostPrice follows the latest Active, non-deleted stock-in line (by VoucherAt, then the voucher's
     /// CreatedAt and Code so vouchers with the same VoucherAt resolve deterministically, then SortOrder).

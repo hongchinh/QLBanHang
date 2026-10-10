@@ -69,6 +69,8 @@ public class StockVoucherQueryTests : InventoryTestBase
         {
             r.PartnerId = supplier;
             r.PaymentMethodId = tm;
+            // The automatic payment overdraws the empty cash fund (P17): acknowledged.
+            r.AcknowledgeNegativeFund = true;
         }, LineRequest(service, 1, 100_000));
         var v2 = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-06 00:30", r => r.Lines[0].WarehouseId = kho02, LineRequest(service, 1, 200_000));
         var v3 = await CreateVoucherAsync(other, StockDirection.In, "NKH", "2026-10-10 08:00", r => r.WarehouseId = kho02, LineRequest(service, 1, 300_000));

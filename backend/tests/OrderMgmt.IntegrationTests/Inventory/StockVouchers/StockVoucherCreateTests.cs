@@ -29,6 +29,8 @@ public class StockVoucherCreateTests : InventoryTestBase
         request.PartnerId = supplierId;
         // TM has a cash fund, so the paid amount defaults to the total (P9).
         request.PaymentMethodId = await InDbAsync(db => db.PaymentMethods.Where(m => m.Code == "TM").Select(m => m.Id).SingleAsync());
+        // The automatic payment overdraws the empty cash fund (P17): acknowledged.
+        request.AcknowledgeNegativeFund = true;
         request.Freight = 200_000;
         request.OrderDiscount = 100_000;
         request.Lines[0].VatRate = 10;

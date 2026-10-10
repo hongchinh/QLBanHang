@@ -1,13 +1,19 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.Debt.Interfaces;
 using OrderMgmt.Application.CashDebt.Debt.Models;
+using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.Interfaces;
+using OrderMgmt.Application.Organization.Branches;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Catalog;
+using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.CashDebt.Debt.Services;
@@ -16,15 +22,26 @@ public class DebtService : IDebtService
 {
     private readonly IAppDbContext _db;
     private readonly IDebtQueryService _debtQuery;
+    private readonly IDebtLedgerService _ledger;
+    private readonly IAutoCashVoucherService _auto;
+    private readonly ITransactionRunner _transaction;
+    private readonly IInventoryLock _inventoryLock;
+    private readonly ICashDebtLock _cashDebtLock;
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
     private readonly ICurrentBranch _currentBranch;
 
-    public DebtService(IAppDbContext db, IDebtQueryService debtQuery, IDateTime clock, ICurrentUser currentUser,
-        ICurrentBranch currentBranch)
+    public DebtService(IAppDbContext db, IDebtQueryService debtQuery, IDebtLedgerService ledger,
+        IAutoCashVoucherService auto, ITransactionRunner transaction, IInventoryLock inventoryLock,
+        ICashDebtLock cashDebtLock, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch)
     {
         _db = db;
         _debtQuery = debtQuery;
+        _ledger = ledger;
+        _auto = auto;
+        _transaction = transaction;
+        _inventoryLock = inventoryLock;
+        _cashDebtLock = cashDebtLock;
         _clock = clock;
         _currentUser = currentUser;
         _currentBranch = currentBranch;
@@ -136,6 +153,144 @@ public class DebtService : IDebtService
             })
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<SettlementDto>> ListSettlementsAsync(SettlementListRequest request,
+        CancellationToken ct = default)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        // Both entries of a settlement share branch, partner and side, so filtering the Increase entry is enough.
+        var entryIds = _db.DebtEntries
+            .Where(e => e.BranchId == branchId && e.PartnerId == request.PartnerId && e.Side == request.Side)
+            .Select(e => e.Id);
+        return await LoadSettlementsAsync(_db.DebtSettlements.Where(s => entryIds.Contains(s.IncreaseEntryId)), ct);
+    }
+
+    public async Task<SettlementBatchDto> CreateSettlementBatchAsync(CreateSettlementBatchRequest request,
+        CancellationToken ct = default)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var batchId = Guid.NewGuid();
+        await _transaction.RunAsync(async c =>
+        {
+            await AcquireLocksAsync(branchId, new[] { request.PartnerId }, c);
+            await EnsureEntriesOfPartnerAsync(request, branchId, c);
+            var drafts = request.Items
+                .Select(i => new SettlementDraft(i.IncreaseEntryId, i.DecreaseEntryId, i.Amount))
+                .ToList();
+            // The ledger checks the pairs, the open amounts (Auto included) and the period lock on EffectiveAt.
+            await _ledger.AddSettlementsAsync(drafts, SettlementOrigin.Manual, batchId, "items", c);
+        }, ct);
+
+        var settlements = await LoadSettlementsAsync(_db.DebtSettlements.Where(s => s.BatchId == batchId), ct);
+        return new SettlementBatchDto { BatchId = batchId, Settlements = settlements.ToList() };
+    }
+
+    public Task DeleteSettlementAsync(Guid id, CancellationToken ct = default) =>
+        RemoveSettlementsAsync(s => s.Id == id, () => new NotFoundException(nameof(DebtSettlement), id), ct);
+
+    public Task DeleteSettlementBatchAsync(Guid batchId, CancellationToken ct = default) =>
+        RemoveSettlementsAsync(s => s.BatchId == batchId, () => new NotFoundException("DebtSettlementBatch", batchId), ct);
+
+    /// Unmatching (P22): the settlements matched by `filter` are removed together, or none is.
+    private async Task RemoveSettlementsAsync(Expression<Func<DebtSettlement, bool>> filter, Func<Exception> notFound,
+        CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        await _transaction.RunAsync(async c =>
+        {
+            // The partners to lock. A settled entry cannot change partner (P11) and Manual / AtVoucher batch ids are
+            // new per batch, so the rows read again after the locks still belong to these partners.
+            var owners = await (from s in _db.DebtSettlements.Where(filter)
+                                join e in _db.DebtEntries on s.IncreaseEntryId equals e.Id
+                                select new { e.BranchId, e.PartnerId })
+                .Distinct()
+                .ToListAsync(c);
+            if (owners.Count == 0)
+                throw notFound();
+            if (owners.Any(o => o.BranchId != branchId))
+                throw new ForbiddenException("Đối trừ thuộc chi nhánh khác.");
+            await AcquireLocksAsync(branchId, owners.Select(o => o.PartnerId), c);
+
+            var settlements = await _db.DebtSettlements.AsNoTracking().Where(filter).ToListAsync(c);
+            if (settlements.Count == 0)
+                throw notFound();
+            if (settlements.Any(s => s.Origin is not (SettlementOrigin.Manual or SettlementOrigin.AtVoucher)))
+                throw new ConflictException("SETTLEMENT_MANAGED", "Đối trừ này do chứng từ quản lý, không bỏ được ở đây.");
+            var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
+            PeriodLockGuard.EnsureNotLocked(lockedUntil, settlements.Select(s => s.EffectiveAt));
+
+            // Logs SettlementRemoved on both documents. The freed room goes back to the Auto settlement of any stock
+            // voucher whose entry (or automatic voucher's entry) was matched here (Phase 07 rule, 2026-10-09).
+            var removed = await _ledger.RemoveSettlementsAsync(settlements.Select(s => s.Id).ToList(), c);
+            await _auto.RecomputeAutoAsync(removed.SelectMany(r => new[] { r.IncreaseEntryId, r.DecreaseEntryId }), c);
+        }, ct);
+    }
+
+    /// The shared branch gate, then the partner keys (P14). Settlements move no money: no fund key.
+    private async Task AcquireLocksAsync(Guid branchId, IEnumerable<Guid> partnerIds, CancellationToken ct)
+    {
+        await _inventoryLock.AcquireBranchGateAsync(new[] { branchId }, exclusive: false, ct);
+        await _cashDebtLock.AcquireAsync(branchId, partnerIds.Distinct(), Array.Empty<Guid>(), ct);
+    }
+
+    /// Every item's two entries belong to the request's partner and side and to the working branch (400 per slot).
+    private async Task EnsureEntriesOfPartnerAsync(CreateSettlementBatchRequest request, Guid branchId,
+        CancellationToken ct)
+    {
+        var ids = request.Items.SelectMany(i => new[] { i.IncreaseEntryId, i.DecreaseEntryId }).Distinct().ToList();
+        var owned = (await _db.DebtEntries.AsNoTracking()
+                .Where(e => ids.Contains(e.Id) && e.BranchId == branchId && e.PartnerId == request.PartnerId
+                            && e.Side == request.Side)
+                .Select(e => e.Id)
+                .ToListAsync(ct))
+            .ToHashSet();
+
+        const string message = "Chứng từ không thuộc đối tượng, loại công nợ hoặc chi nhánh đang làm việc.";
+        var errors = new Dictionary<string, string[]>();
+        for (var i = 0; i < request.Items.Count; i++)
+        {
+            if (!owned.Contains(request.Items[i].IncreaseEntryId))
+                errors[$"items[{i}].increaseEntryId"] = new[] { message };
+            if (!owned.Contains(request.Items[i].DecreaseEntryId))
+                errors[$"items[{i}].decreaseEntryId"] = new[] { message };
+        }
+
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+    }
+
+    private async Task<IReadOnlyList<SettlementDto>> LoadSettlementsAsync(IQueryable<DebtSettlement> settlements,
+        CancellationToken ct) =>
+        await (from s in settlements.AsNoTracking()
+               join i in _db.DebtEntries.AsNoTracking() on s.IncreaseEntryId equals i.Id
+               join d in _db.DebtEntries.AsNoTracking() on s.DecreaseEntryId equals d.Id
+               orderby s.EffectiveAt descending, s.CreatedAt descending, i.DocCode
+               select new SettlementDto
+               {
+                   Id = s.Id,
+                   BatchId = s.BatchId,
+                   Origin = s.Origin,
+                   IncreaseEntryId = i.Id,
+                   IncreaseDocCode = i.DocCode,
+                   IncreaseDocDate = i.DocDate,
+                   IncreaseSourceType = i.SourceType,
+                   IncreaseSourceId = i.SourceId,
+                   DecreaseEntryId = d.Id,
+                   DecreaseDocCode = d.DocCode,
+                   DecreaseDocDate = d.DocDate,
+                   DecreaseSourceType = d.SourceType,
+                   DecreaseSourceId = d.SourceId,
+                   Amount = s.Amount,
+                   EffectiveAt = s.EffectiveAt,
+                   CreatedAt = s.CreatedAt,
+                   CreatedByName = s.CreatedBy == null
+                       ? null
+                       : _db.Users.IgnoreQueryFilters()
+                           .Where(u => u.Id == s.CreatedBy)
+                           .Select(u => u.FullName)
+                           .FirstOrDefault(),
+               })
+            .ToListAsync(ct);
 
     private void EnsureAnyPermission(params string[] codes)
     {

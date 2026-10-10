@@ -17,4 +17,19 @@ public interface IDebtService
     /// reports.debt or credit_limit.manage (customers.view / suppliers.view are not needed).
     Task<List<CustomerSearchItemDto>> SearchPartnersAsync(DebtPartnerSearchRequest request,
         CancellationToken ct = default);
+
+    /// Settlements of the partner and side in the working branch (any origin), newest effective date first.
+    /// The controller requires debt.matching.
+    Task<IReadOnlyList<SettlementDto>> ListSettlementsAsync(SettlementListRequest request, CancellationToken ct = default);
+
+    /// Adds one Manual batch (P22): every entry must belong to the request's partner and side and the working branch.
+    Task<SettlementBatchDto> CreateSettlementBatchAsync(CreateSettlementBatchRequest request,
+        CancellationToken ct = default);
+
+    /// Removes a Manual or AtVoucher settlement (Auto and Offset: 409 SETTLEMENT_MANAGED), logging SettlementRemoved
+    /// on both documents, then recomputes the Auto settlement of the stock vouchers whose entries it joined.
+    Task DeleteSettlementAsync(Guid id, CancellationToken ct = default);
+
+    /// Removes every settlement of a batch, as DeleteSettlementAsync does; a managed row refuses the whole batch.
+    Task DeleteSettlementBatchAsync(Guid batchId, CancellationToken ct = default);
 }

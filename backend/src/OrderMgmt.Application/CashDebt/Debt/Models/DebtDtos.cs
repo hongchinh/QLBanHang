@@ -45,3 +45,54 @@ public sealed class DebtPartnerSearchRequest
     /// (list filters, reports).
     public bool ActiveOnly { get; set; } = true;
 }
+
+/// GET /api/debt/settlements: every settlement between entries of one partner and side in the working branch.
+public sealed class SettlementListRequest
+{
+    public Guid PartnerId { get; set; }
+    public DebtSide Side { get; set; }
+}
+
+/// POST /api/debt/settlements: one Manual batch (P22). Every item pairs an Increase and a Decrease entry of the
+/// request's partner and side in the working branch.
+public sealed class CreateSettlementBatchRequest
+{
+    public Guid PartnerId { get; set; }
+    public DebtSide Side { get; set; }
+    public List<SettlementItemRequest> Items { get; set; } = new();
+}
+
+public sealed class SettlementItemRequest
+{
+    public Guid IncreaseEntryId { get; set; }
+    public Guid DecreaseEntryId { get; set; }
+    public decimal Amount { get; set; }
+}
+
+public sealed class SettlementBatchDto
+{
+    public Guid BatchId { get; set; }
+    public List<SettlementDto> Settlements { get; set; } = new();
+}
+
+/// A settlement with the code, date and source of both its entries.
+public sealed class SettlementDto
+{
+    public Guid Id { get; set; }
+    public Guid BatchId { get; set; }
+    public SettlementOrigin Origin { get; set; }
+    public Guid IncreaseEntryId { get; set; }
+    public string IncreaseDocCode { get; set; } = default!;
+    public DateOnly IncreaseDocDate { get; set; }
+    public DebtSourceType IncreaseSourceType { get; set; }
+    public Guid IncreaseSourceId { get; set; }
+    public Guid DecreaseEntryId { get; set; }
+    public string DecreaseDocCode { get; set; } = default!;
+    public DateOnly DecreaseDocDate { get; set; }
+    public DebtSourceType DecreaseSourceType { get; set; }
+    public Guid DecreaseSourceId { get; set; }
+    public decimal Amount { get; set; }
+    public DateTimeOffset EffectiveAt { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+    public string? CreatedByName { get; set; }
+}

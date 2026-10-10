@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
+using OrderMgmt.Application.CashDebt.Debt.Models;
 using OrderMgmt.Application.CashDebt.DebtOffsets.Models;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.Common.Models;
@@ -363,7 +364,121 @@ public class DebtOffsetTests : CashDebtTestBase
         await AssertCashDebtInvariantsAsync();
     }
 
+    [Fact]
+    public async Task Cancelling_a_settled_document_keeps_the_offset_active()
+    {
+        var partner = await NewDualPartnerAsync();
+        var xbh = await CreateSaleAsync(partner, 3_000m);
+        var xbhEntry = (await EntriesOfAsync(DebtSourceType.StockOut, xbh.Id)).Single();
+        var nmhEntry = (await EntriesOfAsync(DebtSourceType.StockIn, (await CreatePurchaseAsync(partner, 3_000m)).Id)).Single();
+        var offset = await CreateOffsetAsync(partner, "2026-10-06 09:00", (xbhEntry.Id, 3_000m), (nmhEntry.Id, 3_000m));
+
+        // Brainstorm §5: cancelling a document removes all its settlements after the 422, Offset ones included.
+        var cancel = new StockVoucherActionRequest { Version = xbh.Version };
+        var (status, _, error) = await StockActionAsync(xbh.Id, "cancel", cancel);
+        status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        error!.Code.Should().Be(DebtLedgerService.SettlementsWillBeRemovedCode);
+        error.Details.Should().ContainSingle().Which.Key.Should().Be("BT00001");
+        cancel.ConfirmRemoveSettlements = true;
+        var (confirmedStatus, _, confirmedError) = await StockActionAsync(xbh.Id, "cancel", cancel);
+        confirmedStatus.Should().Be(HttpStatusCode.OK, confirmedError?.Message);
+
+        // The offset stays Active with its payable item; its receivable entry is now open.
+        var (_, kept, _) = await GetOffsetAsync(_branchClient, offset.Id);
+        kept!.Status.Should().Be(DocumentStatus.Active);
+        kept.Items.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            Side = DebtSide.Payable,
+            EntryId = nmhEntry.Id,
+            Amount = 3_000m,
+        });
+        var activities = await ActivitiesAsync(offset.Id);
+        activities.Select(a => a.Action).Should().Equal(CashDocumentActivityAction.SettlementRemoved,
+            CashDocumentActivityAction.Created);
+        activities[0].Description.Should().Be(DebtActivityLog.SettlementRemovedText(3_000m, xbh.Code));
+        await AssertCashDebtInvariantsAsync();
+
+        // Only the offset's own settlements are left: cancelling it needs no confirmation.
+        var (cancelStatus, _, cancelError) = await CancelOffsetAsync(_branchClient, offset.Id,
+            new CashDocumentActionRequest { Version = kept.Version });
+        cancelStatus.Should().Be(HttpStatusCode.OK, cancelError?.Message);
+        (await EntriesOfAsync(DebtSourceType.Offset, offset.Id)).Should().BeEmpty();
+        (await OpenItemsAsync(partner, DebtSide.Payable)).Single().Open.Should().Be(3_000m);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Cancelling_an_offset_asks_before_removing_foreign_settlements()
+    {
+        var partner = await NewDualPartnerAsync();
+        var xbh = await CreateSaleAsync(partner, 3_000m);
+        var xbhEntry = (await EntriesOfAsync(DebtSourceType.StockOut, xbh.Id)).Single();
+        var nmhEntry = (await EntriesOfAsync(DebtSourceType.StockIn, (await CreatePurchaseAsync(partner, 3_000m)).Id)).Single();
+        var offset = await CreateOffsetAsync(partner, "2026-10-06 09:00", (xbhEntry.Id, 3_000m), (nmhEntry.Id, 3_000m));
+        var offsetReceivable = (await EntriesOfAsync(DebtSourceType.Offset, offset.Id))
+            .Single(e => e.Side == DebtSide.Receivable);
+
+        // A discount below the offset amount drops the Offset settlement after the 422.
+        var shrink = UpdateRequestFrom(await GetVoucherAsync(_branchClient, xbh.Id));
+        shrink.Lines[0].UnitPrice = 1_000m;
+        shrink.ConfirmRemoveSettlements = true;
+        var (shrinkStatus, _, shrinkError) = await PutVoucherAsync(_branchClient, xbh.Id, shrink);
+        shrinkStatus.Should().Be(HttpStatusCode.OK, shrinkError?.Message);
+        (await ActivitiesAsync(offset.Id)).Select(a => a.Description)
+            .Should().Contain(DebtActivityLog.SettlementRemovedText(3_000m, xbh.Code));
+        await AssertCashDebtInvariantsAsync();
+
+        // The open receivable credit of the offset is matched with another sale on the matching screen.
+        var other = await CreateSaleAsync(partner, 2_000m);
+        var otherEntry = (await EntriesOfAsync(DebtSourceType.StockOut, other.Id)).Single();
+        var match = await _branchClient.PostAsJsonAsync("/api/debt/settlements", new CreateSettlementBatchRequest
+        {
+            PartnerId = partner,
+            Side = DebtSide.Receivable,
+            Items = new List<SettlementItemRequest>
+            {
+                new() { IncreaseEntryId = otherEntry.Id, DecreaseEntryId = offsetReceivable.Id, Amount = 2_000m },
+            },
+        }, TestJson.Options);
+        match.StatusCode.Should().Be(HttpStatusCode.OK, await match.Content.ReadAsStringAsync());
+        var (_, matched, _) = await GetOffsetAsync(_branchClient, offset.Id);
+        matched!.Items.Select(i => i.EntryId).Should().Equal(new[] { nmhEntry.Id },
+            "a Manual settlement is not an item of the offset");
+        await AssertCashDebtInvariantsAsync();
+
+        // That settlement is not the offset's own (P10, P23): cancel and delete ask first.
+        var (askCancel, _, askCancelError) = await CancelOffsetAsync(_branchClient, offset.Id,
+            new CashDocumentActionRequest { Version = matched.Version });
+        askCancel.Should().Be(HttpStatusCode.UnprocessableEntity);
+        askCancelError!.Code.Should().Be(DebtLedgerService.SettlementsWillBeRemovedCode);
+        askCancelError.Details.Should().ContainSingle().Which.Key.Should().Be(other.Code);
+        var (askDelete, _, askDeleteError) = await DeleteOffsetAsync(_branchClient, offset.Id, matched.Version);
+        askDelete.Should().Be(HttpStatusCode.UnprocessableEntity);
+        askDeleteError!.Code.Should().Be(DebtLedgerService.SettlementsWillBeRemovedCode);
+        (await SettlementsOfAsync(otherEntry.Id)).Should().ContainSingle("nothing was removed");
+        (await SettlementsOfAsync(nmhEntry.Id)).Should().ContainSingle("nothing was removed");
+
+        var (cancelStatus, cancelled, cancelError) = await CancelOffsetAsync(_branchClient, offset.Id,
+            new CashDocumentActionRequest { Version = matched.Version, ConfirmRemoveSettlements = true });
+        cancelStatus.Should().Be(HttpStatusCode.OK, cancelError?.Message);
+        cancelled!.Status.Should().Be(DocumentStatus.Cancelled);
+        (await EntriesOfAsync(DebtSourceType.Offset, offset.Id)).Should().BeEmpty();
+        (await SettlementsOfAsync(otherEntry.Id)).Should().BeEmpty();
+        (await SettlementsOfAsync(nmhEntry.Id)).Should().BeEmpty();
+        (await InDbAsync(db => db.StockVoucherActivities.AsNoTracking()
+                .Where(a => a.StockVoucherId == other.Id && a.Action == StockVoucherActivityAction.SettlementRemoved)
+                .Select(a => a.Description)
+                .ToListAsync()))
+            .Should().Equal(DebtActivityLog.SettlementRemovedText(2_000m, "BT00001"));
+        await AssertCashDebtInvariantsAsync();
+    }
+
     // ---- Helpers ------------------------------------------------------------------------------
+
+    /// POST /api/stock-vouchers/{id}/{action} (cancel or restore).
+    private async Task<(HttpStatusCode Status, StockVoucherDto? Voucher, ApiError? Error)> StockActionAsync(Guid id,
+        string action, StockVoucherActionRequest request) =>
+        await ReadVoucherResponseAsync(await _branchClient.PostAsJsonAsync($"/api/stock-vouchers/{id}/{action}", request));
 
     private Task<Guid> NewDualPartnerAsync() => CreatePartnerAsync(NewCode("DT-"), isCustomer: true, isSupplier: true);
 

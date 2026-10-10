@@ -215,7 +215,7 @@ public class DebtOffsetService : IDebtOffsetService
         await ChangeLifecycleAsync(id, request, DocumentStatus.Active, CashDocumentActivityAction.Cancelled,
             "Hủy chứng từ", async (o, c) =>
             {
-                await RemoveDebtAsync(o, c);
+                await RemoveDebtAsync(o, request.ConfirmRemoveSettlements, c);
                 o.Status = DocumentStatus.Cancelled;
                 o.CancelledAt = _clock.UtcNow;
                 o.CancelledBy = _currentUser.UserId;
@@ -229,7 +229,7 @@ public class DebtOffsetService : IDebtOffsetService
             {
                 // Only an Active offset still has its entries and settlements.
                 if (o.Status == DocumentStatus.Active)
-                    await RemoveDebtAsync(o, c);
+                    await RemoveDebtAsync(o, request.ConfirmRemoveSettlements, c);
                 o.IsDeleted = true;
             }, ct);
 
@@ -252,14 +252,16 @@ public class DebtOffsetService : IDebtOffsetService
             await _db.SaveChangesAsync(c);
         }, ct);
 
-    /// Removes the offset's Offset settlements (its own: no confirmation, P23) and its two entries. The entries they
-    /// were settled against are read first: a stock voucher among them gets its Auto settlement recomputed, since the
-    /// freed room goes back to its paid amount (Phase 07 rule, 2026-10-09).
-    private async Task RemoveDebtAsync(DebtOffsetVoucher offset, CancellationToken ct)
+    /// Removes the offset's Offset settlements (its own: no confirmation, P23) and its two entries. Any other
+    /// settlement on its entries (an entry freed when a settled document was cancelled or shrunk, brainstorm §5, then
+    /// matched manually or allocated by a voucher) belongs to another document, so it asks first (P10, P21). The
+    /// entries they were settled against are read first: a stock voucher among them gets its Auto settlement
+    /// recomputed, since the freed room goes back to its paid amount (Phase 07 rule, 2026-10-09).
+    private async Task RemoveDebtAsync(DebtOffsetVoucher offset, bool confirmRemoveSettlements, CancellationToken ct)
     {
         var counterparts = await _ledger.CounterpartEntryIdsAsync(DebtSourceType.Offset, offset.Id, ct);
         await _ledger.RemoveOwnSettlementsAsync(DebtSourceType.Offset, offset.Id, SettlementOrigin.Offset, ct);
-        await _ledger.RemoveSourceAsync(DebtSourceType.Offset, offset.Id, confirmRemoveSettlements: true, ct);
+        await _ledger.RemoveSourceAsync(DebtSourceType.Offset, offset.Id, confirmRemoveSettlements, ct);
         await _auto.RecomputeAutoAsync(counterparts, ct);
     }
 
@@ -331,7 +333,8 @@ public class DebtOffsetService : IDebtOffsetService
         };
     }
 
-    /// The documents settled against the offset's own (Decrease) entries, receivables first.
+    /// The documents the offset settles (its own Offset settlements, batch = the offset), receivables first. Other
+    /// settlements that later use an entry the offset no longer covers are not items of the offset.
     private async Task<List<DebtOffsetItemDto>> ItemsOfAsync(Guid offsetId, CancellationToken ct)
     {
         var own = _db.DebtEntries
@@ -340,6 +343,7 @@ public class DebtOffsetService : IDebtOffsetService
         var items = await (from s in _db.DebtSettlements.AsNoTracking()
                            join i in _db.DebtEntries.AsNoTracking() on s.IncreaseEntryId equals i.Id
                            where own.Contains(s.DecreaseEntryId)
+                                 && s.Origin == SettlementOrigin.Offset && s.BatchId == offsetId
                            select new DebtOffsetItemDto
                            {
                                Side = i.Side,

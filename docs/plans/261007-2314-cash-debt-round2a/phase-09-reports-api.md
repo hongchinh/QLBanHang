@@ -1,6 +1,6 @@
 # Phase 09 — Reports API & invariant replay
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

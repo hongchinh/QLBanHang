@@ -51,6 +51,8 @@ import { StockCardPage } from '@/pages/inventory/stock-card-page';
 // Round 2A: 11.5 fund transfers
 import { FundTransferListPage } from '@/pages/fund-transfers/fund-transfer-list-page';
 import { FundTransferFormPage } from '@/pages/fund-transfers/fund-transfer-form-page';
+// Round 2A: 12.2 debt matching
+import { DebtMatchingPage } from '@/pages/debt/debt-matching-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -441,6 +443,15 @@ export function App() {
                     }
                   />
                 </Route>
+                {/* Round 2A: 12.2 debt matching */}
+                <Route
+                  path="debt/matching"
+                  element={
+                    <ProtectedRoute permission="debt.matching">
+                      <DebtMatchingPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route
                   path="settings/my-quotation-settings"
                   element={<MyQuotationSettingsPage />}

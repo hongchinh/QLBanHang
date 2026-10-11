@@ -50,6 +50,14 @@ export function formatDebitCredit(debit: number, credit: number): string {
   return '0';
 }
 
+// A running balance (Σ increase − Σ decrease) as Dư Nợ / Dư Có (P24, mirrors DebtBalanceSign.Split):
+// Receivable +x is Nợ and −x Có; Payable +x is Có and −x Nợ.
+export function formatSignedBalance(side: DebtSide, balance: number): string {
+  const positive = Math.max(balance, 0);
+  const negative = Math.max(-balance, 0);
+  return side === 'Receivable' ? formatDebitCredit(positive, negative) : formatDebitCredit(negative, positive);
+}
+
 export const NUMERIC_CELL = 'px-2 py-2 text-right tabular-nums';
 
 // Side from a search param; anything else falls back to receivable.

@@ -18,6 +18,7 @@ import {
   NUMERIC_CELL,
   formatAmountCell,
   formatDebitCredit,
+  formatSignedBalance,
   formatYmd,
   parseDebtSide,
 } from './document-link';
@@ -263,7 +264,7 @@ export function DebtLedgerPage() {
                     <td className="px-2 py-2">{row.description}</td>
                     <td className={NUMERIC_CELL}>{formatAmountCell(row.increase)}</td>
                     <td className={NUMERIC_CELL}>{formatAmountCell(row.decrease)}</td>
-                    <td className={NUMERIC_CELL}>{formatCurrencyVnd(row.runningBalance)}</td>
+                    <td className={NUMERIC_CELL}>{formatSignedBalance(ledger.side, row.runningBalance)}</td>
                   </tr>
                 ))}
                 {ledger.rows.length === 0 && (

@@ -110,12 +110,13 @@ describe('DebtLedgerPage', () => {
 
     const stockIn = screen.getByRole('link', { name: 'PN00001' }).closest('tr')!;
     expect(within(stockIn).getAllByRole('cell').map((c) => c.textContent)).toEqual([
-      '02/10/2026', 'PN00001', 'Phiếu nhập', 'Nhập mua tôn', '2.500.000', '', '3.500.000',
+      '02/10/2026', 'PN00001', 'Phiếu nhập', 'Nhập mua tôn', '2.500.000', '', 'Có 3.500.000',
     ]);
     const payment = screen.getByRole('link', { name: 'PC00001' }).closest('tr')!;
     const paymentCells = within(payment).getAllByRole('cell');
     expect(paymentCells[5]).toHaveTextContent('4.000.000');
-    expect(paymentCells[6]).toHaveTextContent('-500.000');
+    // Payable: positive is Dư Có, negative is Dư Nợ (P24), like the opening and closing balances.
+    expect(paymentCells[6]).toHaveTextContent('Nợ 500.000');
     expect(paymentCells[6]).toHaveClass('text-right', 'tabular-nums');
 
     const totals = screen.getByText('Cộng phát sinh').closest('tr')!;
@@ -125,6 +126,27 @@ describe('DebtLedgerPage', () => {
     // Payable with a negative balance shows as Dư Nợ (P24); the server splits it.
     const closing = screen.getByText('Số dư cuối kỳ').closest('tr')!;
     expect(within(closing).getByText('Nợ 600.000')).toBeInTheDocument();
+  });
+
+  it('splits the running balance of a receivable ledger into Nợ and Có', () => {
+    ledgerState.data = ledger({
+      side: 'Receivable',
+      rows: [
+        {
+          entryId: 'e1', postedAt: '2026-10-02T02:00:00Z', docDate: '2026-10-02', docCode: 'PX00001',
+          sourceType: 'StockOut', sourceId: 'v1', description: null, increase: 700_000, decrease: 0, runningBalance: 700_000,
+        },
+        {
+          entryId: 'e2', postedAt: '2026-10-03T02:00:00Z', docDate: '2026-10-03', docCode: 'PT00001',
+          sourceType: 'Receipt', sourceId: 'c1', description: null, increase: 0, decrease: 900_000, runningBalance: -200_000,
+        },
+      ],
+    });
+    renderAt('/reports/debt-ledger?side=Receivable&partnerId=s1&from=2026-10-01&to=2026-10-31');
+
+    const cells = (code: string) => within(screen.getByText(code).closest('tr')!).getAllByRole('cell');
+    expect(cells('PX00001')[6]).toHaveTextContent('Nợ 700.000');
+    expect(cells('PT00001')[6]).toHaveTextContent('Có 200.000');
   });
 
   it('asks for a partner when none is in the url', () => {

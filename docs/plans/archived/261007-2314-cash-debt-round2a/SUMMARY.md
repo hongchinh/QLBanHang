@@ -1,6 +1,6 @@
 # Cash & Debt Round 2A — Receipts/Payments, Funds, Receivables/Payables (Đợt 2A — Thu/Chi, Quỹ & Công nợ)
 
-> Created: 2026-10-07 23:14:51 · Source design: [brainstorm SUMMARY](../../brainstorms/261007-2252-cash-debt-round2/SUMMARY.md), [section-01 decisions](../../brainstorms/261007-2252-cash-debt-round2/section-01-decisions.md), [section-02 design](../../brainstorms/261007-2252-cash-debt-round2/section-02-design.md), [section-03 delivery](../../brainstorms/261007-2252-cash-debt-round2/section-03-delivery.md), [section-04 review decisions](../../brainstorms/261007-2252-cash-debt-round2/section-04-review-decisions.md) · Builds on: [Round 1 plan](../archived/261006-2259-inventory-round1/SUMMARY.md)
+> Created: 2026-10-07 23:14:51 · Source design: [brainstorm SUMMARY](../../../brainstorms/261007-2252-cash-debt-round2/SUMMARY.md), [section-01 decisions](../../../brainstorms/261007-2252-cash-debt-round2/section-01-decisions.md), [section-02 design](../../../brainstorms/261007-2252-cash-debt-round2/section-02-design.md), [section-03 delivery](../../../brainstorms/261007-2252-cash-debt-round2/section-03-delivery.md), [section-04 review decisions](../../../brainstorms/261007-2252-cash-debt-round2/section-04-review-decisions.md) · Builds on: [Round 1 plan](../261006-2259-inventory-round1/SUMMARY.md)
 
 ## Goal
 

@@ -62,5 +62,5 @@ Repository-specific docs outside the standard topic folders.
 | [plans/archived/260523-1530-pwa-progressive-web-app/SUMMARY.md](plans/archived/260523-1530-pwa-progressive-web-app/SUMMARY.md) | Implementation plan for PWA — 4 phases: installable, API cache, push backend, push frontend |
 | [plans/260528-1833-product-form-dialog/SUMMARY.md](plans/260528-1833-product-form-dialog/SUMMARY.md) | Plan for create/edit actions in the product catalog dialog |
 | [plans/archived/261006-2259-inventory-round1/SUMMARY.md](plans/archived/261006-2259-inventory-round1/SUMMARY.md) | Implementation plan for inventory Round 1 — stock vouchers, ledger, costing, reports |
-| [plans/261007-2314-cash-debt-round2a/SUMMARY.md](plans/261007-2314-cash-debt-round2a/SUMMARY.md) | Implementation plan for Round 2A — receipts/payments, funds, fund transfers, receivables/payables with matching and offset, credit limits, debt balance/ledger and cash book reports |
+| [plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md](plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md) | Implementation plan for Round 2A — receipts/payments, funds, fund transfers, receivables/payables with matching and offset, credit limits, debt balance/ledger and cash book reports |
 | [plans/archived/](plans/archived/) | Archived implementation plans and execution reports |

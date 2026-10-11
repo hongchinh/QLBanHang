@@ -667,6 +667,59 @@ describe('StockVoucherFormPage', () => {
     await waitFor(() => expect(byId('stock-paid-amount').value).toBe('165.000'));
   });
 
+  it('paid amount is locked at 0 for a method without a fund, even after the user edited it', async () => {
+    renderPage('In');
+    await fillPerUnitLine(3);
+    await waitFor(() => expect(byId('stock-paid-amount').value).toBe('165.000'));
+    expect(byId('stock-paid-amount')).toBeEnabled();
+
+    fireEvent.change(byId('stock-paid-amount'), { target: { value: '100000' } });
+    fireEvent.blur(byId('stock-paid-amount'));
+    fireEvent.change(byId('stock-payment-method'), { target: { value: PM_NONE } });
+
+    await waitFor(() => expect(byId('stock-paid-amount')).toBeDisabled());
+    expect(byId('stock-paid-amount').value).toBe('0');
+
+    // A fund-backed method unlocks it and follows the total again.
+    fireEvent.change(byId('stock-payment-method'), { target: { value: PM_BANK } });
+    await waitFor(() => expect(byId('stock-paid-amount')).toBeEnabled());
+    await waitFor(() => expect(byId('stock-paid-amount').value).toBe('165.000'));
+  });
+
+  it('server field errors show under their fields', async () => {
+    createMock.mockRejectedValueOnce(
+      apiError(400, 'VALIDATION', {
+        fundId: ['Quỹ không hợp lệ'],
+        paidAmount: ['Số tiền thanh toán không hợp lệ'],
+        paymentMethodId: ['Hình thức thanh toán không có quỹ'],
+      }),
+    );
+    renderPage('In');
+    await fillPerUnitLine(3);
+    await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+    expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+    expect(screen.getByText('Số tiền thanh toán không hợp lệ')).toBeInTheDocument();
+    expect(screen.getByText('Hình thức thanh toán không có quỹ')).toBeInTheDocument();
+    expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
+  });
+
+  it('server due date error shows under the due date', async () => {
+    createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', { dueDate: ['Hạn thanh toán không hợp lệ'] }));
+    partnerResults.data = [supplier];
+    renderPage('In');
+    fireEvent.change(byId('stock-partner'), { target: { value: 'NCC' } });
+    fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('NCC01'));
+    await fillPerUnitLine(3);
+    await waitFor(() => expect(byId('stock-due-date').value).not.toBe(''));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+    expect(await screen.findByText('Hạn thanh toán không hợp lệ')).toBeInTheDocument();
+  });
+
   it('fund select defaults to the default fund of the method kind', async () => {
     createMock.mockResolvedValue(voucher());
     renderPage('In');

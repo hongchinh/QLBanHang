@@ -27,6 +27,10 @@ export interface StockTotalsPanelProps {
   freight: number;
   orderDiscount: number;
   paidAmount: number;
+  // The chosen payment method has no fund: nothing can be paid.
+  paidAmountDisabled?: boolean;
+  // Server message for the paid amount.
+  paidAmountError?: string;
   onFreightChange: (value: number) => void;
   onOrderDiscountChange: (value: number) => void;
   onPaidAmountChange: (value: number) => void;
@@ -43,6 +47,8 @@ export function StockTotalsPanel({
   freight,
   orderDiscount,
   paidAmount,
+  paidAmountDisabled = false,
+  paidAmountError,
   onFreightChange,
   onOrderDiscountChange,
   onPaidAmountChange,
@@ -85,8 +91,9 @@ export function StockTotalsPanel({
           label="Số tiền thanh toán"
           value={paidAmount}
           onChange={onPaidAmountChange}
-          disabled={readOnly}
+          disabled={readOnly || paidAmountDisabled}
         />
+        {paidAmountError && <p className="text-right text-xs text-destructive">{paidAmountError}</p>}
 
         {autoVoucher && (
           <div className="text-right text-sm">
@@ -166,7 +173,7 @@ function EditableRow({ id, label, value, onChange, disabled }: EditableRowProps)
         inputMode="decimal"
         autoComplete="off"
         disabled={disabled}
-        value={draft ?? formatMoneyForDisplay(value)}
+        value={!disabled && draft !== null ? draft : formatMoneyForDisplay(value)}
         onFocus={(e) => {
           setDraft(String(value ?? ''));
           e.currentTarget.select();

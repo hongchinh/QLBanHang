@@ -98,6 +98,9 @@ const CONCURRENCY_MESSAGE =
 const CONCURRENCY_RELOAD_FAILED_MESSAGE =
   'Phiếu đã được người khác cập nhật nhưng không tải lại được dữ liệu. Các thay đổi của bạn vẫn được giữ — vui lòng thử lại.';
 
+// Header fields that show their own error message.
+const HEADER_ERROR_FIELDS = new Set<string>(['fundId', 'dueDate', 'paidAmount', 'paymentMethodId']);
+
 const LINE_ERROR_FIELDS = new Set<string>([
   'productId',
   'warehouseId',
@@ -265,11 +268,18 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   // Until the user edits it, paidAmount follows the total for a method with a fund and is 0 otherwise (P9).
   // A read-only voucher always shows what is stored.
   const defaultPaid = readOnly || methodFundKind === undefined ? undefined : methodHasFund ? total : 0;
+  // A method without a fund moves no money: the server rejects a paid amount for it, so the input is locked at 0.
+  const paidLocked = !readOnly && methodFundKind !== undefined && !methodHasFund;
   useEffect(() => {
+    // An edit made under another method is dropped; the amount follows the default again.
+    if (paidLocked && paidAmountTouched) {
+      form.setValue('paidAmountTouched', false);
+      return;
+    }
     if (paidAmountTouched || defaultPaid === undefined || paidAmount === defaultPaid) return;
     form.setValue('paidAmount', defaultPaid);
-  }, [form, paidAmountTouched, paidAmount, defaultPaid]);
-  const effectivePaid = paidAmountTouched || defaultPaid === undefined ? (paidAmount ?? 0) : defaultPaid;
+  }, [form, paidLocked, paidAmountTouched, paidAmount, defaultPaid]);
+  const effectivePaid = (paidAmountTouched && !paidLocked) || defaultPaid === undefined ? (paidAmount ?? 0) : defaultPaid;
 
   // "Quỹ": only money that moves needs a fund. The branch's default fund of the method's kind is used
   // until the user picks one; a picked fund of another kind gives way to the new kind's default.
@@ -387,7 +397,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
         return;
       }
       case 'VALIDATION':
-        if (apiError.details && applyLineErrors(apiError.details)) {
+        if (apiError.details && applyServerErrors(apiError.details)) {
           toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: apiError.message });
           return;
         }
@@ -396,14 +406,16 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: formatApiErrorDetails(err) });
   }
 
-  // Maps `lines[i].field` keys onto the grid; returns true when every key was a line key.
-  function applyLineErrors(details: Record<string, string[]>): boolean {
+  // Maps `lines[i].field` keys onto the grid and the header keys onto their fields; returns true when every key was mapped.
+  function applyServerErrors(details: Record<string, string[]>): boolean {
     let allMapped = true;
     for (const [key, messages] of Object.entries(details)) {
       const match = /^lines\[(\d+)\]\.(\w+)$/.exec(key);
       if (match && LINE_ERROR_FIELDS.has(match[2])) {
         const path = `lines.${match[1]}.${match[2]}` as FieldPath<StockVoucherFormValues>;
         form.setError(path, { type: 'server', message: messages[0] });
+      } else if (HEADER_ERROR_FIELDS.has(key)) {
+        form.setError(key as FieldPath<StockVoucherFormValues>, { type: 'server', message: messages[0] });
       } else {
         allMapped = false;
       }
@@ -681,6 +693,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                       </option>
                     ))}
                   </select>
+                  <FieldError message={errors.paymentMethodId?.message} />
                 </div>
 
                 {(fundShown || dueDateShown) && (
@@ -740,6 +753,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
               freight={freight}
               orderDiscount={orderDiscount}
               paidAmount={effectivePaid}
+              paidAmountDisabled={paidLocked}
+              paidAmountError={errors.paidAmount?.message}
               onFreightChange={(v) => form.setValue('freight', v, { shouldDirty: true })}
               onOrderDiscountChange={(v) => form.setValue('orderDiscount', v, { shouldDirty: true })}
               onPaidAmountChange={(v) => {

@@ -98,6 +98,14 @@ export const stockVoucherSchema = z.object({
   freight: z.coerce.number().min(0, 'Phí vận chuyển không được âm'),
   orderDiscount: z.coerce.number().min(0, 'Chiết khấu không được âm'),
   paidAmount: optionalNumber({ min: 0 }),
+  // <input type="date"> value; empty = let the server apply the partner's credit days (P27).
+  dueDate: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày không hợp lệ')
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v ? v : undefined)),
+  fundId: optionalUuid(),
   // paidAmount follows the total until the user edits it.
   paidAmountTouched: z.boolean(),
   // Concurrency token of the loaded voucher (D29); never taken from a later refetch.

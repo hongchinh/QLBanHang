@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch, type FieldPath, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { addDays, format } from 'date-fns';
 import { ArrowLeft, Ban, RotateCcw, Save, Trash2, X } from 'lucide-react';
 import {
   useCancelStockVoucher,
@@ -27,6 +28,7 @@ import {
   type StockVoucherDraftPartner,
   type StockVoucherDraftStorage,
 } from '@/features/stock-vouchers/use-stock-voucher-draft';
+import type { FundKind } from '@/features/cash-common/types';
 import type { PartnerType } from '@/features/stock-reasons/types';
 import type {
   PartnerSearchItem,
@@ -39,8 +41,11 @@ import type {
 import { useWarehouses } from '@/features/warehouses/hooks';
 import { useStockReasons } from '@/features/stock-reasons/hooks';
 import { usePaymentMethods } from '@/features/payment-methods/hooks';
+import { useFunds } from '@/features/funds/hooks';
+import { defaultFund, selectableFunds } from '@/features/funds/utils';
 import { useInventorySettings } from '@/features/inventory-settings/hooks';
 import { PartnerAutocomplete } from '@/components/partner-autocomplete/partner-autocomplete';
+import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonLoader } from '@/components/ui/button-loader';
@@ -49,6 +54,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
+import {
+  toConfirmationRequest,
+  withConfirmed,
+  type ConfirmFlags,
+  type ConfirmationRequest,
+} from '@/lib/confirm-required';
 import { toast } from '@/lib/use-toast';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
@@ -56,24 +67,16 @@ import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
 import { StockLineGrid } from './components/stock-line-grid';
 import { StockTotalsPanel } from './components/stock-totals-panel';
-import { NegativeStockDialog } from './components/negative-stock-dialog';
-import { toShortages, type NegativeStockShortage } from './components/negative-stock';
 import { StockVoucherActivityHistory } from './components/stock-voucher-activity-history';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
 
 type SubmitIntent = 'save-stay' | 'save-exit' | 'update';
 type VoucherActionKind = 'cancel' | 'restore' | 'delete';
+// `flags` accumulates the confirmations (P10) the user already accepted; every resend carries all of them.
 type PendingAction =
-  | { kind: 'save'; intent: SubmitIntent; payload: UpsertStockVoucherRequest }
-  | { kind: VoucherActionKind; version?: number };
-
-const CONFIRM_LABELS: Record<PendingAction['kind'], string> = {
-  save: 'Vẫn lưu',
-  cancel: 'Vẫn hủy phiếu',
-  restore: 'Vẫn khôi phục',
-  delete: 'Vẫn xóa',
-};
+  | { kind: 'save'; intent: SubmitIntent; payload: UpsertStockVoucherRequest; flags: ConfirmFlags }
+  | { kind: VoucherActionKind; version?: number; flags: ConfirmFlags };
 
 const ERROR_TITLES: Record<PendingAction['kind'], string> = {
   save: 'Không thể lưu phiếu',
@@ -169,14 +172,20 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     return { draft: isEdit ? null : readStockVoucherDraft(type, userId, branchId), userId, branchId };
   });
 
+  const [initialValues] = useState<StockVoucherFormValues>(
+    () => mountData.draft?.values ?? toFormDefaults(voucher, defaults),
+  );
   const form = useForm<StockVoucherFormValues, unknown, StockVoucherFormParsed>({
     resolver: zodResolver(stockVoucherSchema) as unknown as Resolver<
       StockVoucherFormValues,
       unknown,
       StockVoucherFormParsed
     >,
-    defaultValues: mountData.draft?.values ?? toFormDefaults(voucher, defaults),
+    defaultValues: initialValues,
   });
+  // A fund or due date that is already set counts as chosen by the user: defaults never overwrite it.
+  const fundPickedRef = useRef(!!initialValues.fundId);
+  const dueDateTouchedRef = useRef(!!initialValues.dueDate);
 
   const [selectedPartner, setSelectedPartner] = useState<StockVoucherDraftPartner | null>(
     () => mountData.draft?.selectedPartner ?? partnerOf(voucher),
@@ -185,10 +194,9 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   // `busy` is set only after async validation; the ref blocks a second submit (Ctrl+S key repeat) at once.
   const submittingRef = useRef(false);
   const [confirmKind, setConfirmKind] = useState<VoucherActionKind | null>(null);
-  const [negative, setNegative] = useState<{
+  const [confirmation, setConfirmation] = useState<{
     action: PendingAction;
-    blocked: boolean;
-    shortages: NegativeStockShortage[];
+    request: ConfirmationRequest;
   } | null>(null);
 
   const { hasDraft, draftSavedAt, clearDraft } = useStockVoucherDraft({
@@ -212,8 +220,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     if (!voucher || voucher.version === lastVersionRef.current) return;
     lastVersionRef.current = voucher.version;
     if (isDirty) return;
-    form.reset(toFormDefaults(voucher));
-    setSelectedPartner(partnerOf(voucher));
+    resetTo(voucher);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voucher?.version]);
 
@@ -221,6 +228,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const { data: allReasons = [] } = useStockReasons({ direction: type });
   const reasons = allReasons.filter((r) => r.direction === type);
   const { data: paymentMethods = [] } = usePaymentMethods();
+  const { data: funds } = useFunds();
   const { data: settings } = useInventorySettings();
 
   const watchedLines = (useWatch({ control: form.control, name: 'lines' }) ?? []) as StockLineFormValues[];
@@ -232,7 +240,13 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const warehouseId = useWatch({ control: form.control, name: 'warehouseId' });
   const reasonId = useWatch({ control: form.control, name: 'reasonId' });
   const paymentMethodId = useWatch({ control: form.control, name: 'paymentMethodId' });
+  const fundId = useWatch({ control: form.control, name: 'fundId' }) ?? '';
   const selectedReason = reasons.find((r) => r.id === reasonId);
+  // undefined while the chosen method is not loaded yet: the paid amount and fund are then left alone.
+  const methodFundKind: FundKind | undefined = paymentMethodId
+    ? paymentMethods.find((m) => m.id === paymentMethodId)?.fundKind
+    : 'None';
+  const methodHasFund = methodFundKind === 'Cash' || methodFundKind === 'Bank';
 
   const computed = computeStockVoucher(
     { direction: type, freight, orderDiscount, netExcludesVat: settings?.netExcludesVat ?? false },
@@ -240,11 +254,37 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   );
   const total = computed.totals.total;
 
-  // paidAmount follows the total until the user edits it.
+  // Until the user edits it, paidAmount follows the total for a method with a fund and is 0 otherwise (P9).
+  // A read-only voucher always shows what is stored.
+  const defaultPaid = readOnly || methodFundKind === undefined ? undefined : methodHasFund ? total : 0;
   useEffect(() => {
-    if (paidAmountTouched || paidAmount === total) return;
-    form.setValue('paidAmount', total);
-  }, [form, paidAmountTouched, paidAmount, total]);
+    if (paidAmountTouched || defaultPaid === undefined || paidAmount === defaultPaid) return;
+    form.setValue('paidAmount', defaultPaid);
+  }, [form, paidAmountTouched, paidAmount, defaultPaid]);
+  const effectivePaid = paidAmountTouched || defaultPaid === undefined ? (paidAmount ?? 0) : defaultPaid;
+
+  // "Quỹ": only money that moves needs a fund. The branch's default fund of the method's kind is used
+  // until the user picks one; a picked fund of another kind gives way to the new kind's default.
+  const fundShown = effectivePaid > 0 && methodHasFund;
+  const fundOptions = funds && methodHasFund ? selectableFunds(funds, methodFundKind, fundId) : [];
+  useEffect(() => {
+    if (readOnly || !funds || !methodHasFund) return;
+    const current = funds.find((f) => f.id === fundId);
+    if (fundPickedRef.current && current?.kind === methodFundKind) return;
+    fundPickedRef.current = false;
+    const next = defaultFund(funds, methodFundKind)?.id ?? '';
+    if (next !== fundId) form.setValue('fundId', next);
+  }, [form, readOnly, funds, methodHasFund, methodFundKind, fundId]);
+
+  // "Hạn thanh toán" (P27): debt-increasing reasons only; pre-filled with voucher date + partner credit days.
+  const dueDateShown =
+    selectedReason?.debtEffect === 'ReceivableIncrease' || selectedReason?.debtEffect === 'PayableIncrease';
+  const creditDays = selectedPartner?.creditDays;
+  useEffect(() => {
+    if (readOnly || dueDateTouchedRef.current || !dueDateShown) return;
+    const next = creditDays == null ? '' : addDaysToLocalDate(voucherAt, creditDays);
+    if (next !== (form.getValues('dueDate') ?? '')) form.setValue('dueDate', next, { shouldDirty: true });
+  }, [form, readOnly, dueDateShown, creditDays, voucherAt]);
 
   // Expected number for the chosen date; never resets or unmounts the form (review m5).
   // `defaults` holds the number for server "now"; any other date (a restored draft's included) asks again.
@@ -268,15 +308,18 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   function resetTo(fresh: StockVoucher) {
     lastVersionRef.current = fresh.version;
-    form.reset(toFormDefaults(fresh));
+    const values = toFormDefaults(fresh);
+    fundPickedRef.current = !!values.fundId;
+    dueDateTouchedRef.current = !!values.dueDate;
+    form.reset(values);
     setSelectedPartner(partnerOf(fresh));
   }
 
-  async function runAction(action: PendingAction, acknowledgeNegativeStock: boolean) {
+  async function runAction(action: PendingAction) {
     setBusy(true);
     try {
       if (action.kind === 'save') {
-        const payload = { ...action.payload, acknowledgeNegativeStock };
+        const payload = { ...action.payload, ...action.flags };
         if (id) {
           const saved = await update.mutateAsync({ id, data: payload });
           resetTo(saved);
@@ -289,7 +332,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           else navigate(`${labels.basePath}/${saved.id}`, { replace: true });
         }
       } else if (id) {
-        const body = { version: action.version, acknowledgeNegativeStock };
+        const body = { version: action.version, ...action.flags };
         if (action.kind === 'delete') {
           await remove.mutateAsync({ id, type, body });
           toast({ variant: 'success', title: 'Đã xóa phiếu' });
@@ -308,16 +351,13 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   }
 
   async function handleError(err: unknown, action: PendingAction) {
+    const request = toConfirmationRequest(err);
+    if (request) {
+      setConfirmation({ action, request });
+      return;
+    }
     const apiError = getApiError(err);
     switch (apiError?.code) {
-      case 'NEGATIVE_STOCK_WARNING':
-      case 'NEGATIVE_STOCK_BLOCKED':
-        setNegative({
-          action,
-          blocked: apiError.code === 'NEGATIVE_STOCK_BLOCKED',
-          shortages: toShortages(apiError.details),
-        });
-        return;
       case 'CONCURRENCY': {
         // D29: reload and drop local edits; never resend stale values with the new version.
         const fresh = await refetchVoucher().catch(() => undefined);
@@ -367,7 +407,15 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     submittingRef.current = true;
     dropBlankLines();
     void form
-      .handleSubmit((parsed) => runAction({ kind: 'save', intent, payload: toUpsertPayload(type, parsed) }, false))()
+      .handleSubmit((parsed) => {
+        // Hidden fields are not sent: the server applies its own defaults.
+        const visible = {
+          ...parsed,
+          fundId: fundShown ? parsed.fundId : undefined,
+          dueDate: dueDateShown ? parsed.dueDate : undefined,
+        };
+        return runAction({ kind: 'save', intent, payload: toUpsertPayload(type, visible), flags: {} });
+      })()
       .finally(() => {
         submittingRef.current = false;
       });
@@ -390,7 +438,14 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     form.setValue('partnerName', p.name, { shouldDirty: true });
     form.setValue('partnerAddress', p.companyAddress ?? '', { shouldDirty: true });
     form.setValue('partnerTaxCode', p.taxCode ?? '', { shouldDirty: true });
-    setSelectedPartner({ id: p.id, code: p.code, name: p.name, isCustomer: p.isCustomer, isSupplier: p.isSupplier });
+    setSelectedPartner({
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      isCustomer: p.isCustomer,
+      isSupplier: p.isSupplier,
+      creditDays: p.creditDays,
+    });
   }
 
   function clearPartner() {
@@ -450,6 +505,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                   className="ml-0.5 hover:text-amber-900"
                   onClick={() => {
                     clearDraft();
+                    fundPickedRef.current = false;
+                    dueDateTouchedRef.current = false;
                     form.reset(toFormDefaults(undefined, defaults));
                     setSelectedPartner(null);
                   }}
@@ -610,6 +667,48 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                   </select>
                 </div>
 
+                {(fundShown || dueDateShown) && (
+                  <div className="form-inline-grid form-cols-2">
+                    {fundShown && (
+                      <>
+                        <Label htmlFor="stock-fund" className="field-label">Quỹ</Label>
+                        <select
+                          id="stock-fund"
+                          className={SELECT_CLASS}
+                          value={fundId}
+                          onChange={(e) => {
+                            fundPickedRef.current = true;
+                            form.setValue('fundId', e.target.value, { shouldDirty: true });
+                          }}
+                        >
+                          {!fundId && <option value="">-- Chọn quỹ --</option>}
+                          {fundOptions.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {`${f.code} - ${f.name}`}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                    {dueDateShown && (
+                      <>
+                        <Label htmlFor="stock-due-date" className="field-label">Hạn thanh toán</Label>
+                        <Input
+                          id="stock-due-date"
+                          type="date"
+                          className="h-7"
+                          {...form.register('dueDate', {
+                            onChange: () => {
+                              dueDateTouchedRef.current = true;
+                            },
+                          })}
+                        />
+                      </>
+                    )}
+                    <FieldError message={errors.fundId?.message ?? errors.dueDate?.message} />
+                  </div>
+                )}
+
                 <div className="form-inline-grid">
                   <Label htmlFor="stock-voucher-note" className="field-label">Ghi chú</Label>
                   <Input id="stock-voucher-note" className="h-7" {...form.register('note')} />
@@ -623,7 +722,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
             totals={computed.totals}
             freight={freight}
             orderDiscount={orderDiscount}
-            paidAmount={paidAmountTouched ? (paidAmount ?? 0) : total}
+            paidAmount={effectivePaid}
             onFreightChange={(v) => form.setValue('freight', v, { shouldDirty: true })}
             onOrderDiscountChange={(v) => form.setValue('orderDiscount', v, { shouldDirty: true })}
             onPaidAmountChange={(v) => {
@@ -638,6 +737,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                     )
                 : undefined
             }
+            autoVoucher={autoVoucherOf(voucher)}
             readOnly={readOnly}
           />
         </div>
@@ -704,31 +804,41 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
         onConfirm={() => confirmVoucherAction('delete')}
       />
 
-      <NegativeStockDialog
-        open={!!negative}
-        blocked={negative?.blocked ?? false}
-        shortages={negative?.shortages ?? []}
-        confirmLabel={negative ? CONFIRM_LABELS[negative.action.kind] : undefined}
+      <ConfirmRequiredDialog
+        request={confirmation?.request ?? null}
         onConfirm={() => {
-          if (!negative) return;
-          const { action } = negative;
-          setNegative(null);
-          void runAction(action, true);
+          if (!confirmation) return;
+          const { action, request } = confirmation;
+          setConfirmation(null);
+          // Same action, same version, plus the flag just confirmed.
+          void runAction({ ...action, flags: withConfirmed(action.flags, request) });
         }}
-        onClose={() => setNegative(null)}
+        onClose={() => setConfirmation(null)}
       />
     </div>
   );
 
   function confirmVoucherAction(kind: VoucherActionKind) {
     setConfirmKind(null);
-    void runAction({ kind, version: form.getValues('version') }, false);
+    void runAction({ kind, version: form.getValues('version'), flags: {} });
   }
 }
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="field-message field-message-code text-destructive">{message}</p>;
+}
+
+function autoVoucherOf(voucher?: StockVoucher) {
+  if (!voucher?.autoCashVoucherId || !voucher.autoCashVoucherCode || !voucher.autoCashVoucherType) return undefined;
+  return { id: voucher.autoCashVoucherId, code: voucher.autoCashVoucherCode, type: voucher.autoCashVoucherType };
+}
+
+// datetime-local value (local VN time) + days → yyyy-MM-dd, without going through UTC.
+function addDaysToLocalDate(local: string | undefined, days: number): string {
+  if (!local) return '';
+  const date = new Date(local);
+  return Number.isNaN(date.getTime()) ? '' : format(addDays(date, days), 'yyyy-MM-dd');
 }
 
 function partnerOf(voucher?: StockVoucher): StockVoucherDraftPartner | null {

@@ -6,6 +6,8 @@ import { StockVoucherFormPage } from './stock-voucher-form-page';
 import { toDateTimeLocalValue } from '@/lib/vn-datetime';
 import { toFormDefaults } from '@/features/stock-vouchers/payload';
 import { useBranchStore } from '@/stores/branch-store';
+import type { Fund } from '@/features/funds/types';
+import type { PaymentMethod } from '@/features/payment-methods/types';
 import type { ProductSuggestion } from '@/features/products/types';
 import type { StockReason } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
@@ -50,7 +52,7 @@ const useStockAtMock = vi.fn();
 const useStockReasonsMock = vi.fn();
 const defaultsMock = vi.fn();
 const partnerResults: { data: PartnerSearchItem[] } = { data: [] };
-const paymentMethodsState: { data: { id: string; code: string; name: string; isCash: boolean }[] } = { data: [] };
+const paymentMethodsState: { data: PaymentMethod[] } = { data: [] };
 const voucherState: { data: StockVoucher | undefined } = { data: undefined };
 const activitiesState: { data: unknown[] } = { data: [] };
 
@@ -92,6 +94,12 @@ const R_IN2 = '22222222-2222-4222-8222-222222222223';
 const R_OUT = '22222222-2222-4222-8222-222222222224';
 const R_IN_CUSTOMER = '22222222-2222-4222-8222-222222222225';
 const PM1 = '33333333-3333-4333-8333-333333333333';
+const PM_BANK = '33333333-3333-4333-8333-333333333334';
+const PM_NONE = '33333333-3333-4333-8333-333333333335';
+const FUND_CASH = '88888888-8888-4888-8888-888888888881';
+const FUND_CASH2 = '88888888-8888-4888-8888-888888888882';
+const FUND_BANK = '88888888-8888-4888-8888-888888888883';
+const FUND_CASH_OFF = '88888888-8888-4888-8888-888888888884';
 const P1 = '44444444-4444-4444-8444-444444444444';
 const V1 = '55555555-5555-4555-8555-555555555555';
 const L1 = '66666666-6666-4666-8666-666666666666';
@@ -101,10 +109,21 @@ const warehouses: Warehouse[] = [
 ];
 
 const reasons: StockReason[] = [
-  { id: R_IN, code: 'NMH', name: 'Nhập mua hàng', direction: 'In', partnerType: 'Supplier', isSystem: true },
-  { id: R_IN2, code: 'NKH', name: 'Nhập khác', direction: 'In', partnerType: 'None', isSystem: true },
-  { id: R_IN_CUSTOMER, code: 'NTL', name: 'Nhập hàng trả lại', direction: 'In', partnerType: 'Customer', isSystem: true },
-  { id: R_OUT, code: 'XBH', name: 'Xuất bán hàng', direction: 'Out', partnerType: 'Customer', isSystem: true },
+  { id: R_IN, code: 'NMH', name: 'Nhập mua hàng', direction: 'In', partnerType: 'Supplier', debtEffect: 'PayableIncrease', isSystem: true },
+  { id: R_IN2, code: 'NKH', name: 'Nhập khác', direction: 'In', partnerType: 'None', debtEffect: 'None', isSystem: true },
+  { id: R_IN_CUSTOMER, code: 'NTL', name: 'Nhập hàng trả lại', direction: 'In', partnerType: 'Customer', debtEffect: 'ReceivableDecrease', isSystem: true },
+  { id: R_OUT, code: 'XBH', name: 'Xuất bán hàng', direction: 'Out', partnerType: 'Customer', debtEffect: 'ReceivableIncrease', isSystem: true },
+];
+
+function fund(id: string, code: string, kind: Fund['kind'], extra: Partial<Fund> = {}): Fund {
+  return { id, branchId: 'b1', code, name: code, kind, isDefault: false, openingAmount: 0, isActive: true, ...extra };
+}
+
+const funds: Fund[] = [
+  fund(FUND_CASH2, 'QTM2', 'Cash'),
+  fund(FUND_CASH, 'QTM', 'Cash', { isDefault: true }),
+  fund(FUND_CASH_OFF, 'QTM9', 'Cash', { isActive: false }),
+  fund(FUND_BANK, 'NH01', 'Bank', { isDefault: true }),
 ];
 
 vi.mock('@/features/warehouses/hooks', () => ({ useWarehouses: () => ({ data: warehouses }) }));
@@ -117,6 +136,7 @@ vi.mock('@/features/stock-reasons/hooks', () => ({
 vi.mock('@/features/payment-methods/hooks', () => ({
   usePaymentMethods: () => ({ data: paymentMethodsState.data }),
 }));
+vi.mock('@/features/funds/hooks', () => ({ useFunds: () => ({ data: funds }) }));
 vi.mock('@/features/inventory-settings/hooks', () => ({
   useInventorySettings: () => ({ data: { netExcludesVat: false } }),
 }));
@@ -147,7 +167,11 @@ vi.mock('@/features/products/hooks', () => ({
 }));
 
 const DEFAULT_AT = '2026-10-07T01:30:00.000Z';
-const PAYMENT_METHODS = [{ id: PM1, code: 'TM', name: 'Tiền mặt', isCash: true }];
+const PAYMENT_METHODS: PaymentMethod[] = [
+  { id: PM1, code: 'TM', name: 'Tiền mặt', fundKind: 'Cash' },
+  { id: PM_BANK, code: 'CK', name: 'Chuyển khoản', fundKind: 'Bank' },
+  { id: PM_NONE, code: 'CN', name: 'Công nợ', fundKind: 'None' },
+];
 
 const supplier: PartnerSearchItem = {
   id: '77777777-7777-4777-8777-777777777777',
@@ -156,6 +180,7 @@ const supplier: PartnerSearchItem = {
   status: 'Active',
   isCustomer: false,
   isSupplier: true,
+  creditDays: 30,
 };
 
 // Server "now" defaults, fetched after mount; a dated lookup answers for that date.
@@ -183,6 +208,7 @@ function voucher(overrides: Partial<StockVoucher> = {}): StockVoucher {
     branchId: 'b1',
     warehouseId: WH1,
     reasonId: R_IN,
+    reasonDebtEffect: 'PayableIncrease',
     paymentMethodId: PM1,
     note: 'Ghi chú cũ',
     freight: 0,
@@ -238,6 +264,9 @@ function apiError(status: number, code: string, details?: Record<string, string[
 }
 
 const NEGATIVE_DETAILS = { 'SP01@KHO01': ['Tồn 1, cần 3 — thiếu 2'] };
+const CREDIT_DETAILS = { NCC01: ['Dư nợ 9.000.000 vượt hạn mức 5.000.000'] };
+const FUND_DETAILS = { QTM: ['Quỹ âm 100.000'] };
+const SETTLEMENT_DETAILS = { PC00003: ['Đối trừ 50.000'] };
 
 function byId(id: string): HTMLInputElement {
   const el = document.getElementById(id);
@@ -344,9 +373,9 @@ describe('StockVoucherFormPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
 
-    expect(await screen.findByText('Cảnh báo âm kho')).toBeInTheDocument();
-    expect(screen.getByText('SP01 @ KHO01')).toBeInTheDocument();
-    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn lưu' }));
+    expect(await screen.findByText('Xuất quá tồn kho')).toBeInTheDocument();
+    expect(screen.getByText('SP01@KHO01')).toBeInTheDocument();
+    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn tiếp tục' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
     const [first, second] = createMock.mock.calls.map((c) => c[0]);
@@ -362,7 +391,7 @@ describe('StockVoucherFormPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
 
     expect(await screen.findByText('Không đủ tồn kho')).toBeInTheDocument();
-    expect(dialog().queryByRole('button', { name: 'Vẫn lưu' })).not.toBeInTheDocument();
+    expect(dialog().queryByRole('button', { name: 'Vẫn tiếp tục' })).not.toBeInTheDocument();
     fireEvent.click(dialog().getByRole('button', { name: 'Đóng' }));
     await waitFor(() => expect(screen.queryByText('Không đủ tồn kho')).not.toBeInTheDocument());
     expect(createMock).toHaveBeenCalledTimes(1);
@@ -379,10 +408,10 @@ describe('StockVoucherFormPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hủy phiếu' }));
     fireEvent.click(dialog().getByRole('button', { name: 'Hủy phiếu' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Vẫn hủy phiếu' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Vẫn tiếp tục' }));
 
     await waitFor(() => expect(cancelMock).toHaveBeenCalledTimes(2));
-    expect(cancelMock.mock.calls[0][0]).toEqual({ id: V1, body: { version: 7, acknowledgeNegativeStock: false } });
+    expect(cancelMock.mock.calls[0][0]).toEqual({ id: V1, body: { version: 7 } });
     expect(cancelMock.mock.calls[1][0]).toEqual({ id: V1, body: { version: 7, acknowledgeNegativeStock: true } });
   });
 
@@ -397,7 +426,7 @@ describe('StockVoucherFormPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Xóa' }));
     fireEvent.click(dialog().getByRole('button', { name: 'Xóa' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Vẫn xóa' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Vẫn tiếp tục' }));
 
     await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(2));
     expect(deleteMock.mock.calls[1][0]).toEqual({
@@ -586,6 +615,194 @@ describe('StockVoucherFormPage', () => {
     expect(screen.queryByRole('button', { name: 'Xóa' })).not.toBeInTheDocument();
     expect(byId('stock-voucher-note')).toBeDisabled();
     expect(byId('stock-line-quantity-0')).toBeDisabled();
+  });
+
+  it('paid amount follows total only for fund-backed methods', async () => {
+    renderPage('In');
+    await fillPerUnitLine(3);
+
+    // 3 × 50,000 + 10% VAT.
+    await waitFor(() => expect(byId('stock-paid-amount').value).toBe('165.000'));
+
+    fireEvent.change(byId('stock-payment-method'), { target: { value: PM_NONE } });
+    await waitFor(() => expect(byId('stock-paid-amount').value).toBe('0'));
+
+    fireEvent.change(byId('stock-payment-method'), { target: { value: PM_BANK } });
+    await waitFor(() => expect(byId('stock-paid-amount').value).toBe('165.000'));
+  });
+
+  it('fund select defaults to the default fund of the method kind', async () => {
+    createMock.mockResolvedValue(voucher());
+    renderPage('In');
+
+    // Nothing to pay yet: no fund to choose.
+    expect(document.getElementById('stock-fund')).toBeNull();
+    await fillPerUnitLine(3);
+
+    await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
+    const options = within(byId('stock-fund')).getAllByRole('option').map((o) => o.textContent);
+    expect(options).toEqual(['QTM - QTM', 'QTM2 - QTM2']);
+
+    fireEvent.change(byId('stock-payment-method'), { target: { value: PM_BANK } });
+    await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_BANK));
+
+    fireEvent.change(byId('stock-payment-method'), { target: { value: PM1 } });
+    await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
+    fireEvent.change(byId('stock-fund'), { target: { value: FUND_CASH2 } });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    expect(createMock.mock.calls[0][0].fundId).toBe(FUND_CASH2);
+  });
+
+  it('fund is hidden and not sent for a method without a fund', async () => {
+    createMock.mockResolvedValue(voucher());
+    renderPage('In');
+    await fillPerUnitLine(3);
+    await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
+
+    fireEvent.change(byId('stock-payment-method'), { target: { value: PM_NONE } });
+    await waitFor(() => expect(document.getElementById('stock-fund')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    expect(createMock.mock.calls[0][0].fundId).toBeUndefined();
+  });
+
+  it('due date pre-fills from partner credit days', async () => {
+    createMock.mockResolvedValue(voucher());
+    partnerResults.data = [supplier];
+    renderPage('In');
+    fireEvent.change(byId('stock-voucher-at'), { target: { value: '2026-10-07T08:30' } });
+
+    expect(byId('stock-due-date').value).toBe('');
+    fireEvent.change(byId('stock-partner'), { target: { value: 'NCC' } });
+    fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('NCC01'));
+
+    await waitFor(() => expect(byId('stock-due-date').value).toBe('2026-11-06'));
+
+    // A due date typed by the user is kept when the date changes.
+    fireEvent.change(byId('stock-due-date'), { target: { value: '2026-12-01' } });
+    fireEvent.change(byId('stock-voucher-at'), { target: { value: '2026-10-09T08:30' } });
+    expect(byId('stock-due-date').value).toBe('2026-12-01');
+
+    await fillPerUnitLine(1);
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    expect(createMock.mock.calls[0][0].dueDate).toBe('2026-12-01');
+  });
+
+  it('due date is shown only for debt-increasing reasons', () => {
+    renderPage('In');
+    expect(byId('stock-due-date')).toBeInTheDocument();
+
+    fireEvent.change(byId('stock-reason'), { target: { value: R_IN2 } });
+    expect(document.getElementById('stock-due-date')).toBeNull();
+
+    fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
+    expect(document.getElementById('stock-due-date')).toBeNull();
+  });
+
+  it('credit limit warning then negative fund warning accumulate flags', async () => {
+    createMock
+      .mockRejectedValueOnce(apiError(422, 'CREDIT_LIMIT_WARNING', CREDIT_DETAILS))
+      .mockRejectedValueOnce(apiError(422, 'NEGATIVE_FUND_WARNING', FUND_DETAILS))
+      .mockResolvedValueOnce(voucher());
+    renderPage('In');
+    await fillPerUnitLine(3);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+    expect(await screen.findByText('Vượt hạn mức nợ')).toBeInTheDocument();
+    expect(screen.getByText('NCC01')).toBeInTheDocument();
+    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn tiếp tục' }));
+
+    expect(await screen.findByText('Quỹ bị âm')).toBeInTheDocument();
+    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn tiếp tục' }));
+
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(3));
+    const [first, second, third] = createMock.mock.calls.map((c) => c[0]);
+    expect(first.acknowledgeCreditLimit).toBeUndefined();
+    expect(second).toEqual({ ...first, acknowledgeCreditLimit: true });
+    expect(third).toEqual({ ...first, acknowledgeCreditLimit: true, acknowledgeNegativeFund: true });
+  });
+
+  it('settlement confirmation on cancel resends with confirmRemoveSettlements', async () => {
+    routeParams.id = V1;
+    voucherState.data = voucher();
+    cancelMock
+      .mockRejectedValueOnce(apiError(422, 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', SETTLEMENT_DETAILS))
+      .mockResolvedValueOnce(voucher({ status: 'Cancelled', version: 8 }));
+    renderPage('In');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hủy phiếu' }));
+    fireEvent.click(dialog().getByRole('button', { name: 'Hủy phiếu' }));
+
+    expect(await screen.findByText('Bỏ đối trừ chứng từ')).toBeInTheDocument();
+    expect(screen.getByText('PC00003')).toBeInTheDocument();
+    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn tiếp tục' }));
+
+    await waitFor(() => expect(cancelMock).toHaveBeenCalledTimes(2));
+    expect(cancelMock.mock.calls[1][0]).toEqual({ id: V1, body: { version: 7, confirmRemoveSettlements: true } });
+  });
+
+  it('blocked credit limit shows only close and does not resend', async () => {
+    createMock.mockRejectedValueOnce(apiError(422, 'CREDIT_LIMIT_BLOCKED', CREDIT_DETAILS));
+    renderPage('In');
+    await fillPerUnitLine(3);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+    expect(await screen.findByText('Vượt hạn mức nợ')).toBeInTheDocument();
+    expect(dialog().queryByRole('button', { name: 'Vẫn tiếp tục' })).not.toBeInTheDocument();
+    fireEvent.click(dialog().getByRole('button', { name: 'Đóng' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(createMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the automatic voucher link', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher({
+      type: 'Out',
+      code: 'PX00007',
+      reasonId: R_OUT,
+      reasonDebtEffect: 'ReceivableIncrease',
+      autoCashVoucherId: 'cv-1',
+      autoCashVoucherCode: 'PT00001',
+      autoCashVoucherType: 'Receipt',
+    });
+    renderPage('Out');
+
+    expect(screen.getByRole('link', { name: 'Phiếu thu tự động: PT00001' })).toHaveAttribute('href', '/receipts/cv-1');
+  });
+
+  it('links an automatic payment to the payment form', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher({ autoCashVoucherId: 'cv-2', autoCashVoucherCode: 'PC00002', autoCashVoucherType: 'Payment' });
+    renderPage('In');
+
+    expect(screen.getByRole('link', { name: 'Phiếu chi tự động: PC00002' })).toHaveAttribute('href', '/payments/cv-2');
+  });
+
+  it('no automatic voucher link without an automatic voucher', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher();
+    renderPage('In');
+
+    expect(screen.queryByText(/tự động:/)).not.toBeInTheDocument();
+  });
+
+  it('labels the settlement and automatic voucher activities', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher();
+    activitiesState.data = [
+      { id: 'a1', action: 'SettlementRemoved', actorName: 'Admin', occurredAt: DEFAULT_AT, description: 'Bỏ đối trừ PC00003' },
+      { id: 'a2', action: 'AutoVoucherChanged', actorName: 'Admin', occurredAt: DEFAULT_AT, description: 'Xóa phiếu chi PC00002' },
+    ];
+    renderPage('In');
+
+    expect(screen.getByText('Bỏ đối trừ')).toBeInTheDocument();
+    expect(screen.getByText('Phiếu thu/chi tự động')).toBeInTheDocument();
   });
 
   it('stock-out uses Ngày xuất, Lý do xuất and Người nhận hàng labels', () => {

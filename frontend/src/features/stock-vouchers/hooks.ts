@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { cashKeys } from '@/features/cash-common/keys';
 import { productKeys } from '@/features/products/keys';
 import { stockVouchersApi } from './api';
 import { inventoryKeys, stockVoucherKeys } from './keys';
@@ -95,11 +96,13 @@ function sameRoleFilter(previous: readonly unknown[], next: PartnerSearchKey): b
 }
 
 // Every voucher change moves stock, costs and numbering: refresh the whole inventory root.
+// It also moves the automatic receipt/payment, debt entries and fund balances: refresh the cash root (P28).
 // A stock-in change also makes the server recompute Product.CostPrice (D35).
 function useInvalidateInventory() {
   const qc = useQueryClient();
   return (type: StockDirection) => {
     void qc.invalidateQueries({ queryKey: inventoryKeys.all });
+    void qc.invalidateQueries({ queryKey: cashKeys.all });
     if (type === 'In') void qc.invalidateQueries({ queryKey: productKeys.all });
   };
 }

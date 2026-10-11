@@ -1,4 +1,4 @@
-import { Ban, CirclePlus, Loader2, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { Ban, CirclePlus, Link2Off, Loader2, ReceiptText, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { StockVoucherActivity, StockVoucherActivityAction } from '@/features/stock-vouchers/types';
 
@@ -65,6 +65,8 @@ const ACTIVITY_LABELS: Record<StockVoucherActivityAction, string> = {
   Cancelled: 'Hủy phiếu',
   Restored: 'Khôi phục',
   Deleted: 'Xóa',
+  SettlementRemoved: 'Bỏ đối trừ',
+  AutoVoucherChanged: 'Phiếu thu/chi tự động',
 };
 
 function activityIcon(action: StockVoucherActivityAction) {
@@ -79,6 +81,10 @@ function activityIcon(action: StockVoucherActivityAction) {
       return <RotateCcw className="h-4 w-4 text-emerald-600" />;
     case 'Deleted':
       return <Trash2 className="h-4 w-4 text-red-600" />;
+    case 'SettlementRemoved':
+      return <Link2Off className="h-4 w-4 text-amber-600" />;
+    case 'AutoVoucherChanged':
+      return <ReceiptText className="h-4 w-4 text-indigo-600" />;
   }
 }
 

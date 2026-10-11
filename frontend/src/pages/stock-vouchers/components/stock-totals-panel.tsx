@@ -1,12 +1,25 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import type { CashVoucherType } from '@/features/cash-common/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import type { StockTotals } from '@/pages/stock-vouchers/utils/compute-stock-line';
 
 const fmt = new Intl.NumberFormat('vi-VN');
+
+export interface AutoCashVoucherLink {
+  id: string;
+  code: string;
+  type: CashVoucherType;
+}
+
+const AUTO_VOUCHER_LINKS: Record<CashVoucherType, { label: string; basePath: string }> = {
+  Receipt: { label: 'Phiếu thu tự động', basePath: '/receipts' },
+  Payment: { label: 'Phiếu chi tự động', basePath: '/payments' },
+};
 
 export interface StockTotalsPanelProps {
   type: StockDirection;
@@ -19,6 +32,8 @@ export interface StockTotalsPanelProps {
   onPaidAmountChange: (value: number) => void;
   // Stock-in only (section-02 #2).
   onApplyVatToAll?: (rate: number) => void;
+  // The automatic receipt/payment of the paid amount (P20), shown under the totals.
+  autoVoucher?: AutoCashVoucherLink;
   readOnly: boolean;
 }
 
@@ -32,6 +47,7 @@ export function StockTotalsPanel({
   onOrderDiscountChange,
   onPaidAmountChange,
   onApplyVatToAll,
+  autoVoucher,
   readOnly,
 }: StockTotalsPanelProps) {
   const [vatToAll, setVatToAll] = useState('');
@@ -71,6 +87,17 @@ export function StockTotalsPanel({
           onChange={onPaidAmountChange}
           disabled={readOnly}
         />
+
+        {autoVoucher && (
+          <div className="text-right text-sm">
+            <Link
+              to={`${AUTO_VOUCHER_LINKS[autoVoucher.type].basePath}/${autoVoucher.id}`}
+              className="text-blue-600 hover:underline"
+            >
+              {`${AUTO_VOUCHER_LINKS[autoVoucher.type].label}: ${autoVoucher.code}`}
+            </Link>
+          </div>
+        )}
 
         {type === 'In' && onApplyVatToAll && !readOnly && (
           <div className="flex items-center justify-between gap-2 border-t pt-1.5 mt-0.5">

@@ -30,24 +30,18 @@ public class FundBalanceGuard : IFundBalanceGuard
     public async Task<FundCapture> CaptureAsync(IEnumerable<(Guid FundId, DateTimeOffset From)> funds,
         CancellationToken ct = default)
     {
-        var items = new List<FundCaptureItem>();
-        foreach (var group in funds.GroupBy(f => f.FundId))
-        {
-            var from = group.Min(f => f.From);
-            items.Add(new FundCaptureItem(group.Key, from, await EvaluateAsync(group.Key, from, ct)));
-        }
-        return new FundCapture(items);
+        var froms = funds.GroupBy(f => f.FundId).Select(g => (FundId: g.Key, From: g.Min(f => f.From))).ToList();
+        var results = await EvaluateAsync(froms, ct);
+        return new FundCapture(froms.Select(f => new FundCaptureItem(f.FundId, f.From, results[f.FundId])).ToList());
     }
 
     public async Task CheckAsync(FundCapture capture, bool acknowledge, CancellationToken ct = default)
     {
-        var worse = new List<(Guid FundId, RunningBalanceResult After)>();
-        foreach (var item in capture.Items)
-        {
-            var after = await EvaluateAsync(item.FundId, item.From, ct);
-            if (RunningBalance.IsWorse(item.Before, after))
-                worse.Add((item.FundId, after));
-        }
+        var after = await EvaluateAsync(capture.Items.Select(i => (i.FundId, i.From)).ToList(), ct);
+        var worse = capture.Items
+            .Where(i => RunningBalance.IsWorse(i.Before, after[i.FundId]))
+            .Select(i => (i.FundId, After: after[i.FundId]))
+            .ToList();
         if (worse.Count == 0)
             return;
 
@@ -72,8 +66,17 @@ public class FundBalanceGuard : IFundBalanceGuard
             : new ConfirmationRequiredException("NEGATIVE_FUND_BLOCKED", "Không đủ tiền trong quỹ.", details, canConfirm: false);
     }
 
-    private async Task<RunningBalanceResult> EvaluateAsync(Guid fundId, DateTimeOffset from, CancellationToken ct)
-        => RunningBalance.Evaluate(0m, await MovementsAsync(fundId, ct), from);
+    /// Evaluates each fund from its own `from` on its window: the balance before `from` is summed in SQL and only the
+    /// movements from `from` on are loaded, so the cost does not grow with the fund's history.
+    private async Task<Dictionary<Guid, RunningBalanceResult>> EvaluateAsync(
+        IReadOnlyCollection<(Guid FundId, DateTimeOffset From)> funds, CancellationToken ct)
+    {
+        if (funds.Count == 0)
+            return new Dictionary<Guid, RunningBalanceResult>();
+        var windows = await FundBalanceWindowQuery.LoadAsync(_db, funds, ct);
+        return funds.ToDictionary(f => f.FundId,
+            f => RunningBalance.Evaluate(windows[f.FundId].Start, windows[f.FundId].Movements, f.From));
+    }
 
     /// "Âm 500 tại 05/10/2026 09:00" (VN time). A worse result is always negative, so FirstNegativeAt is set.
     private static string Describe(RunningBalanceResult after)

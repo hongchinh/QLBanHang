@@ -9,7 +9,8 @@ export interface Fund {
   bankName?: string | null;
   accountNumber?: string | null;
   isDefault: boolean;
-  openingAmount: number;
+  // Null for users without cash.opening_balance, cash.catalogs.manage or reports.cash.
+  openingAmount: number | null;
   isActive: boolean;
 }
 

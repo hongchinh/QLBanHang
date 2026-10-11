@@ -12,7 +12,7 @@ public class FundDto
     public string? BankName { get; set; }
     public string? AccountNumber { get; set; }
     public bool IsDefault { get; set; }
-    public decimal OpeningAmount { get; set; }
+    public decimal? OpeningAmount { get; set; }
     public bool IsActive { get; set; }
 }
 

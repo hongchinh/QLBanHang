@@ -57,7 +57,11 @@ export function FundListPage() {
       {
         id: 'openingAmount',
         header: () => <div className={NUMERIC}>Số dư đầu kỳ</div>,
-        cell: ({ row }) => <div className={NUMERIC}>{formatCurrencyVnd(row.original.openingAmount)}</div>,
+        cell: ({ row }) => (
+          <div className={NUMERIC}>
+            {row.original.openingAmount === null ? '—' : formatCurrencyVnd(row.original.openingAmount)}
+          </div>
+        ),
       },
       {
         header: 'Đang dùng',

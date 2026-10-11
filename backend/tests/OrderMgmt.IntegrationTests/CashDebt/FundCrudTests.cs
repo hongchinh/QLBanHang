@@ -57,6 +57,31 @@ public class FundCrudTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Opening_amount_is_hidden_without_a_cash_balance_permission()
+    {
+        var fundId = await FundIdAsync("QTM");
+        await SetFundOpeningAmountAsync(fundId, 7_000m);
+        var suffix = Guid.NewGuid().ToString("N")[..6];
+
+        // Permissions that may see it: setting the opening balance, managing catalogs, or the cash book report.
+        foreach (var code in new[] { Permissions.Cash.OpeningBalance, Permissions.Cash.ManageCatalogs, Permissions.Reports.Cash })
+        {
+            var viewer = await CreateClientWithPermissionsAsync($"fv_{code.Replace('.', '_')}_{suffix}", null, code);
+            var seen = await ReadDataAsync<List<FundDto>>(await viewer.GetAsync("/api/funds"));
+            seen.Single(f => f.Id == fundId).OpeningAmount.Should().Be(7_000m, code);
+        }
+
+        var admin = await ReadDataAsync<FundDto>(await _client.GetAsync($"/api/funds/{fundId}"));
+        admin.OpeningAmount.Should().Be(7_000m);
+
+        // Any other signed-in user (a cash voucher user picking a fund, say) gets no opening balance.
+        var other = await CreateClientWithPermissionsAsync("fv_other_" + suffix, null, Permissions.Cash.Settings);
+        var list = await ReadDataAsync<List<FundDto>>(await other.GetAsync("/api/funds"));
+        list.Single(f => f.Id == fundId).OpeningAmount.Should().BeNull();
+        (await ReadDataAsync<FundDto>(await other.GetAsync($"/api/funds/{fundId}"))).OpeningAmount.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Crud_happy_path_and_guard()
     {
         var (client, branchId) = await NewBranchClientAsync();

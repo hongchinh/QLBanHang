@@ -7,6 +7,7 @@ using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Organization.Branches;
 using OrderMgmt.Domain.Common;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
 
@@ -40,6 +41,11 @@ public class FundService : IFundService
         _fundGuard = fundGuard;
     }
 
+    private bool CanSeeOpeningAmount =>
+        _currentUser.HasPermission(Permissions.Cash.OpeningBalance)
+        || _currentUser.HasPermission(Permissions.Cash.ManageCatalogs)
+        || _currentUser.HasPermission(Permissions.Reports.Cash);
+
     public async Task<IReadOnlyList<FundDto>> ListAsync(FundListRequest request, CancellationToken ct = default)
     {
         var branchId = await _currentBranch.GetIdAsync(ct);
@@ -49,9 +55,9 @@ public class FundService : IFundService
         if (request.IsActive.HasValue)
             query = query.Where(f => f.IsActive == request.IsActive.Value);
 
-        return await query.OrderBy(f => f.Kind).ThenBy(f => f.Code)
-            .Select(f => ToDto(f))
-            .ToListAsync(ct);
+        var funds = await query.OrderBy(f => f.Kind).ThenBy(f => f.Code).ToListAsync(ct);
+        var showOpening = CanSeeOpeningAmount;
+        return funds.Select(f => ToDto(f, showOpening)).ToList();
     }
 
     public async Task<FundDto> GetAsync(Guid id, CancellationToken ct = default)
@@ -59,7 +65,7 @@ public class FundService : IFundService
         var branchId = await _currentBranch.GetIdAsync(ct);
         var fund = await _db.Funds.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id && f.BranchId == branchId, ct)
             ?? throw new NotFoundException(nameof(Fund), id);
-        return ToDto(fund);
+        return ToDto(fund, CanSeeOpeningAmount);
     }
 
     public async Task<FundDto> CreateAsync(CreateFundRequest request, CancellationToken ct = default)
@@ -227,7 +233,9 @@ public class FundService : IFundService
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static FundDto ToDto(Fund f) => new()
+    /// `showOpening`: CanSeeOpeningAmount. The opening balance goes only to users who set it, manage the catalogs or
+    /// read the cash book; every signed-in user may list funds (voucher forms), so others get null.
+    private static FundDto ToDto(Fund f, bool showOpening) => new()
     {
         Id = f.Id,
         BranchId = f.BranchId,
@@ -237,7 +245,7 @@ public class FundService : IFundService
         BankName = f.BankName,
         AccountNumber = f.AccountNumber,
         IsDefault = f.IsDefault,
-        OpeningAmount = f.OpeningAmount,
+        OpeningAmount = showOpening ? f.OpeningAmount : null,
         IsActive = f.IsActive,
     };
 }

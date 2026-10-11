@@ -179,6 +179,7 @@ public class DebtService : IDebtService
                 .ToList();
             // The ledger checks the pairs, the open amounts (Auto included) and the period lock on EffectiveAt.
             await _ledger.AddSettlementsAsync(drafts, SettlementOrigin.Manual, batchId, "items", c);
+            await TouchCashVouchersAsync(drafts.SelectMany(d => new[] { d.IncreaseEntryId, d.DecreaseEntryId }), c);
         }, ct);
 
         var settlements = await LoadSettlementsAsync(_db.DebtSettlements.Where(s => s.BatchId == batchId), ct);
@@ -221,8 +222,31 @@ public class DebtService : IDebtService
             // Logs SettlementRemoved on both documents. The freed room goes back to the Auto settlement of any stock
             // voucher whose entry (or automatic voucher's entry) was matched here (Phase 07 rule, 2026-10-09).
             var removed = await _ledger.RemoveSettlementsAsync(settlements.Select(s => s.Id).ToList(), c);
-            await _auto.RecomputeAutoAsync(removed.SelectMany(r => new[] { r.IncreaseEntryId, r.DecreaseEntryId }), c);
+            var entryIds = removed.SelectMany(r => new[] { r.IncreaseEntryId, r.DecreaseEntryId }).ToList();
+            await _auto.RecomputeAutoAsync(entryIds, c);
+            await TouchCashVouchersAsync(entryIds, c);
         }, ct);
+    }
+
+    /// A cash voucher form resends its own AtVoucher allocations, so matching or unmatching on its entry changes the
+    /// voucher's version (D29): a form opened before gets 409 CONCURRENCY instead of silently undoing the change.
+    private async Task TouchCashVouchersAsync(IEnumerable<Guid> entryIds, CancellationToken ct)
+    {
+        var ids = entryIds.Distinct().ToList();
+        var voucherIds = await _db.DebtEntries
+            .Where(e => ids.Contains(e.Id) && (e.SourceType == DebtSourceType.Receipt || e.SourceType == DebtSourceType.Payment))
+            .Select(e => e.SourceId)
+            .ToListAsync(ct);
+        if (voucherIds.Count == 0)
+            return;
+
+        var now = _clock.UtcNow;
+        foreach (var voucher in await _db.CashVouchers.Where(v => voucherIds.Contains(v.Id)).ToListAsync(ct))
+        {
+            voucher.UpdatedAt = now;
+            voucher.UpdatedBy = _currentUser.UserId;
+        }
+        await _db.SaveChangesAsync(ct);
     }
 
     /// The branch and partner of every settlement matched by `filter` (read through its Increase entry).

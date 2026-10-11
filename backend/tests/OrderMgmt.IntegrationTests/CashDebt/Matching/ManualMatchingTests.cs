@@ -171,6 +171,41 @@ public class ManualMatchingTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Matching_changes_the_version_of_the_cash_vouchers_it_touches()
+    {
+        var customer = await NewCustomerAsync();
+        var hd1 = await CreateOpeningDebtAsync(_branchClient, customer, DebtSide.Receivable, OpeningDebtKind.Debt, "HD1",
+            new DateOnly(2026, 8, 20), 1_000m);
+        var hd2 = await CreateOpeningDebtAsync(_branchClient, customer, DebtSide.Receivable, OpeningDebtKind.Debt, "HD2",
+            new DateOnly(2026, 8, 20), 500m);
+        var request = CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TKH"), _cashFundId, "2026-10-05 09:00",
+            customer, 2_000m);
+        request.Allocations = new List<AllocationRequest> { new() { EntryId = hd1.EntryId, Amount = 1_000m } };
+        var stale = await CreateCashAsync(_branchClient, request);
+        var receiptEntry = (await EntriesOfAsync(DebtSourceType.Receipt, stale.Id)).Single().Id;
+
+        // Another user unmatches the receipt's allocation; a form opened before must not bring it back silently.
+        var allocation = stale.Allocations.Single();
+        (await _branchClient.DeleteAsync($"/api/debt/settlements/{allocation.SettlementId}")).StatusCode
+            .Should().Be(HttpStatusCode.OK);
+        var resend = CashUpdateFrom(stale);
+        resend.Note = "Sửa ghi chú";
+        resend.Allocations = new List<AllocationRequest> { new() { EntryId = hd1.EntryId, Amount = 1_000m } };
+        var (status, _, error) = await PutCashAsync(_branchClient, stale.Id, resend);
+        status.Should().Be(HttpStatusCode.Conflict, error?.Message);
+        error!.Code.Should().Be("CONCURRENCY");
+        (await SettlementsOfAsync(hd1.EntryId)).Should().BeEmpty();
+
+        // A manual match on the receipt changes its version too.
+        var (_, beforeMatch, _) = await GetCashAsync(_branchClient, stale.Id);
+        (await PostBatchAsync(_branchClient, customer, DebtSide.Receivable, (hd2.EntryId, receiptEntry, 500m)))
+            .Status.Should().Be(HttpStatusCode.OK);
+        var (_, afterMatch, _) = await GetCashAsync(_branchClient, stale.Id);
+        afterMatch!.Version.Should().NotBe(beforeMatch!.Version);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
     public async Task Managed_origins_cannot_be_unmatched()
     {
         var customer = await NewCustomerAsync();

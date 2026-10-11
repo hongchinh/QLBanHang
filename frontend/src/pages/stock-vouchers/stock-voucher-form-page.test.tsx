@@ -2,6 +2,7 @@ import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type * as ReactRouterDom from 'react-router-dom';
+import type * as DebtHooks from '@/features/debt/hooks';
 import { StockVoucherFormPage } from './stock-voucher-form-page';
 import { toDateTimeLocalValue } from '@/lib/vn-datetime';
 import { toFormDefaults } from '@/features/stock-vouchers/payload';
@@ -31,12 +32,21 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+// null grants every permission.
+const permissionState: { granted: string[] | null } = { granted: null };
+const hasPermissionMock = (p: string) => permissionState.granted === null || permissionState.granted.includes(p);
 vi.mock('@/stores/auth-store', () => ({
   useAuthStore: Object.assign(
-    (selector: (s: { user: { id: string }; hasPermission: () => boolean }) => unknown) =>
-      selector({ user: { id: 'user-test' }, hasPermission: () => true }),
-    { getState: () => ({ user: { id: 'user-test' }, hasPermission: () => true }) },
+    (selector: (s: { user: { id: string }; hasPermission: (p: string) => boolean }) => unknown) =>
+      selector({ user: { id: 'user-test' }, hasPermission: hasPermissionMock }),
+    { getState: () => ({ user: { id: 'user-test' }, hasPermission: hasPermissionMock }) },
   ),
+}));
+
+const partnerSummaryMock = vi.fn();
+vi.mock('@/features/debt/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof DebtHooks>()),
+  usePartnerDebtSummary: (...args: unknown[]) => partnerSummaryMock(...args),
 }));
 
 const toastMock = vi.fn();
@@ -93,6 +103,7 @@ const R_IN = '22222222-2222-4222-8222-222222222222';
 const R_IN2 = '22222222-2222-4222-8222-222222222223';
 const R_OUT = '22222222-2222-4222-8222-222222222224';
 const R_IN_CUSTOMER = '22222222-2222-4222-8222-222222222225';
+const R_OUT_GIFT = '22222222-2222-4222-8222-222222222226';
 const PM1 = '33333333-3333-4333-8333-333333333333';
 const PM_BANK = '33333333-3333-4333-8333-333333333334';
 const PM_NONE = '33333333-3333-4333-8333-333333333335';
@@ -113,6 +124,7 @@ const reasons: StockReason[] = [
   { id: R_IN2, code: 'NKH', name: 'Nhập khác', direction: 'In', partnerType: 'None', debtEffect: 'None', isSystem: true },
   { id: R_IN_CUSTOMER, code: 'NTL', name: 'Nhập hàng trả lại', direction: 'In', partnerType: 'Customer', debtEffect: 'ReceivableDecrease', isSystem: true },
   { id: R_OUT, code: 'XBH', name: 'Xuất bán hàng', direction: 'Out', partnerType: 'Customer', debtEffect: 'ReceivableIncrease', isSystem: true },
+  { id: R_OUT_GIFT, code: 'XBT', name: 'Xuất biếu tặng', direction: 'Out', partnerType: 'Customer', debtEffect: 'None', isSystem: false },
 ];
 
 function fund(id: string, code: string, kind: Fund['kind'], extra: Partial<Fund> = {}): Fund {
@@ -181,6 +193,16 @@ const supplier: PartnerSearchItem = {
   isCustomer: false,
   isSupplier: true,
   creditDays: 30,
+};
+
+const customer: PartnerSearchItem = {
+  id: '99999999-9999-4999-8999-999999999999',
+  code: 'KH01',
+  name: 'Công ty Xây dựng An Phát',
+  status: 'Active',
+  isCustomer: true,
+  isSupplier: false,
+  creditDays: 15,
 };
 
 // Server "now" defaults, fetched after mount; a dated lookup answers for that date.
@@ -310,6 +332,20 @@ describe('StockVoucherFormPage', () => {
     defaultsMock.mockImplementation((type: 'In' | 'Out', voucherAt?: string) => defaultsResult(type, voucherAt));
     partnerResults.data = [];
     paymentMethodsState.data = PAYMENT_METHODS;
+    permissionState.granted = null;
+    partnerSummaryMock.mockReset();
+    partnerSummaryMock.mockReturnValue({
+      data: {
+        partnerId: customer.id,
+        receivableBalance: 7_000_000,
+        creditLimit: 5_000_000,
+        available: -2_000_000,
+        overdueAmount: 0,
+        creditDays: 15,
+      },
+      isLoading: false,
+      isError: false,
+    });
     useBranchStore.setState({ workingBranchId: 'b1' });
   });
 
@@ -803,6 +839,63 @@ describe('StockVoucherFormPage', () => {
 
     expect(screen.getByText('Bỏ đối trừ')).toBeInTheDocument();
     expect(screen.getByText('Phiếu thu/chi tự động')).toBeInTheDocument();
+  });
+
+  it('debt panel only for stock-out sale with permission', async () => {
+    partnerResults.data = [customer];
+    const panelShown = () => screen.queryByText('Dư nợ phải thu') !== null;
+
+    // New stock-out with the sale reason: nothing until a partner is picked.
+    const { unmount } = renderPage('Out');
+    expect(panelShown()).toBe(false);
+    fireEvent.change(byId('stock-partner'), { target: { value: 'KH' } });
+    fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('KH01'));
+    await waitFor(() => expect(panelShown()).toBe(true));
+    expect(partnerSummaryMock).toHaveBeenCalledWith(customer.id, { enabled: true });
+    expect(screen.getByTestId('customer-debt-available')).toHaveTextContent('-2.000.000');
+
+    // A reason that does not raise the receivable hides it.
+    fireEvent.change(byId('stock-reason'), { target: { value: R_OUT_GIFT } });
+    await waitFor(() => expect(panelShown()).toBe(false));
+    unmount();
+
+    routeParams.id = V1;
+    const sale = voucher({
+      type: 'Out',
+      code: 'PX00007',
+      reasonId: R_OUT,
+      reasonDebtEffect: 'ReceivableIncrease',
+      partnerId: customer.id,
+      partnerCode: customer.code,
+      partnerName: customer.name,
+    });
+    voucherState.data = sale;
+
+    // reports.debt alone grants the panel.
+    permissionState.granted = ['stock_out.view', 'reports.debt'];
+    const second = renderPage('Out');
+    expect(panelShown()).toBe(true);
+    second.unmount();
+
+    // Neither debt.partner_summary nor reports.debt: hidden, and the summary is never requested.
+    permissionState.granted = ['stock_out.view', 'stock_out.edit'];
+    partnerSummaryMock.mockClear();
+    const third = renderPage('Out');
+    expect(panelShown()).toBe(false);
+    expect(partnerSummaryMock).not.toHaveBeenCalled();
+    third.unmount();
+
+    // Stock-in never shows it, even for a customer reason.
+    permissionState.granted = null;
+    voucherState.data = voucher({
+      reasonId: R_IN_CUSTOMER,
+      reasonDebtEffect: 'ReceivableDecrease',
+      partnerId: customer.id,
+      partnerCode: customer.code,
+      partnerName: customer.name,
+    });
+    renderPage('In');
+    expect(panelShown()).toBe(false);
   });
 
   it('stock-out uses Ngày xuất, Lý do xuất and Người nhận hàng labels', () => {

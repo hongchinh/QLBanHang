@@ -7,3 +7,5 @@ export const debtKeys = {
   partners: (side: DebtSide, keyword: string) => [...debtKeys.all, 'partners', side, keyword] as const,
   openItems: (params: OpenItemsParams) => [...debtKeys.all, 'open-items', params] as const,
 };
+
+export const partnerSummaryKey = (partnerId: string) => [...debtKeys.all, 'partner-summary', partnerId] as const;

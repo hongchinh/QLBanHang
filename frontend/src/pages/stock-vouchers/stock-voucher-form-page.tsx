@@ -65,6 +65,7 @@ import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
+import { CustomerDebtPanel } from './components/customer-debt-panel';
 import { StockLineGrid } from './components/stock-line-grid';
 import { StockTotalsPanel } from './components/stock-totals-panel';
 import { StockVoucherActivityHistory } from './components/stock-voucher-activity-history';
@@ -305,6 +306,14 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const gridWarehouses = warehouses.filter((w) => w.isActive || usedWarehouseIds.has(w.id));
 
   const activitiesQuery = useStockVoucherActivities(id, isEdit);
+
+  // Customer debt panel (P6): stock-out sales to a picked partner, for debt.partner_summary or reports.debt.
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canSeePartnerDebt = hasPermission('debt.partner_summary') || hasPermission('reports.debt');
+  const debtPanelPartnerId =
+    type === 'Out' && selectedReason?.debtEffect === 'ReceivableIncrease' && canSeePartnerDebt
+      ? selectedPartner?.id
+      : undefined;
 
   function resetTo(fresh: StockVoucher) {
     lastVersionRef.current = fresh.version;
@@ -717,29 +726,32 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
             </CardContent>
           </Card>
 
-          <StockTotalsPanel
-            type={type}
-            totals={computed.totals}
-            freight={freight}
-            orderDiscount={orderDiscount}
-            paidAmount={effectivePaid}
-            onFreightChange={(v) => form.setValue('freight', v, { shouldDirty: true })}
-            onOrderDiscountChange={(v) => form.setValue('orderDiscount', v, { shouldDirty: true })}
-            onPaidAmountChange={(v) => {
-              form.setValue('paidAmount', v, { shouldDirty: true });
-              form.setValue('paidAmountTouched', true, { shouldDirty: true });
-            }}
-            onApplyVatToAll={
-              type === 'In'
-                ? (rate) =>
-                    form.getValues('lines').forEach((_, i) =>
-                      form.setValue(`lines.${i}.vatRate`, rate, { shouldDirty: true }),
-                    )
-                : undefined
-            }
-            autoVoucher={autoVoucherOf(voucher)}
-            readOnly={readOnly}
-          />
+          <div className="flex flex-col gap-4 [&>*:first-child]:flex-1">
+            <StockTotalsPanel
+              type={type}
+              totals={computed.totals}
+              freight={freight}
+              orderDiscount={orderDiscount}
+              paidAmount={effectivePaid}
+              onFreightChange={(v) => form.setValue('freight', v, { shouldDirty: true })}
+              onOrderDiscountChange={(v) => form.setValue('orderDiscount', v, { shouldDirty: true })}
+              onPaidAmountChange={(v) => {
+                form.setValue('paidAmount', v, { shouldDirty: true });
+                form.setValue('paidAmountTouched', true, { shouldDirty: true });
+              }}
+              onApplyVatToAll={
+                type === 'In'
+                  ? (rate) =>
+                      form.getValues('lines').forEach((_, i) =>
+                        form.setValue(`lines.${i}.vatRate`, rate, { shouldDirty: true }),
+                      )
+                  : undefined
+              }
+              autoVoucher={autoVoucherOf(voucher)}
+              readOnly={readOnly}
+            />
+            {debtPanelPartnerId && <CustomerDebtPanel partnerId={debtPanelPartnerId} />}
+          </div>
         </div>
 
         <Card>

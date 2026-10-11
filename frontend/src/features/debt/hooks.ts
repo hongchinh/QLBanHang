@@ -1,7 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { DebtSide } from '@/features/cash-common/types';
-import { debtApi } from './api';
-import { debtKeys } from './keys';
+import { debtApi, partnerSummaryApi } from './api';
+import { debtKeys, partnerSummaryKey } from './keys';
 import type { OpenItemsParams } from './types';
 
 // An empty keyword returns the first partners of the side, so a picker can list them on focus.
@@ -22,5 +22,14 @@ export function useOpenItems(params: OpenItemsParams, opts: { enabled?: boolean 
     queryKey: debtKeys.openItems(params),
     queryFn: () => debtApi.openItems(params),
     enabled: (opts.enabled ?? true) && !!params.partnerId,
+  });
+}
+
+// Needs debt.partner_summary or reports.debt; callers gate `enabled` on the permission.
+export function usePartnerDebtSummary(partnerId: string | undefined, { enabled = true }: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: partnerSummaryKey(partnerId ?? ''),
+    queryFn: () => partnerSummaryApi.get(partnerId!),
+    enabled: enabled && !!partnerId,
   });
 }

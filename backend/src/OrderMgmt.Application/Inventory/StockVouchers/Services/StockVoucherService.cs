@@ -914,8 +914,9 @@ public class StockVoucherService : IStockVoucherService
     private Task<string> NextCodeAsync(StockDirection type, Guid branchId, DateTimeOffset voucherAt, bool peek,
         CancellationToken ct) =>
         _codes.NextAsync(DocTypeOf(type), branchId, voucherAt, peek, async (codes, c) =>
-            // Same scope as the unique index (type, branch_id, code) WHERE is_deleted = false: the query filter matches it.
-            (await _db.StockVouchers
+            // Soft-deleted rows count too: a deleted document's number is never issued again, even when a reset-policy
+            // change restarts the counter on codes of the old period (the unique index only covers live rows).
+            (await _db.StockVouchers.IgnoreQueryFilters()
                 .Where(v => v.Type == type && v.BranchId == branchId && codes.Contains(v.Code))
                 .Select(v => v.Code)
                 .ToListAsync(c)).ToHashSet(), ct);

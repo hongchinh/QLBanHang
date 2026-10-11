@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.Inventory.Settings.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
@@ -17,6 +18,35 @@ public class CashNumberingTests : CashDebtTestBase
 
     private static UpdateNumberingRequest Request(string prefix) =>
         new() { Prefix = prefix, Length = 5, ResetPolicy = NumberingResetPolicy.None, Pattern = "{KH}{STT}" };
+
+    [Fact]
+    public async Task A_soft_deleted_number_is_not_issued_again_after_the_counter_restarts()
+    {
+        var branchId = await CreateBranchAsync("NB" + Guid.NewGuid().ToString("N")[..8]);
+        await SetBranchOpeningDateAsync(branchId, new DateOnly(2026, 10, 1));
+        var client = CloneAdminClient();
+        UseBranch(client, branchId);
+        var numbering = new UpdateNumberingRequest
+        {
+            Prefix = "PT", Length = 5, ResetPolicy = NumberingResetPolicy.None, Pattern = "{KH}{NAM}{STT}",
+        };
+        (await client.PutAsJsonAsync("/api/inventory/numbering/Receipt", numbering)).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var fundId = await CashFundIdAsync(branchId);
+        var reasonId = await CashReasonIdAsync("TK");
+        var receipts = new List<CashVoucherDto>();
+        for (var i = 0; i < 3; i++)
+            receipts.Add(await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, reasonId, fundId, "2026-10-05 09:00", null, 100m)));
+        receipts.Select(r => r.Code).Should().Equal("PT202600001", "PT202600002", "PT202600003");
+        (await DeleteCashAsync(client, receipts[2].Id, new CashDocumentActionRequest { Version = receipts[2].Version }))
+            .Status.Should().Be(HttpStatusCode.OK);
+
+        // A yearly reset starts a new counter for 2026, which walks over the codes issued under the old policy.
+        numbering.ResetPolicy = NumberingResetPolicy.Yearly;
+        (await client.PutAsJsonAsync("/api/inventory/numbering/Receipt", numbering)).StatusCode.Should().Be(HttpStatusCode.OK);
+        var next = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, reasonId, fundId, "2026-10-06 09:00", null, 100m));
+        next.Code.Should().Be("PT202600004", "the deleted PT202600003 is never issued again");
+    }
 
     [Fact]
     public async Task Seed_and_new_branch_have_numbering_for_all_six_types()

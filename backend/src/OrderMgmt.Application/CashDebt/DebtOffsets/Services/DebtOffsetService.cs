@@ -465,8 +465,9 @@ public class DebtOffsetService : IDebtOffsetService
     /// last lock of a save, P14). Codes already used in the branch are skipped (see DocumentCodeAllocator).
     private Task<string> NextCodeAsync(Guid branchId, DateTimeOffset voucherAt, bool peek, CancellationToken ct) =>
         _codes.NextAsync(DocumentType.DebtOffset, branchId, voucherAt, peek, async (codes, c) =>
-            // Same scope as the unique index (branch_id, code) WHERE is_deleted = false: the query filter matches it.
-            (await _db.DebtOffsetVouchers
+            // Soft-deleted rows count too: a deleted document's number is never issued again, even when a reset-policy
+            // change restarts the counter on codes of the old period (the unique index only covers live rows).
+            (await _db.DebtOffsetVouchers.IgnoreQueryFilters()
                 .Where(o => o.BranchId == branchId && codes.Contains(o.Code))
                 .Select(o => o.Code)
                 .ToListAsync(c)).ToHashSet(), ct);

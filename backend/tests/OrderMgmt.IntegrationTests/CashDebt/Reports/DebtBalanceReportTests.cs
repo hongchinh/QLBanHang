@@ -177,9 +177,14 @@ public class DebtBalanceReportTests : CashDebtTestBase
     {
         var ids = await ReportDataset.SeedAsync(this);
         var client = MainBranchClient(ids);
-        // A receipt dated before the branch opening date (10-01).
+        // A receipt dated before the branch opening date (10-01). The API rejects one now (OpeningDateGuard), so it is
+        // made as legacy data: the opening date is lifted around the save.
+        await InDbAsync(db => db.Branches.Where(b => b.Id == ids.MainBranchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.OpeningDate, (DateOnly?)null)));
         await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TKH"), ids.QtmId,
             "2026-09-25 09:00", ids.Kh1Id, 300m));
+        await InDbAsync(db => db.Branches.Where(b => b.Id == ids.MainBranchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.OpeningDate, (DateOnly?)ReportDataset.OpeningDate)));
 
         var september = await GetBalanceAsync(client, "side=Receivable&from=2026-09-01&to=2026-09-30");
         september.Rows.Should().ContainSingle().Which.Should().BeEquivalentTo(new

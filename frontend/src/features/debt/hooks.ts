@@ -9,19 +9,25 @@ import type { CreateSettlementBatchRequest, DebtPartnerSearchItem, OpenItemsPara
 type PartnerSearchKey = ReturnType<typeof debtKeys.partners>;
 
 // An empty keyword returns the first partners, so a picker can list them on focus. No side: any role;
-// bothRoles: only partners that are both customer and supplier. The previous results are kept while the
+// bothRoles: only partners that are both customer and supplier; includeInactive: inactive partners too, for
+// screens that work on existing debt (matching, offsets, reports). The previous results are kept while the
 // keyword changes, never across another side or role filter (they could hold partners of the wrong role).
 export function useDebtPartnerSearch(
   side: DebtSide | undefined,
   keyword: string,
-  { bothRoles = false }: { bothRoles?: boolean } = {},
+  { bothRoles = false, includeInactive = false }: { bothRoles?: boolean; includeInactive?: boolean } = {},
 ) {
   const trimmed = keyword.trim();
-  const queryKey = debtKeys.partners(side, trimmed, bothRoles);
+  const queryKey = debtKeys.partners(side, trimmed, bothRoles, includeInactive);
   return useQuery({
     queryKey,
     queryFn: () =>
-      debtApi.searchPartners({ side, keyword: trimmed || undefined, bothRoles: bothRoles || undefined }),
+      debtApi.searchPartners({
+        side,
+        keyword: trimmed || undefined,
+        bothRoles: bothRoles || undefined,
+        activeOnly: includeInactive ? false : undefined,
+      }),
     staleTime: 30_000,
     placeholderData: (previous: DebtPartnerSearchItem[] | undefined, previousQuery) =>
       previousQuery && sameRoleFilter(previousQuery.queryKey, queryKey) ? previous : undefined,

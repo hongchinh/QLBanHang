@@ -14,6 +14,8 @@ export interface DebtPartnerSearchParams {
   bothRoles?: boolean;
   keyword?: string;
   limit?: number;
+  // The server default is true (active partners only).
+  activeOnly?: boolean;
 }
 
 // GET /api/debt/open-items (OpenItemDto): open entries of one partner and side in the working branch.

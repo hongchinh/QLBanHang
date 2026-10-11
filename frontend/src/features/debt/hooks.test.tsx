@@ -54,6 +54,22 @@ describe('useDebtPartnerSearch', () => {
     await waitFor(() => expect(debtApi.searchPartners).toHaveBeenCalled());
     expect(debtApi.searchPartners).toHaveBeenCalledWith({ side: undefined, keyword: undefined, bothRoles: true });
   });
+
+  it('includes inactive partners when asked (matching, offsets, reports)', async () => {
+    const { wrapper } = setup();
+    renderHook(() => useDebtPartnerSearch('Receivable', 'kh', { includeInactive: true }), { wrapper });
+
+    await waitFor(() => expect(debtApi.searchPartners).toHaveBeenCalled());
+    expect(debtApi.searchPartners).toHaveBeenCalledWith({ side: 'Receivable', keyword: 'kh', activeOnly: false });
+  });
+
+  it('keeps active partners only by default', async () => {
+    const { wrapper } = setup();
+    renderHook(() => useDebtPartnerSearch('Receivable', 'kh'), { wrapper });
+
+    await waitFor(() => expect(debtApi.searchPartners).toHaveBeenCalled());
+    expect(vi.mocked(debtApi.searchPartners).mock.calls[0][0].activeOnly).toBeUndefined();
+  });
 });
 
 describe('useDebtSettlements', () => {

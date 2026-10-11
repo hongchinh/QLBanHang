@@ -38,7 +38,7 @@ function PartnerPicker({ side, selectedLabel, onSelect }: PartnerPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
   const debouncedKeyword = useDebouncedValue(keyword ?? '', 250);
-  const { data, isLoading, isError } = useDebtPartnerSearch(side, debouncedKeyword);
+  const { data, isLoading, isError } = useDebtPartnerSearch(side, debouncedKeyword, { includeInactive: true });
   const results = data ?? [];
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = `debt-ledger-partners-${useId()}`;

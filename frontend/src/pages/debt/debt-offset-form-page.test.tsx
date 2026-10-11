@@ -195,7 +195,10 @@ describe('DebtOffsetFormPage', () => {
     await pickPartner();
 
     // Partners that are both customer and supplier; open Increase items of each side.
-    expect(mocks.partnerSearch).toHaveBeenLastCalledWith(undefined, expect.any(String), { bothRoles: true });
+    expect(mocks.partnerSearch).toHaveBeenLastCalledWith(undefined, expect.any(String), {
+      bothRoles: true,
+      includeInactive: true,
+    });
     expect(mocks.openItems).toHaveBeenCalledWith({ partnerId: P1, side: 'Receivable', direction: 'Increase' }, undefined);
     expect(mocks.openItems).toHaveBeenCalledWith({ partnerId: P1, side: 'Payable', direction: 'Increase' }, undefined);
     expect(within(receivableGrid()).getByText('PX00001')).toBeInTheDocument();

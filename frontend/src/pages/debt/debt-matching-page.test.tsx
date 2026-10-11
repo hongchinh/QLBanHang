@@ -167,7 +167,10 @@ describe('DebtMatchingPage', () => {
     await user.click(screen.getByRole('combobox', { name: 'Đối tượng' }));
     await user.click(await screen.findByRole('option', { name: /KH01/ }));
 
-    expect(mocks.partnerSearch).toHaveBeenLastCalledWith('Receivable', expect.any(String), { bothRoles: false });
+    expect(mocks.partnerSearch).toHaveBeenLastCalledWith('Receivable', expect.any(String), {
+      bothRoles: false,
+      includeInactive: true,
+    });
     expect(mocks.openItems).toHaveBeenCalledWith({ partnerId: P1, side: 'Receivable', direction: 'Decrease' });
     expect(mocks.openItems).toHaveBeenCalledWith({ partnerId: P1, side: 'Receivable', direction: 'Increase' });
     expect(within(leftGrid()).getByText('PT00001')).toBeInTheDocument();
@@ -182,7 +185,10 @@ describe('DebtMatchingPage', () => {
     expect(currentSearch().get('side')).toBe('Payable');
     expect(currentSearch().get('partnerId')).toBeNull();
     expect(screen.getByRole('button', { name: 'Phải trả' })).toHaveAttribute('aria-pressed', 'true');
-    expect(mocks.partnerSearch).toHaveBeenLastCalledWith('Payable', expect.any(String), { bothRoles: false });
+    expect(mocks.partnerSearch).toHaveBeenLastCalledWith('Payable', expect.any(String), {
+      bothRoles: false,
+      includeInactive: true,
+    });
     expect(screen.getByText('Chọn đối tượng để đối trừ chứng từ.')).toBeInTheDocument();
   });
 

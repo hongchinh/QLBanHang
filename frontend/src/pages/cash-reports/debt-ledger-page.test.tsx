@@ -14,13 +14,15 @@ vi.mock('@/features/cash-reports/hooks', () => ({
   useDebtLedger: (params: DebtLedgerParams, options?: { enabled?: boolean }) => useDebtLedgerMock(params, options),
 }));
 
-const useDebtPartnerSearchMock = vi.fn((side: string, keyword: string) => {
+const useDebtPartnerSearchMock = vi.fn((side: string, keyword: string, options?: { includeInactive?: boolean }) => {
   void side;
   void keyword;
+  void options;
   return { data: [], isLoading: false, isError: false };
 });
 vi.mock('@/features/debt/hooks', () => ({
-  useDebtPartnerSearch: (side: string, keyword: string) => useDebtPartnerSearchMock(side, keyword),
+  useDebtPartnerSearch: (side: string, keyword: string, options?: { includeInactive?: boolean }) =>
+    useDebtPartnerSearchMock(side, keyword, options),
 }));
 
 const ledger = (over: Partial<DebtLedgerReport> = {}): DebtLedgerReport => ({
@@ -80,7 +82,8 @@ describe('DebtLedgerPage', () => {
       { side: 'Payable', partnerId: 's1', from: '2026-10-01', to: '2026-10-31' },
       { enabled: true },
     );
-    expect(useDebtPartnerSearchMock).toHaveBeenLastCalledWith('Payable', expect.any(String));
+    // The ledger of a partner made inactive since must stay reachable.
+    expect(useDebtPartnerSearchMock).toHaveBeenLastCalledWith('Payable', expect.any(String), { includeInactive: true });
     expect(screen.getByRole('combobox', { name: 'Phía' })).toHaveTextContent('Phải trả');
     expect(screen.getByRole('combobox', { name: 'Đối tượng' })).toHaveValue('NCC01 - Thép Hòa Phát');
     expect(screen.getByLabelText('Từ ngày')).toHaveValue('2026-10-01');

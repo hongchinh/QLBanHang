@@ -126,7 +126,10 @@ describe('DebtOffsetListPage', () => {
     await user.click(screen.getByRole('combobox', { name: 'Đối tượng' }));
     await user.click(await screen.findByRole('option', { name: /DT01/ }));
     await waitFor(() => expect(lastParams()).toMatchObject({ partnerId: P1, status: 'All' }));
-    expect(mocks.partnerSearch).toHaveBeenLastCalledWith(undefined, expect.any(String), { bothRoles: true });
+    expect(mocks.partnerSearch).toHaveBeenLastCalledWith(undefined, expect.any(String), {
+      bothRoles: true,
+      includeInactive: true,
+    });
     expect(screen.getByTestId('location').textContent).toContain('partnerId=' + P1);
 
     await user.click(screen.getByRole('button', { name: 'Bỏ chọn đối tượng' }));

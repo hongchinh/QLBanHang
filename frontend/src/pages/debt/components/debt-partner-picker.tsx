@@ -35,7 +35,11 @@ export function DebtPartnerPicker({
   const [isOpen, setIsOpen] = useState(false);
   const [highlighted, setHighlighted] = useState(0);
   const debouncedKeyword = useDebouncedValue(keyword ?? '', 250);
-  const { data, isLoading, isError } = useDebtPartnerSearch(side, debouncedKeyword, { bothRoles });
+  // Matching and offsets settle existing debt, which an inactive partner may still have.
+  const { data, isLoading, isError } = useDebtPartnerSearch(side, debouncedKeyword, {
+    bothRoles,
+    includeInactive: true,
+  });
   const results = data ?? [];
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = `${id}-partners-${useId()}`;

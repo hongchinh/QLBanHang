@@ -30,6 +30,8 @@ import { QuotationListPage } from '@/pages/quotations/quotation-list-page';
 import { QuotationFormPage } from '@/pages/quotations/quotation-form-page';
 import { StockVoucherFormPage } from '@/pages/stock-vouchers/stock-voucher-form-page';
 import { StockVoucherListPage } from '@/pages/stock-vouchers/stock-voucher-list-page';
+// Round 2A: 11.3 receipts and payments
+import { CashVoucherListPage } from '@/pages/cash-vouchers/cash-voucher-list-page';
 import { MyQuotationSettingsPage } from '@/pages/settings/my-quotation-settings-page';
 import { PaymentQrPage } from '@/pages/payment-qr/payment-qr-page';
 import { QuotationSystemSettingsPage } from '@/pages/settings/quotation-system-settings-page';
@@ -325,6 +327,59 @@ export function App() {
                     element={
                       <ProtectedRoute permission="stock_out.view">
                         <StockVoucherFormPage type="Out" />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                {/* Round 2A: 11.3 receipts and payments (new and :id show the list until the form page, Task 11.4) */}
+                <Route path="receipts">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="receipts.view">
+                        <CashVoucherListPage type="Receipt" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="receipts.create">
+                        <CashVoucherListPage type="Receipt" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="receipts.view">
+                        <CashVoucherListPage type="Receipt" />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                <Route path="payments">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="payments.view">
+                        <CashVoucherListPage type="Payment" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="payments.create">
+                        <CashVoucherListPage type="Payment" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="payments.view">
+                        <CashVoucherListPage type="Payment" />
                       </ProtectedRoute>
                     }
                   />

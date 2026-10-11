@@ -125,6 +125,9 @@ public class BranchService : IBranchService
             throw new ConflictException("Chi nhánh đang là chi nhánh mặc định của người dùng, không thể xóa.");
         if (await _db.Warehouses.AnyAsync(w => w.BranchId == id, ct))
             throw new ConflictException("Chi nhánh đang có kho, không thể xóa.");
+        // Cash documents need no warehouse: without this the branch's cash book and debt ledger become unreachable.
+        if (await HasDocumentsAsync(id, ct) || await HasOpeningDataAsync(id, ct))
+            throw new ConflictException("Chi nhánh đã có chứng từ hoặc số dư đầu kỳ, không thể xóa.");
 
         branch.IsDeleted = true;
         branch.DeletedAt = _clock.UtcNow;

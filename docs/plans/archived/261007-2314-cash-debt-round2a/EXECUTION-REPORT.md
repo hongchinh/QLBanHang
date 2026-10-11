@@ -111,6 +111,26 @@ New BA questions raised during execution:
 - **Partner summary for suppliers:** `GET /api/debt/partner-summary` returns zeros for a supplier-only partner and 404 for a soft-deleted customer. Is that the intended behaviour?
 - **Unmatch across branches:** unmatching another branch's settlement returns 403 "Đối trừ thuộc chi nhánh khác.", which reveals that the id exists. Is that acceptable?
 
+## Team-lead review and fixes (2026-10-11)
+
+After Phase 13, a team-lead review covered the whole branch in four areas: the ledger, automatic vouchers and stock voucher integration; the cash voucher, transfer, offset, opening debt and matching services; the catalogs, migrations and reports; and the frontend. Every High and Medium finding was traced again in the code before being accepted. The blocking items were then fixed test-first, one commit each:
+
+| Commit | Finding | Fix |
+|---|---|---|
+| `ad404f1` | **High.** Editing a cash voucher removed the `AtVoucher` settlements that another cash voucher had made against it (`TKH` ↔ `CHKH`, `THNCC` ↔ `TNCC`), with no P10 confirmation and no activity, and the P11 409 no longer fired. | `AtVoucher` settlements use the voucher id as `BatchId`, as `Auto` and `Offset` already did. `RemoveOwnSettlementsAsync` removes only `BatchId == source`. `CashVoucherAllocationDto.IsOwn` tells the form which rows it edits. Unmatching re-reads the batch's partners after the locks (409 `CONCURRENCY`). |
+| `8a8df8d` | **Medium.** The matching, offset and debt-ledger partner pickers never found inactive partners (`activeOnly` defaults to true). | `useDebtPartnerSearch(..., { includeInactive })`, used by those three screens. |
+| `f276516` | **Medium.** A partner with cash/debt data but no stock voucher could be deleted, or lose the role of a side it had debt on. | 409 on delete when debt entries, cash vouchers, opening debts or offsets exist. 400 `isCustomer` / `isSupplier` on a role removal while that side has entries. |
+| `585a1a2` | **Medium.** `PaymentMethod.FundKind` could change while paid stock vouchers used the method, which left them invalid (P9). | 400 `fundKind` while a non-deleted stock voucher with `PaidAmount > 0` uses the method. |
+| `2c7e314` | **Low.** The opening-date validation error had the key `value`. | Key `openingDate`, which the branch form already reads. |
+
+| # | Area | Deviation | Reason |
+|---|---|---|---|
+| D-21 | Open items, P26 (`ad404f1`) | With `forSourceType` / `forSourceId`, only the source's own `AtVoucher` settlements are added back, not every settlement of its entries. | An edit replaces only those. The plan's wording made the edit grid show more room than the save accepts once `Manual`, `Offset` or another voucher's settlements exist. |
+
+`AtVoucher` settlements saved before `ad404f1` have a random `BatchId`, so they now count as another document's settlement: an edit keeps them and asks for confirmation before removing them. The dev/test database reset at deploy (go-live gate) clears them.
+
+Verification after the fixes (on `2c7e314`): `dotnet test` 19 failed / 735 total (716 passed), the same 19 baseline tests; `npm run test` 3 failed / 646 total (643 passed), the same 3 baseline tests; typecheck clean; lint 3 errors and 14 warnings (baseline); `npm run build` passes.
+
 ## Follow-ups (for Round 2B or a separate fix)
 
 | # | Item |
@@ -130,6 +150,33 @@ New BA questions raised during execution:
 | F-8 | Performance: the cash book loads every movement of each fund and filters in memory. Partner-summary overdue reads every entry of the partner. Both are fine at current volumes. |
 | F-9 | No ownership or `edit_all` check on offset cancel/delete, because the plan defines no such permission. |
 | F-10 | Round 2B (separate plan): Công nợ theo chứng từ, Tuổi nợ, Nợ quá hạn, Công nợ theo nhân viên, Biên bản đối chiếu, and the overdue warning list. |
+| F-11 | **Before go-live (review, Medium).** Nothing requires `Branch.OpeningDate` before the first document or `VoucherAt ≥ OpeningDate`. A branch created without a date that gets a voucher can never take opening stock, opening debt or a fund opening balance (`BRANCH_HAS_DOCUMENTS`). Reject stock, cash, transfer and offset saves without a date or dated before it, or require the date when a branch is created. |
+| F-12 | **Before go-live (review, Medium; extends F-8).** The negative-fund guard loads a fund's whole history two to four times per write while holding the `cash-fund` key, on every receipt, payment, transfer and paid stock voucher. Sum the balance before `from` in SQL and load only the later movements. |
+| F-13 | Backend items from the review (Low):
+  - stock voucher `Total → 0` with settlements returns 409 instead of the confirmable 422;
+  - `DueDate` may be earlier than the document date;
+  - a confirmed resend removes whatever settlements exist then, not only the ones the 422 listed;
+  - restore does not re-check the stored fund or the method's `FundKind`;
+  - soft-deleted numbers can be issued again after a numbering reset-policy change;
+  - an unmatch is undone by saving a cash voucher form opened before it;
+  - `OpeningDebt` has no `xmin`;
+  - branch delete ignores 2A data;
+  - `GET /api/funds` returns `OpeningAmount` to every role (BA);
+  - every stock voucher save logs `Updated` on its automatic voucher;
+  - the rollback recipe does not remove `document_numberings` of types 3–6 or `NTL`/`XTL`;
+  - the report tests have no VN-day boundary case. |
+| F-14 | Frontend items from the review (Low):
+  - the cash voucher form submits allocations its own grid marks invalid;
+  - the confirmation dialog's dismiss button reads "Hủy", which is ambiguous on a cancel action;
+  - the paid amount stays editable for a method without a fund, and server errors on `fundId` / `dueDate` show only as a toast;
+  - links to automatic vouchers and opening debts ignore permissions;
+  - the Sổ chi tiết running balance does not split Nợ/Có;
+  - the list state may carry over between /receipts and /payments (no `key`). |
+| F-15 | Refactoring from the review:
+  - `CashVoucherService`, `FundTransferService` and `DebtOffsetService` duplicate their lifecycle, activity, lock and helper code;
+  - `RecomputeAutoAsync` is a manual hook at six call sites;
+  - the "in use" guards list their tables by hand (the cause of `f276516`);
+  - the frontend has five partner pickers and copies the form-action code across four forms. |
 
 ## Housekeeping for the user
 

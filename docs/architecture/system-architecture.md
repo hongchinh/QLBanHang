@@ -170,12 +170,12 @@ A balance is Σ Increase − Σ Decrease. Settlements move no balance: they only
 
 | Origin | Created by | Managed by |
 |---|---|---|
-| `AtVoucher` | The allocation grid of a receipt or payment | The voucher: an edit with an allocation list silently replaces its own `AtVoucher` settlements (`null` keeps them). They can also be removed on the matching screen. |
+| `AtVoucher` | The allocation grid of a receipt or payment (`BatchId` = that voucher's id) | The voucher that made them: an edit with an allocation list silently replaces its own `AtVoucher` settlements (`null` keeps them). Another voucher's `AtVoucher` settlement against it (a refund allocated against a prepayment) is treated like a `Manual` one. They can also be removed on the matching screen. |
 | `Manual` | The matching screen (`POST /api/debt/settlements`, `debt.matching`) | The matching screen (`DELETE /api/debt/settlements/{id}`, `DELETE /api/debt/settlement-batches/{batchId}`) |
 | `Auto` | The stock voucher, between its own entry and its automatic voucher's entry: `min(PaidAmount, stock entry open excluding Auto, automatic entry open excluding Auto)` | The stock voucher. The matching screen returns 409 `SETTLEMENT_MANAGED`. |
 | `Offset` | The debt offset voucher | Cancelling or deleting the offset (409 `SETTLEMENT_MANAGED` on the matching screen) |
 
-A caller first removes its own `AtVoucher` or `Auto` settlements (`RemoveOwnSettlementsAsync`), without confirmation or activity. Every other settlement that a save would drop is subject to the confirmation and blocked-edit rules below, and its removal writes `SettlementRemoved` on both documents (`StockVoucherActivityAction.SettlementRemoved = 6` on stock vouchers, which also log `AutoVoucherChanged = 7` when their automatic voucher is created or deleted).
+A caller first removes its own `AtVoucher` or `Auto` settlements (`RemoveOwnSettlementsAsync`: the settlements of that origin whose `BatchId` is the caller's document), without confirmation or activity. Every other settlement that a save would drop is subject to the confirmation and blocked-edit rules below, and its removal writes `SettlementRemoved` on both documents (`StockVoucherActivityAction.SettlementRemoved = 6` on stock vouchers, which also log `AutoVoucherChanged = 7` when their automatic voucher is created or deleted).
 
 `IAutoCashVoucherService.RecomputeAutoAsync` sets the `Auto` settlement of every affected stock voucher back to the formula above whenever foreign settlements are removed: cash voucher edit, cancel and delete, opening debt edit and delete, the stock voucher paths, manual unmatching, and offset cancel and delete. The freed room goes back to the paid amount. An `Auto` settlement dated on or before `LockedUntil` is left unchanged, so the open-period write still goes through. When `PUT /api/branches/{id}/lock` moves the lock earlier or clears it, `RecomputeReopenedAsync` recomputes the `Auto` settlements of the reopened days under the exclusive branch gate, without writing an activity. A `lockedUntil` in year 9999 is rejected with 400 `VALIDATION` (key `lockedUntil`), because the next day overflows and such a lock could never be moved earlier or cleared.
 
@@ -213,7 +213,7 @@ Each key set is taken in one statement, ordered `COLLATE "C"` (shared helper `Ad
 - **Balance sign (P24):** a positive receivable shows as Dư Nợ and a negative one as Dư Có; a positive payable shows as Dư Có and a negative one as Dư Nợ.
 - **Cash book with several funds (P25):** each fund group shows its transfer rows, so its running balance reconciles. In the grand total, a transfer whose two funds are both selected is left out, because the two halves cancel; a transfer with only one selected fund counts.
 
-Other read endpoints: `GET /api/debt/partner-summary` (receivable balance, credit limit, available amount and overdue amount, shown on the stock-out form), `GET /api/debt/open-items` (with `forSourceType` / `forSourceId`, the open amount adds back the room the edited voucher already uses, P26) and `GET /api/debt/partners`.
+Other read endpoints: `GET /api/debt/partner-summary` (receivable balance, credit limit, available amount and overdue amount, shown on the stock-out form), `GET /api/debt/open-items` (with `forSourceType` / `forSourceId`, the open amount adds back the edited voucher's own `AtVoucher` settlements, the ones its save replaces, P26) and `GET /api/debt/partners`.
 
 ### Dashboard, Reports, Search, Branding And Notifications
 

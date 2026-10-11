@@ -48,6 +48,9 @@ import { CashSettingsPage } from '@/pages/settings/cash-settings-page';
 import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
 import { StockOnHandPage } from '@/pages/inventory/stock-on-hand-page';
 import { StockCardPage } from '@/pages/inventory/stock-card-page';
+// Round 2A: 11.5 fund transfers
+import { FundTransferListPage } from '@/pages/fund-transfers/fund-transfer-list-page';
+import { FundTransferFormPage } from '@/pages/fund-transfers/fund-transfer-form-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -410,6 +413,34 @@ export function App() {
                     </ProtectedRoute>
                   }
                 />
+                {/* Round 2A: 11.5 fund transfers */}
+                <Route path="fund-transfers">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="fund_transfers.view">
+                        <FundTransferListPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="fund_transfers.create">
+                        <FundTransferFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      // Readable with view; the form hides the actions the user lacks.
+                      <ProtectedRoute permission="fund_transfers.view">
+                        <FundTransferFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
                 <Route
                   path="settings/my-quotation-settings"
                   element={<MyQuotationSettingsPage />}

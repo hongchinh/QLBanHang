@@ -1123,7 +1123,7 @@ public class StockVoucherService : IStockVoucherService
     /// The stock draft: one entry when the reason affects debt and the total is positive, none otherwise.
     private static IReadOnlyList<DebtEntryDraft> DebtDraftsOf(StockVoucher voucher, StockReason reason)
     {
-        if (voucher.Total <= 0 || DebtEffectRules.Resolve(reason.DebtEffect) is not { } effect)
+        if (DebtEffectRules.Resolve(reason.DebtEffect) is not { } effect)
             return Array.Empty<DebtEntryDraft>();
 
         var partnerId = voucher.PartnerId
@@ -1131,7 +1131,8 @@ public class StockVoucherService : IStockVoucherService
         var docDate = VnTime.ToVnDate(voucher.VoucherAt);
         return new[]
         {
-            new DebtEntryDraft(voucher.BranchId, partnerId, effect.Side, effect.Direction, voucher.Total,
+            // Total 0 still affects debt: a zero draft is a shrink to 0 for the ledger (P10), not a removed side (P11).
+            new DebtEntryDraft(voucher.BranchId, partnerId, effect.Side, effect.Direction, Math.Max(voucher.Total, 0m),
                 voucher.VoucherAt, docDate, DebtDates.EntryDueDate(effect.Direction, docDate, voucher.DueDate),
                 voucher.OwnerUserId, voucher.Code, reason.Name),
         };

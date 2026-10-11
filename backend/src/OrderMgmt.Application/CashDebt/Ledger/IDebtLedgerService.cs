@@ -8,7 +8,8 @@ namespace OrderMgmt.Application.CashDebt.Ledger;
 public interface IDebtLedgerService
 {
     /// Save path (P21, P11). At most one draft per side (else ArgumentException). Upserts in place by
-    /// (SourceType, SourceId, Side); a side missing from drafts is deleted.
+    /// (SourceType, SourceId, Side); a side missing from drafts is deleted, and settlements on it give 409. A draft with
+    /// Amount 0 also deletes the side, but as a shrink to 0: its settlements ask for confirmation (P10) instead.
     Task<IReadOnlyList<DebtEntry>> PostAsync(DebtSourceType sourceType, Guid sourceId,
         IReadOnlyList<DebtEntryDraft> drafts, bool confirmRemoveSettlements, CancellationToken ct = default);
 

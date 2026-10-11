@@ -71,7 +71,8 @@ public class DebtLedgerService : IDebtLedgerService
         {
             var entry = existing.SingleOrDefault(e => e.Side == side);
             var draft = drafts.SingleOrDefault(d => d.Side == side);
-            if (draft is null)
+            // A zero draft was checked as a shrink to 0 above; the entry then goes like a removed side.
+            if (draft is null || draft.Amount == 0)
             {
                 if (entry is not null)
                     _db.DebtEntries.Remove(entry);

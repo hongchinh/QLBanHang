@@ -155,6 +155,32 @@ public class StockVoucherSettlementTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Total_down_to_zero_asks_to_remove_settlements_like_any_shrink()
+    {
+        var customer = await NewCustomerAsync();
+        var sale = await CreateSaleAsync(customer, 3, 1_000, paid: 0);
+        var stockEntry = (await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single();
+        var receipt = await CreateReceiptAsync(customer, 1_000m, (stockEntry.Id, 1_000m));
+
+        // A free sale (price 0) keeps the reason's debt effect: it is a shrink to 0, so it asks (P10), not 409 (P11).
+        var free = UpdateRequestFrom(sale);
+        free.Lines[0].UnitPrice = 0;
+        var (status, _, error) = await PutVoucherAsync(_branchClient, sale.Id, free);
+        status.Should().Be(HttpStatusCode.UnprocessableEntity, error?.Message);
+        error!.Code.Should().Be(Removed);
+        error.Details.Should().ContainSingle().Which.Key.Should().Be(receipt.Code);
+
+        free.ConfirmRemoveSettlements = true;
+        var (confirmedStatus, updated, confirmedError) = await PutVoucherAsync(_branchClient, sale.Id, free);
+        confirmedStatus.Should().Be(HttpStatusCode.OK, confirmedError?.Message);
+        updated!.Total.Should().Be(0m);
+        (await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Should().BeEmpty();
+        (await SettlementsOfAsync((await EntriesOfAsync(DebtSourceType.Receipt, receipt.Id)).Single().Id))
+            .Should().BeEmpty();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
     public async Task Changing_partner_with_foreign_settlement_is_409()
     {
         var customer = await NewCustomerAsync();

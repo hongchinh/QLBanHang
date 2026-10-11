@@ -44,6 +44,15 @@ public class PaymentMethodService : IPaymentMethodService
     public async Task<PaymentMethodDto> UpdateAsync(Guid id, UpdatePaymentMethodRequest request, CancellationToken ct = default)
     {
         var method = await FindAsync(id, ct);
+        // A paid stock voucher stores a fund of the method's kind (P9): changing the kind would leave it invalid and
+        // its next save rejected.
+        if (request.FundKind != method.FundKind
+            && await _db.StockVouchers.AnyAsync(v => v.PaymentMethodId == id && v.PaidAmount > 0, ct))
+            throw new ValidationDomainException(new Dictionary<string, string[]>
+            {
+                ["fundKind"] = new[] { "Phương thức thanh toán đã được dùng trên phiếu kho có thanh toán, không đổi được loại quỹ." },
+            }, null);
+
         method.Name = request.Name.Trim();
         method.FundKind = request.FundKind;
         await _db.SaveChangesAsync(ct);

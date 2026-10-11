@@ -404,6 +404,42 @@ describe('CashVoucherFormPage', () => {
     ]);
   });
 
+  it('blocks saving while an allocation is above its open amount', async () => {
+    createMock.mockResolvedValue(voucher());
+    renderPage('Receipt');
+    await pickCustomer();
+    fillLine('2500');
+    await waitFor(() => expect(allocationInput('PX00001')).toHaveValue('1.000'));
+
+    typeMoney(allocationInput('PX00001'), '1500');
+
+    expect(await screen.findByText('Phân bổ vượt số còn nợ')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lưu tạm' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Lưu và thoát' })).toBeDisabled();
+    // Ctrl+S goes through the same guard.
+    fireEvent.keyDown(byId('cash-fund'), { key: 's', ctrlKey: true });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('blocks saving while the allocations exceed the voucher amount', async () => {
+    createMock.mockResolvedValue(voucher());
+    renderPage('Receipt');
+    await pickCustomer();
+    fillLine('2500');
+    await waitFor(() => expect(allocationInput('PX00002')).toHaveValue('1.500'));
+
+    typeMoney(allocationInput('PX00002'), '1400');
+    typeMoney(screen.getByRole('textbox', { name: 'Số tiền dòng 1' }), '1000');
+
+    expect(await screen.findByText('Tổng phân bổ vượt số tiền phiếu')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lưu tạm' })).toBeDisabled();
+
+    // Back inside the capacity: saving works again.
+    typeMoney(allocationInput('PX00002'), '0');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Lưu tạm' })).toBeEnabled());
+  });
+
   it('changing to a reason without debt effect hides allocations and sends an empty list', async () => {
     createMock.mockResolvedValue(voucher());
     renderPage('Receipt');

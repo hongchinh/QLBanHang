@@ -21,7 +21,7 @@ import {
   type CashVoucherFormValues,
 } from '@/features/cash-vouchers/schema';
 import { isOwnAllocation, toFormDefaults, toUpsertPayload } from '@/features/cash-vouchers/payload';
-import { allocationTotal, suggestAllocations } from '@/features/cash-vouchers/allocation';
+import { allocationTotal, checkAllocations, suggestAllocations } from '@/features/cash-vouchers/allocation';
 import type {
   CashVoucher,
   CashVoucherAllocation,
@@ -259,6 +259,18 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     form.setValue('allocations', next, { shouldDirty: true });
   }, [form, readOnly, allocationsTouched, showAllocations, openItems, total, otherSettled]);
 
+  // The grid flags these rows; the server would reject them, so saving is blocked until they are fixed.
+  const allocationsInvalid =
+    showAllocations &&
+    !readOnly &&
+    !!openItems &&
+    checkAllocations(
+      openItems,
+      allocations.map((row) => ({ entryId: row.entryId, amount: toNum(row.amount) })),
+      total,
+      otherSettled,
+    ).invalid;
+
   const activitiesQuery = useCashVoucherActivities(id, isEdit);
 
   function resetTo(fresh: CashVoucher) {
@@ -373,7 +385,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   }
 
   function submitWithIntent(intent: SubmitIntent) {
-    if (submittingRef.current || busy || readOnly) return;
+    if (submittingRef.current || busy || readOnly || allocationsInvalid) return;
     submittingRef.current = true;
     dropBlankLines();
     void form
@@ -470,10 +482,10 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
           <div className="flex flex-wrap justify-end gap-2">
             {!isEdit && (
               <>
-                <Button type="button" variant="outline" size="sm" onClick={() => submitWithIntent('save-exit')} disabled={busy}>
+                <Button type="button" variant="outline" size="sm" onClick={() => submitWithIntent('save-exit')} disabled={busy || allocationsInvalid}>
                   Lưu và thoát
                 </Button>
-                <Button type="button" size="sm" onClick={() => submitWithIntent('save-stay')} disabled={busy}>
+                <Button type="button" size="sm" onClick={() => submitWithIntent('save-stay')} disabled={busy || allocationsInvalid}>
                   {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
                   Lưu tạm
                 </Button>
@@ -486,7 +498,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
               </Button>
             )}
             {isEdit && !isManaged && !readOnly && (
-              <Button type="button" size="sm" onClick={() => submitWithIntent('update')} disabled={busy}>
+              <Button type="button" size="sm" onClick={() => submitWithIntent('update')} disabled={busy || allocationsInvalid}>
                 {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
                 Cập nhật
               </Button>

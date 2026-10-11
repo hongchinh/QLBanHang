@@ -1,7 +1,6 @@
-import { allocationTotal, suggestAllocations } from '@/features/cash-vouchers/allocation';
+import { checkAllocations, suggestAllocations } from '@/features/cash-vouchers/allocation';
 import type { CashAllocationFormValues } from '@/features/cash-vouchers/schema';
 import type { OpenItem } from '@/features/debt/types';
-import { roundAwayFromZero } from '@/lib/round';
 import { cn } from '@/lib/utils';
 import { CellError, MoneyCell } from './cash-line-grid';
 import '@/pages/quotations/components/line-items-grid.css';
@@ -53,10 +52,12 @@ export function AllocationGrid({
     return row === undefined ? undefined : toNum(row.amount);
   };
 
-  const allocated = allocationTotal(value.map((row) => ({ amount: toNum(row.amount) })));
-  const capacity = roundAwayFromZero(total - otherSettled, 2);
-  const remaining = roundAwayFromZero(capacity - allocated, 2);
-  const overAllocated = remaining < 0;
+  const { allocated, capacity, remaining, overAllocated, overOpenEntryIds } = checkAllocations(
+    items,
+    value.map((row) => ({ entryId: row.entryId, amount: toNum(row.amount) })),
+    total,
+    otherSettled,
+  );
 
   const setAmount = (entryId: string, amount: number) => {
     const next = items
@@ -103,7 +104,7 @@ export function AllocationGrid({
               const amount = amountOf(item.entryId);
               const inputId = `allocation-amount-${item.entryId}`;
               const error =
-                amount !== undefined && amount > item.open ? 'Phân bổ vượt số còn nợ' : errors?.[item.entryId];
+                overOpenEntryIds.has(item.entryId) ? 'Phân bổ vượt số còn nợ' : errors?.[item.entryId];
               return (
                 <tr key={item.entryId}>
                   <td>

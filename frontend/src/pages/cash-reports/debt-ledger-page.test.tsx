@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth-store';
 import { DebtLedgerPage } from './debt-ledger-page';
 import type { DebtLedgerParams, DebtLedgerReport } from '@/features/cash-reports/types';
 
@@ -60,6 +61,16 @@ const ledger = (over: Partial<DebtLedgerReport> = {}): DebtLedgerReport => ({
   ...over,
 });
 
+const ALL_LINK_PERMISSIONS = [
+  'stock_in.view', 'stock_out.view', 'receipts.view', 'payments.view', 'debt_offset.view', 'debt.opening_balance',
+];
+
+function setPermissions(permissions: string[]) {
+  useAuthStore.setState({
+    user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions },
+  });
+}
+
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
@@ -73,6 +84,7 @@ describe('DebtLedgerPage', () => {
     useDebtLedgerMock.mockClear();
     useDebtPartnerSearchMock.mockClear();
     ledgerState.data = ledger();
+    setPermissions(ALL_LINK_PERMISSIONS);
   });
 
   it('reads params from the url and renders running balance', () => {
@@ -151,5 +163,26 @@ describe('DebtLedgerPage', () => {
     expect(screen.getByRole('link', { name: 'PC00001' })).toHaveAttribute('href', '/payments/c1');
     expect(screen.getByRole('link', { name: 'BT00001' })).toHaveAttribute('href', '/debt/offsets/o1');
     expect(screen.getByRole('link', { name: 'NDK' })).toHaveAttribute('href', '/debt/opening');
+  });
+
+  it('document codes without the permission of their screen are plain text', () => {
+    ledgerState.data = ledger({
+      rows: [
+        ...ledger().rows,
+        {
+          entryId: 'e6', postedAt: '2026-10-09T02:00:00Z', docDate: '2026-10-09', docCode: 'NDK',
+          sourceType: 'Opening', sourceId: 'od1', description: null, increase: 0, decrease: 0, runningBalance: -600_000,
+        },
+      ],
+    });
+    setPermissions(['stock_in.view', 'payments.view']);
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31');
+
+    expect(screen.getByRole('link', { name: 'PN00001' })).toHaveAttribute('href', '/stock-in/v1');
+    expect(screen.getByRole('link', { name: 'PC00001' })).toHaveAttribute('href', '/payments/c1');
+    for (const code of ['BT00001', 'NDK']) {
+      expect(screen.getByText(code)).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: code })).not.toBeInTheDocument();
+    }
   });
 });

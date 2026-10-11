@@ -1,5 +1,4 @@
 import { useId, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useCashBook } from '@/features/cash-reports/hooks';
 import type { CashBookGroup, CashBookRow, FundKindFilter } from '@/features/cash-reports/types';
@@ -11,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getErrorMessage } from '@/lib/api-client';
 import { formatCurrencyVnd } from '@/lib/utils';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
-import { NUMERIC_CELL, documentLink, formatAmountCell } from './document-link';
+import { DocumentCodeLink } from './document-code-link';
+import { NUMERIC_CELL, formatAmountCell } from './document-link';
 
 const ALL = 'all';
 
@@ -24,9 +24,7 @@ const KIND_OPTIONS: { value: FundKindFilter; label: string }[] = [
 function CodeLink({ row, code }: { row: CashBookRow; code: string | null | undefined }) {
   if (!code) return null;
   return (
-    <Link to={documentLink(row.sourceType, row.sourceId)} className="text-primary hover:underline">
-      {code}
-    </Link>
+    <DocumentCodeLink sourceType={row.sourceType} sourceId={row.sourceId} code={code} />
   );
 }
 

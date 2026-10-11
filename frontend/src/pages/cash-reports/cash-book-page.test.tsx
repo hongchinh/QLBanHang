@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth-store';
 import { CashBookPage } from './cash-book-page';
 import type { CashBookGroup, CashBookParams, CashBookReport } from '@/features/cash-reports/types';
 import type { Fund, FundListParams } from '@/features/funds/types';
@@ -67,6 +68,12 @@ const report = (groups: CashBookGroup[], over: Partial<CashBookReport> = {}): Ca
   grandOpening: 1_000_000, grandIn: 500_000, grandOut: 200_000, grandClosing: 1_300_000, ...over,
 });
 
+function setPermissions(permissions: string[]) {
+  useAuthStore.setState({
+    user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions },
+  });
+}
+
 function renderPage() {
   return render(
     <MemoryRouter>
@@ -79,6 +86,7 @@ describe('CashBookPage', () => {
   beforeEach(() => {
     useCashBookMock.mockClear();
     useFundsMock.mockClear();
+    setPermissions(['receipts.view', 'payments.view', 'fund_transfers.view']);
   });
 
   it('renders one group per fund with opening and closing', () => {
@@ -118,6 +126,18 @@ describe('CashBookPage', () => {
     expect(within(closing).getByText('1.000.000')).toBeInTheDocument();
 
     expect(screen.queryByText('Không tính chuyển quỹ nội bộ giữa các quỹ đang xem')).not.toBeInTheDocument();
+  });
+
+  it('document codes without the permission of their screen are plain text', () => {
+    reportState.data = report([cashGroup]);
+    setPermissions(['receipts.view']);
+    renderPage();
+
+    expect(screen.getByRole('link', { name: 'PT00001' })).toHaveAttribute('href', '/receipts/r1');
+    for (const code of ['PC00001', 'CQ00001']) {
+      expect(screen.getByText(code)).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: code })).not.toBeInTheDocument();
+    }
   });
 
   it('grand total shown for several funds', () => {

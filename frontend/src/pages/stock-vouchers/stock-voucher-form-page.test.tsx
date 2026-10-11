@@ -873,6 +873,16 @@ describe('StockVoucherFormPage', () => {
     expect(screen.getByRole('link', { name: 'Phiếu chi tự động: PC00002' })).toHaveAttribute('href', '/payments/cv-2');
   });
 
+  it('shows the automatic voucher as plain text without the permission of its screen', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher({ autoCashVoucherId: 'cv-2', autoCashVoucherCode: 'PC00002', autoCashVoucherType: 'Payment' });
+    permissionState.granted = ['stock_in.view', 'stock_in.update', 'receipts.view'];
+    renderPage('In');
+
+    expect(screen.getByText('Phiếu chi tự động: PC00002')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Phiếu chi tự động: PC00002' })).not.toBeInTheDocument();
+  });
+
   it('no automatic voucher link without an automatic voucher', () => {
     routeParams.id = V1;
     voucherState.data = voucher();

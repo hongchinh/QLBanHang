@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useCanAccessRoute } from '@/hooks/useCanAccessRoute';
 import type { CashVoucherType } from '@/features/cash-common/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
@@ -56,8 +57,12 @@ export function StockTotalsPanel({
   autoVoucher,
   readOnly,
 }: StockTotalsPanelProps) {
+  const canAccess = useCanAccessRoute();
   const [vatToAll, setVatToAll] = useState('');
   const vatToAllRate = Number(vatToAll);
+  const autoVoucherText = autoVoucher
+    ? `${AUTO_VOUCHER_LINKS[autoVoucher.type].label}: ${autoVoucher.code}`
+    : '';
   const canApplyVat = vatToAll.trim() !== '' && Number.isFinite(vatToAllRate) && vatToAllRate >= 0 && vatToAllRate <= 100;
 
   return (
@@ -97,12 +102,16 @@ export function StockTotalsPanel({
 
         {autoVoucher && (
           <div className="text-right text-sm">
-            <Link
-              to={`${AUTO_VOUCHER_LINKS[autoVoucher.type].basePath}/${autoVoucher.id}`}
-              className="text-blue-600 hover:underline"
-            >
-              {`${AUTO_VOUCHER_LINKS[autoVoucher.type].label}: ${autoVoucher.code}`}
-            </Link>
+            {canAccess(`${AUTO_VOUCHER_LINKS[autoVoucher.type].basePath}/${autoVoucher.id}`) ? (
+              <Link
+                to={`${AUTO_VOUCHER_LINKS[autoVoucher.type].basePath}/${autoVoucher.id}`}
+                className="text-blue-600 hover:underline"
+              >
+                {autoVoucherText}
+              </Link>
+            ) : (
+              <span>{autoVoucherText}</span>
+            )}
           </div>
         )}
 

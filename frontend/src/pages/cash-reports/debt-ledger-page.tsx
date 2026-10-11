@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { useDebtLedger } from '@/features/cash-reports/hooks';
 import { useDebtPartnerSearch } from '@/features/debt/hooks';
 import type { DebtPartnerSearchItem } from '@/features/debt/types';
@@ -16,12 +16,12 @@ import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
 import {
   DEBT_SOURCE_TYPE_LABELS,
   NUMERIC_CELL,
-  documentLink,
   formatAmountCell,
   formatDebitCredit,
   formatYmd,
   parseDebtSide,
 } from './document-link';
+import { DocumentCodeLink } from './document-code-link';
 
 const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 
@@ -257,9 +257,7 @@ export function DebtLedgerPage() {
                   <tr key={row.entryId} className="border-b">
                     <td className="whitespace-nowrap px-2 py-2">{formatYmd(row.docDate)}</td>
                     <td className="px-2 py-2">
-                      <Link to={documentLink(row.sourceType, row.sourceId)} className="text-primary hover:underline">
-                        {row.docCode}
-                      </Link>
+                      <DocumentCodeLink sourceType={row.sourceType} sourceId={row.sourceId} code={row.docCode} />
                     </td>
                     <td className="px-2 py-2">{DEBT_SOURCE_TYPE_LABELS[row.sourceType]}</td>
                     <td className="px-2 py-2">{row.description}</td>

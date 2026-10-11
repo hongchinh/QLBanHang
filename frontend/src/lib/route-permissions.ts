@@ -64,15 +64,27 @@ const RULES: RouteRule[] = [
   { pattern: /^\/settings\/cash$/, permission: 'cash.settings' },
 ];
 
+export function canAccessRouteWith(
+  pathname: string,
+  hasPermission: (permission: string) => boolean,
+  isInRole: (role: string) => boolean,
+): boolean {
+  const rule = RULES.find((r) => r.pattern.test(pathname));
+  if (!rule) return true;
+  if (rule.permission && !hasPermission(rule.permission)) return false;
+  if (rule.anyPermission && !rule.anyPermission.some((p) => hasPermission(p))) return false;
+  if (rule.role && !isInRole(rule.role)) return false;
+  return true;
+}
+
 export function canAccessRoute(
   pathname: string,
   perms: readonly string[],
   roles: readonly string[],
 ): boolean {
-  const rule = RULES.find((r) => r.pattern.test(pathname));
-  if (!rule) return true;
-  if (rule.permission && !perms.includes(rule.permission)) return false;
-  if (rule.anyPermission && !rule.anyPermission.some((p) => perms.includes(p))) return false;
-  if (rule.role && !roles.includes(rule.role)) return false;
-  return true;
+  return canAccessRouteWith(
+    pathname,
+    (p) => perms.includes(p),
+    (r) => roles.includes(r),
+  );
 }

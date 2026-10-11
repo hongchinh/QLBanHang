@@ -10,6 +10,14 @@ import '@/pages/quotations/components/line-items-grid.css';
 const fmt = new Intl.NumberFormat('vi-VN');
 
 const OVER_OPEN_MESSAGE = 'Vượt số còn lại';
+const NEGATIVE_MESSAGE = 'Số tiền không được âm';
+
+// Error of one row's amount; the caller blocks the save while one exists.
+function amountError(amount: number | undefined, open: number): string | undefined {
+  if (amount === undefined) return undefined;
+  if (amount < 0) return NEGATIVE_MESSAGE;
+  return amount > open ? OVER_OPEN_MESSAGE : undefined;
+}
 
 // `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
 function formatDateOnly(value?: string | null): string {
@@ -31,8 +39,8 @@ export interface OpenItemGridProps {
   docHref?: (sourceType: DebtSourceType, sourceId: string) => string;
 }
 
-// One side of a matching: the open documents with a money input per row. An amount above the open amount
-// is shown as an error; the caller blocks the save while one exists.
+// One side of a matching: the open documents with a money input per row. A negative amount or one above the
+// open amount is shown as an error; the caller blocks the save while one exists.
 export function OpenItemGrid({ title, items, value, onChange, isLoading = false, docHref }: OpenItemGridProps) {
   const titleId = useId();
   const amountOf = (entryId: string): number | undefined => value.find((r) => r.entryId === entryId)?.amount;
@@ -77,7 +85,7 @@ export function OpenItemGrid({ title, items, value, onChange, isLoading = false,
             {items.map((item) => {
               const amount = amountOf(item.entryId);
               const inputId = `${titleId}-amount-${item.entryId}`;
-              const error = amount !== undefined && amount > item.open ? OVER_OPEN_MESSAGE : undefined;
+              const error = amountError(amount, item.open);
               return (
                 <tr key={item.entryId}>
                   <td>

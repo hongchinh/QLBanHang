@@ -82,6 +82,22 @@ describe('OpenItemGrid', () => {
     expect(JSON.parse(screen.getByTestId('rows').textContent!)).toEqual([{ entryId: B, amount: 300_000 }]);
   });
 
+  it('flags a negative amount', () => {
+    render(<Harness />);
+
+    const grid = screen.getByRole('region', { name: 'Chứng từ ghi nợ còn nợ' });
+    const row = within(grid).getByText('PX00002').closest('tr')!;
+    const second = within(grid).getByRole('textbox', { name: 'Đối trừ PX00002' });
+    enter(second, '-100000');
+
+    expect(second).toHaveAttribute('aria-invalid', 'true');
+    expect(within(row).getByText('Số tiền không được âm')).toBeInTheDocument();
+
+    enter(second, '100000');
+    expect(second).not.toHaveAttribute('aria-invalid');
+    expect(within(row).queryByText('Số tiền không được âm')).not.toBeInTheDocument();
+  });
+
   it('links the document code when a link is given', () => {
     render(<Harness docHref={(sourceType, sourceId) => `/${sourceType}/${sourceId}`} />);
 

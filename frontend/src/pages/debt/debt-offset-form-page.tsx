@@ -57,9 +57,11 @@ function listedRows(rows: MatchRow[], items: OpenItem[]): MatchRow[] {
   return rows.filter((row) => ids.has(row.entryId));
 }
 
-function exceedsOpen(rows: MatchRow[], items: OpenItem[]): boolean {
+// A row the grid flags: negative or above the open amount. The payload drops non-positive rows, so the sums
+// shown would no longer be what is sent.
+function hasInvalidRow(rows: MatchRow[], items: OpenItem[]): boolean {
   const open = new Map(items.map((item) => [item.entryId, item.open]));
-  return rows.some((row) => row.amount > (open.get(row.entryId) ?? 0));
+  return rows.some((row) => row.amount < 0 || row.amount > (open.get(row.entryId) ?? 0));
 }
 
 const toAllocatable = (items: OpenItem[]) => items.map((item) => ({ ...item, dueDate: item.dueDate ?? null }));
@@ -121,9 +123,9 @@ function DebtOffsetCreateForm({ defaults }: { defaults?: DebtOffsetDefaults }) {
   const payables = listedRows(payableRows, payableItems);
   const receivableSum = sumOf(receivables);
   const payableSum = sumOf(payables);
-  const overOpen = exceedsOpen(receivables, receivableItems) || exceedsOpen(payables, payableItems);
+  const invalidRow = hasInvalidRow(receivables, receivableItems) || hasInvalidRow(payables, payableItems);
   const canSave =
-    canCreate && !!partner && !!voucherAt && receivableSum > 0 && receivableSum === payableSum && !overOpen && !busy;
+    canCreate && !!partner && !!voucherAt && receivableSum > 0 && receivableSum === payableSum && !invalidRow && !busy;
   const loadError = partner ? (receivable.error ?? payable.error) : null;
 
   const clear = () => {

@@ -221,6 +221,30 @@ describe('DebtOffsetFormPage', () => {
     expect(mocks.create).not.toHaveBeenCalled();
   });
 
+  it('blocks the save while a row is negative', async () => {
+    render(<DebtOffsetFormPage />);
+    await pickPartner();
+
+    // Shown sums 100,000 = 100,000, but only the positive rows would be sent (200,000 against 100,000).
+    enter(within(receivableGrid()).getByRole('textbox', { name: 'Đối trừ PX00001' }), '200000');
+    const negative = within(receivableGrid()).getByRole('textbox', { name: 'Đối trừ PX00002' });
+    enter(negative, '-100000');
+    enter(within(payableGrid()).getByRole('textbox', { name: 'Đối trừ PN00001' }), '100000');
+
+    expect(negative).toHaveAttribute('aria-invalid', 'true');
+    expect(within(receivableGrid()).getByText('Số tiền không được âm')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lưu' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu' }));
+    expect(mocks.create).not.toHaveBeenCalled();
+
+    // The negative row fixed: the sides match again and can be saved.
+    enter(negative, '0');
+    enter(within(payableGrid()).getByRole('textbox', { name: 'Đối trừ PN00001' }), '200000');
+    expect(screen.getByTestId('sum-receivable')).toHaveTextContent('200.000');
+    expect(screen.getByTestId('sum-payable')).toHaveTextContent('200.000');
+    expect(screen.getByRole('button', { name: 'Lưu' })).toBeEnabled();
+  });
+
   it('creates an offset', async () => {
     mocks.create.mockResolvedValue(offset({ id: O1 }));
     render(<DebtOffsetFormPage />);

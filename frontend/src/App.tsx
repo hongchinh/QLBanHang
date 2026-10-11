@@ -309,7 +309,7 @@ export function App() {
                     index
                     element={
                       <ProtectedRoute permission="stock_in.view">
-                        <StockVoucherListPage type="In" />
+                        <StockVoucherListPage key="In" type="In" />
                       </ProtectedRoute>
                     }
                   />
@@ -317,7 +317,7 @@ export function App() {
                     path="new"
                     element={
                       <ProtectedRoute permission="stock_in.create">
-                        <StockVoucherFormPage type="In" />
+                        <StockVoucherFormPage key="In" type="In" />
                       </ProtectedRoute>
                     }
                   />
@@ -325,7 +325,7 @@ export function App() {
                     path=":id"
                     element={
                       <ProtectedRoute permission="stock_in.view">
-                        <StockVoucherFormPage type="In" />
+                        <StockVoucherFormPage key="In" type="In" />
                       </ProtectedRoute>
                     }
                   />
@@ -335,7 +335,7 @@ export function App() {
                     index
                     element={
                       <ProtectedRoute permission="stock_out.view">
-                        <StockVoucherListPage type="Out" />
+                        <StockVoucherListPage key="Out" type="Out" />
                       </ProtectedRoute>
                     }
                   />
@@ -343,7 +343,7 @@ export function App() {
                     path="new"
                     element={
                       <ProtectedRoute permission="stock_out.create">
-                        <StockVoucherFormPage type="Out" />
+                        <StockVoucherFormPage key="Out" type="Out" />
                       </ProtectedRoute>
                     }
                   />
@@ -351,18 +351,18 @@ export function App() {
                     path=":id"
                     element={
                       <ProtectedRoute permission="stock_out.view">
-                        <StockVoucherFormPage type="Out" />
+                        <StockVoucherFormPage key="Out" type="Out" />
                       </ProtectedRoute>
                     }
                   />
                 </Route>
-                {/* Round 2A: 11.3 receipts and payments (list); 11.4 form for new and :id */}
+                {/* Round 2A: 11.3 receipts and payments (list); 11.4 form for new and :id. Both types share one page component, so each element is keyed by type to never reuse the other's state. */}
                 <Route path="receipts">
                   <Route
                     index
                     element={
                       <ProtectedRoute permission="receipts.view">
-                        <CashVoucherListPage type="Receipt" />
+                        <CashVoucherListPage key="Receipt" type="Receipt" />
                       </ProtectedRoute>
                     }
                   />
@@ -370,7 +370,7 @@ export function App() {
                     path="new"
                     element={
                       <ProtectedRoute permission="receipts.create">
-                        <CashVoucherFormPage type="Receipt" />
+                        <CashVoucherFormPage key="Receipt" type="Receipt" />
                       </ProtectedRoute>
                     }
                   />
@@ -378,7 +378,7 @@ export function App() {
                     path=":id"
                     element={
                       <ProtectedRoute permission="receipts.view">
-                        <CashVoucherFormPage type="Receipt" />
+                        <CashVoucherFormPage key="Receipt" type="Receipt" />
                       </ProtectedRoute>
                     }
                   />
@@ -388,7 +388,7 @@ export function App() {
                     index
                     element={
                       <ProtectedRoute permission="payments.view">
-                        <CashVoucherListPage type="Payment" />
+                        <CashVoucherListPage key="Payment" type="Payment" />
                       </ProtectedRoute>
                     }
                   />
@@ -396,7 +396,7 @@ export function App() {
                     path="new"
                     element={
                       <ProtectedRoute permission="payments.create">
-                        <CashVoucherFormPage type="Payment" />
+                        <CashVoucherFormPage key="Payment" type="Payment" />
                       </ProtectedRoute>
                     }
                   />
@@ -404,7 +404,7 @@ export function App() {
                     path=":id"
                     element={
                       <ProtectedRoute permission="payments.view">
-                        <CashVoucherFormPage type="Payment" />
+                        <CashVoucherFormPage key="Payment" type="Payment" />
                       </ProtectedRoute>
                     }
                   />

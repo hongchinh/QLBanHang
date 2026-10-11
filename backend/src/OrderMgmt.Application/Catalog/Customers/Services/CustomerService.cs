@@ -203,6 +203,7 @@ public class CustomerService : ICustomerService
         if (!isCustomer && !isSupplier)
             throw new DomainException("PARTNER_ROLE_REQUIRED", "Đối tượng phải là khách hàng hoặc nhà cung cấp.");
         PartnerPermissionGuard.EnsureCanUpdate(_currentUser, customer.IsCustomer, customer.IsSupplier, isCustomer, isSupplier);
+        await EnsureRolesKeepTheirDebtAsync(customer, isCustomer, isSupplier, ct);
 
         customer.Name = request.Name.Trim();
         customer.TaxCode = request.TaxCode?.Trim();
@@ -229,6 +230,8 @@ public class CustomerService : ICustomerService
         PartnerPermissionGuard.EnsureCanDelete(_currentUser, customer.IsCustomer, customer.IsSupplier);
         if (await _db.StockVouchers.AnyAsync(v => v.PartnerId == id, ct))
             throw new ConflictException("Đối tượng đã có phiếu nhập/xuất kho, không thể xóa.");
+        if (await HasCashOrDebtDataAsync(id, ct))
+            throw new ConflictException("Đối tượng đã có phiếu thu/chi hoặc công nợ, không thể xóa.");
 
         customer.IsDeleted = true;
         customer.DeletedAt = _clock.UtcNow;
@@ -236,6 +239,31 @@ public class CustomerService : ICustomerService
 
         await _db.SaveChangesAsync(ct);
     }
+
+    /// Debt of a side needs the role of that side on every later save of its documents (P19), and the matching and
+    /// offset screens search partners by role: a side with debt entries keeps its role.
+    private async Task EnsureRolesKeepTheirDebtAsync(Customer customer, bool isCustomer, bool isSupplier,
+        CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (customer.IsCustomer && !isCustomer && await HasDebtAsync(customer.Id, DebtSide.Receivable, ct))
+            errors["isCustomer"] = new[] { "Đối tượng đã có công nợ phải thu, không bỏ được vai trò khách hàng." };
+        if (customer.IsSupplier && !isSupplier && await HasDebtAsync(customer.Id, DebtSide.Payable, ct))
+            errors["isSupplier"] = new[] { "Đối tượng đã có công nợ phải trả, không bỏ được vai trò nhà cung cấp." };
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
+    }
+
+    private Task<bool> HasDebtAsync(Guid partnerId, DebtSide side, CancellationToken ct) =>
+        _db.DebtEntries.AnyAsync(e => e.PartnerId == partnerId && e.Side == side, ct);
+
+    /// Non-deleted cash vouchers, opening debts and offsets of any status (a cancelled one can be restored), and any
+    /// debt entry. Deleting the partner would leave them uneditable and its debt unreachable.
+    private async Task<bool> HasCashOrDebtDataAsync(Guid partnerId, CancellationToken ct) =>
+        await _db.DebtEntries.AnyAsync(e => e.PartnerId == partnerId, ct)
+        || await _db.CashVouchers.AnyAsync(v => v.PartnerId == partnerId, ct)
+        || await _db.OpeningDebts.AnyAsync(d => d.PartnerId == partnerId, ct)
+        || await _db.DebtOffsetVouchers.AnyAsync(o => o.PartnerId == partnerId, ct);
 
     private static IQueryable<Customer> WithRole(IQueryable<Customer> query, PartnerRole role) =>
         role == PartnerRole.Supplier ? query.Where(c => c.IsSupplier) : query.Where(c => c.IsCustomer);

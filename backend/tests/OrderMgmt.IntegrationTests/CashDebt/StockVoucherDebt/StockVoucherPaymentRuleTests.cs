@@ -161,6 +161,13 @@ public class StockVoucherPaymentRuleTests : CashDebtTestBase
         explicitDue.DueDate = new DateOnly(2026, 10, 20);
         (await PostOkAsync(explicitDue)).DueDate.Should().Be(new DateOnly(2026, 10, 20));
 
+        // A due date before the document's VN date would be overdue on the day it is posted; the same day is fine.
+        var early = await SaleRequestAsync(customer, 1, 100_000);
+        early.DueDate = new DateOnly(2026, 10, 4);
+        await ExpectInvalidAsync(early, "dueDate");
+        early.DueDate = new DateOnly(2026, 10, 5);
+        (await PostOkAsync(early)).DueDate.Should().Be(new DateOnly(2026, 10, 5));
+
         // XKH has no debt effect: no default.
         var other = await SaleRequestAsync(customer, 1, 100_000);
         other.ReasonId = await ReasonIdAsync("XKH");

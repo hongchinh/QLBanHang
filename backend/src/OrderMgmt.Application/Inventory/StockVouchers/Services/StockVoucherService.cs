@@ -696,6 +696,9 @@ public class StockVoucherService : IStockVoucherService
         var voucherAt = VnTime.ToUtc(request.VoucherAt);
         if (voucherAt < MinVoucherAt || voucherAt > _clock.UtcNow.AddYears(1))
             Add("voucherAt", "Ngày chứng từ không hợp lệ.");
+        // Due before the document's VN date would be overdue on the day it is posted (P27).
+        else if (request.DueDate is { } dueDate && dueDate < VnTime.ToVnDate(voucherAt))
+            Add("dueDate", "Hạn thanh toán không được trước ngày chứng từ.");
 
         var products = await LoadProductsAsync(request.Lines.Select(l => l.ProductId), ct);
         var storedLines = existing?.Lines.Where(l => !l.IsDeleted).ToDictionary(l => l.Id)

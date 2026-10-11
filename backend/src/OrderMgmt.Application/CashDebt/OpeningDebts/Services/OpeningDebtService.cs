@@ -224,6 +224,8 @@ public class OpeningDebtService : IOpeningDebtService
             Add("docDate", "Ngày chứng từ phải trước hoặc bằng ngày đầu kỳ.");
         if (request.Kind == OpeningDebtKind.Prepayment && request.DueDate is not null)
             Add("dueDate", "Khoản trả trước không có hạn thanh toán.");
+        else if (request.DueDate is { } dueDate && dueDate < request.DocDate)
+            Add("dueDate", "Hạn thanh toán không được trước ngày chứng từ.");
         if (request.Amount <= 0)
             Add("amount", "Số tiền phải lớn hơn 0.");
 

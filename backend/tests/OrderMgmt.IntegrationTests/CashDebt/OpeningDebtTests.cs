@@ -87,6 +87,22 @@ public class OpeningDebtTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Due_date_cannot_be_before_the_document_date()
+    {
+        var (_, client) = await BranchWithDateAsync("E", Oct1);
+        var customerId = await CreatePartnerAsync("OE" + _suffix, isCustomer: true, isSupplier: false);
+
+        var early = await SendAsync(client, HttpMethod.Post, "/api/opening-debts", Request(customerId, DebtSide.Receivable,
+            OpeningDebtKind.Debt, "HD1", new DateOnly(2026, 9, 20), 1_000m, dueDate: new DateOnly(2026, 9, 19)));
+        early.Status.Should().Be(HttpStatusCode.BadRequest);
+        early.Error!.Details.Should().ContainKey("dueDate");
+
+        var sameDay = await SendAsync(client, HttpMethod.Post, "/api/opening-debts", Request(customerId, DebtSide.Receivable,
+            OpeningDebtKind.Debt, "HD1", new DateOnly(2026, 9, 20), 1_000m, dueDate: new DateOnly(2026, 9, 20)));
+        sameDay.Status.Should().Be(HttpStatusCode.OK, sameDay.Error?.Message);
+    }
+
+    [Fact]
     public async Task Prepayment_posts_a_decrease_and_rejects_due_date()
     {
         var (_, client) = await BranchWithDateAsync("B", Oct1);

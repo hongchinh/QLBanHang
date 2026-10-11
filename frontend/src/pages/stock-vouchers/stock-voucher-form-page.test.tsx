@@ -411,7 +411,7 @@ describe('StockVoucherFormPage', () => {
 
     expect(await screen.findByText('Xuất quá tồn kho')).toBeInTheDocument();
     expect(screen.getByText('SP01@KHO01')).toBeInTheDocument();
-    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn tiếp tục' }));
+    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn lưu' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
     const [first, second] = createMock.mock.calls.map((c) => c[0]);
@@ -444,7 +444,7 @@ describe('StockVoucherFormPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Hủy phiếu' }));
     fireEvent.click(dialog().getByRole('button', { name: 'Hủy phiếu' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Vẫn tiếp tục' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Vẫn hủy phiếu' }));
 
     await waitFor(() => expect(cancelMock).toHaveBeenCalledTimes(2));
     expect(cancelMock.mock.calls[0][0]).toEqual({ id: V1, body: { version: 7 } });
@@ -462,7 +462,7 @@ describe('StockVoucherFormPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Xóa' }));
     fireEvent.click(dialog().getByRole('button', { name: 'Xóa' }));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Vẫn tiếp tục' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Vẫn xóa' }));
 
     await waitFor(() => expect(deleteMock).toHaveBeenCalledTimes(2));
     expect(deleteMock.mock.calls[1][0]).toEqual({
@@ -751,10 +751,10 @@ describe('StockVoucherFormPage', () => {
 
     expect(await screen.findByText('Vượt hạn mức nợ')).toBeInTheDocument();
     expect(screen.getByText('NCC01')).toBeInTheDocument();
-    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn tiếp tục' }));
+    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn lưu' }));
 
     expect(await screen.findByText('Quỹ bị âm')).toBeInTheDocument();
-    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn tiếp tục' }));
+    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn lưu' }));
 
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(3));
     const [first, second, third] = createMock.mock.calls.map((c) => c[0]);
@@ -776,7 +776,7 @@ describe('StockVoucherFormPage', () => {
 
     expect(await screen.findByText('Bỏ đối trừ chứng từ')).toBeInTheDocument();
     expect(screen.getByText('PC00003')).toBeInTheDocument();
-    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn tiếp tục' }));
+    fireEvent.click(dialog().getByRole('button', { name: 'Vẫn hủy phiếu' }));
 
     await waitFor(() => expect(cancelMock).toHaveBeenCalledTimes(2));
     expect(cancelMock.mock.calls[1][0]).toEqual({ id: V1, body: { version: 7, confirmRemoveSettlements: true } });

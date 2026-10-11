@@ -52,7 +52,7 @@ export function ConfirmRequiredDialog({ request, confirmLabel = 'Vẫn tiếp t�
           ) : (
             <>
               <Button variant="outline" onClick={onClose}>
-                Hủy
+                Quay lại
               </Button>
               <Button variant="destructive" onClick={onConfirm}>
                 {confirmLabel}

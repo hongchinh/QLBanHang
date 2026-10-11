@@ -38,7 +38,7 @@ describe('ConfirmRequiredDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Vẫn tiếp tục' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Hủy' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -59,7 +59,7 @@ describe('ConfirmRequiredDialog', () => {
     expect(screen.getByText('Không đủ tiền trong quỹ.')).toBeInTheDocument();
     expect(screen.getByText('QTM')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Vẫn tiếp tục' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Hủy' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Quay lại' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Đóng' }));
     expect(onClose).toHaveBeenCalled();
   });

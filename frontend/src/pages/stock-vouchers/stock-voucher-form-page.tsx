@@ -79,6 +79,13 @@ type PendingAction =
   | { kind: 'save'; intent: SubmitIntent; payload: UpsertStockVoucherRequest; flags: ConfirmFlags }
   | { kind: VoucherActionKind; version?: number; flags: ConfirmFlags };
 
+const CONFIRM_LABELS: Record<PendingAction['kind'], string> = {
+  save: 'Vẫn lưu',
+  cancel: 'Vẫn hủy phiếu',
+  restore: 'Vẫn khôi phục',
+  delete: 'Vẫn xóa',
+};
+
 const ERROR_TITLES: Record<PendingAction['kind'], string> = {
   save: 'Không thể lưu phiếu',
   cancel: 'Không thể hủy phiếu',
@@ -818,6 +825,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
       <ConfirmRequiredDialog
         request={confirmation?.request ?? null}
+        confirmLabel={confirmation ? CONFIRM_LABELS[confirmation.action.kind] : undefined}
         onConfirm={() => {
           if (!confirmation) return;
           const { action, request } = confirmation;

@@ -29,6 +29,7 @@ public class SetOpeningDateRequestValidator : AbstractValidator<SetOpeningDateRe
         RuleFor(x => x.OpeningDate!.Value)
             .InclusiveBetween(new DateOnly(2000, 1, 1), new DateOnly(2100, 12, 31))
             .When(x => x.OpeningDate is not null)
-            .WithName("openingDate");
+            .OverridePropertyName("openingDate")
+            .WithMessage("Ngày đầu kỳ phải từ 01/01/2000 đến 31/12/2100.");
     }
 }

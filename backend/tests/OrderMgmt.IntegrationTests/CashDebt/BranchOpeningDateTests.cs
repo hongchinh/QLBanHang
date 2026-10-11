@@ -39,6 +39,7 @@ public class BranchOpeningDateTests : CashDebtTestBase
 
         var outOfRange = await PutOpeningDateAsync(_client, branchId, new DateOnly(1999, 12, 31));
         outOfRange.Status.Should().Be(HttpStatusCode.BadRequest);
+        outOfRange.Error!.Details.Should().ContainKey("openingDate", "the form attaches the error to the field");
 
         var cleared = await PutOpeningDateAsync(_client, branchId, null);
         cleared.Status.Should().Be(HttpStatusCode.OK, cleared.Error?.Message);

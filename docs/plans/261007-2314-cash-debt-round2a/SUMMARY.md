@@ -133,7 +133,7 @@ Round 1 rules still apply unchanged: D25 (test database), D26 (test depth), D27 
 - [x] Phase 09 — Reports API & invariant replay (L) — `phase-09-reports-api.md`
 - [x] Phase 10 — Frontend foundations, catalogs & settings (L) — `phase-10-frontend-foundations-catalogs.md`
 - [x] Phase 11 — Frontend cash vouchers, fund transfers & stock voucher form (XL) — `phase-11-frontend-vouchers.md`
-- [ ] Phase 12 — Frontend matching, offset, opening balances & reports (L) — `phase-12-frontend-matching-reports.md`
+- [x] Phase 12 — Frontend matching, offset, opening balances & reports (L) — `phase-12-frontend-matching-reports.md`
 - [ ] Phase 13 — Documentation & final verification (S) — `phase-13-docs-and-verification.md`
 
 Phases run in order. Phases 10–12 depend on the API contracts of Phases 01–09 and must not start before Phase 09 is complete.

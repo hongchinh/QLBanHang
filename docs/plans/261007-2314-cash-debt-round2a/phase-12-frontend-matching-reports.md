@@ -1,6 +1,6 @@
 # Phase 12 — Frontend matching, offset, opening debts & reports
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

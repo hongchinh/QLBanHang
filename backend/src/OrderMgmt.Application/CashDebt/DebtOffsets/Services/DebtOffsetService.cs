@@ -179,6 +179,7 @@ public class DebtOffsetService : IDebtOffsetService
             var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
             PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucherAt }.Where(IsValidVoucherAt));
             var partner = await ValidateAsync(request, branchId, voucherAt, c);
+            await OpeningDateGuard.EnsureOnOrAfterAsync(_db, branchId, voucherAt, c);
 
             var offset = new DebtOffsetVoucher
             {

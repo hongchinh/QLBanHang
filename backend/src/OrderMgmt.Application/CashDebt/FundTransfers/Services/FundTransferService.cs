@@ -175,6 +175,7 @@ public class FundTransferService : IFundTransferService
             var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
             PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucherAt }.Where(IsValidVoucherAt));
             await ValidateAsync(request, branchId, existing: null, c);
+            await OpeningDateGuard.EnsureOnOrAfterAsync(_db, branchId, voucherAt, c);
             // Every fund involved: the source loses the amount (the one the check can flag), the destination gains it.
             var fundCapture = await _fundGuard.CaptureAsync(
                 new[] { (request.FromFundId, voucherAt), (request.ToFundId, voucherAt) }, c);
@@ -213,6 +214,7 @@ public class FundTransferService : IFundTransferService
             PeriodLockGuard.EnsureNotLocked(lockedUntil,
                 new[] { transfer.VoucherAt }.Concat(new[] { voucherAt }.Where(IsValidVoucherAt)));
             await ValidateAsync(request, transfer.BranchId, transfer, c);
+            await OpeningDateGuard.EnsureOnOrAfterAsync(_db, transfer.BranchId, voucherAt, c);
             // Every fund involved, old and new, from the earlier of the two dates: an old destination that loses the
             // transfer is checked as well as a new or changed source.
             var from = transfer.VoucherAt < voucherAt ? transfer.VoucherAt : voucherAt;

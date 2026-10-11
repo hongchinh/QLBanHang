@@ -14,6 +14,7 @@ using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.Posting;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
+using OrderMgmt.Application.Organization.Branches;
 using OrderMgmt.Application.Sales.Quotations.Helpers;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.CashDebt;
@@ -380,6 +381,7 @@ public class StockVoucherService : IStockVoucherService
             var reason = await EnsureReferencesStillExistAsync(request, branchId, null, terms, c);
             // Read after the shared branch gate, so a concurrent period lock change is serialized (review finding).
             await EnsureNotLockedAsync(branchId, new[] { voucherAt }, c);
+            await OpeningDateGuard.EnsureOnOrAfterAsync(_db, branchId, voucherAt, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
             var credit = await CaptureCreditAsync(branchId, reason, request.PartnerId, c);
             var fundCapture = await CaptureFundsAsync(new[] { (terms.FundId, voucherAt) }, c);
@@ -425,6 +427,7 @@ public class StockVoucherService : IStockVoucherService
                 new[] { voucher.FundId, terms.FundId }, new[] { voucher.ReasonId, request.ReasonId }, c);
             var reason = await EnsureReferencesStillExistAsync(request, voucher.BranchId, voucher, terms, c);
             await EnsureNotLockedAsync(voucher.BranchId, new[] { voucher.VoucherAt, voucherAt }, c);
+            await OpeningDateGuard.EnsureOnOrAfterAsync(_db, voucher.BranchId, voucherAt, c);
             var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, c);
             var credit = await CaptureCreditAsync(voucher.BranchId, reason, request.PartnerId, c);
             // Both funds from the earlier of the two dates: the old fund loses the automatic voucher, the new one gains it.

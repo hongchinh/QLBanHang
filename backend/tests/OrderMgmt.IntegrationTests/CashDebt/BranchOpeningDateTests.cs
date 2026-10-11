@@ -47,19 +47,31 @@ public class BranchOpeningDateTests : CashDebtTestBase
     }
 
     [Fact]
-    public async Task Rejected_when_branch_has_documents()
+    public async Task With_documents_only_a_first_date_on_or_before_the_earliest_one_is_accepted()
     {
-        // The main branch already has stock vouchers from other tests; make sure of it.
-        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-02 08:00",
-            LineRequest(await CreateInventoryProductAsync(NewCode("ODP")), 1, 1000));
-
-        var blocked = await PutOpeningDateAsync(_client, MainBranchId, new DateOnly(2026, 10, 1));
-        blocked.Status.Should().Be(HttpStatusCode.Conflict);
-        blocked.Error!.Code.Should().Be("BRANCH_HAS_DOCUMENTS");
-
+        // A branch that started without an opening date and already has a document (cancelled ones count too).
         var branchId = await CreateBranchAsync(NewCode("OD2"));
-        var ok = await PutOpeningDateAsync(_client, branchId, new DateOnly(2026, 10, 1));
-        ok.Status.Should().Be(HttpStatusCode.OK, ok.Error?.Message);
+        var warehouseId = await CreateWarehouseAsync(branchId, NewCode("W2"));
+        using var branchClient = CloneAdminClient();
+        UseBranch(branchClient, branchId);
+        await CreateVoucherAsync(branchClient, StockDirection.In, "NKH", "2026-10-02 08:00",
+            r => r.WarehouseId = warehouseId, LineRequest(await CreateInventoryProductAsync(NewCode("ODP")), 1, 1000));
+
+        var afterFirst = await PutOpeningDateAsync(_client, branchId, new DateOnly(2026, 10, 3));
+        afterFirst.Status.Should().Be(HttpStatusCode.BadRequest);
+        afterFirst.Error!.Details.Should().ContainKey("openingDate");
+
+        var onFirst = await PutOpeningDateAsync(_client, branchId, new DateOnly(2026, 10, 2));
+        onFirst.Status.Should().Be(HttpStatusCode.OK, onFirst.Error?.Message);
+        onFirst.Branch!.OpeningDate.Should().Be(new DateOnly(2026, 10, 2));
+
+        // Once set, the date no longer moves while documents exist.
+        var moved = await PutOpeningDateAsync(_client, branchId, new DateOnly(2026, 10, 1));
+        moved.Status.Should().Be(HttpStatusCode.Conflict);
+        moved.Error!.Code.Should().Be("BRANCH_HAS_DOCUMENTS");
+        var cleared = await PutOpeningDateAsync(_client, branchId, null);
+        cleared.Status.Should().Be(HttpStatusCode.Conflict);
+        cleared.Error!.Code.Should().Be("BRANCH_HAS_DOCUMENTS");
     }
 
     [Fact]

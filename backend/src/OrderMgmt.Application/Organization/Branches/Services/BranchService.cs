@@ -1,7 +1,9 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
@@ -169,7 +171,26 @@ public class BranchService : IBranchService
             PeriodLockGuard.EnsureNotLocked(branch.LockedUntil,
                 new[] { oldDate, newDate }.Where(d => d is not null).Select(d => d!.Value));
             if (await HasDocumentsAsync(id, c))
-                throw new ConflictException("BRANCH_HAS_DOCUMENTS", "Chi nhánh đã có chứng từ, không đổi được ngày đầu kỳ.");
+            {
+                // A branch that started without an opening date may still take its first one, on or before its
+                // earliest document: it has no opening data to repost, and no document falls before the new date.
+                if (oldDate is not null || newDate is not { } first || await HasOpeningDataAsync(id, c))
+                    throw new ConflictException("BRANCH_HAS_DOCUMENTS", "Chi nhánh đã có chứng từ, không đổi được ngày đầu kỳ.");
+                var earliest = await EarliestDocumentDateAsync(id, c);
+                if (first > earliest)
+                    throw new ValidationDomainException(new Dictionary<string, string[]>
+                    {
+                        ["openingDate"] = new[]
+                        {
+                            string.Create(CultureInfo.InvariantCulture,
+                                $"Chi nhánh đã có chứng từ từ ngày {earliest:dd/MM/yyyy}, ngày đầu kỳ không được sau ngày này."),
+                        },
+                    }, null);
+
+                branch.OpeningDate = first;
+                await _db.SaveChangesAsync(c);
+                return ToDto(branch);
+            }
             if (oldDate == newDate)
                 return ToDto(branch);
 
@@ -193,6 +214,24 @@ public class BranchService : IBranchService
                 await _openingDebt.RepostBranchAsync(id, c);
             return ToDto(branch);
         }, ct);
+    }
+
+    private async Task<bool> HasOpeningDataAsync(Guid branchId, CancellationToken ct) =>
+        await _db.OpeningStocks.AnyAsync(o => o.BranchId == branchId, ct)
+        || await _db.OpeningDebts.AnyAsync(o => o.BranchId == branchId, ct)
+        || await _db.Funds.AnyAsync(f => f.BranchId == branchId && f.OpeningAmount != 0, ct);
+
+    /// The VN date of the branch's earliest non-deleted document, of any status. Call it only when one exists.
+    private async Task<DateOnly> EarliestDocumentDateAsync(Guid branchId, CancellationToken ct)
+    {
+        var firsts = new[]
+        {
+            await _db.StockVouchers.Where(v => v.BranchId == branchId).MinAsync(v => (DateTimeOffset?)v.VoucherAt, ct),
+            await _db.CashVouchers.Where(v => v.BranchId == branchId).MinAsync(v => (DateTimeOffset?)v.VoucherAt, ct),
+            await _db.FundTransfers.Where(t => t.BranchId == branchId).MinAsync(t => (DateTimeOffset?)t.VoucherAt, ct),
+            await _db.DebtOffsetVouchers.Where(o => o.BranchId == branchId).MinAsync(o => (DateTimeOffset?)o.VoucherAt, ct),
+        };
+        return VnTime.ToVnDate(firsts.OfType<DateTimeOffset>().Min());
     }
 
     // Non-deleted documents of any status (the query filters skip deleted ones).

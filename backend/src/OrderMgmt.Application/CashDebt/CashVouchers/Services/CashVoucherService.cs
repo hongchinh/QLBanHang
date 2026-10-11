@@ -243,6 +243,7 @@ public class CashVoucherService : ICashVoucherService
             var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
             PeriodLockGuard.EnsureNotLocked(lockedUntil, new[] { voucherAt }.Where(IsValidVoucherAt));
             var (reason, partner) = await ValidateAsync(request, branchId, existing: null, c);
+            await OpeningDateGuard.EnsureOnOrAfterAsync(_db, branchId, voucherAt, c);
             var fundCapture = await _fundGuard.CaptureAsync(new[] { (request.FundId, voucherAt) }, c);
 
             var voucher = new CashVoucher
@@ -282,6 +283,7 @@ public class CashVoucherService : ICashVoucherService
             PeriodLockGuard.EnsureNotLocked(lockedUntil,
                 new[] { voucher.VoucherAt }.Concat(new[] { voucherAt }.Where(IsValidVoucherAt)));
             var (reason, partner) = await ValidateAsync(request, voucher.BranchId, voucher, c);
+            await OpeningDateGuard.EnsureOnOrAfterAsync(_db, voucher.BranchId, voucherAt, c);
             // Both funds from the earlier of the two dates: the old fund loses the voucher, the new one gains it.
             var from = voucher.VoucherAt < voucherAt ? voucher.VoucherAt : voucherAt;
             var fundCapture = await _fundGuard.CaptureAsync(new[] { (voucher.FundId, from), (request.FundId, from) }, c);

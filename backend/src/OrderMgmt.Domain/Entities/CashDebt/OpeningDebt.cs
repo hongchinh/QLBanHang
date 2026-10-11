@@ -24,4 +24,7 @@ public class OpeningDebt : BaseEntity
     public decimal Amount { get; set; }
     public Guid? OwnerUserId { get; set; }
     public string? Note { get; set; }
+
+    /// Optimistic concurrency token (Postgres xmin, D29).
+    public uint Version { get; set; }
 }

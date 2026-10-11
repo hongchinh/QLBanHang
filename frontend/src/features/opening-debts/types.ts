@@ -19,6 +19,8 @@ export interface OpeningDebt {
   ownerUserId?: string | null;
   ownerName?: string | null;
   note?: string | null;
+  // xmin row version (D29): sent back on update and delete.
+  version: number;
 }
 
 // GET /api/opening-debts: the rows plus the branch opening date (null while it is not set).
@@ -48,4 +50,6 @@ export interface UpsertOpeningDebtRequest {
   ownerUserId?: string | null;
   note?: string;
   confirmRemoveSettlements: boolean;
+  // Required on update, omitted on create.
+  version?: number;
 }

@@ -70,13 +70,14 @@ public class OpeningDebtTests : CashDebtTestBase
         list.Items.Should().ContainSingle().Which.Id.Should().Be(created.Debt.Id);
 
         request.Amount = 6_000_000m;
+        request.Version = created.Debt.Version;
         var updated = await SendAsync(client, HttpMethod.Put, $"/api/opening-debts/{created.Debt.Id}", request);
         updated.Status.Should().Be(HttpStatusCode.OK, updated.Error?.Message);
         var moved = (await EntriesOfAsync(DebtSourceType.Opening, created.Debt.Id)).Should().ContainSingle().Subject;
         moved.Id.Should().Be(entry.Id);
         moved.Amount.Should().Be(6_000_000m);
 
-        var deleted = await client.DeleteAsync($"/api/opening-debts/{created.Debt.Id}");
+        var deleted = await client.DeleteAsync($"/api/opening-debts/{created.Debt.Id}?version={updated.Debt!.Version}");
         deleted.StatusCode.Should().Be(HttpStatusCode.OK, await deleted.Content.ReadAsStringAsync());
         (await EntriesOfAsync(DebtSourceType.Opening, created.Debt.Id)).Should().BeEmpty();
         (await ReadDataAsync<OpeningDebtListResult>(await client.GetAsync($"/api/opening-debts?partnerId={partnerId}")))
@@ -166,6 +167,7 @@ public class OpeningDebtTests : CashDebtTestBase
         list.Items.Select(i => i.Settled).Should().Equal(400m, 400m);
 
         debtRequest.Amount = 300m;
+        debtRequest.Version = debt.Version;
         var shrink = await SendAsync(client, HttpMethod.Put, $"/api/opening-debts/{debt.Id}", debtRequest);
         shrink.Status.Should().Be((HttpStatusCode)422);
         shrink.Error!.Code.Should().Be("DEBT_SETTLEMENTS_WILL_BE_REMOVED");
@@ -177,6 +179,41 @@ public class OpeningDebtTests : CashDebtTestBase
         confirmed.Debt.Settled.Should().Be(0m);
         var entry = (await EntriesOfAsync(DebtSourceType.Opening, debt.Id)).Single();
         (await SettlementsOfAsync(entry.Id)).Should().BeEmpty();
+
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Update_and_delete_check_the_row_version()
+    {
+        var (_, client) = await BranchWithDateAsync("V", Oct1);
+        var partnerId = await CreatePartnerAsync("OV" + _suffix, isCustomer: true, isSupplier: false);
+        var request = Request(partnerId, DebtSide.Receivable, OpeningDebtKind.Debt, "HV1", new DateOnly(2026, 9, 1), 1_000m);
+        var created = (await SendAsync(client, HttpMethod.Post, "/api/opening-debts", request)).Debt!;
+
+        request.Amount = 2_000m;
+        var missing = await SendAsync(client, HttpMethod.Put, $"/api/opening-debts/{created.Id}", request);
+        missing.Status.Should().Be(HttpStatusCode.BadRequest);
+        missing.Error!.Details.Should().ContainKey("version");
+
+        request.Version = created.Version;
+        var fresh = await SendAsync(client, HttpMethod.Put, $"/api/opening-debts/{created.Id}", request);
+        fresh.Status.Should().Be(HttpStatusCode.OK, fresh.Error?.Message);
+        fresh.Debt!.Version.Should().NotBe(created.Version);
+
+        // The second editor still holds the version read before the first save.
+        request.Amount = 3_000m;
+        var stale = await SendAsync(client, HttpMethod.Put, $"/api/opening-debts/{created.Id}", request);
+        stale.Status.Should().Be(HttpStatusCode.Conflict);
+        stale.Error!.Code.Should().Be("CONCURRENCY");
+
+        var noVersion = await client.DeleteAsync($"/api/opening-debts/{created.Id}");
+        noVersion.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        var staleDelete = await client.DeleteAsync($"/api/opening-debts/{created.Id}?version={created.Version}");
+        staleDelete.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await staleDelete.Content.ReadAsStringAsync()).Should().Contain("CONCURRENCY");
+        var freshDelete = await client.DeleteAsync($"/api/opening-debts/{created.Id}?version={fresh.Debt.Version}");
+        freshDelete.StatusCode.Should().Be(HttpStatusCode.OK, await freshDelete.Content.ReadAsStringAsync());
 
         await AssertCashDebtInvariantsAsync();
     }

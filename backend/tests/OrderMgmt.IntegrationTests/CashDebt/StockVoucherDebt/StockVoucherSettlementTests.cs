@@ -433,7 +433,7 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         }
 
         var (deletedSale, deletedId) = await PrepaidSaleAsync("TT1");
-        var deleted = await _branchClient.DeleteAsync($"/api/opening-debts/{deletedId}?confirmRemoveSettlements=true");
+        var deleted = await _branchClient.DeleteAsync($"/api/opening-debts/{deletedId}?version={await OpeningDebtVersionAsync(deletedId)}&confirmRemoveSettlements=true");
         deleted.StatusCode.Should().Be(HttpStatusCode.OK, await deleted.Content.ReadAsStringAsync());
         await AssertAutoSettlementAsync(deletedSale, 1_000m);
         await AssertCashDebtInvariantsAsync();
@@ -448,6 +448,7 @@ public class StockVoucherSettlementTests : CashDebtTestBase
             DocDate = new DateOnly(2026, 9, 20),
             Amount = 2_500m,
             ConfirmRemoveSettlements = true,
+            Version = await OpeningDebtVersionAsync(shrunkId),
         }, TestJson.Options);
         shrunk.StatusCode.Should().Be(HttpStatusCode.OK, await shrunk.Content.ReadAsStringAsync());
         await AssertAutoSettlementAsync(shrunkSale, 1_000m);

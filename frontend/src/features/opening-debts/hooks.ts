@@ -44,6 +44,13 @@ function useInvalidateOpeningDebts() {
   };
 }
 
+// A stale version (D29): reload the list so the next edit or delete starts from the saved row.
+function invalidateOnConcurrency(invalidate: () => void) {
+  return (error: unknown) => {
+    if (getApiError(error)?.code === 'CONCURRENCY') invalidate();
+  };
+}
+
 export function useCreateOpeningDebt() {
   const invalidate = useInvalidateOpeningDebts();
   return useMutation({
@@ -57,6 +64,7 @@ export function useUpdateOpeningDebt() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpsertOpeningDebtRequest }) => openingDebtsApi.update(id, data),
     onSuccess: invalidate,
+    onError: invalidateOnConcurrency(invalidate),
   });
 }
 
@@ -80,8 +88,9 @@ export function useOpeningDateNotSetHandler() {
 export function useDeleteOpeningDebt() {
   const invalidate = useInvalidateOpeningDebts();
   return useMutation({
-    mutationFn: ({ id, confirmRemoveSettlements }: { id: string; confirmRemoveSettlements: boolean }) =>
-      openingDebtsApi.remove(id, confirmRemoveSettlements),
+    mutationFn: ({ id, version, confirmRemoveSettlements }: { id: string; version: number; confirmRemoveSettlements: boolean }) =>
+      openingDebtsApi.remove(id, version, confirmRemoveSettlements),
     onSuccess: invalidate,
+    onError: invalidateOnConcurrency(invalidate),
   });
 }

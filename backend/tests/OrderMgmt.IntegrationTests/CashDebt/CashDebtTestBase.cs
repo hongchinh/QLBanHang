@@ -522,6 +522,10 @@ public abstract partial class CashDebtTestBase : InventoryTestBase
         InDbAsync(db => db.Funds.Where(f => f.Id == fundId)
             .ExecuteUpdateAsync(s => s.SetProperty(f => f.OpeningAmount, amount)));
 
+    /// The current row version (xmin) of an opening debt.
+    protected Task<uint> OpeningDebtVersionAsync(Guid id) =>
+        InDbAsync(async db => await db.OpeningDebts.AsNoTracking().Where(o => o.Id == id).Select(o => o.Version).SingleAsync());
+
     /// Creates an opening debt through the API in the client's working branch (which needs an opening date) and
     /// returns the row id and the id of its debt entry.
     protected async Task<(Guid OpeningDebtId, Guid EntryId)> CreateOpeningDebtAsync(HttpClient c, Guid partnerId,

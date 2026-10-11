@@ -253,6 +253,9 @@ public class OpeningDebtConfiguration : IEntityTypeConfiguration<OpeningDebt>
         b.Property(x => x.Amount).HasColumnType("numeric(18,2)");
         b.Property(x => x.Note).HasMaxLength(500);
 
+        // Npgsql maps a uint row version to the xmin system column (no DDL is emitted for it).
+        b.Property(x => x.Version).IsRowVersion();
+
         b.HasIndex(x => new { x.BranchId, x.PartnerId });
         b.HasQueryFilter(x => !x.IsDeleted);
 

@@ -24,6 +24,7 @@ const ROWS: OpeningDebt[] = [
     ownerUserId: '99999999-9999-4999-8999-999999999999',
     ownerName: 'Nguyễn Văn A',
     note: 'Nợ cũ',
+    version: 11,
   },
   {
     id: 'o2',
@@ -40,6 +41,7 @@ const ROWS: OpeningDebt[] = [
     ownerUserId: null,
     ownerName: null,
     note: null,
+    version: 12,
   },
 ];
 
@@ -299,15 +301,37 @@ describe('OpeningDebtPage', () => {
       note: 'Nợ cũ',
     };
     await waitFor(() =>
-      expect(updateMock).toHaveBeenCalledWith({ id: 'o1', data: { ...expected, confirmRemoveSettlements: false } }),
+      expect(updateMock).toHaveBeenCalledWith({
+        id: 'o1',
+        data: { ...expected, confirmRemoveSettlements: false, version: 11 },
+      }),
     );
     expect(await screen.findByText('Bỏ đối trừ chứng từ')).toBeInTheDocument();
     expect(screen.getByText('PT00012: 2.000.000')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Vẫn tiếp tục' }));
     await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(2));
-    expect(updateMock).toHaveBeenLastCalledWith({ id: 'o1', data: { ...expected, confirmRemoveSettlements: true } });
+    expect(updateMock).toHaveBeenLastCalledWith({
+      id: 'o1',
+      data: { ...expected, confirmRemoveSettlements: true, version: 11 },
+    });
     await waitFor(() => expect(screen.queryByLabelText('Số tiền *')).not.toBeInTheDocument());
+  });
+
+  it('a stale version on save closes the dialog with a reload message', async () => {
+    const user = userEvent.setup();
+    updateMock.mockRejectedValueOnce(apiError(409, 'CONCURRENCY', 'Dữ liệu đã được người khác cập nhật.'));
+    renderPage();
+
+    const row = screen.getByText('HD001').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: 'Sửa nợ đầu kỳ' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+
+    await waitFor(() => expect(screen.queryByLabelText('Số tiền *')).not.toBeInTheDocument());
+    expect(toast).toHaveBeenCalledWith(
+      expect.objectContaining({ variant: 'destructive', title: expect.stringContaining('người khác cập nhật') }),
+    );
   });
 
   it('deleting a settled row asks to remove settlements', async () => {
@@ -320,11 +344,11 @@ describe('OpeningDebtPage', () => {
     const row = screen.getByText('HD001').closest('tr')!;
     await user.click(within(row).getByRole('button', { name: 'Xóa nợ đầu kỳ' }));
     await user.click(await screen.findByRole('button', { name: 'Xóa' }));
-    await waitFor(() => expect(deleteMock).toHaveBeenCalledWith({ id: 'o1', confirmRemoveSettlements: false }));
+    await waitFor(() => expect(deleteMock).toHaveBeenCalledWith({ id: 'o1', version: 11, confirmRemoveSettlements: false }));
 
     expect(await screen.findByText('Bỏ đối trừ chứng từ')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Vẫn tiếp tục' }));
-    await waitFor(() => expect(deleteMock).toHaveBeenLastCalledWith({ id: 'o1', confirmRemoveSettlements: true }));
+    await waitFor(() => expect(deleteMock).toHaveBeenLastCalledWith({ id: 'o1', version: 11, confirmRemoveSettlements: true }));
     await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' })));
   });
 

@@ -152,7 +152,7 @@ export function OpeningDebtPage() {
 
   const deleteRow = async (row: OpeningDebt, confirmRemoveSettlements: boolean) => {
     try {
-      await remove.mutateAsync({ id: row.id, confirmRemoveSettlements });
+      await remove.mutateAsync({ id: row.id, version: row.version, confirmRemoveSettlements });
       toast({ variant: 'success', title: 'Đã xóa nợ đầu kỳ', description: row.docNo });
     } catch (err) {
       const request = toConfirmationRequest(err);

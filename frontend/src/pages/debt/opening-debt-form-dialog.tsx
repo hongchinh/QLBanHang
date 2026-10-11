@@ -25,7 +25,7 @@ import {
   type OpeningDebtFormValues,
 } from '@/features/opening-debts/schema';
 import type { OpeningDebt } from '@/features/opening-debts/types';
-import { formatApiErrorDetails } from '@/lib/api-client';
+import { formatApiErrorDetails, getApiError } from '@/lib/api-client';
 import { applyApiFieldErrors } from '@/lib/apply-api-field-errors';
 import { toConfirmationRequest, type ConfirmationRequest } from '@/lib/confirm-required';
 import { toast } from '@/lib/use-toast';
@@ -37,6 +37,9 @@ const SELECT_CLASS =
 
 const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 const KINDS: OpeningDebtKind[] = ['Debt', 'Prepayment'];
+const CONCURRENCY_MESSAGE =
+  'Nợ đầu kỳ đã được người khác cập nhật. Đã tải lại danh sách — vui lòng mở lại để sửa.';
+
 const SERVER_FIELDS = ['partnerId', 'docNo', 'docDate', 'dueDate', 'amount', 'note'] as const;
 
 // GET /api/debt/partners of the chosen side; one stable hook per side.
@@ -106,6 +109,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
     const data = toUpsertOpeningDebtRequest(values, {
       ownerUserId: initial ? (initial.ownerUserId ?? null) : undefined,
       confirmRemoveSettlements,
+      version: initial?.version,
     });
     try {
       if (initial) await update.mutateAsync({ id: initial.id, data });
@@ -119,6 +123,12 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
         return;
       }
       if (handleOpeningDateNotSet(err)) return;
+      if (getApiError(err)?.code === 'CONCURRENCY') {
+        // D29: the list is reloaded by the hook; close so the next edit starts from the saved row.
+        toast({ variant: 'destructive', title: CONCURRENCY_MESSAGE });
+        onOpenChange(false);
+        return;
+      }
       applyApiFieldErrors(err, form.setError, SERVER_FIELDS);
       toast({ variant: 'destructive', title: 'Không thể lưu', description: formatApiErrorDetails(err) });
     }

@@ -111,7 +111,7 @@ public class OpeningDebtService : IOpeningDebtService
         var branchId = await _currentBranch.GetIdAsync(ct);
         await _transaction.RunAsync(async c =>
         {
-            var row = await LockRowAsync(branchId, id, request.PartnerId, c);
+            var row = await LockRowAsync(branchId, id, request.PartnerId, request.Version, c);
             var openingDate = await OpeningDateAsync(branchId, c);
             await ValidateAsync(request, openingDate, c);
 
@@ -129,12 +129,12 @@ public class OpeningDebtService : IOpeningDebtService
         return await GetAsync(id, ct);
     }
 
-    public async Task DeleteAsync(Guid id, bool confirmRemoveSettlements, CancellationToken ct = default)
+    public async Task DeleteAsync(Guid id, uint? version, bool confirmRemoveSettlements, CancellationToken ct = default)
     {
         var branchId = await _currentBranch.GetIdAsync(ct);
         await _transaction.RunAsync(async c =>
         {
-            var row = await LockRowAsync(branchId, id, newPartnerId: null, c);
+            var row = await LockRowAsync(branchId, id, newPartnerId: null, version, c);
             await OpeningDateAsync(branchId, c);
 
             var counterparts = await _ledger.CounterpartEntryIdsAsync(DebtSourceType.Opening, row.Id, c);
@@ -176,8 +176,9 @@ public class OpeningDebtService : IOpeningDebtService
         await _cashDebtLock.AcquireAsync(branchId, partnerIds.Distinct(), Array.Empty<Guid>(), ct);
     }
 
-    /// Locks the row's current partner (and the new one) and returns the tracked row of the working branch.
-    private async Task<OpeningDebt> LockRowAsync(Guid branchId, Guid id, Guid? newPartnerId, CancellationToken ct)
+    /// Locks the row's current partner (and the new one) and returns the tracked row of the working branch. The row is
+    /// always marked modified so the xmin check runs even when nothing else changes (D29).
+    private async Task<OpeningDebt> LockRowAsync(Guid branchId, Guid id, Guid? newPartnerId, uint? version, CancellationToken ct)
     {
         var oldPartnerId = await _db.OpeningDebts.AsNoTracking()
             .Where(o => o.Id == id && o.BranchId == branchId)
@@ -193,6 +194,13 @@ public class OpeningDebtService : IOpeningDebtService
         // A concurrent save moved the row to a partner whose key this write does not hold.
         if (row.PartnerId != oldPartnerId)
             throw new ConflictException("Công nợ đầu kỳ vừa được người khác cập nhật. Vui lòng tải lại.");
+        if (version is null)
+            throw new ValidationDomainException(
+                new Dictionary<string, string[]> { ["version"] = new[] { "Thiếu phiên bản dữ liệu của công nợ đầu kỳ." } }, null);
+
+        _db.Entry(row).Property(o => o.Version).OriginalValue = version.Value;
+        row.UpdatedAt = _clock.UtcNow;
+        row.UpdatedBy = _currentUser.UserId;
         return row;
     }
 
@@ -288,6 +296,7 @@ public class OpeningDebtService : IOpeningDebtService
             OwnerUserId = o.OwnerUserId,
             OwnerName = _db.Users.Where(u => u.Id == o.OwnerUserId).Select(u => u.FullName).FirstOrDefault(),
             Note = o.Note,
+            Version = o.Version,
         });
 
     /// Settled = Σ settlements of each row's Opening entry.

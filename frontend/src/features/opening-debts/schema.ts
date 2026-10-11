@@ -48,7 +48,7 @@ export type OpeningDebtFormParsed = z.output<typeof openingDebtSchema>;
 
 export function toUpsertOpeningDebtRequest(
   values: OpeningDebtFormParsed,
-  extra: { ownerUserId?: string | null; confirmRemoveSettlements: boolean },
+  extra: { ownerUserId?: string | null; confirmRemoveSettlements: boolean; version?: number },
 ): UpsertOpeningDebtRequest {
   return {
     partnerId: values.partnerId,
@@ -61,5 +61,6 @@ export function toUpsertOpeningDebtRequest(
     ...(extra.ownerUserId !== undefined ? { ownerUserId: extra.ownerUserId } : {}),
     note: values.note,
     confirmRemoveSettlements: extra.confirmRemoveSettlements,
+    ...(extra.version !== undefined ? { version: extra.version } : {}),
   };
 }

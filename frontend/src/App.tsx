@@ -68,6 +68,10 @@ import { SalesPerformancePage } from '@/pages/reports/sales-performance-page';
 import { SalesRevenuePage } from '@/pages/reports/sales-revenue-page';
 import { SalesRevenueDetailPage } from '@/pages/reports/sales-revenue-detail-page';
 import { VehicleRevenuePage } from '@/pages/reports/vehicle-revenue-page';
+// Round 2A: 12.5 debt balance, debt ledger and cash book reports
+import { DebtBalancePage } from '@/pages/cash-reports/debt-balance-page';
+import { DebtLedgerPage } from '@/pages/cash-reports/debt-ledger-page';
+import { CashBookPage } from '@/pages/cash-reports/cash-book-page';
 import { ForbiddenPage, NotFoundPage } from '@/pages/error-pages';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useBeforeInstallPrompt } from '@/hooks/useBeforeInstallPrompt';
@@ -635,6 +639,31 @@ export function App() {
                     element={
                       <ProtectedRoute permission="reports.revenue">
                         <VehicleRevenuePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Round 2A: 12.5 debt balance, debt ledger and cash book reports */}
+                  <Route
+                    path="debt-balance"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtBalancePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-ledger"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtLedgerPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="cash-book"
+                    element={
+                      <ProtectedRoute permission="reports.cash">
+                        <CashBookPage />
                       </ProtectedRoute>
                     }
                   />

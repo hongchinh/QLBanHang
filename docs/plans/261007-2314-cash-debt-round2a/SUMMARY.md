@@ -134,7 +134,7 @@ Round 1 rules still apply unchanged: D25 (test database), D26 (test depth), D27 
 - [x] Phase 10 — Frontend foundations, catalogs & settings (L) — `phase-10-frontend-foundations-catalogs.md`
 - [x] Phase 11 — Frontend cash vouchers, fund transfers & stock voucher form (XL) — `phase-11-frontend-vouchers.md`
 - [x] Phase 12 — Frontend matching, offset, opening balances & reports (L) — `phase-12-frontend-matching-reports.md`
-- [ ] Phase 13 — Documentation & final verification (S) — `phase-13-docs-and-verification.md`
+- [x] Phase 13 — Documentation & final verification (S) — `phase-13-docs-and-verification.md`
 
 Phases run in order. Phases 10–12 depend on the API contracts of Phases 01–09 and must not start before Phase 09 is complete.
 
@@ -231,7 +231,7 @@ Manual smoke test (dev stack: `docker compose up -d`, backend `dotnet run --proj
 
 - **Code:** every task is a separate commit on `feat/cash-debt-round2a`; revert the branch or individual commits with `git revert`.
 - **Database:**
-  - The new migrations are `AddCashDebtSettings`, `AddBranchOpeningDate`, `AddCashReasons`, `AddFunds`, `AddPaymentMethodFundKind`, `AddStockReasonDebtEffect`, `AddCustomerCreditDaysAndCreditLimits`, `AddDebtLedger`, `AddOpeningDebts`, `AddCashVouchers`, `AddFundTransfers`, `AddStockVoucherDebtFields`, `AddDebtOffsets`.
+  - The new migrations are `AddCashDebtSettings`, `AddBranchOpeningDate`, `AddCashReasons`, `AddFunds`, `AddPaymentMethodFundKind`, `AddStockReasonDebtEffect`, `AddCustomerCreditDaysAndCreditLimits`, `AddDebtLedger`, `AddOpeningDebts`, `AddCashVouchers`, `AddFundTransfers`, `AddStockVoucherDebtFields`, `AddDebtOffsets`, plus `AddFundDefaultUniqueIndex` (added during execution, see EXECUTION-REPORT D-1).
   - To roll back, run `dotnet ef database update AddStockVouchersAndLedger --project src/OrderMgmt.Infrastructure --startup-project src/OrderMgmt.WebApi`. This drops every cash/debt table and column.
   - `PaymentMethod.IsCash` is restored by the `Down` of `AddPaymentMethodFundKind` (`FundKind = 1` → `true`).
   - There is no production data yet, so the rollback is lossless for quotation and inventory data.

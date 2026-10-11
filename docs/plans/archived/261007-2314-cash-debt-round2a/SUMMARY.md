@@ -231,10 +231,17 @@ Manual smoke test (dev stack: `docker compose up -d`, backend `dotnet run --proj
 
 - **Code:** every task is a separate commit on `feat/cash-debt-round2a`; revert the branch or individual commits with `git revert`.
 - **Database:**
-  - The new migrations are `AddCashDebtSettings`, `AddBranchOpeningDate`, `AddCashReasons`, `AddFunds`, `AddPaymentMethodFundKind`, `AddStockReasonDebtEffect`, `AddCustomerCreditDaysAndCreditLimits`, `AddDebtLedger`, `AddOpeningDebts`, `AddCashVouchers`, `AddFundTransfers`, `AddStockVoucherDebtFields`, `AddDebtOffsets`, plus `AddFundDefaultUniqueIndex` (added during execution, see EXECUTION-REPORT D-1).
+  - The new migrations are `AddCashDebtSettings`, `AddBranchOpeningDate`, `AddCashReasons`, `AddFunds`, `AddPaymentMethodFundKind`, `AddStockReasonDebtEffect`, `AddCustomerCreditDaysAndCreditLimits`, `AddDebtLedger`, `AddOpeningDebts`, `AddCashVouchers`, `AddFundTransfers`, `AddStockVoucherDebtFields`, `AddDebtOffsets`, plus `AddFundDefaultUniqueIndex` (added during execution, see EXECUTION-REPORT D-1) and `AddOpeningDebtVersion` (added after the team-lead review).
   - To roll back, run `dotnet ef database update AddStockVouchersAndLedger --project src/OrderMgmt.Infrastructure --startup-project src/OrderMgmt.WebApi`. This drops every cash/debt table and column.
   - `PaymentMethod.IsCash` is restored by the `Down` of `AddPaymentMethodFundKind` (`FundKind = 1` → `true`).
   - There is no production data yet, so the rollback is lossless for quotation and inventory data.
+  - The seeder also added rows outside the dropped tables: the numbering and counters of the four cash document types, and the system stock reasons `NTL`/`XTL`. Remove them after the rollback so Round 1 does not list unknown numbering types:
+    ```sql
+    DELETE FROM document_counters WHERE doc_type IN (3, 4, 5, 6);
+    DELETE FROM document_numberings WHERE doc_type IN (3, 4, 5, 6);
+    DELETE FROM stock_reasons r WHERE r.code IN ('NTL', 'XTL')
+      AND NOT EXISTS (SELECT 1 FROM stock_vouchers v WHERE v.reason_id = r.id);
+    ```
 - **Permissions:** new rows are harmless if code is rolled back. To remove them (role assignments first; `\_` escapes the LIKE wildcard):
   ```sql
   DELETE FROM role_permissions WHERE permission_id IN (SELECT id FROM permissions WHERE code LIKE 'receipts.%' OR code LIKE 'payments.%' OR code LIKE 'fund\_transfers.%' OR code LIKE 'debt\_offset.%' OR code LIKE 'debt.%' OR code LIKE 'cash.%' OR code IN ('credit_limit.manage','reports.cash'));

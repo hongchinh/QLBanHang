@@ -131,6 +131,34 @@ After Phase 13, a team-lead review covered the whole branch in four areas: the l
 
 Verification after the fixes (on `2c7e314`): `dotnet test` 19 failed / 735 total (716 passed), the same 19 baseline tests; `npm run test` 3 failed / 646 total (643 passed), the same 3 baseline tests; typecheck clean; lint 3 errors and 14 warnings (baseline); `npm run build` passes.
 
+### Second pass: the remaining findings (2026-10-12)
+
+The user then asked for every remaining finding to be fixed, the refactors included. The fixes below are on the branch; the confirmation token (F-13) and the refactors (F-15) are planned in [261012-0433-round2a-review-refactor](../../261012-0433-round2a-review-refactor/SUMMARY.md).
+
+| Commit | Finding | Fix |
+|---|---|---|
+| `acaab35` | F-11 (Medium): a branch that got a document before its opening date could never take opening data; documents could be dated before the opening date. | User decision: a branch without an opening date may take its **first** one after documents exist, on or before its earliest document (400 `openingDate` otherwise). Once set, stock vouchers, cash vouchers, fund transfers and offsets dated before it are rejected (`OpeningDateGuard`, 400 `voucherAt`). See D-22. |
+| `f65175a` | The D-16 report test created a receipt before the opening date through the API. | It now seeds that receipt as legacy data (the date is lifted around the save). |
+| `4f012eb` | F-12 (Medium): the negative-fund guard read the whole fund history under the fund lock. | `FundBalanceWindowQuery` sums the balance before `from` in SQL and loads only the later movements, batched across funds; the cash book is unchanged. |
+| `1d7c444` | Report tests had no VN-day boundary case. | Receipts at 00:30 VN and 23:59 VN on and around the window edges. |
+| `7638bcc` | Branch delete ignored 2A data. | 409 when the branch has documents or opening data. |
+| `94e0605` | Stock voucher Total → 0 with settlements answered 409. | A zero draft is a shrink to 0: 422 `DEBT_SETTLEMENTS_WILL_BE_REMOVED`, then the entry is deleted. |
+| `240418f` | A due date could be before the document date. | 400 `dueDate` on stock vouchers and opening debts. |
+| `de70882` | Restore did not re-check the stored fund. | 409 when the fund is gone, inactive or no longer of the method's kind. |
+| `2ec9f08` | Every stock voucher save logged "Updated" on its automatic voucher. | Logged only when a mirrored field changed. |
+| `8998f93` | `OpeningDebt` had no optimistic concurrency. | `xmin` version on update and delete (migration `AddOpeningDebtVersion`, added to the rollback list); the form sends it. |
+| `030c004` | `GET /api/funds` returned `OpeningAmount` to every role. | `null` unless the user holds `cash.opening_balance`, `cash.catalogs.manage` or `reports.cash`. |
+| `b3b8db9` | An unmatch was undone by saving a cash voucher form opened before it. | Matching and unmatching change the version of the cash vouchers they touch (409 `CONCURRENCY` for the stale form). |
+| `192bb1d` | A soft-deleted number could be issued again after a reset-policy change. | Every numbering check counts soft-deleted documents (stock, cash, automatic, transfer, offset). |
+| `10be052` … `779265b` | F-14 (frontend, 6 items). | The cash voucher form blocks invalid allocations; "Quay lại" and per-action confirm labels; the paid amount is locked without a fund and server field errors show under their fields; document links are plain text without the route's permission; the ledger's running balance shows Dư Nợ / Dư Có; list and form routes are keyed by type. |
+| (docs) | The rollback recipe missed seeded rows. | SUMMARY.md lists `AddOpeningDebtVersion` and the SQL for the numbering rows of types 3–6 and `NTL`/`XTL`. |
+
+| # | Area | Deviation | Reason |
+|---|---|---|---|
+| D-22 | Opening date, P8 (`acaab35`) **(user)** | A branch without an opening date may set its first one after documents exist, on or before its earliest document. No document may be dated before the opening date. | Without it, a branch that started without a date could never take opening data. |
+
+Verification after the second pass (on `192bb1d`): `dotnet test` 19 failed / 756 total (737 passed), the same 19 baseline tests; `npm run test` 3 failed / 658 total (655 passed), the same 3 baseline tests; typecheck clean; lint 3 errors and 14 warnings (baseline); `npm run build` passes.
+
 ## Follow-ups (for Round 2B or a separate fix)
 
 | # | Item |
@@ -150,9 +178,9 @@ Verification after the fixes (on `2c7e314`): `dotnet test` 19 failed / 735 total
 | F-8 | Performance: the cash book loads every movement of each fund and filters in memory. Partner-summary overdue reads every entry of the partner. Both are fine at current volumes. |
 | F-9 | No ownership or `edit_all` check on offset cancel/delete, because the plan defines no such permission. |
 | F-10 | Round 2B (separate plan): Công nợ theo chứng từ, Tuổi nợ, Nợ quá hạn, Công nợ theo nhân viên, Biên bản đối chiếu, and the overdue warning list. |
-| F-11 | **Before go-live (review, Medium).** Nothing requires `Branch.OpeningDate` before the first document or `VoucherAt ≥ OpeningDate`. A branch created without a date that gets a voucher can never take opening stock, opening debt or a fund opening balance (`BRANCH_HAS_DOCUMENTS`). Reject stock, cash, transfer and offset saves without a date or dated before it, or require the date when a branch is created. |
-| F-12 | **Before go-live (review, Medium; extends F-8).** The negative-fund guard loads a fund's whole history two to four times per write while holding the `cash-fund` key, on every receipt, payment, transfer and paid stock voucher. Sum the balance before `from` in SQL and load only the later movements. |
-| F-13 | Backend items from the review (Low):
+| F-11 | **Fixed in the second pass (`acaab35`).** **Before go-live (review, Medium).** Nothing requires `Branch.OpeningDate` before the first document or `VoucherAt ≥ OpeningDate`. A branch created without a date that gets a voucher can never take opening stock, opening debt or a fund opening balance (`BRANCH_HAS_DOCUMENTS`). Reject stock, cash, transfer and offset saves without a date or dated before it, or require the date when a branch is created. |
+| F-12 | **Fixed in the second pass (`4f012eb`).** **Before go-live (review, Medium; extends F-8).** The negative-fund guard loads a fund's whole history two to four times per write while holding the `cash-fund` key, on every receipt, payment, transfer and paid stock voucher. Sum the balance before `from` in SQL and load only the later movements. |
+| F-13 | Backend items from the review (Low). **Fixed in the second pass, except the confirmation token, which is planned:**
   - stock voucher `Total → 0` with settlements returns 409 instead of the confirmable 422;
   - `DueDate` may be earlier than the document date;
   - a confirmed resend removes whatever settlements exist then, not only the ones the 422 listed;
@@ -165,14 +193,14 @@ Verification after the fixes (on `2c7e314`): `dotnet test` 19 failed / 735 total
   - every stock voucher save logs `Updated` on its automatic voucher;
   - the rollback recipe does not remove `document_numberings` of types 3–6 or `NTL`/`XTL`;
   - the report tests have no VN-day boundary case. |
-| F-14 | Frontend items from the review (Low):
+| F-14 | Frontend items from the review (Low). **Fixed in the second pass (`10be052` … `779265b`):**
   - the cash voucher form submits allocations its own grid marks invalid;
   - the confirmation dialog's dismiss button reads "Hủy", which is ambiguous on a cancel action;
   - the paid amount stays editable for a method without a fund, and server errors on `fundId` / `dueDate` show only as a toast;
   - links to automatic vouchers and opening debts ignore permissions;
   - the Sổ chi tiết running balance does not split Nợ/Có;
   - the list state may carry over between /receipts and /payments (no `key`). |
-| F-15 | Refactoring from the review:
+| F-15 | Refactoring from the review. **Planned in `docs/plans/261012-0433-round2a-review-refactor`:**
   - `CashVoucherService`, `FundTransferService` and `DebtOffsetService` duplicate their lifecycle, activity, lock and helper code;
   - `RecomputeAutoAsync` is a manual hook at six call sites;
   - the "in use" guards list their tables by hand (the cause of `f276516`);

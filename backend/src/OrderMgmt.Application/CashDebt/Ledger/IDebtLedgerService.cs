@@ -16,7 +16,10 @@ public interface IDebtLedgerService
     Task RemoveSourceAsync(DebtSourceType sourceType, Guid sourceId, bool confirmRemoveSettlements,
         CancellationToken ct = default);
 
-    /// Silently removes settlements of one origin attached to the source's entries (no confirmation, no activity).
+    /// Silently removes the source's own settlements of one origin (no confirmation, no activity). A settlement is owned
+    /// by the document whose id is its BatchId: Auto by the stock voucher, AtVoucher by the cash voucher that made the
+    /// allocation, Offset by the offset voucher. Another document's settlement of the same origin on the source's
+    /// entries stays, and is subject to the P10/P11 rules of PostAsync.
     Task RemoveOwnSettlementsAsync(DebtSourceType sourceType, Guid sourceId, SettlementOrigin origin,
         CancellationToken ct = default);
 

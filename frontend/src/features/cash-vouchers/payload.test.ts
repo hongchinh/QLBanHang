@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { toFormDefaults, toUpsertPayload } from './payload';
+import { isOwnAllocation, toFormDefaults, toUpsertPayload } from './payload';
 import { cashVoucherSchema, type CashVoucherFormValues } from './schema';
 import type { CashVoucher, CashVoucherAllocation, CashVoucherDefaults } from './types';
 
@@ -17,6 +17,7 @@ const PARTNER = '33333333-3333-3333-3333-333333333333';
 const ENTRY_1 = '44444444-4444-4444-4444-444444444441';
 const ENTRY_2 = '44444444-4444-4444-4444-444444444442';
 const ENTRY_3 = '44444444-4444-4444-4444-444444444443';
+const ENTRY_4 = '44444444-4444-4444-4444-444444444444';
 const LINE_ID = '55555555-5555-5555-5555-555555555555';
 const VOUCHER_ID = '66666666-6666-6666-6666-666666666666';
 
@@ -56,6 +57,7 @@ function allocation(overrides: Partial<CashVoucherAllocation>): CashVoucherAlloc
     docDate: '2026-10-01',
     amount: 1_000,
     origin: 'AtVoucher',
+    isOwn: true,
     ...overrides,
   };
 }
@@ -90,8 +92,10 @@ function serverVoucher(overrides: Partial<CashVoucher> = {}): CashVoucher {
     lines: [{ id: LINE_ID, sortOrder: 0, description: 'Thu tiền hàng', amount: 2_500 }],
     allocations: [
       allocation({ entryId: ENTRY_1, docCode: 'PX00001', amount: 1_000, origin: 'AtVoucher' }),
-      allocation({ entryId: ENTRY_2, docCode: 'PX00002', amount: 700, origin: 'Manual' }),
-      allocation({ entryId: ENTRY_3, docCode: 'BT00001', amount: 300, origin: 'Offset' }),
+      allocation({ entryId: ENTRY_2, docCode: 'PX00002', amount: 700, origin: 'Manual', isOwn: false }),
+      allocation({ entryId: ENTRY_3, docCode: 'BT00001', amount: 300, origin: 'Offset', isOwn: false }),
+      // A refund payment allocated against this receipt: AtVoucher, but the payment's.
+      allocation({ entryId: ENTRY_4, docCode: 'PC00001', amount: 200, origin: 'AtVoucher', isOwn: false }),
     ],
     ...overrides,
   };
@@ -154,6 +158,14 @@ describe('toUpsertPayload', () => {
   });
 });
 
+describe('isOwnAllocation', () => {
+  it('is true only for an at-voucher settlement the voucher made', () => {
+    expect(isOwnAllocation(allocation({ origin: 'AtVoucher', isOwn: true }))).toBe(true);
+    expect(isOwnAllocation(allocation({ origin: 'AtVoucher', isOwn: false }))).toBe(false);
+    expect(isOwnAllocation(allocation({ origin: 'Manual', isOwn: false }))).toBe(false);
+  });
+});
+
 describe('toFormDefaults', () => {
   it('new voucher uses the server defaults and one empty line', () => {
     const defaults: CashVoucherDefaults = {
@@ -186,7 +198,7 @@ describe('toFormDefaults', () => {
     expect(values.reasonId).toBe('');
   });
 
-  it('edit keeps only at-voucher allocations in defaults', () => {
+  it('edit keeps only its own at-voucher allocations in defaults', () => {
     const values = toFormDefaults(serverVoucher(), undefined, 'Receipt');
 
     expect(values.allocations).toEqual([{ entryId: ENTRY_1, docCode: 'PX00001', amount: 1_000 }]);

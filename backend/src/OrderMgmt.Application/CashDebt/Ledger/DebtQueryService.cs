@@ -37,18 +37,21 @@ public class DebtQueryService : IDebtQueryService
         var entryIds = entries.Select(e => e.Id).ToList();
         var settlements = await _db.DebtSettlements.AsNoTracking()
             .Where(s => entryIds.Contains(s.IncreaseEntryId))
-            .Select(s => new { s.IncreaseEntryId, s.DecreaseEntryId, s.Amount })
+            .Select(s => new { s.IncreaseEntryId, s.DecreaseEntryId, s.Amount, s.Origin, s.BatchId })
             .ToListAsync(ct);
 
-        // P26: the source's own entries are left out, and their settlements no longer count as settled.
-        var sourceEntryIds = query.ForSourceType is { } sourceType && query.ForSourceId is { } sourceId
+        // P26: the source's own entries are left out, and the settlements an edit of the source replaces (its own
+        // AtVoucher batch) no longer count as settled. Every other settlement on its entries stays on save.
+        var forSourceId = query.ForSourceId;
+        var sourceEntryIds = query.ForSourceType is { } sourceType && forSourceId is { } sourceId
             ? entries.Where(e => e.SourceType == sourceType && e.SourceId == sourceId).Select(e => e.Id).ToHashSet()
             : new HashSet<Guid>();
 
         var settled = entryIds.ToDictionary(id => id, _ => 0m);
         foreach (var s in settlements)
         {
-            if (sourceEntryIds.Contains(s.IncreaseEntryId) || sourceEntryIds.Contains(s.DecreaseEntryId))
+            if ((sourceEntryIds.Contains(s.IncreaseEntryId) || sourceEntryIds.Contains(s.DecreaseEntryId))
+                && s.Origin == SettlementOrigin.AtVoucher && s.BatchId == forSourceId)
                 continue;
             settled[s.IncreaseEntryId] += s.Amount;
             settled[s.DecreaseEntryId] += s.Amount;

@@ -536,7 +536,11 @@ public class CashVoucherService : ICashVoucherService
 
         var settlements = await _db.DebtSettlements.AsNoTracking()
             .Where(s => ownIds.Contains(s.IncreaseEntryId) || ownIds.Contains(s.DecreaseEntryId))
-            .Select(s => new { s.Id, s.Amount, s.Origin, OtherId = ownIds.Contains(s.IncreaseEntryId) ? s.DecreaseEntryId : s.IncreaseEntryId })
+            .Select(s => new
+            {
+                s.Id, s.Amount, s.Origin, s.BatchId,
+                OtherId = ownIds.Contains(s.IncreaseEntryId) ? s.DecreaseEntryId : s.IncreaseEntryId,
+            })
             .ToListAsync(ct);
         var otherIds = settlements.Select(s => s.OtherId).Distinct().ToList();
         var others = await _db.DebtEntries.AsNoTracking()
@@ -557,6 +561,7 @@ public class CashVoucherService : ICashVoucherService
                 DocDate = x.Entry.DocDate,
                 Amount = x.Settlement.Amount,
                 Origin = x.Settlement.Origin,
+                IsOwn = x.Settlement.Origin == SettlementOrigin.AtVoucher && x.Settlement.BatchId == voucher.Id,
             })
             .ToList();
     }
@@ -759,7 +764,8 @@ public class CashVoucherService : ICashVoucherService
     }
 
     /// Allocation at voucher time: validates the allocations of the voucher's own entry against its open items
-    /// (P26: this voucher's own settlements count as open room) and saves them as one AtVoucher batch.
+    /// (P26: this voucher's own AtVoucher settlements count as open room) and saves them as the AtVoucher batch whose
+    /// id is the voucher's.
     /// Capacity = own entry Amount − its settlements still kept.
     private async Task AllocateAsync(IReadOnlyList<DebtEntry> ownEntries, IReadOnlyList<AllocationRequest>? allocations,
         CancellationToken ct)
@@ -792,7 +798,8 @@ public class CashVoucherService : ICashVoucherService
                 ? new SettlementDraft(own.Id, a.EntryId, a.Amount)
                 : new SettlementDraft(a.EntryId, own.Id, a.Amount))
             .ToList();
-        await _ledger.AddSettlementsAsync(drafts, SettlementOrigin.AtVoucher, Guid.NewGuid(), "allocations", ct);
+        // The batch is the voucher: it marks the allocations as this voucher's own (RemoveOwnSettlementsAsync).
+        await _ledger.AddSettlementsAsync(drafts, SettlementOrigin.AtVoucher, own.SourceId, "allocations", ct);
     }
 
     private void AddActivity(CashVoucher voucher, CashDocumentActivityAction action, string description) =>

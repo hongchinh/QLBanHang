@@ -22,7 +22,7 @@ public sealed class PartnerDebtSummaryDto
 }
 
 /// GET /api/debt/open-items: open entries of one partner and side in the working branch. With ForSourceType and
-/// ForSourceId (P26) that source's own entries are left out and their settlements are added back.
+/// ForSourceId (P26) that source's own entries are left out and its own AtVoucher settlements are added back.
 public sealed class OpenItemsRequest
 {
     public Guid PartnerId { get; set; }

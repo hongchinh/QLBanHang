@@ -253,6 +253,7 @@ function voucher(overrides: Partial<CashVoucher> = {}): CashVoucher {
         docDate: '2026-10-01',
         amount: 1_000,
         origin: 'AtVoucher',
+        isOwn: true,
       },
     ],
     ...overrides,

@@ -33,6 +33,8 @@ export interface CashVoucherAllocation {
   docDate: string;
   amount: number;
   origin: SettlementOrigin;
+  // An AtVoucher settlement this voucher made. Another voucher's AtVoucher settlement against it is not edited here.
+  isOwn: boolean;
 }
 
 export interface CashVoucher {

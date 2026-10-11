@@ -10,7 +10,8 @@ using Xunit;
 
 namespace OrderMgmt.IntegrationTests.CashDebt.CashVouchers;
 
-/// Allocation at voucher time (rule 4, AllocationValidator, AtVoucher settlements) on create.
+/// Allocation at voucher time (rule 4, AllocationValidator, AtVoucher settlements) on create, and the ownership of
+/// AtVoucher settlements between two cash vouchers on edit.
 [Collection(nameof(PostgresCollection))]
 public class CashVoucherAllocationTests : CashDebtTestBase
 {
@@ -217,6 +218,62 @@ public class CashVoucherAllocationTests : CashDebtTestBase
 
         (await OpenItemsAsync(branchId, customerId)).Should().ContainSingle()
             .Which.Should().BeEquivalentTo(new { EntryId = prepayment.EntryId, Open = 500m });
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Editing_a_voucher_keeps_the_allocations_another_voucher_made_against_it()
+    {
+        var (branchId, client, fundId) = await BranchClientAsync();
+        await SetFundOpeningAmountAsync(fundId, 10_000m);
+        var customerId = await CreatePartnerAsync(NewCode("KH"), isCustomer: true, isSupplier: false);
+        var otherId = await CreatePartnerAsync(NewCode("KH"), isCustomer: true, isSupplier: false);
+
+        // A prepayment receipt, then a refund payment allocated against it: the AtVoucher settlement is the refund's.
+        var receipt = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TKH"),
+            fundId, "2026-10-05 09:00", customerId, 2_000m));
+        var receiptEntry = (await EntriesOfAsync(DebtSourceType.Receipt, receipt.Id)).Single();
+        var refundRequest = CashRequest(CashVoucherType.Payment, await CashReasonIdAsync("CHKH"), fundId,
+            "2026-10-06 09:00", customerId, 1_500m);
+        refundRequest.Allocations = new List<AllocationRequest> { new() { EntryId = receiptEntry.Id, Amount = 1_500m } };
+        var refund = await CreateCashAsync(client, refundRequest);
+        var settlement = (await SettlementsOfAsync(receiptEntry.Id)).Should().ContainSingle().Subject;
+        settlement.BatchId.Should().Be(refund.Id, "an AtVoucher batch belongs to the voucher that made it");
+
+        refund.Allocations.Should().ContainSingle().Which.IsOwn.Should().BeTrue();
+        var (_, fetched, _) = await GetCashAsync(client, receipt.Id);
+        fetched!.Allocations.Should().ContainSingle().Which.Should().BeEquivalentTo(new
+        {
+            SettlementId = settlement.Id, Origin = SettlementOrigin.AtVoucher, IsOwn = false, Amount = 1_500m,
+        });
+
+        // The receipt's edit grid gets no room back from the refund's settlement.
+        var editOpen = await InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtQueryService>()
+            .OpenItemsAsync(new OpenItemsQuery
+            {
+                BranchId = branchId,
+                PartnerId = customerId,
+                Side = DebtSide.Receivable,
+                ForSourceType = DebtSourceType.Receipt,
+                ForSourceId = receipt.Id,
+            }, ct));
+        editOpen.Should().BeEmpty();
+
+        // An empty allocation list clears only the receipt's own allocations.
+        var clear = CashUpdateFrom(fetched);
+        clear.Allocations = new List<AllocationRequest>();
+        var (clearStatus, cleared, clearError) = await PutCashAsync(client, receipt.Id, clear);
+        clearStatus.Should().Be(HttpStatusCode.OK, clearError?.Message);
+        (await SettlementsOfAsync(receiptEntry.Id)).Should().ContainSingle().Which.Id.Should().Be(settlement.Id);
+
+        // The refund's settlement still blocks a partner change (P11).
+        var move = CashUpdateFrom(cleared!);
+        move.PartnerId = otherId;
+        move.Allocations = new List<AllocationRequest>();
+        var (moveStatus, _, moveError) = await PutCashAsync(client, receipt.Id, move);
+        moveStatus.Should().Be(HttpStatusCode.Conflict, moveError?.Message);
+        moveError!.Code.Should().Be("DEBT_HAS_SETTLEMENTS");
+        (await SettlementsOfAsync(receiptEntry.Id)).Should().ContainSingle().Which.Id.Should().Be(settlement.Id);
         await AssertCashDebtInvariantsAsync();
     }
 

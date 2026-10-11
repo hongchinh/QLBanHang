@@ -2,7 +2,13 @@ import type { DebtEffect } from '@/features/cash-common/types';
 import type { ConfirmFlags } from '@/lib/confirm-required';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
 import type { CashLineFormValues, CashVoucherFormParsed, CashVoucherFormValues } from './schema';
-import type { CashVoucher, CashVoucherDefaults, CashVoucherType, UpsertCashVoucherRequest } from './types';
+import type {
+  CashVoucher,
+  CashVoucherAllocation,
+  CashVoucherDefaults,
+  CashVoucherType,
+  UpsertCashVoucherRequest,
+} from './types';
 
 export function toUpsertPayload(
   parsed: CashVoucherFormParsed,
@@ -38,6 +44,12 @@ export function toUpsertPayload(
             .map((row) => ({ entryId: row.entryId, amount: row.amount })),
     ...flags,
   };
+}
+
+// The only settlements the voucher form edits: the AtVoucher ones this voucher made. Manual, Offset and Auto
+// settlements, and another voucher's AtVoucher settlement against this one, are managed elsewhere.
+export function isOwnAllocation(row: CashVoucherAllocation): boolean {
+  return row.origin === 'AtVoucher' && row.isOwn;
 }
 
 export function createEmptyCashLine(): CashLineFormValues {
@@ -92,9 +104,8 @@ export function toFormDefaults(
       amount: line.amount,
       note: line.note ?? '',
     })),
-    // Manual, Offset and Auto settlements are managed elsewhere and are not edited here.
     allocations: voucher.allocations
-      .filter((row) => row.origin === 'AtVoucher')
+      .filter(isOwnAllocation)
       .map((row) => ({ entryId: row.entryId, docCode: row.docCode, amount: row.amount })),
     // A stored voucher keeps its allocations until the user asks for a new suggestion.
     allocationsTouched: true,

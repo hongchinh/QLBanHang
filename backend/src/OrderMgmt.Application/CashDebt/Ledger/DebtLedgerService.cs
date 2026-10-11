@@ -131,7 +131,7 @@ public class DebtLedgerService : IDebtLedgerService
         CancellationToken ct = default)
     {
         var (_, settlements) = await LoadSourceAsync(sourceType, sourceId, ct);
-        var own = settlements.Where(s => s.Origin == origin).ToList();
+        var own = settlements.Where(s => s.Origin == origin && s.BatchId == sourceId).ToList();
         if (own.Count == 0)
             return;
 

@@ -9,7 +9,7 @@ public interface IDebtQueryService
     Task<decimal> BalanceAsync(Guid branchId, Guid partnerId, DebtSide side, DateTimeOffset? at = null,
         CancellationToken ct = default);
 
-    /// Entries with Open > 0. The source's own entries are excluded; with ForSource, settlements against the
-    /// source's own entries are added back to Open. Ordered by (DueDate ?? DocDate), DocDate, DocCode.
+    /// Entries with Open > 0. The source's own entries are excluded; with ForSource, the source's own AtVoucher
+    /// settlements (the ones its edit replaces) are added back to Open. Ordered by (DueDate ?? DocDate), DocDate, DocCode.
     Task<IReadOnlyList<OpenItemDto>> OpenItemsAsync(OpenItemsQuery query, CancellationToken ct = default);
 }

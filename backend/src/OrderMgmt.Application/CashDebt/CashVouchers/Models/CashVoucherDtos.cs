@@ -105,6 +105,9 @@ public class CashVoucherAllocationDto
     public DateOnly DocDate { get; set; }
     public decimal Amount { get; set; }
     public SettlementOrigin Origin { get; set; }
+    /// An AtVoucher settlement this voucher made (its batch is the voucher). Only these are edited on the voucher;
+    /// another voucher's AtVoucher settlement against it is as read-only as a Manual one.
+    public bool IsOwn { get; set; }
 }
 
 public class CashVoucherListRequest : PageRequest

@@ -198,13 +198,10 @@ public class DebtService : IDebtService
         var branchId = await _currentBranch.GetIdAsync(ct);
         await _transaction.RunAsync(async c =>
         {
-            // The partners to lock. A settled entry cannot change partner (P11) and Manual / AtVoucher batch ids are
-            // new per batch, so the rows read again after the locks still belong to these partners.
-            var owners = await (from s in _db.DebtSettlements.Where(filter)
-                                join e in _db.DebtEntries on s.IncreaseEntryId equals e.Id
-                                select new { e.BranchId, e.PartnerId })
-                .Distinct()
-                .ToListAsync(c);
+            // The partners to lock. A settled entry cannot change partner (P11), but an AtVoucher batch id is its
+            // cash voucher's id: a save of that voucher between this read and the locks can move the batch to another
+            // partner. The partners are read again after the locks, and a change is a 409.
+            var owners = await OwnersAsync(filter, c);
             if (owners.Count == 0)
                 throw notFound();
             if (owners.Any(o => o.BranchId != branchId))
@@ -214,6 +211,8 @@ public class DebtService : IDebtService
             var settlements = await _db.DebtSettlements.AsNoTracking().Where(filter).ToListAsync(c);
             if (settlements.Count == 0)
                 throw notFound();
+            if (!(await OwnersAsync(filter, c)).ToHashSet().IsSubsetOf(owners))
+                throw new ConflictException("CONCURRENCY", "Dữ liệu đã được người khác cập nhật. Vui lòng tải lại.");
             if (settlements.Any(s => s.Origin is not (SettlementOrigin.Manual or SettlementOrigin.AtVoucher)))
                 throw new ConflictException("SETTLEMENT_MANAGED", "Đối trừ này do chứng từ quản lý, không bỏ được ở đây.");
             var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(c);
@@ -225,6 +224,17 @@ public class DebtService : IDebtService
             await _auto.RecomputeAutoAsync(removed.SelectMany(r => new[] { r.IncreaseEntryId, r.DecreaseEntryId }), c);
         }, ct);
     }
+
+    /// The branch and partner of every settlement matched by `filter` (read through its Increase entry).
+    private async Task<List<(Guid BranchId, Guid PartnerId)>> OwnersAsync(
+        Expression<Func<DebtSettlement, bool>> filter, CancellationToken ct) =>
+        (await (from s in _db.DebtSettlements.Where(filter)
+                join e in _db.DebtEntries on s.IncreaseEntryId equals e.Id
+                select new { e.BranchId, e.PartnerId })
+            .Distinct()
+            .ToListAsync(ct))
+        .Select(o => (o.BranchId, o.PartnerId))
+        .ToList();
 
     /// The shared branch gate, then the partner keys (P14). Settlements move no money: no fund key.
     private async Task AcquireLocksAsync(Guid branchId, IEnumerable<Guid> partnerIds, CancellationToken ct)

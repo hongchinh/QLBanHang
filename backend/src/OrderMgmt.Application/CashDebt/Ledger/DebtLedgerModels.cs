@@ -13,7 +13,7 @@ public sealed record RemovedSettlement(Guid SettlementId, Guid IncreaseEntryId, 
     SettlementOrigin Origin);
 
 /// Open items of one partner and side. With ForSourceType + ForSourceId (P26), that source's entries are left out
-/// and their settlements are added back to the other entries' open amounts.
+/// and its own AtVoucher settlements are added back to the other entries' open amounts.
 public sealed class OpenItemsQuery
 {
     public Guid BranchId { get; set; }

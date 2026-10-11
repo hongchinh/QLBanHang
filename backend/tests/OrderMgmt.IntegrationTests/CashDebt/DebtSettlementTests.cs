@@ -141,20 +141,42 @@ public class DebtSettlementTests : CashDebtTestBase
         var x = await EntryAsync(Draft(_partnerId, R, Inc, 1_000m, "2026-10-01 08:00", "X" + _suffix), sourceId: source);
         var y = await EntryAsync(Draft(_partnerId, R, Dec, 400m, "2026-10-02 08:00", "Y" + _suffix));
         var z = await EntryAsync(Draft(_partnerId, R, Dec, 300m, "2026-10-02 08:00", "Z" + _suffix));
-        await SettleAsync(SettlementOrigin.Auto, new SettlementDraft(x, y, 400m));
+        await SettleAsync(SettlementOrigin.Auto, source, new SettlementDraft(x, y, 400m));
         var manual = (await SettleAsync(SettlementOrigin.Manual, new SettlementDraft(x, z, 300m))).Single();
 
-        await InTransactionAsync(async (sp, ct) =>
-        {
-            await sp.GetRequiredService<IDebtLedgerService>()
-                .RemoveOwnSettlementsAsync(DebtSourceType.Opening, source, SettlementOrigin.Auto, ct);
-            return true;
-        });
+        await RemoveOwnAsync(source, SettlementOrigin.Auto);
 
         (await SettlementsOfAsync(x)).Should().ContainSingle().Which.Id.Should().Be(manual.Id);
         (await SettlementsOfAsync(y)).Should().BeEmpty();
         await AssertCashDebtInvariantsAsync();
     }
+
+    [Fact]
+    public async Task Remove_own_settlements_keeps_the_same_origin_made_by_another_source()
+    {
+        // Two cash vouchers: X allocated Y (batch X), and Z allocated X (batch Z). Both are AtVoucher.
+        var source = Guid.NewGuid();
+        var other = Guid.NewGuid();
+        var x = await EntryAsync(Draft(_partnerId, R, Inc, 1_000m, "2026-10-01 08:00", "X" + _suffix), sourceId: source);
+        var y = await EntryAsync(Draft(_partnerId, R, Dec, 400m, "2026-10-02 08:00", "Y" + _suffix));
+        var z = await EntryAsync(Draft(_partnerId, R, Dec, 300m, "2026-10-02 08:00", "Z" + _suffix), sourceId: other);
+        await SettleAsync(SettlementOrigin.AtVoucher, source, new SettlementDraft(x, y, 400m));
+        var foreign = (await SettleAsync(SettlementOrigin.AtVoucher, other, new SettlementDraft(x, z, 300m))).Single();
+
+        await RemoveOwnAsync(source, SettlementOrigin.AtVoucher);
+
+        (await SettlementsOfAsync(x)).Should().ContainSingle().Which.Id.Should().Be(foreign.Id);
+        (await SettlementsOfAsync(y)).Should().BeEmpty();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    private Task RemoveOwnAsync(Guid source, SettlementOrigin origin) =>
+        InTransactionAsync(async (sp, ct) =>
+        {
+            await sp.GetRequiredService<IDebtLedgerService>()
+                .RemoveOwnSettlementsAsync(DebtSourceType.Opening, source, origin, ct);
+            return true;
+        });
 
     [Fact]
     public async Task Remove_source_requires_confirmation_when_settled()
@@ -221,8 +243,12 @@ public class DebtSettlementTests : CashDebtTestBase
     }
 
     private Task<IReadOnlyList<DebtSettlement>> SettleAsync(SettlementOrigin origin, params SettlementDraft[] drafts) =>
+        SettleAsync(origin, Guid.NewGuid(), drafts);
+
+    private Task<IReadOnlyList<DebtSettlement>> SettleAsync(SettlementOrigin origin, Guid batchId,
+        params SettlementDraft[] drafts) =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .AddSettlementsAsync(drafts, origin, Guid.NewGuid(), "items", ct));
+            .AddSettlementsAsync(drafts, origin, batchId, "items", ct));
 
     private async Task ExpectErrorsAsync(SettlementDraft[] drafts, params string[] keys)
     {

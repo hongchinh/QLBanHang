@@ -20,7 +20,7 @@ import {
   type CashVoucherFormParsed,
   type CashVoucherFormValues,
 } from '@/features/cash-vouchers/schema';
-import { toFormDefaults, toUpsertPayload } from '@/features/cash-vouchers/payload';
+import { isOwnAllocation, toFormDefaults, toUpsertPayload } from '@/features/cash-vouchers/payload';
 import { allocationTotal, suggestAllocations } from '@/features/cash-vouchers/allocation';
 import type {
   CashVoucher,
@@ -232,8 +232,8 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
 
   // Display only: the server computes Total = Σ lines.
   const total = round2(watchedLines.reduce((sum, line) => sum + toNum(line.amount), 0));
-  // The voucher's own Manual/Offset/Auto settlements use part of its amount and are not edited here.
-  const otherSettled = allocationTotal((voucher?.allocations ?? []).filter((a) => a.origin !== 'AtVoucher'));
+  // Settlements this form does not edit (Manual/Offset/Auto, another voucher's AtVoucher) use part of its amount.
+  const otherSettled = allocationTotal((voucher?.allocations ?? []).filter((a) => !isOwnAllocation(a)));
 
   // Open items use the opposite direction; on edit they add back the room this voucher already uses (P26).
   const openItemsQuery = useOpenItems(
@@ -680,7 +680,9 @@ function StoredAllocations({ rows }: { rows: CashVoucherAllocation[] }) {
             <tr key={row.settlementId} className="border-b last:border-0">
               <td className="px-2 py-1">{row.docCode}</td>
               <td className="px-2 py-1">{formatDateOnly(row.docDate)}</td>
-              <td className="px-2 py-1">{SETTLEMENT_ORIGIN_LABELS[row.origin]}</td>
+              <td className="px-2 py-1">
+                {row.origin === 'AtVoucher' && !row.isOwn ? 'Tại phiếu khác' : SETTLEMENT_ORIGIN_LABELS[row.origin]}
+              </td>
               <td className="px-2 py-1 text-right tabular-nums">{moneyFormat.format(row.amount)}</td>
             </tr>
           ))}

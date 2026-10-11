@@ -95,34 +95,40 @@ public class DebtQueryTests : CashDebtTestBase
     }
 
     [Fact]
-    public async Task For_source_adds_back_its_own_settlements()
+    public async Task For_source_adds_back_only_its_own_at_voucher_settlements()
     {
         var receiptId = Guid.NewGuid();
         var x = await EntryAsync(Draft(_partnerId, R, Inc, 1_000m, "2026-10-01 08:00", "X" + _suffix));
         var w = await EntryAsync(Draft(_partnerId, R, Inc, 300m, "2026-10-01 08:00", "W" + _suffix));
-        var s = await EntryAsync(Draft(_partnerId, R, Dec, 500m, "2026-10-05 08:00", "S" + _suffix),
+        var v = await EntryAsync(Draft(_partnerId, R, Inc, 400m, "2026-10-01 08:00", "V" + _suffix));
+        var s = await EntryAsync(Draft(_partnerId, R, Dec, 850m, "2026-10-05 08:00", "S" + _suffix),
             DebtSourceType.Receipt, receiptId);
         var y = await EntryAsync(Draft(_partnerId, R, Dec, 100m, "2026-10-05 08:00", "Y" + _suffix),
             DebtSourceType.Receipt, Guid.NewGuid());
-        await SettleAsync(new SettlementDraft(x, s, 500m));
+        await SettleAsync(SettlementOrigin.AtVoucher, receiptId, new SettlementDraft(x, s, 500m));
+        await SettleAsync(new SettlementDraft(x, s, 200m));
+        await SettleAsync(SettlementOrigin.AtVoucher, Guid.NewGuid(), new SettlementDraft(v, s, 150m));
         await SettleAsync(new SettlementDraft(w, y, 100m));
 
         var plain = await OpenItemsAsync(new OpenItemsQuery { BranchId = MainBranchId, PartnerId = _partnerId, Side = R });
-        plain.Select(i => i.EntryId).Should().BeEquivalentTo(new[] { x, w });
-        plain.Single(i => i.EntryId == x).Open.Should().Be(500m);
+        plain.Select(i => i.EntryId).Should().BeEquivalentTo(new[] { x, w, v });
+        plain.Single(i => i.EntryId == x).Open.Should().Be(300m);
         plain.Single(i => i.EntryId == w).Open.Should().Be(200m);
+        plain.Single(i => i.EntryId == v).Open.Should().Be(250m);
 
         var forSource = await OpenItemsAsync(new OpenItemsQuery
         {
             BranchId = MainBranchId, PartnerId = _partnerId, Side = R,
             ForSourceType = DebtSourceType.Receipt, ForSourceId = receiptId,
         });
-        // S itself is excluded; X gets back the 500 settled against S; W keeps its settlement with another source.
-        forSource.Select(i => i.EntryId).Should().BeEquivalentTo(new[] { x, w });
+        // S itself is excluded. An edit replaces only S's own AtVoucher batch, so X gets back those 500 and keeps the
+        // Manual 200; V keeps the AtVoucher 150 another voucher made against S; W keeps its settlement with Y.
+        forSource.Select(i => i.EntryId).Should().BeEquivalentTo(new[] { x, w, v });
         var xItem = forSource.Single(i => i.EntryId == x);
-        xItem.Settled.Should().Be(0m);
-        xItem.Open.Should().Be(1_000m);
+        xItem.Settled.Should().Be(200m);
+        xItem.Open.Should().Be(800m);
         forSource.Single(i => i.EntryId == w).Open.Should().Be(200m);
+        forSource.Single(i => i.EntryId == v).Open.Should().Be(250m);
 
         await AssertCashDebtInvariantsAsync();
     }
@@ -139,8 +145,12 @@ public class DebtQueryTests : CashDebtTestBase
     }
 
     private Task<IReadOnlyList<DebtSettlement>> SettleAsync(params SettlementDraft[] drafts) =>
+        SettleAsync(SettlementOrigin.Manual, Guid.NewGuid(), drafts);
+
+    private Task<IReadOnlyList<DebtSettlement>> SettleAsync(SettlementOrigin origin, Guid batchId,
+        params SettlementDraft[] drafts) =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .AddSettlementsAsync(drafts, SettlementOrigin.Manual, Guid.NewGuid(), "items", ct));
+            .AddSettlementsAsync(drafts, origin, batchId, "items", ct));
 
     private Task<decimal> BalanceAsync(DebtSide side, DateTimeOffset? at) =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtQueryService>()

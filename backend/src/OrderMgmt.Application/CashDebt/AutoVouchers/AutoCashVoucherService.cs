@@ -91,6 +91,7 @@ public class AutoCashVoucherService : IAutoCashVoucherService
 
         var description = (type == CashVoucherType.Receipt ? "Thu tiền theo phiếu xuất " : "Chi tiền theo phiếu nhập ")
                           + voucher.Code;
+        var mirroredBefore = MirroredFieldsOf(auto);
         auto.VoucherAt = voucher.VoucherAt;
         auto.FundId = voucher.FundId
             ?? throw new InvalidOperationException("A stock voucher with a paid amount has a fund (P9).");
@@ -124,11 +125,18 @@ public class AutoCashVoucherService : IAutoCashVoucherService
         if (entries.Count > 0)
             await SettleAsync(voucher, entries.Single(), lockedUntil: null, ct);
 
-        AddActivity(auto, voucher, action);
+        // An update that changed none of the mirrored fields (e.g. only a stock line note) is not logged.
+        if (action != CashDocumentActivityAction.Updated || !Equals(mirroredBefore, MirroredFieldsOf(auto)))
+            AddActivity(auto, voucher, action);
         if (action == CashDocumentActivityAction.Created)
             AddStockActivity(voucher, $"Tạo {NounOf(type)} tự động {auto.Code}");
         await _db.SaveChangesAsync(ct);
     }
+
+    /// What the automatic voucher copies from its stock voucher (P20), compared to decide whether an update is logged.
+    private static object MirroredFieldsOf(CashVoucher auto) =>
+        (auto.VoucherAt, auto.FundId, auto.PartnerId, auto.PartnerName, auto.PartnerAddress, auto.PartnerTaxCode,
+            auto.PersonName, auto.Description, auto.OwnerUserId, auto.Total);
 
     /// The automatic voucher's entry: the stock reason's side with the opposite direction, when the reason affects
     /// debt (P20); none otherwise.

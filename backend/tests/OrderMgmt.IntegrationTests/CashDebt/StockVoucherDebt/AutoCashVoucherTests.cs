@@ -306,6 +306,13 @@ public class AutoCashVoucherTests : CashDebtTestBase
             (CashDocumentActivityAction.Created, "Theo phiếu PX00001"),
             (CashDocumentActivityAction.Updated, "Theo phiếu PX00001"));
         (await AutoVoucherActivitiesOfAsync(sale.Id)).Should().Equal("Tạo phiếu thu tự động PT00001");
+
+        // A change the receipt does not mirror (the note) leaves its history alone.
+        var noteOnly = UpdateRequestFrom(edited);
+        noteOnly.Note = "Chỉ sửa ghi chú";
+        var (noteStatus, _, noteError) = await PutVoucherAsync(_branchClient, sale.Id, noteOnly);
+        noteStatus.Should().Be(HttpStatusCode.OK, noteError?.Message);
+        (await CashActivitiesOfAsync(receipt.Id)).Should().HaveCount(2);
         await AssertCashDebtInvariantsAsync();
     }
 

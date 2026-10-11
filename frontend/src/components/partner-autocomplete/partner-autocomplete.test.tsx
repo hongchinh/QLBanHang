@@ -35,7 +35,7 @@ const partners: PartnerSearchItem[] = [
 type Props = React.ComponentProps<typeof PartnerAutocomplete>;
 
 function renderAutocomplete(overrides: Partial<Props> = {}) {
-  const props: Props = {
+  const props = {
     type: 'In',
     reasonId: REASON,
     partnerType: 'Supplier',
@@ -43,7 +43,7 @@ function renderAutocomplete(overrides: Partial<Props> = {}) {
     onSelect: vi.fn(),
     inputId: 'partner',
     ...overrides,
-  };
+  } as Props;
   render(<PartnerAutocomplete {...props} />);
   return props;
 }
@@ -84,6 +84,20 @@ describe('PartnerAutocomplete', () => {
     expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', REASON);
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(props.onSelect).toHaveBeenCalledWith(partners[1]);
+  });
+
+  it('a given search hook replaces the stock voucher partner search', async () => {
+    const useSearch = vi.fn((keyword: string) => ({ data: keyword ? [partners[1]] : [], isFetching: false }));
+    const props = renderAutocomplete({ type: undefined, partnerType: 'Customer', useSearch });
+    const input = screen.getByRole('combobox');
+
+    fireEvent.change(input, { target: { value: 'abc' } });
+
+    await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(1));
+    expect(useSearch.mock.lastCall?.slice(0, 2)).toEqual(['abc', REASON]);
+    expect(usePartnerSearchMock).not.toHaveBeenCalled();
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(props.onSelect).toHaveBeenCalledWith(partners[1]);
   });

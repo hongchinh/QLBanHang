@@ -32,6 +32,8 @@ import { StockVoucherFormPage } from '@/pages/stock-vouchers/stock-voucher-form-
 import { StockVoucherListPage } from '@/pages/stock-vouchers/stock-voucher-list-page';
 // Round 2A: 11.3 receipts and payments
 import { CashVoucherListPage } from '@/pages/cash-vouchers/cash-voucher-list-page';
+// Round 2A: 11.4 receipt and payment form
+import { CashVoucherFormPage } from '@/pages/cash-vouchers/cash-voucher-form-page';
 import { MyQuotationSettingsPage } from '@/pages/settings/my-quotation-settings-page';
 import { PaymentQrPage } from '@/pages/payment-qr/payment-qr-page';
 import { QuotationSystemSettingsPage } from '@/pages/settings/quotation-system-settings-page';
@@ -331,7 +333,7 @@ export function App() {
                     }
                   />
                 </Route>
-                {/* Round 2A: 11.3 receipts and payments (new and :id show the list until the form page, Task 11.4) */}
+                {/* Round 2A: 11.3 receipts and payments (list); 11.4 form for new and :id */}
                 <Route path="receipts">
                   <Route
                     index
@@ -345,7 +347,7 @@ export function App() {
                     path="new"
                     element={
                       <ProtectedRoute permission="receipts.create">
-                        <CashVoucherListPage type="Receipt" />
+                        <CashVoucherFormPage type="Receipt" />
                       </ProtectedRoute>
                     }
                   />
@@ -353,7 +355,7 @@ export function App() {
                     path=":id"
                     element={
                       <ProtectedRoute permission="receipts.view">
-                        <CashVoucherListPage type="Receipt" />
+                        <CashVoucherFormPage type="Receipt" />
                       </ProtectedRoute>
                     }
                   />
@@ -371,7 +373,7 @@ export function App() {
                     path="new"
                     element={
                       <ProtectedRoute permission="payments.create">
-                        <CashVoucherListPage type="Payment" />
+                        <CashVoucherFormPage type="Payment" />
                       </ProtectedRoute>
                     }
                   />
@@ -379,7 +381,7 @@ export function App() {
                     path=":id"
                     element={
                       <ProtectedRoute permission="payments.view">
-                        <CashVoucherListPage type="Payment" />
+                        <CashVoucherFormPage type="Payment" />
                       </ProtectedRoute>
                     }
                   />

@@ -34,9 +34,20 @@ export interface AllocationGridProps {
   readOnly: boolean;
   // The voucher's own Manual/Offset settlements (edit only); they use part of the voucher amount.
   otherSettled: number;
+  // Server validation messages per entryId (`allocations[i].*` mapped through the sent payload).
+  errors?: Record<string, string>;
 }
 
-export function AllocationGrid({ items, value, total, onChange, onSuggest, readOnly, otherSettled }: AllocationGridProps) {
+export function AllocationGrid({
+  items,
+  value,
+  total,
+  onChange,
+  onSuggest,
+  readOnly,
+  otherSettled,
+  errors,
+}: AllocationGridProps) {
   const amountOf = (entryId: string): number | undefined => {
     const row = value.find((r) => r.entryId === entryId);
     return row === undefined ? undefined : toNum(row.amount);
@@ -91,7 +102,8 @@ export function AllocationGrid({ items, value, total, onChange, onSuggest, readO
             {items.map((item) => {
               const amount = amountOf(item.entryId);
               const inputId = `allocation-amount-${item.entryId}`;
-              const error = amount !== undefined && amount > item.open ? 'Phân bổ vượt số còn nợ' : undefined;
+              const error =
+                amount !== undefined && amount > item.open ? 'Phân bổ vượt số còn nợ' : errors?.[item.entryId];
               return (
                 <tr key={item.entryId}>
                   <td>

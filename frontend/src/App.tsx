@@ -53,6 +53,9 @@ import { FundTransferListPage } from '@/pages/fund-transfers/fund-transfer-list-
 import { FundTransferFormPage } from '@/pages/fund-transfers/fund-transfer-form-page';
 // Round 2A: 12.2 debt matching
 import { DebtMatchingPage } from '@/pages/debt/debt-matching-page';
+// Round 2A: 12.3 debt offsets
+import { DebtOffsetListPage } from '@/pages/debt/debt-offset-list-page';
+import { DebtOffsetFormPage } from '@/pages/debt/debt-offset-form-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -452,6 +455,33 @@ export function App() {
                     </ProtectedRoute>
                   }
                 />
+                {/* Round 2A: 12.3 debt offsets */}
+                <Route path="debt/offsets">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="debt_offset.view">
+                        <DebtOffsetListPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="debt_offset.create">
+                        <DebtOffsetFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="debt_offset.view">
+                        <DebtOffsetFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
                 <Route
                   path="settings/my-quotation-settings"
                   element={<MyQuotationSettingsPage />}

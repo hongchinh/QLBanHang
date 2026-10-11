@@ -195,6 +195,39 @@ public class StockVoucherFundTests : CashDebtTestBase
         return voucher!;
     }
 
+    [Fact]
+    public async Task Restore_into_a_deactivated_fund_is_rejected()
+    {
+        // A sale paid into a second, non-default cash fund, then cancelled.
+        var qtm2 = new Fund
+        {
+            BranchId = _branchId, Code = "QTM2", Name = "Quỹ tiền mặt 2", Kind = FundKind.Cash, IsActive = true,
+        };
+        await InDbAsync(async db =>
+        {
+            db.Funds.Add(qtm2);
+            await db.SaveChangesAsync();
+        });
+        var request = await StockRequestAsync(StockDirection.Out, "XBH", await NewCustomerAsync(), 1, 1_000, paid: 1_000,
+            "2026-10-05 09:00");
+        request.FundId = qtm2.Id;
+        var (status, sale, error) = await PostVoucherAsync(_branchClient, request);
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        var (_, cancelled, _) = await ActionAsync(sale!.Id, "cancel", new StockVoucherActionRequest { Version = sale.Version });
+
+        // The fund stops taking money: the automatic receipt cannot come back into it.
+        await InDbAsync(db => db.Funds.Where(f => f.Id == qtm2.Id).ExecuteUpdateAsync(s => s.SetProperty(f => f.IsActive, false)));
+        var restore = new StockVoucherActionRequest { Version = cancelled!.Version };
+        var (blockedStatus, _, blockedError) = await ActionAsync(sale.Id, "restore", restore);
+        blockedStatus.Should().Be(HttpStatusCode.Conflict, blockedError?.Message);
+        (await InDbAsync(db => db.StockVouchers.Where(v => v.Id == sale.Id).Select(v => v.Status).SingleAsync()))
+            .Should().Be(StockVoucherStatus.Cancelled);
+
+        await InDbAsync(db => db.Funds.Where(f => f.Id == qtm2.Id).ExecuteUpdateAsync(s => s.SetProperty(f => f.IsActive, true)));
+        (await ActionAsync(sale.Id, "restore", restore)).Status.Should().Be(HttpStatusCode.OK);
+        await AssertCashDebtInvariantsAsync();
+    }
+
     private Task<int> StockVoucherCountAsync() =>
         InDbAsync(db => db.StockVouchers.CountAsync(v => v.BranchId == _branchId));
 

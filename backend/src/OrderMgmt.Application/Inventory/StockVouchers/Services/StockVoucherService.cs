@@ -571,6 +571,21 @@ public class StockVoucherService : IStockVoucherService
                 || StockUnit.NameFor(product.PricingMode, product.Unit?.Name) != line.UnitName)
                 throw new ConflictException($"Không thể khôi phục: hàng hóa {line.ProductCode} đã đổi cách tính, ĐVT hoặc theo dõi tồn.");
         }
+
+        // The automatic voucher brings the paid amount back into the stored fund (P9, P20), read under its fund key:
+        // it must still take money and match the method's kind (both are locked while the voucher uses them, so this
+        // is a guard against a deactivation made meanwhile).
+        if (voucher.PaidAmount > 0 && voucher.FundId is { } fundId)
+        {
+            var fund = await _db.Funds.AsNoTracking().FirstOrDefaultAsync(f => f.Id == fundId, ct);
+            var methodKind = await _db.PaymentMethods.AsNoTracking()
+                .Where(m => m.Id == voucher.PaymentMethodId)
+                .Select(m => (FundKind?)m.FundKind)
+                .FirstOrDefaultAsync(ct);
+            if (fund is null || !fund.IsActive || fund.Kind != methodKind)
+                throw new ConflictException(
+                    $"Không thể khôi phục: quỹ {fund?.Code} đã ngừng sử dụng hoặc không còn đúng loại của phương thức thanh toán.");
+        }
     }
 
     /// ValidateAsync runs before the locks; a product or warehouse deleted (or a warehouse moved to another branch)

@@ -81,7 +81,7 @@ Every report runs in the working branch behind the existing `reports.debt` permi
 - [x] Phase 00 — Baseline commit and failure baseline (S) — `phase-00-baseline.md`
 - [x] Phase 01 — Aging calculator, position query & debt documents report (M) — `phase-01-position-query-and-documents.md`
 - [x] Phase 02 — Aging & overdue reports (M) — `phase-02-aging-and-overdue.md`
-- [ ] Phase 03 — By-salesperson, reconciliation reports & opening-debt owner options (M) — `phase-03-salesperson-and-reconciliation.md`
+- [x] Phase 03 — By-salesperson, reconciliation reports & opening-debt owner options (M) — `phase-03-salesperson-and-reconciliation.md`
 - [ ] Phase 04 — Frontend: documents, aging, overdue pages & panel link (L) — `phase-04-frontend-position-reports.md`
 - [ ] Phase 05 — Frontend: by-salesperson & reconciliation pages, opening-debt owner picker (M) — `phase-05-frontend-salesperson-reconciliation.md`
 - [ ] Phase 06 — Documentation & final verification (S) — `phase-06-docs-and-verification.md`

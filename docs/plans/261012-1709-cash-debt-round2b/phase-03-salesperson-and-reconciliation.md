@@ -1,6 +1,6 @@
 # Phase 03 — By-salesperson & reconciliation reports
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective
@@ -184,3 +184,9 @@ dotnet test OrderMgmt.sln   # compare with BASELINE.md
 - `GET /api/opening-debts/owners` returns the active users to holders of `debt.opening_balance`.
 - Full backend suite: no new failures against `BASELINE.md`.
 - **The five Round 2B API contracts and the owner-options endpoint are frozen for Phases 04–05.**
+
+## Deviations
+
+- None from the API contracts or the hand-computed expectations; all numbers matched. `sp2` needed only `stock_out.view` and `stock_out.create` (no 403).
+- Full backend suite after Phase 03: 840 tests, 821 passed, 19 failed; the failure set equals `BASELINE.md` exactly.
+- Environment note: with a dev server locking `bin`, build and test with `-o "$TEMP/qlbh-build"` and `--no-restore`; the Git Bash session had no `APPDATA`, which breaks NuGet restore unless set.

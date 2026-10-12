@@ -1,6 +1,6 @@
 # Phase 03 — Accent-insensitive search
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

@@ -103,14 +103,8 @@ describe('confirmed settlement token', () => {
     const second = removal('t2');
     expect(withConfirmed(withConfirmed({}, first), second).confirmedSettlements).toBe('t2');
   });
-});
 
-describe('stale token', () => {
   it('a later removal 422 without a token drops the earlier token', () => {
-    const first = toConfirmationRequest(
-      axiosErrorWith(422, errorBody('DEBT_SETTLEMENTS_WILL_BE_REMOVED', undefined, 't1')),
-    )!;
-    const second = toConfirmationRequest(axiosErrorWith(422, errorBody('DEBT_SETTLEMENTS_WILL_BE_REMOVED')))!;
-    expect(withConfirmed(withConfirmed({}, first), second)).toEqual({ confirmRemoveSettlements: true });
+    expect(withConfirmed(withConfirmed({}, removal('t1')), removal())).toEqual({ confirmRemoveSettlements: true });
   });
 });

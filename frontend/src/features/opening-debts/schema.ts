@@ -66,7 +66,7 @@ export function toUpsertOpeningDebtRequest(
     ...(extra.ownerUserId !== undefined ? { ownerUserId: extra.ownerUserId } : {}),
     note: values.note,
     confirmRemoveSettlements: extra.confirmRemoveSettlements,
-    ...(extra.confirmedSettlements ? { confirmedSettlements: extra.confirmedSettlements } : {}),
+    ...(extra.confirmedSettlements != null ? { confirmedSettlements: extra.confirmedSettlements } : {}),
     ...(extra.version !== undefined ? { version: extra.version } : {}),
   };
 }

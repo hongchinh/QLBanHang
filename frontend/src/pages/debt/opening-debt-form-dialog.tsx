@@ -27,7 +27,7 @@ import {
 import type { OpeningDebt } from '@/features/opening-debts/types';
 import { formatApiErrorDetails, getApiError } from '@/lib/api-client';
 import { applyApiFieldErrors } from '@/lib/apply-api-field-errors';
-import { toConfirmationRequest, withConfirmed, type ConfirmationRequest } from '@/lib/confirm-required';
+import { toConfirmationRequest, withConfirmed, type ConfirmationRequest, type ConfirmFlags } from '@/lib/confirm-required';
 import { toast } from '@/lib/use-toast';
 import { todayYmd } from '@/lib/vn-datetime';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
@@ -64,6 +64,7 @@ interface PickedPartner {
 interface PendingConfirmation {
   request: ConfirmationRequest;
   values: OpeningDebtFormParsed;
+  flags: ConfirmFlags;
 }
 
 interface Props {
@@ -104,9 +105,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
   const kind = useWatch({ control: form.control, name: 'kind' });
   const errors = form.formState.errors;
 
-  // `confirmed` is the pending 422 the user accepted; its token goes back with the flag.
-  const submit = async (values: OpeningDebtFormParsed, confirmed?: ConfirmationRequest) => {
-    const flags = confirmed ? withConfirmed({}, confirmed) : {};
+  const submit = async (values: OpeningDebtFormParsed, flags: ConfirmFlags = {}) => {
     // The owner field is not shown in 2A (P2); an edit keeps the loaded owner.
     const data = toUpsertOpeningDebtRequest(values, {
       ownerUserId: initial ? (initial.ownerUserId ?? null) : undefined,
@@ -122,7 +121,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
     } catch (err) {
       const request = toConfirmationRequest(err);
       if (request) {
-        setPending({ request, values });
+        setPending({ request, values, flags });
         return;
       }
       if (handleOpeningDateNotSet(err)) return;
@@ -139,9 +138,9 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
 
   const onConfirm = () => {
     if (!pending) return;
-    const { values, request } = pending;
+    const { values, request, flags } = pending;
     setPending(null);
-    void submit(values, request);
+    void submit(values, withConfirmed(flags, request));
   };
 
   return (

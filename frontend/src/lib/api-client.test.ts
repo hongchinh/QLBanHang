@@ -94,6 +94,11 @@ describe('X-Branch-Id header', () => {
 });
 
 describe('getApiError', () => {
+  it('keeps the token of an ApiCallError', () => {
+    const err = new ApiCallError({ code: 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', message: 'm', token: 't1' });
+    expect(getApiError(err)).toMatchObject({ code: 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', token: 't1' });
+  });
+
   it('getApiError reads code and details from an axios 422 response', () => {
     const err = axiosErrorWith(422, {
       success: false,

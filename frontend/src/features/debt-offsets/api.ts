@@ -17,6 +17,6 @@ export const debtOffsetsApi = {
   activities: (id: string) => apiGet<DebtOffsetActivity[]>(`/debt-offsets/${id}/activities`),
   create: (data: CreateDebtOffsetRequest) => apiPost<DebtOffset>('/debt-offsets', data),
   cancel: (id: string, body: DebtOffsetActionRequest) => apiPost<DebtOffset>(`/debt-offsets/${id}/cancel`, body),
-  // DELETE carries version and confirmRemoveSettlements in the query string.
+  // DELETE carries version, confirmRemoveSettlements and confirmedSettlements in the query string.
   remove: (id: string, body: DebtOffsetActionRequest) => apiDelete(`/debt-offsets/${id}`, { params: body }),
 };

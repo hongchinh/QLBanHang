@@ -20,7 +20,7 @@ import {
 } from '@/features/opening-debts/hooks';
 import type { OpeningDebt } from '@/features/opening-debts/types';
 import { getErrorMessage } from '@/lib/api-client';
-import { toConfirmationRequest, withConfirmed, type ConfirmationRequest } from '@/lib/confirm-required';
+import { toConfirmationRequest, withConfirmed, type ConfirmationRequest, type ConfirmFlags } from '@/lib/confirm-required';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { toast } from '@/lib/use-toast';
 import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
@@ -44,6 +44,7 @@ function parseSide(value: string | null): DebtSide | undefined {
 interface PendingRemoval {
   request: ConfirmationRequest;
   row: OpeningDebt;
+  flags: ConfirmFlags;
 }
 
 // Route permission: debt.opening_balance (every opening debt endpoint needs it).
@@ -150,8 +151,7 @@ export function OpeningDebtPage() {
 
   const table = useReactTable({ data: data?.items ?? [], columns, getCoreRowModel: getCoreRowModel() });
 
-  const deleteRow = async (row: OpeningDebt, confirmed?: ConfirmationRequest) => {
-    const flags = confirmed ? withConfirmed({}, confirmed) : {};
+  const deleteRow = async (row: OpeningDebt, flags: ConfirmFlags = {}) => {
     try {
       await remove.mutateAsync({
         id: row.id,
@@ -162,7 +162,7 @@ export function OpeningDebtPage() {
       toast({ variant: 'success', title: 'Đã xóa nợ đầu kỳ', description: row.docNo });
     } catch (err) {
       const request = toConfirmationRequest(err);
-      if (request) setPendingRemoval({ request, row });
+      if (request) setPendingRemoval({ request, row, flags });
       else if (!handleOpeningDateNotSet(err))
         toast({ variant: 'destructive', title: 'Không thể xóa', description: getErrorMessage(err) });
     } finally {
@@ -172,9 +172,9 @@ export function OpeningDebtPage() {
 
   const onConfirmRemoval = () => {
     if (!pendingRemoval) return;
-    const { row, request } = pendingRemoval;
+    const { row, request, flags } = pendingRemoval;
     setPendingRemoval(null);
-    void deleteRow(row, request);
+    void deleteRow(row, withConfirmed(flags, request));
   };
 
   return (

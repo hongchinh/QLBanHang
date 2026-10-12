@@ -53,7 +53,7 @@ export function toConfirmationRequest(error: unknown): ConfirmationRequest | nul
     title: rule.title,
     message: apiError.message,
     items: Object.entries(apiError.details ?? {}).map(([key, messages]) => ({ key, messages })),
-    ...(apiError.token ? { token: apiError.token } : {}),
+    ...(apiError.token != null ? { token: apiError.token } : {}),
   };
 }
 
@@ -63,7 +63,9 @@ export function withConfirmed(flags: ConfirmFlags, request: ConfirmationRequest)
   const confirmed: ConfirmFlags = { ...flags, [request.flag]: true };
   if (request.flag === 'confirmRemoveSettlements') {
     // The latest 422 wins: a token left from an earlier, different list must not ride along.
-    if (request.token) confirmed.confirmedSettlements = request.token;
+    // No token -> the server treats the confirmation as covering all settlements (legacy);
+    // the new server always sends one.
+    if (request.token != null) confirmed.confirmedSettlements = request.token;
     else delete confirmed.confirmedSettlements;
   }
   return confirmed;

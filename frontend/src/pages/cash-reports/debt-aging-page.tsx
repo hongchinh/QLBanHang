@@ -14,10 +14,10 @@ import { getErrorMessage } from '@/lib/api-client';
 import { formatCurrencyVnd } from '@/lib/utils';
 import { todayYmd } from '@/lib/vn-datetime';
 import { NUMERIC_CELL, formatSignedBalance, parseDebtSide } from './document-link';
+import { BucketBoundariesInput } from './bucket-boundaries-input';
 import { ReportPartnerPicker } from './report-partner-picker';
 
 const SIDES: DebtSide[] = ['Receivable', 'Payable'];
-const BUCKETS_ERROR = 'Mốc không hợp lệ: các số nguyên dương tăng dần, cách nhau bởi dấu phẩy, tối đa 6 mốc';
 
 // Tuổi nợ: open debt per partner by age bucket as at a date. Route permission: reports.debt.
 // Filters live in the URL; the bucket boundaries are typed here and validated before they reach the API.
@@ -29,18 +29,6 @@ export function DebtAgingPage() {
   const partnerId = searchParams.get('partnerId') || undefined;
   const urlBuckets = normalizeBuckets(searchParams.get('buckets') ?? '');
   const [picked, setPicked] = useState<{ id: string; label: string } | null>(null);
-  const [bucketsText, setBucketsText] = useState(searchParams.get('buckets') ?? DEFAULT_BUCKETS);
-  const [typedInvalid, setTypedInvalid] = useState(false);
-  // The page stays mounted when only the query string changes (e.g. the sidebar link), so re-derive the
-  // typed text from the URL whenever its raw value changes.
-  const rawBuckets = searchParams.get('buckets') ?? '';
-  const [syncedBuckets, setSyncedBuckets] = useState(rawBuckets);
-  if (syncedBuckets !== rawBuckets) {
-    setSyncedBuckets(rawBuckets);
-    setBucketsText(rawBuckets || DEFAULT_BUCKETS);
-    setTypedInvalid(false);
-  }
-
   const { data, isLoading, isError, error } = useDebtAging(
     { side, at, partnerId, buckets: urlBuckets ?? DEFAULT_BUCKETS },
     { enabled: urlBuckets !== null },
@@ -62,17 +50,6 @@ export function DebtAgingPage() {
     },
     [setSearchParams],
   );
-
-  const commitBuckets = () => {
-    const normalized = normalizeBuckets(bucketsText);
-    if (normalized === null) {
-      setTypedInvalid(true);
-      return;
-    }
-    setTypedInvalid(false);
-    setBucketsText(normalized);
-    updateParams({ buckets: normalized });
-  };
 
   // A disabled query still returns cached data for its key; never show a report for buckets the URL rejected.
   const report = urlBuckets === null ? undefined : data;
@@ -147,22 +124,14 @@ export function DebtAgingPage() {
               onClear={() => updateParams({ partnerId: null })}
             />
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="debt-aging-buckets">Mốc tuổi nợ</Label>
-            <Input
-              id="debt-aging-buckets"
-              value={bucketsText}
-              onChange={(e) => setBucketsText(e.target.value)}
-              onBlur={commitBuckets}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commitBuckets();
-              }}
-            />
-          </div>
+          <BucketBoundariesInput
+            id="debt-aging-buckets"
+            label="Mốc tuổi nợ"
+            rawValue={searchParams.get('buckets') ?? ''}
+            onCommit={(buckets) => updateParams({ buckets })}
+          />
         </CardContent>
       </Card>
-
-      {(typedInvalid || urlBuckets === null) && <p className="text-sm text-destructive">{BUCKETS_ERROR}</p>}
 
       {isError ? (
         <p className="text-sm text-destructive">{getErrorMessage(error)}</p>

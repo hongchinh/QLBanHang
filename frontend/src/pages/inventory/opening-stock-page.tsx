@@ -19,6 +19,7 @@ import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-c
 import { roundAwayFromZero } from '@/lib/round';
 import { formatStockQuantity, parseQuantityInput, stockUnitName } from '@/lib/stock-quantity';
 import { toast } from '@/lib/use-toast';
+import { formatDateOnly } from '@/lib/date-only';
 
 interface Row {
   key: string;
@@ -63,12 +64,6 @@ const quantityError = (r: Row) =>
   r.quantity.trim() !== '' && parseQuantityInput(r.quantity) === undefined ? 'Số lượng không hợp lệ' : undefined;
 const amountError = (r: Row) =>
   r.amount.trim() !== '' && parseMoneyInput(r.amount) === undefined ? 'Giá trị không hợp lệ' : undefined;
-
-// `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
-function formatDateOnly(value: string): string {
-  const [y, m, d] = value.split('-');
-  return `${d}/${m}/${y}`;
-}
 
 // Route permission: inventory.opening_stock. Opening values are part of that permission (D36),
 // so no inventory.view_cost check here.

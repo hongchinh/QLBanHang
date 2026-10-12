@@ -25,16 +25,10 @@ import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { toast } from '@/lib/use-toast';
 import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import { OpeningDebtFormDialog } from './opening-debt-form-dialog';
+import { formatDateOnly } from '@/lib/date-only';
 
 const PAGE_SIZE = 20;
 const SELECT_CLASS = 'h-9 rounded-md border border-input bg-background px-3 text-sm';
-
-// `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
-function formatDateOnly(value?: string | null): string {
-  if (!value) return '';
-  const [y, m, d] = value.split('-');
-  return `${d}/${m}/${y}`;
-}
 
 function parseSide(value: string | null): DebtSide | undefined {
   return value === 'Receivable' || value === 'Payable' ? value : undefined;

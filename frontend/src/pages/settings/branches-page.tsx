@@ -15,13 +15,7 @@ import { getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { useBranchStore } from '@/stores/branch-store';
 import { BranchFormDialog, BranchOpeningDateDialog } from './branch-form-dialog';
-
-// `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
-function formatDateOnly(value?: string | null): string {
-  if (!value) return '';
-  const [y, m, d] = value.split('-');
-  return `${d}/${m}/${y}`;
-}
+import { formatDateOnly } from '@/lib/date-only';
 
 export function BranchesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);

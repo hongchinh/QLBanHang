@@ -15,6 +15,7 @@ import { ProductTypeaheadCell } from '@/pages/quotations/components/product-type
 import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
 import '@/pages/quotations/components/line-items-grid.css';
+import { toOptionalNumber } from '@/lib/to-number';
 
 const fmt = new Intl.NumberFormat('vi-VN');
 
@@ -93,12 +94,6 @@ function isFieldDisabled(mode: PricingMode, field: LineFocusField): boolean {
     default:
       return false;
   }
-}
-
-function toNum(v: unknown): number | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : undefined;
 }
 
 function parseQuantityInput(text: string): number | undefined {
@@ -189,7 +184,7 @@ function PercentCell({
       value={editing ?? value ?? ''}
       onChange={(e) => {
         setEditing(e.target.value);
-        onCommit(toNum(e.target.value) ?? 0);
+        onCommit(toOptionalNumber(e.target.value) ?? 0);
       }}
       onBlur={() => setEditing(null)}
     />
@@ -312,7 +307,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           {...errorProps(focusField, idx, error)}
           disabled={disabled}
           value={(line?.[field] ?? '') as number | string}
-          onChange={(e) => setLineField(idx, field, toNum(e.target.value) ?? '')}
+          onChange={(e) => setLineField(idx, field, toOptionalNumber(e.target.value) ?? '')}
         />
         <CellError id={errorId(focusField, idx)} message={error} />
       </td>
@@ -327,7 +322,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           field={focusField}
           rowIndex={idx}
           label={label}
-          value={toNum(rows[idx]?.[field])}
+          value={toOptionalNumber(rows[idx]?.[field])}
           disabled={readOnly}
           error={error}
           onCommit={(value) => {
@@ -401,7 +396,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
               const stockKey = `${line.productId}:${line.warehouseId}`;
               const productError = errorOf(idx, 'productId');
               const warehouseError = errorOf(idx, 'warehouseId');
-              const quantityValue = mode === 'PerUnit' ? toNum(line.quantity) : result?.quantity;
+              const quantityValue = mode === 'PerUnit' ? toOptionalNumber(line.quantity) : result?.quantity;
               return (
                 <tr key={line._uiKey ?? field.id}>
                   <td className="row-no">{idx + 1}</td>
@@ -485,7 +480,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                       field="unit-price"
                       rowIndex={idx}
                       label="Đơn giá"
-                      value={toNum(line.unitPrice)}
+                      value={toOptionalNumber(line.unitPrice)}
                       format={formatMoneyForDisplay}
                       parse={parseMoneyInput}
                       onCommit={(v) => setLineField(idx, 'unitPrice', v ?? 0)}
@@ -503,7 +498,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                       field="discount-amount"
                       rowIndex={idx}
                       label="Tiền CK"
-                      value={line.discountManual ? toNum(line.discountAmount) : result?.discountAmount}
+                      value={line.discountManual ? toOptionalNumber(line.discountAmount) : result?.discountAmount}
                       format={formatMoneyForDisplay}
                       parse={parseMoneyInput}
                       onCommit={(v) => {

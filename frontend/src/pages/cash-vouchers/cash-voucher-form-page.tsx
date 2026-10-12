@@ -56,6 +56,8 @@ import {
   type CashVoucherSelectedPartner,
 } from './components/cash-voucher-header';
 import { CASH_VOUCHER_LABELS, type CashVoucherLabels } from './labels';
+import { formatDateOnly } from '@/lib/date-only';
+import { toNumberOrZero } from '@/lib/to-number';
 
 type SubmitIntent = 'save-stay' | 'save-exit' | 'update';
 type VoucherActionKind = 'cancel' | 'restore' | 'delete';
@@ -231,7 +233,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   const showAllocations = !!ownEntry && !!partnerId;
 
   // Display only: the server computes Total = Σ lines.
-  const total = round2(watchedLines.reduce((sum, line) => sum + toNum(line.amount), 0));
+  const total = round2(watchedLines.reduce((sum, line) => sum + toNumberOrZero(line.amount), 0));
   // Settlements this form does not edit (Manual/Offset/Auto, another voucher's AtVoucher) use part of its amount.
   const otherSettled = allocationTotal((voucher?.allocations ?? []).filter((a) => !isOwnAllocation(a)));
 
@@ -266,7 +268,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     !!openItems &&
     checkAllocations(
       openItems,
-      allocations.map((row) => ({ entryId: row.entryId, amount: toNum(row.amount) })),
+      allocations.map((row) => ({ entryId: row.entryId, amount: toNumberOrZero(row.amount) })),
       total,
       otherSettled,
     ).invalid;
@@ -380,7 +382,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   // Trailing rows the user never filled are dropped instead of failing validation.
   function dropBlankLines() {
     const lines = form.getValues('lines');
-    const kept = lines.filter((l) => !!l.description?.trim() || toNum(l.amount) !== 0);
+    const kept = lines.filter((l) => !!l.description?.trim() || toNumberOrZero(l.amount) !== 0);
     if (kept.length > 0 && kept.length < lines.length) form.setValue('lines', kept, { shouldDirty: true });
   }
 
@@ -722,16 +724,6 @@ function partnerFits(
 }
 
 function sameAllocations(a: CashAllocationFormValues[], b: CashAllocationFormValues[]): boolean {
-  return a.length === b.length && a.every((row, i) => row.entryId === b[i].entryId && toNum(row.amount) === b[i].amount);
+  return a.length === b.length && a.every((row, i) => row.entryId === b[i].entryId && toNumberOrZero(row.amount) === b[i].amount);
 }
 
-function toNum(v: unknown): number {
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-// `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
-function formatDateOnly(value: string): string {
-  const [y, m, d] = value.split('-');
-  return `${d}/${m}/${y}`;
-}

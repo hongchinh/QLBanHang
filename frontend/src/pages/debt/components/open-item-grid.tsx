@@ -6,6 +6,7 @@ import type { OpenItem } from '@/features/debt/types';
 import { roundAwayFromZero } from '@/lib/round';
 import { CellError, MoneyCell } from '@/pages/cash-vouchers/components/cash-line-grid';
 import '@/pages/quotations/components/line-items-grid.css';
+import { formatDateOnly } from '@/lib/date-only';
 
 const fmt = new Intl.NumberFormat('vi-VN');
 
@@ -17,13 +18,6 @@ function amountError(amount: number | undefined, open: number): string | undefin
   if (amount === undefined) return undefined;
   if (amount < 0) return NEGATIVE_MESSAGE;
   return amount > open ? OVER_OPEN_MESSAGE : undefined;
-}
-
-// `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
-function formatDateOnly(value?: string | null): string {
-  if (!value) return '';
-  const [y, m, d] = value.split('-');
-  return `${d}/${m}/${y}`;
 }
 
 export interface OpenItemGridProps {

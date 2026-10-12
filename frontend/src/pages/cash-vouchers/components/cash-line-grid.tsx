@@ -10,13 +10,9 @@ import type {
 import { roundAwayFromZero } from '@/lib/round';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import '@/pages/quotations/components/line-items-grid.css';
+import { toNumberOrZero } from '@/lib/to-number';
 
 const fmt = new Intl.NumberFormat('vi-VN');
-
-function toNum(v: unknown): number {
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export interface MoneyCellProps {
   id: string;
@@ -82,7 +78,7 @@ export function CashLineGrid({ form, readOnly }: CashLineGridProps) {
   const lineErrors = form.formState.errors.lines;
   // Display only: the server computes Total = Σ lines.
   const total = roundAwayFromZero(
-    rows.reduce((sum, row) => sum + toNum(row?.amount), 0),
+    rows.reduce((sum, row) => sum + toNumberOrZero(row?.amount), 0),
     2,
   );
 
@@ -160,7 +156,7 @@ export function CashLineGrid({ form, readOnly }: CashLineGridProps) {
                     <MoneyCell
                       id={cellId('amount', idx)}
                       label={`Số tiền dòng ${idx + 1}`}
-                      value={line.amount === undefined ? undefined : toNum(line.amount)}
+                      value={line.amount === undefined ? undefined : toNumberOrZero(line.amount)}
                       onCommit={(v) => setLineField(idx, 'amount', v ?? 0)}
                       disabled={readOnly}
                       error={amountError}

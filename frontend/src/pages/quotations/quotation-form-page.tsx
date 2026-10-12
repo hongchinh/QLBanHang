@@ -76,6 +76,7 @@ import { createEmptyLine, LineItemsGrid, type LineItemsGridHandle } from './comp
 import { TotalsPanel } from './components/totals-panel';
 import { computeLineQuantity } from './utils/compute-line';
 import type { HeaderLike, LineLike } from './utils/compute-line';
+import { toOptionalNumber } from '@/lib/to-number';
 
 type QuotationSubmitIntent = 'save-exit' | 'save-stay' | 'save-print';
 type QuotationButtonAction = 'send' | 'confirm' | 'cancel' | 'accounting-confirm' | 'clone' | 'print' | 'excel' | 'excel-handover-price' | 'excel-handover-no-price' | 'print-handover-price' | 'print-handover-no-price';
@@ -1198,21 +1199,15 @@ function toFormDefaults(q?: Quotation): QuotationFormValues {
 function toLineLike(line: QuotationLineFormValues): LineLike {
   return {
     pricingMode: line.pricingMode,
-    length: toNum(line.length),
-    width: toNum(line.width),
-    thickness: toNum(line.thickness),
-    density: toNum(line.density),
-    sheetCount: toNum(line.sheetCount),
-    quantity: toNum(line.quantity) ?? 0,
-    unitPrice: toNum(line.unitPrice) ?? 0,
-    unitCost: toNum(line.unitCost),
+    length: toOptionalNumber(line.length),
+    width: toOptionalNumber(line.width),
+    thickness: toOptionalNumber(line.thickness),
+    density: toOptionalNumber(line.density),
+    sheetCount: toOptionalNumber(line.sheetCount),
+    quantity: toOptionalNumber(line.quantity) ?? 0,
+    unitPrice: toOptionalNumber(line.unitPrice) ?? 0,
+    unitCost: toOptionalNumber(line.unitCost),
   };
-}
-
-function toNum(v: unknown): number | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : undefined;
 }
 
 function toPayload(parsed: QuotationFormParsed): UpsertQuotationRequest {

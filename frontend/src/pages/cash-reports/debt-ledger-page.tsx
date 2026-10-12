@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getErrorMessage } from '@/lib/api-client';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn, formatCurrencyVnd } from '@/lib/utils';
+import { formatDateOnly } from '@/lib/date-only';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
 import {
   DEBT_SOURCE_TYPE_LABELS,
@@ -19,7 +20,6 @@ import {
   formatAmountCell,
   formatDebitCredit,
   formatSignedBalance,
-  formatYmd,
   parseDebtSide,
 } from './document-link';
 import { DocumentCodeLink } from './document-code-link';
@@ -256,7 +256,7 @@ export function DebtLedgerPage() {
                 </tr>
                 {ledger.rows.map((row) => (
                   <tr key={row.entryId} className="border-b">
-                    <td className="whitespace-nowrap px-2 py-2">{formatYmd(row.docDate)}</td>
+                    <td className="whitespace-nowrap px-2 py-2">{formatDateOnly(row.docDate)}</td>
                     <td className="px-2 py-2">
                       <DocumentCodeLink sourceType={row.sourceType} sourceId={row.sourceId} code={row.docCode} />
                     </td>

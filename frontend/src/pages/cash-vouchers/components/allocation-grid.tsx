@@ -4,20 +4,10 @@ import type { OpenItem } from '@/features/debt/types';
 import { cn } from '@/lib/utils';
 import { CellError, MoneyCell } from './cash-line-grid';
 import '@/pages/quotations/components/line-items-grid.css';
+import { formatDateOnly } from '@/lib/date-only';
+import { toNumberOrZero } from '@/lib/to-number';
 
 const fmt = new Intl.NumberFormat('vi-VN');
-
-// `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
-function formatDateOnly(value?: string | null): string {
-  if (!value) return '';
-  const [y, m, d] = value.split('-');
-  return `${d}/${m}/${y}`;
-}
-
-function toNum(v: unknown): number {
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
 
 export interface AllocationGridProps {
   // Open items of the partner and side (`useOpenItems`, with `forSource` on edit so the room this voucher uses is added back).
@@ -49,12 +39,12 @@ export function AllocationGrid({
 }: AllocationGridProps) {
   const amountOf = (entryId: string): number | undefined => {
     const row = value.find((r) => r.entryId === entryId);
-    return row === undefined ? undefined : toNum(row.amount);
+    return row === undefined ? undefined : toNumberOrZero(row.amount);
   };
 
   const { allocated, capacity, remaining, overAllocated, overOpenEntryIds } = checkAllocations(
     items,
-    value.map((row) => ({ entryId: row.entryId, amount: toNum(row.amount) })),
+    value.map((row) => ({ entryId: row.entryId, amount: toNumberOrZero(row.amount) })),
     total,
     otherSettled,
   );

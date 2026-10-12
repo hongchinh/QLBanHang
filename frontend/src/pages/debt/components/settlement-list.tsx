@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getErrorMessage } from '@/lib/api-client';
 import { roundAwayFromZero } from '@/lib/round';
 import { toast } from '@/lib/use-toast';
+import { formatDateOnly } from '@/lib/date-only';
 
 const SETTLEMENT_ORIGIN_LABELS: Record<SettlementOrigin, string> = {
   AtVoucher: 'Lúc lập phiếu',
@@ -24,11 +25,6 @@ const NUMERIC_CELL = 'px-2 py-2 text-right tabular-nums';
 
 // Auto settlements belong to the stock voucher and Offset ones to the offset voucher (P22).
 const isUnmatchable = (origin: SettlementOrigin) => origin === 'Manual' || origin === 'AtVoucher';
-
-function formatYmd(ymd: string): string {
-  const [y, m, d] = ymd.slice(0, 10).split('-');
-  return `${d}/${m}/${y}`;
-}
 
 function formatInstant(iso: string): string {
   const d = new Date(iso);
@@ -110,7 +106,7 @@ export function SettlementList({ partnerId, side, docHref }: SettlementListProps
       ) : (
         <span className="font-medium">{code}</span>
       )}
-      <span className="ml-2 text-muted-foreground tabular-nums">{formatYmd(ymd)}</span>
+      <span className="ml-2 text-muted-foreground tabular-nums">{formatDateOnly(ymd)}</span>
     </td>
   );
 

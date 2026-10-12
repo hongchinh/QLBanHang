@@ -38,6 +38,7 @@ import { useAuthStore } from '@/stores/auth-store';
 import { StockVoucherActivityHistory } from '@/pages/stock-vouchers/components/stock-voucher-activity-history';
 import { DebtPartnerPicker } from './components/debt-partner-picker';
 import { OpenItemGrid } from './components/open-item-grid';
+import { formatDateOnly } from '@/lib/date-only';
 
 const BASE_PATH = '/debt/offsets';
 const TITLE = 'Phiếu bù trừ công nợ';
@@ -65,12 +66,6 @@ function hasInvalidRow(rows: MatchRow[], items: OpenItem[]): boolean {
 }
 
 const toAllocatable = (items: OpenItem[]) => items.map((item) => ({ ...item, dueDate: item.dueDate ?? null }));
-
-// `yyyy-MM-dd` (DateOnly) → `dd/MM/yyyy`, without going through Date (no time-zone shift).
-function formatDateOnly(value: string): string {
-  const [y, m, d] = value.split('-');
-  return `${d}/${m}/${y}`;
-}
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);

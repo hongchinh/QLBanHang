@@ -71,6 +71,7 @@ import { StockTotalsPanel } from './components/stock-totals-panel';
 import { StockVoucherActivityHistory } from './components/stock-voucher-activity-history';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
+import { toOptionalNumber } from '@/lib/to-number';
 
 type SubmitIntent = 'save-stay' | 'save-exit' | 'update';
 type VoucherActionKind = 'cancel' | 'restore' | 'delete';
@@ -243,9 +244,9 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const { data: settings } = useInventorySettings();
 
   const watchedLines = (useWatch({ control: form.control, name: 'lines' }) ?? []) as StockLineFormValues[];
-  const freight = toNum(useWatch({ control: form.control, name: 'freight' })) ?? 0;
-  const orderDiscount = toNum(useWatch({ control: form.control, name: 'orderDiscount' })) ?? 0;
-  const paidAmount = toNum(useWatch({ control: form.control, name: 'paidAmount' }));
+  const freight = toOptionalNumber(useWatch({ control: form.control, name: 'freight' })) ?? 0;
+  const orderDiscount = toOptionalNumber(useWatch({ control: form.control, name: 'orderDiscount' })) ?? 0;
+  const paidAmount = toOptionalNumber(useWatch({ control: form.control, name: 'paidAmount' }));
   const paidAmountTouched = useWatch({ control: form.control, name: 'paidAmountTouched' });
   const voucherAt = useWatch({ control: form.control, name: 'voucherAt' });
   const warehouseId = useWatch({ control: form.control, name: 'warehouseId' });
@@ -893,27 +894,21 @@ function partnerFits(
   return role ?? nextType === previousType;
 }
 
-function toNum(v: unknown): number | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : undefined;
-}
-
 function toStockLineLike(line: StockLineFormValues): StockLineLike {
   return {
     trackInventory: line.trackInventory,
     pricingMode: line.pricingMode,
     priceIncludesVat: line.priceIncludesVat,
-    sheetCount: toNum(line.sheetCount),
-    length: toNum(line.length),
-    width: toNum(line.width),
-    thickness: toNum(line.thickness),
-    quantity: toNum(line.quantity) ?? 0,
-    unitPrice: toNum(line.unitPrice) ?? 0,
-    discountRate: toNum(line.discountRate) ?? 0,
-    discountAmount: toNum(line.discountAmount),
+    sheetCount: toOptionalNumber(line.sheetCount),
+    length: toOptionalNumber(line.length),
+    width: toOptionalNumber(line.width),
+    thickness: toOptionalNumber(line.thickness),
+    quantity: toOptionalNumber(line.quantity) ?? 0,
+    unitPrice: toOptionalNumber(line.unitPrice) ?? 0,
+    discountRate: toOptionalNumber(line.discountRate) ?? 0,
+    discountAmount: toOptionalNumber(line.discountAmount),
     discountManual: line.discountManual,
-    vatRate: toNum(line.vatRate) ?? 0,
+    vatRate: toOptionalNumber(line.vatRate) ?? 0,
   };
 }
 

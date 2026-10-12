@@ -32,12 +32,6 @@ export const DEBT_SOURCE_TYPE_LABELS: Record<DebtSourceType, string> = {
   Offset: 'Bù trừ công nợ',
 };
 
-// VN date yyyy-MM-dd → dd/MM/yyyy, without going through a Date (no time zone shift).
-export function formatYmd(ymd: string): string {
-  const [y, m, d] = ymd.slice(0, 10).split('-');
-  return `${d}/${m}/${y}`;
-}
-
 // Empty cell for a zero movement, so the columns stay readable.
 export function formatAmountCell(value: number): string {
   return value ? formatCurrencyVnd(value) : '';

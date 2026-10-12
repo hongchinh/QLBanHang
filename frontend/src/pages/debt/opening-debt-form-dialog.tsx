@@ -16,6 +16,7 @@ import { useDebtPartnerSearch } from '@/features/debt/hooks';
 import {
   useCreateOpeningDebt,
   useOpeningDateNotSetHandler,
+  useOpeningDebtOwners,
   useUpdateOpeningDebt,
 } from '@/features/opening-debts/hooks';
 import {
@@ -39,6 +40,8 @@ const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 const KINDS: OpeningDebtKind[] = ['Debt', 'Prepayment'];
 const CONCURRENCY_MESSAGE =
   'Nợ đầu kỳ đã được người khác cập nhật. Đã tải lại danh sách — vui lòng mở lại để sửa.';
+
+const GONE_OWNER_LABEL = 'Nhân viên đã ngừng hoạt động';
 
 const SERVER_FIELDS = ['partnerId', 'docNo', 'docDate', 'dueDate', 'amount', 'note'] as const;
 
@@ -83,6 +86,8 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
   const saving = create.isPending || update.isPending;
 
   const [partner, setPartner] = useState<PickedPartner | null>(null);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const { data: owners } = useOpeningDebtOwners();
   const [pending, setPending] = useState<PendingConfirmation | null>(null);
 
   const form = useForm<OpeningDebtFormValues, unknown, OpeningDebtFormParsed>({
@@ -98,17 +103,23 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
     if (!open) return;
     form.reset(toDefaults(initial, openingDate));
     setPartner(initial ? { id: initial.partnerId, code: initial.partnerCode, name: initial.partnerName } : null);
+    setOwnerUserId(initial?.ownerUserId ?? null);
     setPending(null);
   }, [open, initial, openingDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const side = useWatch({ control: form.control, name: 'side' });
   const kind = useWatch({ control: form.control, name: 'kind' });
   const errors = form.formState.errors;
+  // The loaded owner may be missing from the active options (deactivated or deleted user): keep it selectable.
+  const ownerOptions = owners ?? [];
+  const missingOwner =
+    initial?.ownerUserId && !ownerOptions.some((o) => o.id === initial.ownerUserId)
+      ? { id: initial.ownerUserId, fullName: initial.ownerName ?? GONE_OWNER_LABEL }
+      : null;
 
   const submit = async (values: OpeningDebtFormParsed, flags: ConfirmFlags = {}) => {
-    // The owner field is not shown in 2A (P2); an edit keeps the loaded owner.
     const data = toUpsertOpeningDebtRequest(values, {
-      ownerUserId: initial ? (initial.ownerUserId ?? null) : undefined,
+      ownerUserId: initial ? ownerUserId : (ownerUserId ?? undefined),
       confirmRemoveSettlements: flags.confirmRemoveSettlements ?? false,
       confirmedSettlements: flags.confirmedSettlements,
       version: initial?.version,
@@ -210,6 +221,24 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
             />
             {partner && <p className="text-sm text-muted-foreground">{partner.name}</p>}
             {errors.partnerId && <p className="text-sm text-destructive">{errors.partnerId.message}</p>}
+          </div>
+
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="opening-debt-owner">Nhân viên</Label>
+            <select
+              id="opening-debt-owner"
+              className={SELECT_CLASS}
+              value={ownerUserId ?? ''}
+              onChange={(e) => setOwnerUserId(e.target.value || null)}
+            >
+              <option value="">Không chọn</option>
+              {ownerOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.fullName}
+                </option>
+              ))}
+              {missingOwner && <option value={missingOwner.id}>{missingOwner.fullName}</option>}
+            </select>
           </div>
 
           <div className="space-y-2">

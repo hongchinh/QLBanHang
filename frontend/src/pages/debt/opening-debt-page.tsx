@@ -111,6 +111,11 @@ export function OpeningDebtPage() {
           <span className="block text-right tabular-nums">{formatMoneyForDisplay(row.original.settled)}</span>
         ),
       },
+      {
+        id: 'owner',
+        header: 'Nhân viên',
+        cell: ({ row }) => row.original.ownerName ?? '—',
+      },
       { id: 'note', header: 'Ghi chú', cell: ({ row }) => row.original.note ?? '' },
       {
         id: 'actions',

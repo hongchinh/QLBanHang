@@ -16,6 +16,15 @@ export function useOpeningDebts(params: OpeningDebtListParams) {
   });
 }
 
+// Owner options of the form (active users, B1).
+export function useOpeningDebtOwners() {
+  return useQuery({
+    queryKey: openingDebtKeys.owners(),
+    queryFn: () => openingDebtsApi.owners(),
+    staleTime: 5 * 60_000,
+  });
+}
+
 // List filter: partners of every role (the form picker uses useDebtPartnerSearch of the chosen side).
 export function useOpeningDebtPartnerSearch(keyword: string) {
   const trimmed = keyword.trim();

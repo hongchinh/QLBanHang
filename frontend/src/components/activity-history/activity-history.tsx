@@ -1,4 +1,4 @@
-import { Ban, CirclePlus, Link2Off, Loader2, ReceiptText, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { Ban, CirclePlus, Link2Off, Loader2, ReceiptText, RotateCcw, Save, Trash2, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { StockVoucherActivityAction } from '@/features/stock-vouchers/types';
 
@@ -21,12 +21,12 @@ interface Props {
   onRetry: () => void;
 }
 
-// Same layout as QuotationActivityHistory.
+// QuotationActivityHistory (pages/quotations/quotation-form-page.tsx) duplicates this layout with its own action union.
 export function ActivityHistory({ activities, isLoading, isError, errorMessage, onRetry }: Props) {
   if (isLoading) {
     return (
-      <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+      <div role="status" className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
+        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-blue-600" />
         Đang tải lịch sử...
       </div>
     );
@@ -34,7 +34,7 @@ export function ActivityHistory({ activities, isLoading, isError, errorMessage, 
 
   if (isError) {
     return (
-      <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+      <div role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
         <div>{errorMessage}</div>
         <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onRetry}>
           Thử lại
@@ -55,11 +55,13 @@ export function ActivityHistory({ activities, isLoading, isError, errorMessage, 
     <ul className="divide-y rounded-md border">
       {activities.map((activity) => (
         <li key={activity.id} className="flex gap-3 p-3">
-          <div className="mt-0.5">{activityIcon(activity.action)}</div>
+          <div className="mt-0.5"><ActivityIcon action={activity.action} /></div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <span className="font-medium">{ACTIVITY_LABELS[activity.action] ?? activity.action}</span>
-              <span className="text-xs text-muted-foreground">{formatActivityTime(activity.occurredAt)}</span>
+              <time dateTime={activity.occurredAt} className="text-xs text-muted-foreground">
+                {formatActivityTime(activity.occurredAt)}
+              </time>
             </div>
             <p className="mt-1 text-sm text-foreground">{activity.description}</p>
             <p className="mt-1 text-xs text-muted-foreground">{activity.actorName ?? 'Người dùng không xác định'}</p>
@@ -80,23 +82,22 @@ const ACTIVITY_LABELS: Record<DocumentActivityAction, string> = {
   AutoVoucherChanged: 'Phiếu thu/chi tự động',
 };
 
-function activityIcon(action: DocumentActivityAction) {
-  switch (action) {
-    case 'Created':
-      return <CirclePlus className="h-4 w-4 text-cyan-600" />;
-    case 'Updated':
-      return <Save className="h-4 w-4 text-blue-600" />;
-    case 'Cancelled':
-      return <Ban className="h-4 w-4 text-red-600" />;
-    case 'Restored':
-      return <RotateCcw className="h-4 w-4 text-emerald-600" />;
-    case 'Deleted':
-      return <Trash2 className="h-4 w-4 text-red-600" />;
-    case 'SettlementRemoved':
-      return <Link2Off className="h-4 w-4 text-amber-600" />;
-    case 'AutoVoucherChanged':
-      return <ReceiptText className="h-4 w-4 text-indigo-600" />;
-  }
+const ACTIVITY_ICONS: Record<DocumentActivityAction, { icon: LucideIcon; className: string }> = {
+  Created: { icon: CirclePlus, className: 'text-cyan-600' },
+  Updated: { icon: Save, className: 'text-blue-600' },
+  Cancelled: { icon: Ban, className: 'text-red-600' },
+  Restored: { icon: RotateCcw, className: 'text-emerald-600' },
+  Deleted: { icon: Trash2, className: 'text-red-600' },
+  SettlementRemoved: { icon: Link2Off, className: 'text-amber-600' },
+  AutoVoucherChanged: { icon: ReceiptText, className: 'text-indigo-600' },
+};
+
+// An action the map does not know (a newer server) shows no icon.
+function ActivityIcon({ action }: { action: DocumentActivityAction }) {
+  const entry = ACTIVITY_ICONS[action];
+  if (!entry) return null;
+  const Icon = entry.icon;
+  return <Icon aria-hidden="true" className={`h-4 w-4 ${entry.className}`} />;
 }
 
 function formatActivityTime(value: string) {

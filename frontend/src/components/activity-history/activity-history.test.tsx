@@ -19,12 +19,13 @@ describe('ActivityHistory', () => {
     const onRetry = vi.fn();
     render(<ActivityHistory {...baseProps} isError errorMessage="Lỗi mạng" onRetry={onRetry} />);
     expect(screen.getByText('Lỗi mạng')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Thử lại' }));
     expect(onRetry).toHaveBeenCalledTimes(1);
   });
 
   it('shows the empty state', () => {
-    render(<ActivityHistory {...baseProps} />);
+    render(<ActivityHistory {...baseProps} activities={[]} />);
     expect(screen.getByText('Chưa có lịch sử.')).toBeInTheDocument();
   });
 
@@ -45,5 +46,12 @@ describe('ActivityHistory', () => {
   it('falls back to an unknown actor', () => {
     render(<ActivityHistory {...baseProps} activities={[{ ...activity('Updated'), actorName: null }]} />);
     expect(screen.getByText('Người dùng không xác định')).toBeInTheDocument();
+  });
+
+  it('shows an invalid timestamp and an unknown action as raw text', () => {
+    const unknown = { ...activity('Created'), action: 'Archived', occurredAt: 'not-a-date' } as unknown as DocumentActivity;
+    render(<ActivityHistory {...baseProps} activities={[unknown]} />);
+    expect(screen.getByText('Archived')).toBeInTheDocument();
+    expect(screen.getByText('not-a-date')).toBeInTheDocument();
   });
 });

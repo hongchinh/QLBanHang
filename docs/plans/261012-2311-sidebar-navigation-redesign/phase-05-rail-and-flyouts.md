@@ -1,6 +1,6 @@
 # Phase 05 — Collapsed rail and flyouts
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

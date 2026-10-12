@@ -15,17 +15,20 @@ public class CashDebtReportsController : ApiControllerBase
     private readonly ICashDebtReportService _service;
     private readonly IValidator<DebtBalanceReportRequest> _debtBalanceValidator;
     private readonly IValidator<DebtLedgerReportRequest> _debtLedgerValidator;
+    private readonly IValidator<DebtReconciliationReportRequest> _debtReconciliationValidator;
     private readonly IValidator<CashBookReportRequest> _cashBookValidator;
 
     public CashDebtReportsController(
         ICashDebtReportService service,
         IValidator<DebtBalanceReportRequest> debtBalanceValidator,
         IValidator<DebtLedgerReportRequest> debtLedgerValidator,
+        IValidator<DebtReconciliationReportRequest> debtReconciliationValidator,
         IValidator<CashBookReportRequest> cashBookValidator)
     {
         _service = service;
         _debtBalanceValidator = debtBalanceValidator;
         _debtLedgerValidator = debtLedgerValidator;
+        _debtReconciliationValidator = debtReconciliationValidator;
         _cashBookValidator = cashBookValidator;
     }
 
@@ -45,6 +48,15 @@ public class CashDebtReportsController : ApiControllerBase
     {
         await _debtLedgerValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.GetDebtLedgerAsync(request, ct));
+    }
+
+    [HttpGet("debt-reconciliation")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtReconciliationReportDto>>> DebtReconciliation(
+        [FromQuery] DebtReconciliationReportRequest request, CancellationToken ct)
+    {
+        await _debtReconciliationValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetDebtReconciliationAsync(request, ct));
     }
 
     [HttpGet("cash-book")]

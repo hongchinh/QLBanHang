@@ -160,3 +160,29 @@ public class CashBookRowDto
     /// Balance after this row: the group opening plus Σ In − Σ Out up to and including it.
     public decimal Running { get; set; }
 }
+
+/// Biên bản đối chiếu công nợ of one partner: one ledger per side it has (B8).
+public class DebtReconciliationReportRequest
+{
+    public Guid PartnerId { get; set; }
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+}
+
+public class DebtReconciliationReportDto
+{
+    public Guid PartnerId { get; set; }
+    public string PartnerCode { get; set; } = default!;
+    public string PartnerName { get; set; } = default!;
+    public string? TaxCode { get; set; }
+    public string? Address { get; set; }
+    public string BranchName { get; set; } = default!;
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+
+    /// Receivable first, then Payable.
+    public List<DebtLedgerReportDto> Sides { get; set; } = new();
+
+    /// Receivable.ClosingBalance - Payable.ClosingBalance when both sides are listed, else null; positive = the partner owes us.
+    public decimal? NetBalance { get; set; }
+}

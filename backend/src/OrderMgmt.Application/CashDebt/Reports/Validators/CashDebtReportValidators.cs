@@ -27,6 +27,10 @@ public class DebtLedgerReportRequestValidator : AbstractValidator<DebtLedgerRepo
     }
 }
 
+public class DebtReconciliationReportRequestValidator : AbstractValidator<DebtReconciliationReportRequest>
+{
+}
+
 public class CashBookReportRequestValidator : AbstractValidator<CashBookReportRequest>
 {
     public CashBookReportRequestValidator()

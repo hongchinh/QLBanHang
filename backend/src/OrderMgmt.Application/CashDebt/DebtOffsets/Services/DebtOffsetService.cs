@@ -145,24 +145,7 @@ public class DebtOffsetService : IDebtOffsetService
             ?? throw new NotFoundException(nameof(DebtOffsetVoucher), id);
         await EnsureWorkingBranchAsync(branchId, ct);
 
-        return await _db.CashDocumentActivities.AsNoTracking()
-            .Where(a => a.DocumentType == DocumentType.DebtOffset && a.DocumentId == id)
-            .OrderByDescending(a => a.OccurredAt)
-            .Select(a => new CashDocumentActivityDto
-            {
-                Id = a.Id,
-                Action = a.Action,
-                ActorUserId = a.ActorUserId,
-                ActorName = a.ActorUserId == null
-                    ? "Hệ thống"
-                    : _db.Users.IgnoreQueryFilters()
-                        .Where(u => u.Id == a.ActorUserId)
-                        .Select(u => u.FullName)
-                        .FirstOrDefault() ?? "Người dùng không xác định",
-                OccurredAt = a.OccurredAt,
-                Description = a.Description,
-            })
-            .ToListAsync(ct);
+        return await CashDocuments.ListActivitiesAsync(_db, DocumentType.DebtOffset, id, ct);
     }
 
     public Task<DebtOffsetDto> GetAsync(Guid id, CancellationToken ct = default) =>
@@ -452,15 +435,13 @@ public class DebtOffsetService : IDebtOffsetService
             items.Select(a => new SettlementDraft(a.EntryId, own.Id, a.Amount)).ToList(),
             SettlementOrigin.Offset, offset.Id, errorKeyPrefix, ct);
 
-    private static readonly DateTimeOffset MinVoucherAt = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
-
     // Exclusive upper bound of numeric(18,2).
     private const decimal MaxMoney = 10_000_000_000_000_000m;
 
     /// Same range as cash vouchers and fund transfers. An out-of-range date is reported by the rules (400
     /// `voucherAt`), so the period lock check skips it: VnTime cannot convert dates near DateTimeOffset.MaxValue.
     private bool IsValidVoucherAt(DateTimeOffset voucherAt) =>
-        voucherAt >= MinVoucherAt && voucherAt <= _clock.UtcNow.AddYears(1);
+        CashDocuments.IsValidVoucherAt(voucherAt, _clock.UtcNow);
 
     /// `peek` reads the next number without using it; otherwise the counter is incremented (the counter row is the
     /// last lock of a save, P14). Codes already used in the branch are skipped (see DocumentCodeAllocator).
@@ -474,21 +455,11 @@ public class DebtOffsetService : IDebtOffsetService
                 .ToListAsync(c)).ToHashSet(), ct);
 
     private void AddActivity(DebtOffsetVoucher offset, CashDocumentActivityAction action, string description) =>
-        _db.CashDocumentActivities.Add(new CashDocumentActivity
-        {
-            DocumentType = DocumentType.DebtOffset,
-            DocumentId = offset.Id,
-            Action = action,
-            ActorUserId = _currentUser.UserId,
-            OccurredAt = _clock.UtcNow,
-            Description = description,
-        });
+        _db.CashDocumentActivities.Add(CashDocuments.NewActivity(
+            DocumentType.DebtOffset, offset.Id, action, _currentUser.UserId, _clock.UtcNow, description));
 
     // ---- Guards -----------------------------------------------------------------------------
 
-    private async Task EnsureWorkingBranchAsync(Guid branchId, CancellationToken ct)
-    {
-        if (branchId != await _currentBranch.GetIdAsync(ct))
-            throw new ForbiddenException("Chứng từ thuộc chi nhánh khác.");
-    }
+    private Task EnsureWorkingBranchAsync(Guid branchId, CancellationToken ct) =>
+        CashDocuments.EnsureWorkingBranchAsync(_currentBranch, branchId, "Chứng từ thuộc chi nhánh khác.", ct);
 }

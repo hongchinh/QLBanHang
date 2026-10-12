@@ -207,24 +207,7 @@ public class CashVoucherService : ICashVoucherService
         await EnsureWorkingBranchAsync(voucher.BranchId, ct);
 
         var documentType = DocTypeOf(voucher.Type);
-        return await _db.CashDocumentActivities.AsNoTracking()
-            .Where(a => a.DocumentType == documentType && a.DocumentId == id)
-            .OrderByDescending(a => a.OccurredAt)
-            .Select(a => new CashDocumentActivityDto
-            {
-                Id = a.Id,
-                Action = a.Action,
-                ActorUserId = a.ActorUserId,
-                ActorName = a.ActorUserId == null
-                    ? "Hệ thống"
-                    : _db.Users.IgnoreQueryFilters()
-                        .Where(u => u.Id == a.ActorUserId)
-                        .Select(u => u.FullName)
-                        .FirstOrDefault() ?? "Người dùng không xác định",
-                OccurredAt = a.OccurredAt,
-                Description = a.Description,
-            })
-            .ToListAsync(ct);
+        return await CashDocuments.ListActivitiesAsync(_db, documentType, id, ct);
     }
 
     public Task<CashVoucherDto> GetAsync(Guid id, CancellationToken ct = default) =>
@@ -644,15 +627,13 @@ public class CashVoucherService : ICashVoucherService
         return (reason!, partner);
     }
 
-    private static readonly DateTimeOffset MinVoucherAt = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
-
     // Exclusive upper bound of numeric(18,2).
     private const decimal MaxMoney = 10_000_000_000_000_000m;
 
     /// Same range as stock vouchers. An out-of-range date is reported by the rules (400 `voucherAt`), so the period
     /// lock check skips it: VnTime cannot convert dates near DateTimeOffset.MaxValue.
     private bool IsValidVoucherAt(DateTimeOffset voucherAt) =>
-        voucherAt >= MinVoucherAt && voucherAt <= _clock.UtcNow.AddYears(1);
+        CashDocuments.IsValidVoucherAt(voucherAt, _clock.UtcNow);
 
     /// Partner rules per reason: PartnerType (Round 1 D4), then the debt side's role when the reason affects debt (P19).
     private static void ValidatePartner(CashReason reason, Guid? partnerId, Customer? partner, Action<string, string> add)
@@ -807,15 +788,8 @@ public class CashVoucherService : ICashVoucherService
     }
 
     private void AddActivity(CashVoucher voucher, CashDocumentActivityAction action, string description) =>
-        _db.CashDocumentActivities.Add(new CashDocumentActivity
-        {
-            DocumentType = DocTypeOf(voucher.Type),
-            DocumentId = voucher.Id,
-            Action = action,
-            ActorUserId = _currentUser.UserId,
-            OccurredAt = _clock.UtcNow,
-            Description = description,
-        });
+        _db.CashDocumentActivities.Add(CashDocuments.NewActivity(
+            DocTypeOf(voucher.Type), voucher.Id, action, _currentUser.UserId, _clock.UtcNow, description));
 
     // ---- Guards and mapping -----------------------------------------------------------------
 
@@ -825,11 +799,8 @@ public class CashVoucherService : ICashVoucherService
             throw new ForbiddenException();
     }
 
-    private async Task EnsureWorkingBranchAsync(Guid branchId, CancellationToken ct)
-    {
-        if (branchId != await _currentBranch.GetIdAsync(ct))
-            throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
-    }
+    private Task EnsureWorkingBranchAsync(Guid branchId, CancellationToken ct) =>
+        CashDocuments.EnsureWorkingBranchAsync(_currentBranch, branchId, "Phiếu thuộc chi nhánh khác.", ct);
 
     private static DocumentType DocTypeOf(CashVoucherType type) =>
         type == CashVoucherType.Receipt ? DocumentType.Receipt : DocumentType.Payment;

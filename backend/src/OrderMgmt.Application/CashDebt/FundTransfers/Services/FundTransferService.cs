@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
+using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.FundTransfers.Interfaces;
 using OrderMgmt.Application.CashDebt.FundTransfers.Models;
 using OrderMgmt.Application.CashDebt.Guards;
@@ -141,24 +142,7 @@ public class FundTransferService : IFundTransferService
             ?? throw new NotFoundException(nameof(FundTransfer), id);
         await EnsureWorkingBranchAsync(branchId, ct);
 
-        return await _db.CashDocumentActivities.AsNoTracking()
-            .Where(a => a.DocumentType == DocumentType.FundTransfer && a.DocumentId == id)
-            .OrderByDescending(a => a.OccurredAt)
-            .Select(a => new CashDocumentActivityDto
-            {
-                Id = a.Id,
-                Action = a.Action,
-                ActorUserId = a.ActorUserId,
-                ActorName = a.ActorUserId == null
-                    ? "Hệ thống"
-                    : _db.Users.IgnoreQueryFilters()
-                        .Where(u => u.Id == a.ActorUserId)
-                        .Select(u => u.FullName)
-                        .FirstOrDefault() ?? "Người dùng không xác định",
-                OccurredAt = a.OccurredAt,
-                Description = a.Description,
-            })
-            .ToListAsync(ct);
+        return await CashDocuments.ListActivitiesAsync(_db, DocumentType.FundTransfer, id, ct);
     }
 
     public Task<FundTransferDto> GetAsync(Guid id, CancellationToken ct = default) =>
@@ -436,12 +420,10 @@ public class FundTransferService : IFundTransferService
             throw new ValidationDomainException(errors, null);
     }
 
-    private static readonly DateTimeOffset MinVoucherAt = new(2000, 1, 1, 0, 0, 0, TimeSpan.Zero);
-
     /// Same range as cash and stock vouchers. An out-of-range date is reported by the rules (400 `voucherAt`), so the
     /// period lock check skips it: VnTime cannot convert dates near DateTimeOffset.MaxValue.
     private bool IsValidVoucherAt(DateTimeOffset voucherAt) =>
-        voucherAt >= MinVoucherAt && voucherAt <= _clock.UtcNow.AddYears(1);
+        CashDocuments.IsValidVoucherAt(voucherAt, _clock.UtcNow);
 
     /// `peek` reads the next number without using it; otherwise the counter is incremented (the counter row is the
     /// last lock of a save, P14). Codes already used in the branch are skipped (see DocumentCodeAllocator).
@@ -465,21 +447,11 @@ public class FundTransferService : IFundTransferService
     }
 
     private void AddActivity(FundTransfer transfer, CashDocumentActivityAction action, string description) =>
-        _db.CashDocumentActivities.Add(new CashDocumentActivity
-        {
-            DocumentType = DocumentType.FundTransfer,
-            DocumentId = transfer.Id,
-            Action = action,
-            ActorUserId = _currentUser.UserId,
-            OccurredAt = _clock.UtcNow,
-            Description = description,
-        });
+        _db.CashDocumentActivities.Add(CashDocuments.NewActivity(
+            DocumentType.FundTransfer, transfer.Id, action, _currentUser.UserId, _clock.UtcNow, description));
 
     // ---- Guards -----------------------------------------------------------------------------
 
-    private async Task EnsureWorkingBranchAsync(Guid branchId, CancellationToken ct)
-    {
-        if (branchId != await _currentBranch.GetIdAsync(ct))
-            throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
-    }
+    private Task EnsureWorkingBranchAsync(Guid branchId, CancellationToken ct) =>
+        CashDocuments.EnsureWorkingBranchAsync(_currentBranch, branchId, "Phiếu thuộc chi nhánh khác.", ct);
 }

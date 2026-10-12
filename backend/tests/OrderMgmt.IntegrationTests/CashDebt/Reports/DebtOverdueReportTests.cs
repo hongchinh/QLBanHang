@@ -1,9 +1,9 @@
-using OrderMgmt.Domain.Constants;
-using OrderMgmt.Application.Common.Models;
-using System.Net.Http.Json;
 using System.Net;
+using System.Net.Http.Json;
 using FluentAssertions;
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;

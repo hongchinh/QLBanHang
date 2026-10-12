@@ -287,9 +287,10 @@ public class DebtLedgerService : IDebtLedgerService
             await _activityLog.SettlementRemovedAsync(increase, decrease, s.Amount, ct);
             await _activityLog.SettlementRemovedAsync(decrease, increase, s.Amount, ct);
             _db.DebtSettlements.Remove(s);
-            RecordRemoved(new[] { s });
             removed.Add(new RemovedSettlement(s.Id, s.IncreaseEntryId, s.DecreaseEntryId, s.Amount, s.Origin));
         }
+
+        RecordRemoved(settlements);
 
         return removed;
     }

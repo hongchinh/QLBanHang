@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
@@ -112,11 +111,11 @@ public class OpeningDebtService : IOpeningDebtService
             var openingDate = await OpeningDateAsync(branchId, c);
             await ValidateAsync(request, openingDate, c);
 
-            // A confirmed shrink drops the row's settlements: a stock voucher among the entries they join gets its Auto
-            // settlement recomputed before the commit (AutoRecomputeHook).
             Apply(row, request);
             await _db.SaveChangesAsync(c);
 
+            // A confirmed shrink drops the row's settlements: a stock voucher among the entries they join gets its Auto
+            // settlement recomputed before the commit (AutoRecomputeHook).
             await _ledger.PostAsync(DebtSourceType.Opening, row.Id, new[] { Draft(row, openingDate) },
                 request.ConfirmRemoveSettlements, c);
         }, ct);

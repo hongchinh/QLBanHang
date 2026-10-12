@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
-using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.Debt.Interfaces;
 using OrderMgmt.Application.CashDebt.Debt.Models;
 using OrderMgmt.Application.CashDebt.Interfaces;

@@ -7,6 +7,8 @@ namespace OrderMgmt.Application.CashDebt.Ledger;
 /// partner locks (P14).
 /// Every removal of a non-Auto settlement is recorded in SettlementChangeCollector, and AutoRecomputeHook recomputes the
 /// Auto settlements of the stock vouchers involved just before the commit, so callers do not.
+/// Only the outermost ITransactionRunner.RunAsync runs the before-commit hooks: a ledger write under RunSnapshotAsync or
+/// in a transaction opened outside the runner skips the Auto recompute.
 public interface IDebtLedgerService
 {
     /// Save path (P21, P11). At most one draft per side (else ArgumentException). Upserts in place by

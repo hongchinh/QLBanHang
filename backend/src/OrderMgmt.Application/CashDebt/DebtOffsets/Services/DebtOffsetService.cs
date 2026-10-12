@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.DebtOffsets.Interfaces;

@@ -11,6 +11,7 @@ export interface MoneyCellProps {
   errorId?: string;
 }
 
+// A cell of an `.accounting-grid`: its styles come from the grid stylesheet `pages/quotations/components/line-items-grid.css`.
 // Formatted when idle; raw text while focused. Every keystroke commits the parsed value.
 export function MoneyCell({ id, label, value, onCommit, disabled, error, errorId }: MoneyCellProps) {
   const [editing, setEditing] = useState<string | null>(null);

@@ -1,4 +1,4 @@
-import { type KeyboardEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
 import { CellError, MoneyCell } from '@/components/money-cell/money-cell';

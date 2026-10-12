@@ -1,7 +1,7 @@
 # Thiết kế lại sidebar trái — nhóm chức năng, tìm kiếm, ghim
 
 **Date:** 2026-10-12 21:35:33
-**Status:** Design approved (cấu trúc + UI phong cách C, cập nhật 2026-10-12 21:59), reviewed 2026-10-12 22:08, pending implementation plan
+**Status:** Implemented (plan docs/plans/261012-2311-sidebar-navigation-redesign)
 **UI design:** [section-01-ui-design.md](section-01-ui-design.md). File này là nguồn đúng cho giao diện, component, edge case và kiểm thử. Mockup: [mockup-01-visual-styles.html](mockup-01-visual-styles.html) · [mockup-02-option-c-states.html](mockup-02-option-c-states.html)
 **Related:** [261007-2252-cash-debt-round2](../261007-2252-cash-debt-round2/SUMMARY.md) · plan Round 2B `docs/plans/261012-1709-cash-debt-round2b/` (thêm 5 báo cáo công nợ vào sidebar)
 
@@ -163,7 +163,7 @@ Danh sách đầy đủ theo từng file test ở [section-01 §7](section-01-ui
 
 ## Open Questions
 
-- Thứ tự mục trong *Báo cáo › Công nợ* lấy theo plan Round 2B. Cần xác nhận lại khi Round 2B xong.
+- ~~Thứ tự mục trong *Báo cáo › Công nợ* lấy theo plan Round 2B. Cần xác nhận lại khi Round 2B xong.~~ Đã chốt: dùng đúng thứ tự Round 2B đã merge: Số dư công nợ, Sổ chi tiết công nợ, Công nợ theo chứng từ, Tuổi nợ, Nợ quá hạn, Công nợ theo nhân viên, Biên bản đối chiếu.
 - ~~Giới hạn số mục ghim?~~ Đã chốt: không giới hạn số ghim; chỉ hiện tối đa 6 chip, phần dư gom vào "+N".
 
 ---

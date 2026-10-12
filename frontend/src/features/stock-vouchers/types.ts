@@ -236,6 +236,7 @@ export interface UpsertStockVoucherRequest {
   version?: number;
   acknowledgeNegativeStock: boolean;
   confirmRemoveSettlements?: boolean;
+  confirmedSettlements?: string;
   acknowledgeCreditLimit?: boolean;
   acknowledgeNegativeFund?: boolean;
   lines: UpsertStockVoucherLineRequest[];
@@ -245,6 +246,7 @@ export interface StockVoucherActionRequest {
   version?: number;
   acknowledgeNegativeStock?: boolean;
   confirmRemoveSettlements?: boolean;
+  confirmedSettlements?: string;
   acknowledgeCreditLimit?: boolean;
   acknowledgeNegativeFund?: boolean;
 }

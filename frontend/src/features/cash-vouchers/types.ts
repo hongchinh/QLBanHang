@@ -147,7 +147,7 @@ export interface CashAllocationRequest {
 }
 
 export interface UpsertCashVoucherRequest
-  extends Pick<ConfirmFlags, 'confirmRemoveSettlements' | 'acknowledgeNegativeFund'> {
+  extends Pick<ConfirmFlags, 'confirmRemoveSettlements' | 'confirmedSettlements' | 'acknowledgeNegativeFund'> {
   // Create: chooses the type; update: must equal the stored type.
   type: CashVoucherType;
   // ISO instant
@@ -171,7 +171,7 @@ export interface UpsertCashVoucherRequest
 }
 
 export interface CashDocumentActionRequest
-  extends Pick<ConfirmFlags, 'confirmRemoveSettlements' | 'acknowledgeNegativeFund'> {
+  extends Pick<ConfirmFlags, 'confirmRemoveSettlements' | 'confirmedSettlements' | 'acknowledgeNegativeFund'> {
   version?: number;
 }
 

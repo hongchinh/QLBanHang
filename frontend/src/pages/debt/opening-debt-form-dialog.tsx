@@ -27,7 +27,7 @@ import {
 import type { OpeningDebt } from '@/features/opening-debts/types';
 import { formatApiErrorDetails, getApiError } from '@/lib/api-client';
 import { applyApiFieldErrors } from '@/lib/apply-api-field-errors';
-import { toConfirmationRequest, type ConfirmationRequest } from '@/lib/confirm-required';
+import { toConfirmationRequest, withConfirmed, type ConfirmationRequest } from '@/lib/confirm-required';
 import { toast } from '@/lib/use-toast';
 import { todayYmd } from '@/lib/vn-datetime';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
@@ -104,11 +104,14 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
   const kind = useWatch({ control: form.control, name: 'kind' });
   const errors = form.formState.errors;
 
-  const submit = async (values: OpeningDebtFormParsed, confirmRemoveSettlements: boolean) => {
+  // `confirmed` is the pending 422 the user accepted; its token goes back with the flag.
+  const submit = async (values: OpeningDebtFormParsed, confirmed?: ConfirmationRequest) => {
+    const flags = confirmed ? withConfirmed({}, confirmed) : {};
     // The owner field is not shown in 2A (P2); an edit keeps the loaded owner.
     const data = toUpsertOpeningDebtRequest(values, {
       ownerUserId: initial ? (initial.ownerUserId ?? null) : undefined,
-      confirmRemoveSettlements,
+      confirmRemoveSettlements: flags.confirmRemoveSettlements ?? false,
+      confirmedSettlements: flags.confirmedSettlements,
       version: initial?.version,
     });
     try {
@@ -136,9 +139,9 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
 
   const onConfirm = () => {
     if (!pending) return;
-    const { values } = pending;
+    const { values, request } = pending;
     setPending(null);
-    void submit(values, true);
+    void submit(values, request);
   };
 
   return (
@@ -149,7 +152,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
         </DialogHeader>
 
         <form
-          onSubmit={form.handleSubmit((values) => submit(values, false))}
+          onSubmit={form.handleSubmit((values) => submit(values))}
           className="grid gap-4 pt-2 sm:grid-cols-2"
         >
           <div className="space-y-2">

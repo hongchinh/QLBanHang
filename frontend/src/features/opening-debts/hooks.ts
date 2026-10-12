@@ -88,8 +88,17 @@ export function useOpeningDateNotSetHandler() {
 export function useDeleteOpeningDebt() {
   const invalidate = useInvalidateOpeningDebts();
   return useMutation({
-    mutationFn: ({ id, version, confirmRemoveSettlements }: { id: string; version: number; confirmRemoveSettlements: boolean }) =>
-      openingDebtsApi.remove(id, version, confirmRemoveSettlements),
+    mutationFn: ({
+      id,
+      version,
+      confirmRemoveSettlements,
+      confirmedSettlements,
+    }: {
+      id: string;
+      version: number;
+      confirmRemoveSettlements: boolean;
+      confirmedSettlements?: string;
+    }) => openingDebtsApi.remove(id, version, confirmRemoveSettlements, confirmedSettlements),
     onSuccess: invalidate,
     onError: invalidateOnConcurrency(invalidate),
   });

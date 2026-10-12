@@ -50,6 +50,7 @@ export interface UpsertOpeningDebtRequest {
   ownerUserId?: string | null;
   note?: string;
   confirmRemoveSettlements: boolean;
+  confirmedSettlements?: string;
   // Required on update, omitted on create.
   version?: number;
 }

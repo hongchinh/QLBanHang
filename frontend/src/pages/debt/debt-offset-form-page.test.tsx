@@ -131,11 +131,11 @@ function offset(overrides: Partial<DebtOffset> = {}): DebtOffset {
   };
 }
 
-function apiError(status: number, code: string, details?: Record<string, string[]>) {
+function apiError(status: number, code: string, details?: Record<string, string[]>, token?: string) {
   return {
     isAxiosError: true,
     message: code,
-    response: { status, data: { success: false, error: { code, message: `Thông báo ${code}`, details } } },
+    response: { status, data: { success: false, error: { code, message: `Thông báo ${code}`, details, token } } },
   };
 }
 
@@ -305,7 +305,7 @@ describe('DebtOffsetFormPage', () => {
     routeParams.id = O1;
     offsetState.data = offset();
     mocks.cancel
-      .mockRejectedValueOnce(apiError(422, 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', { PT00009: ['Đối trừ 300.000'] }))
+      .mockRejectedValueOnce(apiError(422, 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', { PT00009: ['Đối trừ 300.000'] }, 't1'))
       .mockResolvedValueOnce(offset({ status: 'Cancelled', canCancel: false, items: [] }));
     render(<DebtOffsetFormPage />);
 
@@ -336,7 +336,7 @@ describe('DebtOffsetFormPage', () => {
     fireEvent.click(dialog.getByRole('button', { name: 'Vẫn hủy phiếu' }));
 
     await waitFor(() => expect(mocks.cancel).toHaveBeenCalledTimes(2));
-    expect(mocks.cancel).toHaveBeenLastCalledWith({ id: O1, body: { version: 7, confirmRemoveSettlements: true } });
+    expect(mocks.cancel).toHaveBeenLastCalledWith({ id: O1, body: { version: 7, confirmRemoveSettlements: true, confirmedSettlements: 't1' } });
     await waitFor(() =>
       expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success', title: 'Đã hủy phiếu' })),
     );

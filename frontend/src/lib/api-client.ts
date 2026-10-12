@@ -12,6 +12,8 @@ export interface ApiError {
   code: string;
   message: string;
   details?: Record<string, string[]>;
+  // DEBT_SETTLEMENTS_WILL_BE_REMOVED: the listed settlement ids, resent as confirmedSettlements.
+  token?: string | null;
 }
 
 export interface ApiResponse<T> {
@@ -150,11 +152,13 @@ function unwrap<T>(payload: ApiResponse<T>): T {
 export class ApiCallError extends Error {
   code: string;
   details?: Record<string, string[]>;
+  token?: string | null;
 
   constructor(error: ApiError) {
     super(error.message);
     this.code = error.code;
     this.details = error.details;
+    this.token = error.token;
   }
 }
 
@@ -178,6 +182,7 @@ export interface ApiErrorShape {
   code: string;
   message: string;
   details?: Record<string, string[]>;
+  token?: string | null;
   status?: number;
 }
 
@@ -214,15 +219,15 @@ function toCamelPath(key: string): string {
 // Returns undefined for anything else.
 export function getApiError(error: unknown): ApiErrorShape | undefined {
   if (error instanceof ApiCallError) {
-    return { code: error.code, message: error.message, details: error.details };
+    return { code: error.code, message: error.message, details: error.details, token: error.token };
   }
   if (!axios.isAxiosError(error)) return undefined;
 
   const status = error.response?.status;
   const data: unknown = error.response?.data;
   if (isApiErrorBody(data)) {
-    const { code, message, details } = data.error;
-    return { code, message, details, status };
+    const { code, message, details, token } = data.error;
+    return { code, message, details, token, status };
   }
   if (isValidationProblem(data)) {
     const details: Record<string, string[]> = {};

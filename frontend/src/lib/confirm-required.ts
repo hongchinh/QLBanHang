@@ -6,7 +6,7 @@ export type ConfirmFlag =
   | 'confirmRemoveSettlements'
   | 'acknowledgeCreditLimit'
   | 'acknowledgeNegativeFund';
-export type ConfirmFlags = Partial<Record<ConfirmFlag, boolean>>;
+export type ConfirmFlags = Partial<Record<ConfirmFlag, boolean>> & { confirmedSettlements?: string };
 
 export interface ConfirmationItem {
   key: string;
@@ -20,6 +20,8 @@ export interface ConfirmationRequest {
   title: string;
   message: string;
   items: ConfirmationItem[];
+  // The settlements the server listed; resent so it can tell the list is still the one confirmed.
+  token?: string;
 }
 
 interface CodeRule {
@@ -51,10 +53,18 @@ export function toConfirmationRequest(error: unknown): ConfirmationRequest | nul
     title: rule.title,
     message: apiError.message,
     items: Object.entries(apiError.details ?? {}).map(([key, messages]) => ({ key, messages })),
+    ...(apiError.token ? { token: apiError.token } : {}),
   };
 }
 
 /** Adds the request's flag to the flags already confirmed. */
 export function withConfirmed(flags: ConfirmFlags, request: ConfirmationRequest): ConfirmFlags {
-  return request.flag ? { ...flags, [request.flag]: true } : { ...flags };
+  if (!request.flag) return { ...flags };
+  const confirmed: ConfirmFlags = { ...flags, [request.flag]: true };
+  if (request.flag === 'confirmRemoveSettlements') {
+    // The latest 422 wins: a token left from an earlier, different list must not ride along.
+    if (request.token) confirmed.confirmedSettlements = request.token;
+    else delete confirmed.confirmedSettlements;
+  }
+  return confirmed;
 }

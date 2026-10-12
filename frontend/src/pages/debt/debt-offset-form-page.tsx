@@ -374,7 +374,11 @@ function DebtOffsetDetail({ offset, refetch, activities }: DetailProps) {
 
   async function runAction(action: PendingAction, flags: ConfirmFlags) {
     setBusy(true);
-    const body = { version: action.version, confirmRemoveSettlements: flags.confirmRemoveSettlements ?? false };
+    const body = {
+      version: action.version,
+      confirmRemoveSettlements: flags.confirmRemoveSettlements ?? false,
+      confirmedSettlements: flags.confirmedSettlements,
+    };
     try {
       if (action.kind === 'delete') {
         await remove.mutateAsync({ id: offset.id, body });

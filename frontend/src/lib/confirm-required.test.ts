@@ -13,8 +13,8 @@ function axiosErrorWith(status: number, data: unknown): AxiosError {
   });
 }
 
-function errorBody(code: string, details?: Record<string, string[]>) {
-  return { success: false, error: { code, message: `Server says ${code}`, details }, timestamp: '' };
+function errorBody(code: string, details?: Record<string, string[]>, token?: string) {
+  return { success: false, error: { code, message: `Server says ${code}`, details, token }, timestamp: '' };
 }
 
 describe('toConfirmationRequest', () => {
@@ -79,5 +79,38 @@ describe('withConfirmed', () => {
     });
     expect(start).toEqual({ acknowledgeNegativeStock: true });
     expect(withConfirmed(afterFund, blocked)).toEqual(afterFund);
+  });
+});
+
+describe('confirmed settlement token', () => {
+  const removal = (token?: string) =>
+    toConfirmationRequest(axiosErrorWith(422, errorBody('DEBT_SETTLEMENTS_WILL_BE_REMOVED', undefined, token)))!;
+
+  it('carries the token of the 422 and resends it with the flag', () => {
+    const request = removal('t1');
+    expect(request.token).toBe('t1');
+    expect(withConfirmed({}, request)).toEqual({ confirmRemoveSettlements: true, confirmedSettlements: 't1' });
+  });
+
+  it('adds no token for other codes or when the 422 has none', () => {
+    const credit = toConfirmationRequest(axiosErrorWith(422, errorBody('CREDIT_LIMIT_WARNING', undefined, 'x')))!;
+    expect(withConfirmed({}, credit)).toEqual({ acknowledgeCreditLimit: true });
+    expect(withConfirmed({}, removal())).toEqual({ confirmRemoveSettlements: true });
+  });
+
+  it('a second 422 replaces the first token', () => {
+    const first = removal('t1');
+    const second = removal('t2');
+    expect(withConfirmed(withConfirmed({}, first), second).confirmedSettlements).toBe('t2');
+  });
+});
+
+describe('stale token', () => {
+  it('a later removal 422 without a token drops the earlier token', () => {
+    const first = toConfirmationRequest(
+      axiosErrorWith(422, errorBody('DEBT_SETTLEMENTS_WILL_BE_REMOVED', undefined, 't1')),
+    )!;
+    const second = toConfirmationRequest(axiosErrorWith(422, errorBody('DEBT_SETTLEMENTS_WILL_BE_REMOVED')))!;
+    expect(withConfirmed(withConfirmed({}, first), second)).toEqual({ confirmRemoveSettlements: true });
   });
 });

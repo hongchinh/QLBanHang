@@ -20,7 +20,7 @@ import {
 } from '@/features/opening-debts/hooks';
 import type { OpeningDebt } from '@/features/opening-debts/types';
 import { getErrorMessage } from '@/lib/api-client';
-import { toConfirmationRequest, type ConfirmationRequest } from '@/lib/confirm-required';
+import { toConfirmationRequest, withConfirmed, type ConfirmationRequest } from '@/lib/confirm-required';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { toast } from '@/lib/use-toast';
 import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
@@ -150,9 +150,15 @@ export function OpeningDebtPage() {
 
   const table = useReactTable({ data: data?.items ?? [], columns, getCoreRowModel: getCoreRowModel() });
 
-  const deleteRow = async (row: OpeningDebt, confirmRemoveSettlements: boolean) => {
+  const deleteRow = async (row: OpeningDebt, confirmed?: ConfirmationRequest) => {
+    const flags = confirmed ? withConfirmed({}, confirmed) : {};
     try {
-      await remove.mutateAsync({ id: row.id, version: row.version, confirmRemoveSettlements });
+      await remove.mutateAsync({
+        id: row.id,
+        version: row.version,
+        confirmRemoveSettlements: flags.confirmRemoveSettlements ?? false,
+        confirmedSettlements: flags.confirmedSettlements,
+      });
       toast({ variant: 'success', title: 'Đã xóa nợ đầu kỳ', description: row.docNo });
     } catch (err) {
       const request = toConfirmationRequest(err);
@@ -166,9 +172,9 @@ export function OpeningDebtPage() {
 
   const onConfirmRemoval = () => {
     if (!pendingRemoval) return;
-    const { row } = pendingRemoval;
+    const { row, request } = pendingRemoval;
     setPendingRemoval(null);
-    void deleteRow(row, true);
+    void deleteRow(row, request);
   };
 
   return (
@@ -337,7 +343,7 @@ export function OpeningDebtPage() {
         confirmLabel="Xóa"
         loading={remove.isPending}
         onConfirm={() => {
-          if (pendingDelete) void deleteRow(pendingDelete, false);
+          if (pendingDelete) void deleteRow(pendingDelete);
         }}
       />
 

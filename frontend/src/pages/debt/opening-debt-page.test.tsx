@@ -115,14 +115,14 @@ vi.mock('@/features/debt/hooks', () => ({
 
 vi.mock('@/lib/use-toast', () => ({ toast: vi.fn() }));
 
-function apiError(status: number, code: string, message: string, details?: Record<string, string[]>) {
+function apiError(status: number, code: string, message: string, details?: Record<string, string[]>, token?: string) {
   const config = { headers: new AxiosHeaders(), url: '/opening-debts/o1' } as InternalAxiosRequestConfig;
   return new AxiosError('Request failed', 'ERR_BAD_RESPONSE', config, null, {
     status,
     statusText: '',
     headers: {},
     config,
-    data: { success: false, error: { code, message, details }, timestamp: '' },
+    data: { success: false, error: { code, message, details, token }, timestamp: '' },
   });
 }
 
@@ -273,7 +273,7 @@ describe('OpeningDebtPage', () => {
       .mockRejectedValueOnce(
         apiError(422, 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', 'Các đối trừ sau sẽ bị bỏ.', {
           HD001: ['PT00012: 2.000.000'],
-        }),
+        }, 't1'),
       )
       .mockResolvedValueOnce({});
     renderPage();
@@ -313,7 +313,7 @@ describe('OpeningDebtPage', () => {
     await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(2));
     expect(updateMock).toHaveBeenLastCalledWith({
       id: 'o1',
-      data: { ...expected, confirmRemoveSettlements: true, version: 11 },
+      data: { ...expected, confirmRemoveSettlements: true, confirmedSettlements: 't1', version: 11 },
     });
     await waitFor(() => expect(screen.queryByLabelText('Số tiền *')).not.toBeInTheDocument());
   });
@@ -337,7 +337,7 @@ describe('OpeningDebtPage', () => {
   it('deleting a settled row asks to remove settlements', async () => {
     const user = userEvent.setup();
     deleteMock
-      .mockRejectedValueOnce(apiError(422, 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', 'Các đối trừ sau sẽ bị bỏ.'))
+      .mockRejectedValueOnce(apiError(422, 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', 'Các đối trừ sau sẽ bị bỏ.', undefined, 't1'))
       .mockResolvedValueOnce(undefined);
     renderPage();
 
@@ -348,7 +348,7 @@ describe('OpeningDebtPage', () => {
 
     expect(await screen.findByText('Bỏ đối trừ chứng từ')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Vẫn tiếp tục' }));
-    await waitFor(() => expect(deleteMock).toHaveBeenLastCalledWith({ id: 'o1', version: 11, confirmRemoveSettlements: true }));
+    await waitFor(() => expect(deleteMock).toHaveBeenLastCalledWith({ id: 'o1', version: 11, confirmRemoveSettlements: true, confirmedSettlements: 't1' }));
     await waitFor(() => expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' })));
   });
 

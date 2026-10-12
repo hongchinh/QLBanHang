@@ -96,6 +96,7 @@ export interface CreateDebtOffsetRequest {
 export interface DebtOffsetActionRequest {
   version?: number;
   confirmRemoveSettlements: boolean;
+  confirmedSettlements?: string;
 }
 
 // No edit and no restore (P23).

@@ -1,7 +1,10 @@
+using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using OrderMgmt.Application.CashDebt.Debt.Models;
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -212,6 +215,35 @@ public class DebtDocumentsReportTests : CashDebtTestBase
         lateGroup.Items.Select(i => (i.DocCode, i.Remaining)).Should().Equal(("PX00001", 2_000m));
         lateGroup.Unallocated.Select(u => (u.DocCode, u.Remaining)).Should().Equal(("PN00001", 500m));
         lateGroup.Balance.Should().Be(1_500m);
+    }
+
+    [Fact]
+    public async Task Filters_validation_and_permission()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+
+        var other = await GetDocumentsAsync(client, $"side=Receivable&at=2026-10-31&partnerId={ids.Ncc1Id}");
+        other.Groups.Should().BeEmpty();
+        other.TotalRemaining.Should().Be(0m);
+        other.TotalUnallocated.Should().Be(0m);
+        other.TotalBalance.Should().Be(0m);
+
+        var mine = await GetDocumentsAsync(client, $"side=Receivable&at=2026-10-31&partnerId={ids.Kh1Id}");
+        mine.Groups.Should().ContainSingle().Which.PartnerId.Should().Be(ids.Kh1Id);
+
+        var noAt = await client.GetAsync("/api/reports/debt-documents?side=Receivable");
+        noAt.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await noAt.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey("at");
+
+        var noSide = await client.GetAsync("/api/reports/debt-documents?at=2026-10-31");
+        noSide.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await noSide.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey("side");
+
+        var suffix = ids.Kh1Code[3..];
+        var cashOnly = await CreateClientWithPermissionsAsync("dd_cash_" + suffix, ids.MainBranchId, Permissions.Reports.Cash);
+        (await cashOnly.GetAsync("/api/reports/debt-documents?side=Receivable&at=2026-10-31"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     private HttpClient MainBranchClient(ReportIds ids)

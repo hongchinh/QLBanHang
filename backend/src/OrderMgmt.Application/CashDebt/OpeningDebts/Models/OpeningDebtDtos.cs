@@ -25,6 +25,13 @@ public sealed class OpeningDebtDto
     public uint Version { get; set; }
 }
 
+/// A user offered by the owner picker of the opening-debt form.
+public sealed class OpeningDebtOwnerDto
+{
+    public Guid Id { get; set; }
+    public string FullName { get; set; } = default!;
+}
+
 /// Opening debts of the working branch, plus its opening date for the screen header.
 public sealed class OpeningDebtListResult : PagedResult<OpeningDebtDto>
 {

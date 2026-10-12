@@ -1,6 +1,6 @@
 # Sidebar navigation redesign (Thiết kế lại sidebar trái)
 
-> Created: 2026-10-12 23:11:18 · Source design: [brainstorm SUMMARY](../../brainstorms/261012-2135-sidebar-navigation-redesign/SUMMARY.md), [section-01 UI design](../../brainstorms/261012-2135-sidebar-navigation-redesign/section-01-ui-design.md) (source of truth for UI, components, edge cases and tests) · Mockups: [mockup-02-option-c-states.html](../../brainstorms/261012-2135-sidebar-navigation-redesign/mockup-02-option-c-states.html) · Depends on: [Round 2B plan](../261012-1709-cash-debt-round2b/SUMMARY.md) (must be merged before Phase 01)
+> Created: 2026-10-12 23:11:18 · Source design: [brainstorm SUMMARY](../../../brainstorms/261012-2135-sidebar-navigation-redesign/SUMMARY.md), [section-01 UI design](../../../brainstorms/261012-2135-sidebar-navigation-redesign/section-01-ui-design.md) (source of truth for UI, components, edge cases and tests) · Mockups: [mockup-02-option-c-states.html](../../../brainstorms/261012-2135-sidebar-navigation-redesign/mockup-02-option-c-states.html) · Depends on: [Round 2B plan](../261012-1709-cash-debt-round2b/SUMMARY.md) (must be merged before Phase 01)
 
 ## Goal
 

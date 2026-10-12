@@ -92,7 +92,7 @@ Thiết kế chi tiết Đợt 1: [section-03-round1-design.md](section-03-round
 
 ## Follow-up — chưa làm (kiểm tra 2026-10-12)
 
-### Đợt 2B (cần plan riêng, không đổi schema 2A) — [plan](../../plans/261012-1709-cash-debt-round2b/SUMMARY.md)
+### Đợt 2B (cần plan riêng, không đổi schema 2A) — [plan](../../plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md)
 - [x] Báo cáo Công nợ theo chứng từ
 - [x] Báo cáo Tuổi nợ
 - [x] Báo cáo Nợ quá hạn

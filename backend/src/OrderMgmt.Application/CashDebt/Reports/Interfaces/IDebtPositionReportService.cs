@@ -10,4 +10,7 @@ public interface IDebtPositionReportService
 
     /// Tuoi no: open Increase amounts per partner split into age buckets, minus the unallocated amount.
     Task<DebtAgingReportDto> GetAgingAsync(DebtAgingReportRequest request, CancellationToken ct = default);
+
+    /// No qua han: open Increase documents past their due date per partner, with days overdue and buckets.
+    Task<DebtOverdueReportDto> GetOverdueAsync(DebtOverdueReportRequest request, CancellationToken ct = default);
 }

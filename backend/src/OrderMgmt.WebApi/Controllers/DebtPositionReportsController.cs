@@ -15,15 +15,18 @@ public class DebtPositionReportsController : ApiControllerBase
     private readonly IDebtPositionReportService _service;
     private readonly IValidator<DebtDocumentsReportRequest> _documentsValidator;
     private readonly IValidator<DebtAgingReportRequest> _agingValidator;
+    private readonly IValidator<DebtOverdueReportRequest> _overdueValidator;
 
     public DebtPositionReportsController(
         IDebtPositionReportService service,
         IValidator<DebtDocumentsReportRequest> documentsValidator,
-        IValidator<DebtAgingReportRequest> agingValidator)
+        IValidator<DebtAgingReportRequest> agingValidator,
+        IValidator<DebtOverdueReportRequest> overdueValidator)
     {
         _service = service;
         _documentsValidator = documentsValidator;
         _agingValidator = agingValidator;
+        _overdueValidator = overdueValidator;
     }
 
     [HttpGet("debt-documents")]
@@ -42,5 +45,14 @@ public class DebtPositionReportsController : ApiControllerBase
     {
         await _agingValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.GetAgingAsync(request, ct));
+    }
+
+    [HttpGet("debt-overdue")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtOverdueReportDto>>> DebtOverdue(
+        [FromQuery] DebtOverdueReportRequest request, CancellationToken ct)
+    {
+        await _overdueValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetOverdueAsync(request, ct));
     }
 }

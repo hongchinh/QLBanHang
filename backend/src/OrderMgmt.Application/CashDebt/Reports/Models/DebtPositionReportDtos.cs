@@ -106,3 +106,54 @@ public class DebtAgingRowDto
     /// TotalOpen - Unallocated.
     public decimal Balance { get; set; }
 }
+
+public class DebtOverdueReportRequest
+{
+    public DebtSide Side { get; set; }
+    public DateOnly At { get; set; }
+    public Guid? PartnerId { get; set; }
+
+    /// Comma-separated day boundaries, e.g. "30,60,90"; missing means the defaults.
+    public string? Buckets { get; set; }
+}
+
+public class DebtOverdueReportDto
+{
+    public DebtSide Side { get; set; }
+    public DateOnly At { get; set; }
+    public List<AgingBucketDto> Buckets { get; set; } = new();
+    public List<DebtOverdueGroupDto> Groups { get; set; } = new();
+
+    /// One per bucket; zero-filled when there are no groups.
+    public List<decimal> TotalAmounts { get; set; } = new();
+    public decimal TotalOverdue { get; set; }
+    public decimal TotalUnallocated { get; set; }
+}
+
+public class DebtOverdueGroupDto
+{
+    public Guid PartnerId { get; set; }
+    public string? PartnerCode { get; set; }
+    public string? PartnerName { get; set; }
+    public List<DebtOverdueRowDto> Items { get; set; } = new();
+    public List<decimal> Amounts { get; set; } = new();
+    public decimal TotalOverdue { get; set; }
+
+    /// Open Decrease total at the date; information only, not subtracted.
+    public decimal Unallocated { get; set; }
+}
+
+public class DebtOverdueRowDto
+{
+    public Guid EntryId { get; set; }
+    public DebtSourceType SourceType { get; set; }
+    public Guid SourceId { get; set; }
+    public string DocCode { get; set; } = default!;
+    public DateOnly DocDate { get; set; }
+    public DateOnly DueDate { get; set; }
+    public string? Description { get; set; }
+    public decimal Amount { get; set; }
+    public decimal Remaining { get; set; }
+    public int DaysOverdue { get; set; }
+    public int BucketIndex { get; set; }
+}

@@ -111,6 +111,87 @@ public class DebtPositionReportService : IDebtPositionReportService
         };
     }
 
+    public Task<DebtOverdueReportDto> GetOverdueAsync(DebtOverdueReportRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildOverdueAsync(request, c), ct);
+
+    private async Task<DebtOverdueReportDto> BuildOverdueAsync(DebtOverdueReportRequest request, CancellationToken ct)
+    {
+        var boundaries = DebtAging.ParseBoundaries(request.Buckets) ?? DebtAging.DefaultBoundaries;
+        var buckets = DebtAging.Ranges(boundaries, firstFrom: 1);
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.At));
+        var open = (await DebtPositionQuery.LoadAsync(_db, branchId, request.Side, request.PartnerId, end, ct))
+            .Where(i => i.Open > 0m)
+            .ToList();
+
+        var overdue = open
+            .Where(i => i.Direction == DebtDirection.Increase && (i.DueDate ?? i.DocDate) < request.At)
+            .ToList();
+        var partnerIds = overdue.Select(i => i.PartnerId).Distinct().ToList();
+        var info = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => partnerIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.Code, c.Name })
+            .ToDictionaryAsync(c => c.Id, ct);
+        var unallocatedByPartner = open
+            .Where(i => i.Direction == DebtDirection.Decrease && partnerIds.Contains(i.PartnerId))
+            .GroupBy(i => i.PartnerId)
+            .ToDictionary(g => g.Key, g => g.Sum(i => i.Open));
+
+        var groups = new List<DebtOverdueGroupDto>();
+        foreach (var byPartner in overdue.GroupBy(i => i.PartnerId))
+        {
+            var amounts = new decimal[buckets.Count];
+            var items = byPartner
+                .Select(i => new { Entry = i, Due = i.DueDate ?? i.DocDate })
+                .OrderBy(x => x.Due).ThenBy(x => x.Entry.DocDate)
+                .ThenBy(x => x.Entry.DocCode, StringComparer.Ordinal).ThenBy(x => x.Entry.EntryId)
+                .Select(x =>
+                {
+                    var days = request.At.DayNumber - x.Due.DayNumber;
+                    var bucket = DebtAging.BucketIndex(days, boundaries);
+                    amounts[bucket] += x.Entry.Open;
+                    return new DebtOverdueRowDto
+                    {
+                        EntryId = x.Entry.EntryId,
+                        SourceType = x.Entry.SourceType,
+                        SourceId = x.Entry.SourceId,
+                        DocCode = x.Entry.DocCode,
+                        DocDate = x.Entry.DocDate,
+                        DueDate = x.Due,
+                        Description = x.Entry.Description,
+                        Amount = x.Entry.Amount,
+                        Remaining = x.Entry.Open,
+                        DaysOverdue = days,
+                        BucketIndex = bucket,
+                    };
+                }).ToList();
+
+            var partner = info.GetValueOrDefault(byPartner.Key);
+            groups.Add(new DebtOverdueGroupDto
+            {
+                PartnerId = byPartner.Key,
+                PartnerCode = partner?.Code,
+                PartnerName = partner?.Name,
+                Items = items,
+                Amounts = amounts.ToList(),
+                TotalOverdue = amounts.Sum(),
+                Unallocated = unallocatedByPartner.GetValueOrDefault(byPartner.Key),
+            });
+        }
+        groups = groups.OrderBy(g => g.PartnerCode, StringComparer.Ordinal).ToList();
+
+        return new DebtOverdueReportDto
+        {
+            Side = request.Side,
+            At = request.At,
+            Buckets = buckets.Select(b => new AgingBucketDto { From = b.From, To = b.To }).ToList(),
+            Groups = groups,
+            TotalAmounts = Enumerable.Range(0, buckets.Count).Select(i => groups.Sum(g => g.Amounts[i])).ToList(),
+            TotalOverdue = groups.Sum(g => g.TotalOverdue),
+            TotalUnallocated = groups.Sum(g => g.Unallocated),
+        };
+    }
+
     public Task<DebtAgingReportDto> GetAgingAsync(DebtAgingReportRequest request, CancellationToken ct = default) =>
         _transaction.RunSnapshotAsync(c => BuildAgingAsync(request, c), ct);
 

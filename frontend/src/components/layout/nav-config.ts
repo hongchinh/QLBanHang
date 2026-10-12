@@ -28,6 +28,7 @@ import {
   BookText,
   Landmark,
   Gauge,
+  Hourglass,
 } from 'lucide-react';
 import type { Permission, Role } from '@/lib/permissions';
 import type { SidebarNavGroup, SidebarNavItem } from './sidebar/sidebar';
@@ -89,6 +90,7 @@ const navGroups: NavGroup[] = [
       { to: '/reports/debt-balance', label: 'Số dư công nợ', icon: BookOpen, permission: 'reports.debt' },
       { to: '/reports/debt-ledger', label: 'Sổ chi tiết công nợ', icon: BookText, permission: 'reports.debt' },
       { to: '/reports/debt-documents', label: 'Công nợ theo chứng từ', icon: FileText, permission: 'reports.debt' },
+      { to: '/reports/debt-aging', label: 'Tuổi nợ', icon: Hourglass, permission: 'reports.debt' },
       { to: '/reports/cash-book', label: 'Sổ quỹ', icon: Wallet, permission: 'reports.cash' },
     ],
   },

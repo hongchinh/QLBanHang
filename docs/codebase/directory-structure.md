@@ -58,17 +58,18 @@ QLDonHang/
 | Suppliers (partner roles) | `Application/Catalog/Customers` (`PartnerRole`, `PartnerPermissionGuard`), `SuppliersController.cs` |
 | Inventory catalogs | `Domain/Entities/Inventory`, `Application/Inventory/{Warehouses,StockReasons,PaymentMethods}` |
 | Inventory settings and numbering | `Application/Inventory/{Settings,Numbering}` (`IDocumentCodeAllocator` issues the codes of stock and cash documents), `InventorySettingsController.cs` |
-| Stock vouchers | `Application/Inventory/StockVouchers`, `StockVouchersController.cs` |
+| Stock vouchers | `Application/Inventory/StockVouchers` (`Services/StockVoucherCashDebt.cs` with `Interfaces/IStockVoucherCashDebt.cs`: the cash and debt steps of a save), `StockVouchersController.cs` |
 | Ledger, costing and posting engine | `Application/Inventory/{Common,Ledger,Costing,Posting,Interfaces}`, `Infrastructure/Inventory` (advisory locks, document counter), `Infrastructure/Persistence/EfTransactionRunner.cs` |
 | Opening stock | `Application/Inventory/OpeningStocks`, `OpeningStocksController.cs` |
 | Cost recalculation | `Application/Inventory/Costing` (`InventoryRecalcService`), `InventoryCostController.cs` |
 | Inventory reports | `Application/Inventory/Reports`, `InventoryReportsController.cs` |
 | Cash & debt domain (Round 2A) | `Domain/Entities/CashDebt` (`CashReason`, `Fund`, `CashVoucher`/`CashVoucherLine`, `FundTransfer`, `DebtEntry`, `DebtSettlement`, `DebtOffsetVoucher`, `OpeningDebt`, `CreditLimit`, `CashDocumentActivity`, `CashDebtSettings`), `Domain/Enums/CashDebtEnums.cs`, `Infrastructure/Persistence/Configurations/CashDebtConfiguration.cs` |
-| Cash & debt shared engine | `Application/CashDebt/Common` (`DebtEffectRules`, `DebtSettlementMath`, `AllocationValidator`, `RunningBalance`, `DebtBalanceSign`, `LimitPolicyDecision`), `Application/CashDebt/Ledger` (`IDebtLedgerService`, `IDebtQueryService`, `IDebtActivityLog`), `Application/CashDebt/Guards` (`CreditLimitGuard`, `FundBalanceGuard`, `FundMovementQuery`), `Application/CashDebt/Interfaces/ICashDebtLock.cs`, `Infrastructure/CashDebt/PostgresCashDebtLock.cs` |
+| Cash & debt shared engine | `Application/CashDebt/Common` (`CashDocuments` shared by the three cash document services, `DebtEffectRules`, `DebtSettlementMath`, `AllocationValidator`, `RunningBalance`, `DebtBalanceSign`, `LimitPolicyDecision`), `Application/CashDebt/Ledger` (`IDebtLedgerService`, `IDebtQueryService`, `IDebtActivityLog`, `SettlementRemovalConfirmation` for the 422 token, `SettlementChangeCollector` for the removed settlements of a request), `Application/CashDebt/Guards` (`CreditLimitGuard`, `FundBalanceGuard`, `FundMovementQuery`), `Application/CashDebt/Interfaces/ICashDebtLock.cs`, `Infrastructure/CashDebt/PostgresCashDebtLock.cs` |
 | Cash settings and catalogs | `Application/CashDebt/{Settings,CashReasons,Funds,CreditLimits}`, `CashSettingsController.cs`, `CashReasonsController.cs`, `FundsController.cs`, `CreditLimitsController.cs` |
 | Receipts/payments and fund transfers | `Application/CashDebt/{CashVouchers,FundTransfers}`, `CashVouchersController.cs`, `FundTransfersController.cs` |
-| Automatic receipt/payment of stock vouchers | `Application/CashDebt/AutoVouchers` (`IAutoCashVoucherService`), called from `StockVoucherService` and from every path that removes settlements |
+| Automatic receipt/payment of stock vouchers | `Application/CashDebt/AutoVouchers` (`IAutoCashVoucherService`; `AutoRecomputeHook` recomputes the `Auto` settlements before the commit of every request that removed settlements) |
 | Opening debts, matching and offsets | `Application/CashDebt/{OpeningDebts,Debt,DebtOffsets}`, `OpeningDebtsController.cs`, `DebtController.cs`, `DebtOffsetsController.cs` |
+| Cross-feature application helpers | `Application/Common/LikePattern.cs` (ILike escaping), `Application/Common/References` (`IReferenceUsage`: every "is used" check of partners, payment methods, branches and funds), `Application/Common/Interfaces/IBeforeCommitHook.cs` (run by `EfTransactionRunner` before the outermost commit) |
 | Cash & debt reports | `Application/CashDebt/Reports`, `CashDebtReportsController.cs` |
 
 ## API Controllers
@@ -121,9 +122,12 @@ frontend/src/
 ├── components/
 │   ├── auth/                    # permission-aware UI helpers
 │   ├── confirm-required-dialog/ # dialog for confirmable/blocked 422 responses
+│   ├── activity-history/        # ActivityHistory: activity list of a document
 │   ├── customer-autocomplete/   # quotation customer picker + quick add
 │   ├── layout/                  # app shell, header, sidebar, search, notifications
+│   ├── money-cell/              # MoneyCell, CellError: editable money cell of the line and allocation grids
 │   ├── partner-autocomplete/    # customer/supplier picker for cash and debt screens
+│   ├── search-combobox/         # generic search combobox behind DebtPartnerPicker and the ledger PartnerPicker
 │   └── ui/                      # shadcn-style primitives
 ├── features/
 │   ├── admin-roles/
@@ -183,14 +187,15 @@ frontend/src/
 │   ├── stock-vouchers/          # /stock-in and /stock-out list + form, customer debt panel
 │   ├── suppliers/
 │   └── warehouses/
+├── hooks/                       # useDocumentActions (shared save flow of the four document forms), route access hooks
 ├── routes/
 ├── stores/
-├── lib/
+├── lib/                         # includes date-only.ts, to-number.ts, money-input.ts, vn-datetime.ts
 ├── styles/
 └── test/
 ```
 
-Feature folders generally contain `api.ts`, `hooks.ts`, `types.ts`, optional `schema.ts` and `keys.ts`. Pages compose those hooks with reusable UI components.
+Feature folders generally contain `api.ts`, `hooks.ts`, `types.ts`, optional `schema.ts` and `keys.ts` (every feature keeps its query keys there, `credit-limits`, `opening-debts` and `cash-settings` included). Pages compose those hooks with reusable UI components.
 
 ## Route Entry Points
 

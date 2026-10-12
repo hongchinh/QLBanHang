@@ -164,6 +164,14 @@ describe('DebtAgingPage', () => {
     expect(useDebtAgingMock).toHaveBeenLastCalledWith(expect.anything(), { enabled: false });
   });
 
+  it('does not show cached report data when the url buckets are invalid', () => {
+    reportState.data = report();
+    renderAt('/reports/debt-aging?buckets=45,15');
+
+    expect(screen.getByText(ERROR_TEXT)).toBeInTheDocument();
+    expect(screen.queryByText('KH01')).not.toBeInTheDocument();
+  });
+
   it('shows the empty message', () => {
     reportState.data = report({ rows: [] });
     renderAt('/reports/debt-aging');

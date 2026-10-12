@@ -41,7 +41,7 @@ export function DebtAgingPage() {
     setTypedInvalid(false);
   }
 
-  const { data: report, isLoading, isError, error } = useDebtAging(
+  const { data, isLoading, isError, error } = useDebtAging(
     { side, at, partnerId, buckets: urlBuckets ?? DEFAULT_BUCKETS },
     { enabled: urlBuckets !== null },
   );
@@ -74,6 +74,8 @@ export function DebtAgingPage() {
     updateParams({ buckets: normalized });
   };
 
+  // A disabled query still returns cached data for its key; never show a report for buckets the URL rejected.
+  const report = urlBuckets === null ? undefined : data;
   const rows = report?.rows ?? [];
   const matched = partnerId ? rows.find((r) => r.partnerId === partnerId) : undefined;
   const selectedLabel = !partnerId

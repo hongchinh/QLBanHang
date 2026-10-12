@@ -11,9 +11,6 @@ namespace OrderMgmt.Application.CashDebt.Ledger;
 
 public class DebtLedgerService : IDebtLedgerService
 {
-    /// The 422 code (P10) of a save, cancel or delete that would remove settlements of other documents.
-    public const string SettlementsWillBeRemovedCode = "DEBT_SETTLEMENTS_WILL_BE_REMOVED";
-
     private static readonly DebtSide[] Sides = { DebtSide.Receivable, DebtSide.Payable };
 
     private readonly IAppDbContext _db;
@@ -345,20 +342,8 @@ public class DebtLedgerService : IDebtLedgerService
             .GroupBy(x => x.Key)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Text).ToArray());
 
-        return SettlementsWillBeRemoved(details);
+        return SettlementRemovalConfirmation.Create(details);
     }
-
-    /// One confirmation for two sources saved together (a stock voucher and its automatic voucher): the details of
-    /// both, merged by the other document's code.
-    public static ConfirmationRequiredException MergeSettlementRemovals(ConfirmationRequiredException first,
-        ConfirmationRequiredException second) =>
-        SettlementsWillBeRemoved(first.Details.Concat(second.Details)
-            .GroupBy(d => d.Key)
-            .ToDictionary(g => g.Key, g => g.SelectMany(d => d.Value).ToArray()));
-
-    private static ConfirmationRequiredException SettlementsWillBeRemoved(IDictionary<string, string[]> details) =>
-        new(SettlementsWillBeRemovedCode, "Chứng từ đã được đối trừ. Lưu sẽ bỏ các đối trừ sau.", details,
-            canConfirm: true);
 
     private static bool Touches(DebtSettlement s, Guid entryId) =>
         s.IncreaseEntryId == entryId || s.DecreaseEntryId == entryId;

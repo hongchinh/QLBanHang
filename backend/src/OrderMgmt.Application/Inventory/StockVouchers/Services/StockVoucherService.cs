@@ -1103,7 +1103,7 @@ public class StockVoucherService : IStockVoucherService
         {
             await PostOrRemoveAsync(confirmRemoveSettlements);
         }
-        catch (ConfirmationRequiredException e) when (e.Code == DebtLedgerService.SettlementsWillBeRemovedCode)
+        catch (ConfirmationRequiredException e) when (e.Code == SettlementRemovalConfirmation.Code)
         {
             stockRemovals = e;
             await PostOrRemoveAsync(confirm: true);
@@ -1114,9 +1114,9 @@ public class StockVoucherService : IStockVoucherService
             await _auto.SyncAsync(voucher, reason, confirmRemoveSettlements, ct);
         }
         catch (ConfirmationRequiredException e) when (stockRemovals is not null
-                                                      && e.Code == DebtLedgerService.SettlementsWillBeRemovedCode)
+                                                      && e.Code == SettlementRemovalConfirmation.Code)
         {
-            throw DebtLedgerService.MergeSettlementRemovals(stockRemovals, e);
+            throw SettlementRemovalConfirmation.Merge(stockRemovals, e);
         }
 
         if (stockRemovals is not null)

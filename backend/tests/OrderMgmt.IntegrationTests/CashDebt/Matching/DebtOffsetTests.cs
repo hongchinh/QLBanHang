@@ -377,7 +377,7 @@ public class DebtOffsetTests : CashDebtTestBase
         var cancel = new StockVoucherActionRequest { Version = xbh.Version };
         var (status, _, error) = await StockActionAsync(xbh.Id, "cancel", cancel);
         status.Should().Be(HttpStatusCode.UnprocessableEntity);
-        error!.Code.Should().Be(DebtLedgerService.SettlementsWillBeRemovedCode);
+        error!.Code.Should().Be(SettlementRemovalConfirmation.Code);
         error.Details.Should().ContainSingle().Which.Key.Should().Be("BT00001");
         cancel.ConfirmRemoveSettlements = true;
         var (confirmedStatus, _, confirmedError) = await StockActionAsync(xbh.Id, "cancel", cancel);
@@ -450,11 +450,11 @@ public class DebtOffsetTests : CashDebtTestBase
         var (askCancel, _, askCancelError) = await CancelOffsetAsync(_branchClient, offset.Id,
             new CashDocumentActionRequest { Version = matched.Version });
         askCancel.Should().Be(HttpStatusCode.UnprocessableEntity);
-        askCancelError!.Code.Should().Be(DebtLedgerService.SettlementsWillBeRemovedCode);
+        askCancelError!.Code.Should().Be(SettlementRemovalConfirmation.Code);
         askCancelError.Details.Should().ContainSingle().Which.Key.Should().Be(other.Code);
         var (askDelete, _, askDeleteError) = await DeleteOffsetAsync(_branchClient, offset.Id, matched.Version);
         askDelete.Should().Be(HttpStatusCode.UnprocessableEntity);
-        askDeleteError!.Code.Should().Be(DebtLedgerService.SettlementsWillBeRemovedCode);
+        askDeleteError!.Code.Should().Be(SettlementRemovalConfirmation.Code);
         (await SettlementsOfAsync(otherEntry.Id)).Should().ContainSingle("nothing was removed");
         (await SettlementsOfAsync(nmhEntry.Id)).Should().ContainSingle("nothing was removed");
 

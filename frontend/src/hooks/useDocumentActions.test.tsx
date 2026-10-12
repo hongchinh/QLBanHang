@@ -127,6 +127,11 @@ describe('useDocumentActions', () => {
 
     await act(async () => hook.result.current.confirmDialogProps.onConfirm());
     expect(perform).toHaveBeenCalledTimes(4);
+    expect(perform.mock.calls[2][1]).toEqual({
+      acknowledgeNegativeFund: true,
+      confirmRemoveSettlements: true,
+      confirmedSettlements: 'token-1',
+    });
     expect(perform.mock.calls[3][1]).toEqual({
       acknowledgeNegativeFund: true,
       confirmRemoveSettlements: true,
@@ -154,6 +159,31 @@ describe('useDocumentActions', () => {
 
     expect(onReloaded).not.toHaveBeenCalled();
     expect(toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'Không tải lại được' });
+  });
+
+  it('keeps local edits when the reload rejects', async () => {
+    const { perform, reload, onReloaded, hook } = setup();
+    reload.mockRejectedValue(new Error('offline'));
+    perform.mockRejectedValueOnce(apiError(409, 'CONCURRENCY'));
+
+    await act(() => hook.result.current.run({ kind: 'save', flags: {} }));
+
+    expect(onReloaded).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith({ variant: 'destructive', title: 'Không tải lại được' });
+    expect(hook.result.current.busy).toBe(false);
+  });
+
+  it('falls through to the generic toast on VALIDATION without applyValidationErrors', async () => {
+    const { perform, hook } = setup();
+    perform.mockRejectedValueOnce(apiError(400, 'VALIDATION', { other: ['Sai'] }));
+
+    await act(() => hook.result.current.run({ kind: 'save', flags: {} }));
+
+    expect(toast).toHaveBeenCalledWith({
+      variant: 'destructive',
+      title: 'Không thể lưu',
+      description: 'Server says VALIDATION; Sai',
+    });
   });
 
   it('toasts the server message when every validation key was mapped', async () => {

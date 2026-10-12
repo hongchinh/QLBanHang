@@ -8,11 +8,11 @@ import {
 } from '@/lib/confirm-required';
 import { toast } from '@/lib/use-toast';
 
-// `flags` are the confirmations (P10) already given for the action; a resend keeps them all.
+/** `flags` are the confirmations (P10) already given for the action; a resend keeps them all. */
 export type DocumentAction = { kind: string; flags: ConfirmFlags };
 
 interface Options<A extends DocumentAction> {
-  /** Runs the mutations, navigation and success toasts; rejects with the API error. */
+  /** Runs the mutations, navigation and success toasts; should reject with the API error. */
   perform: (action: A, flags: ConfirmFlags) => Promise<void>;
   /** Refetches the document; resolves undefined when that failed. */
   reload: () => Promise<unknown | undefined>;
@@ -20,9 +20,13 @@ interface Options<A extends DocumentAction> {
   onReloaded: (fresh: unknown) => void;
   /** Maps server validation keys onto the form; true when every key was mapped. */
   applyValidationErrors?: (details: Record<string, string[]>, action: A) => boolean;
+  /** Toast title per action kind for a failed action. */
   errorTitles: Record<A['kind'], string>;
+  /** Label of the confirm button of the 422 dialog, per action kind. */
   confirmLabels: Record<A['kind'], string>;
+  /** Toast after a 409 once the document was reloaded. */
   concurrencyMessage: string;
+  /** Toast after a 409 when the reload failed (resolved undefined or rejected); local edits are kept. */
   concurrencyReloadFailedMessage: string;
 }
 
@@ -30,6 +34,10 @@ interface Options<A extends DocumentAction> {
  * The action flow shared by the document forms: busy state, the 422 confirmation chain
  * (a confirmed resend keeps every earlier flag; a newer 422 replaces the pending request),
  * 409 reload and the error toasts.
+ *
+ * Callers own the submit guard (run has no re-entry guard), `perform` (mutations, navigation, success
+ * toasts; it should reject with the API error) and the field-error mapping; the hook owns busy, the 422
+ * resend with accumulated flags (token-aware via withConfirmed), the 409 reload and the error toasts.
  */
 export function useDocumentActions<A extends DocumentAction>(options: Options<A>) {
   const [busy, setBusy] = useState(false);

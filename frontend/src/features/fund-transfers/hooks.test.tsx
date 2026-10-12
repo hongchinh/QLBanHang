@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cashKeys } from '@/features/cash-common/keys';
@@ -11,6 +11,7 @@ import {
   useRestoreFundTransfer,
   useUpdateFundTransfer,
 } from './hooks';
+import type { FundTransferActionRequest, UpsertFundTransferRequest } from './types';
 
 vi.mock('./api', () => ({
   fundTransfersApi: {
@@ -26,6 +27,8 @@ vi.mock('./api', () => ({
   },
 }));
 
+type Wrapper = ({ children }: { children: React.ReactNode }) => React.JSX.Element;
+
 function setup() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const invalidate = vi.spyOn(qc, 'invalidateQueries');
@@ -35,26 +38,53 @@ function setup() {
   return { wrapper, invalidate };
 }
 
-const body = { reason: 'x' } as never;
-const data = {} as never;
+const body: FundTransferActionRequest = { version: 1, acknowledgeNegativeFund: false };
+const data: UpsertFundTransferRequest = {
+  voucherAt: '2026-01-01T00:00:00Z',
+  fromFundId: 'f1',
+  toFundId: 'f2',
+  amount: 1,
+  acknowledgeNegativeFund: false,
+};
 
-const cases: Array<[string, () => { mutate: (v: never) => void }, unknown]> = [
-  ['create', useCreateFundTransfer as never, data],
-  ['update', useUpdateFundTransfer as never, { id: 't1', data }],
-  ['cancel', useCancelFundTransfer as never, { id: 't1', body }],
-  ['restore', useRestoreFundTransfer as never, { id: 't1', body }],
-  ['delete', useDeleteFundTransfer as never, { id: 't1', body }],
+type ApiMethod = 'create' | 'update' | 'cancel' | 'restore' | 'remove';
+
+const cases: Array<[string, ApiMethod, (render: Wrapper) => void]> = [
+  ['create', 'create', (w) => renderHook(() => useCreateFundTransfer(), { wrapper: w }).result.current.mutate(data)],
+  [
+    'update',
+    'update',
+    (w) => renderHook(() => useUpdateFundTransfer(), { wrapper: w }).result.current.mutate({ id: 't1', data }),
+  ],
+  [
+    'cancel',
+    'cancel',
+    (w) => renderHook(() => useCancelFundTransfer(), { wrapper: w }).result.current.mutate({ id: 't1', body }),
+  ],
+  [
+    'restore',
+    'restore',
+    (w) => renderHook(() => useRestoreFundTransfer(), { wrapper: w }).result.current.mutate({ id: 't1', body }),
+  ],
+  [
+    'delete',
+    'remove',
+    (w) => renderHook(() => useDeleteFundTransfer(), { wrapper: w }).result.current.mutate({ id: 't1', body }),
+  ],
 ];
 
-describe('fund transfer mutations', () => {
-  it.each(cases)('%s refreshes the cash and inventory roots', async (_name, useHook, variables) => {
-    const { wrapper, invalidate } = setup();
-    const { result } = renderHook(() => useHook(), { wrapper });
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
-    result.current.mutate(variables as never);
+describe('fund transfer mutations', () => {
+  it.each(cases)('%s calls the api and refreshes the cash and inventory roots', async (_name, method, run) => {
+    const { wrapper, invalidate } = setup();
+
+    run(wrapper);
 
     await waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: cashKeys.all }));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: inventoryKeys.all });
-    expect(fundTransfersApi).toBeDefined();
+    expect(fundTransfersApi[method]).toHaveBeenCalledTimes(1);
   });
 });

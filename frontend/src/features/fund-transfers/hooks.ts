@@ -41,7 +41,7 @@ export function useFundTransferDefaults(opts: { enabled?: boolean } = {}) {
   });
 }
 
-// Same as the other cash mutations: refresh the whole cash root (fund balances, cash book) and the inventory root.
+// Same as the other cash mutations: refresh the whole cash root (fund balances, cash book) and the inventory root, per the cash-mutation convention (stock voucher payments read fund balances).
 function useInvalidateCash() {
   const qc = useQueryClient();
   return () => {

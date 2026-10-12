@@ -48,12 +48,17 @@ The scope is being expanded (approved 2026-10-06) to replace the stock voucher w
   - Customer credit limits (Hạn mức nợ) with a customer debt panel on the stock-out form; credit-limit and negative-fund policies.
   - Branch opening date (Ngày đầu kỳ) shared by opening stock, opening debts and fund opening balances.
   - Reports: Số dư công nợ, Sổ chi tiết công nợ and Sổ quỹ.
+- **Round 2B — Debt reports** (implemented; goes live after Round 3). Plan: [Round 2B plan](../plans/261012-1709-cash-debt-round2b/SUMMARY.md). Five on-screen reports behind `reports.debt`, all scoped to the working branch (its print form comes in Round 3):
+  - Công nợ theo chứng từ (open amount per document as at a date), Tuổi nợ (aging buckets per partner, default 30/60/90 days) and Nợ quá hạn (overdue buckets per partner; the unallocated amount is shown, not subtracted).
+  - Công nợ theo nhân viên: opening, increase, settled, closing and overdue per employee, where the employee is the creator of the source voucher (B1), or the owner picked on an opening debt (the opening-debt form and list gain a "Nhân viên" column). An entry without an owner shows as "Không xác định". If the BA later wants a separate salesperson on the voucher, only what is written to the entry owner changes.
+  - Biên bản đối chiếu: the partner's receivable and payable ledgers of the period with the net balance, on screen.
+  - The stock-out customer debt panel links to the Nợ quá hạn report (new tab, filtered to the customer) when the customer is overdue and the user holds `reports.debt` (B2: that report is the overdue warning list; there is no dashboard widget or save-time warning).
+  - The documents, aging and by-employee totals equal the Số dư công nợ closing balance (B4).
 
 ## Planned Scope
 
 Approved but not yet implemented. Go-live happens after Round 3. Design: [stock voucher brainstorm](../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md), [cash & debt brainstorm](../brainstorms/261007-2252-cash-debt-round2/SUMMARY.md).
 
-- **Round 2B — Debt reports**: Công nợ theo chứng từ, Tuổi nợ, Nợ quá hạn, Công nợ theo nhân viên and Biên bản đối chiếu (on screen; its print form comes in Round 3).
 - **Round 3 — Output and productivity**: template-based print/Excel export of vouchers (forms 01-VT/02-VT, receipts/payments, Biên bản đối chiếu), Excel import of voucher lines and voucher copy. The cut-over decides whether opening debts are typed in or imported from Excel.
 - **Backlog**: FIFO costing, warehouse transfer, stocktake, returns and quotation → sales voucher conversion.
 

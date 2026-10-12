@@ -16,7 +16,7 @@ Backend (.NET 9 Web API)
 PostgreSQL 16
 ```
 
-The product is quotation-first. The quotation is the main sales document; revenue is counted when a quotation reaches `Confirmed`. Orders and delivery are outside the scope. Inventory (Round 1: branches, stock vouchers, ledger, costing and reports) and cash & debt (Round 2A: receipts and payments, funds and fund transfers, the receivable/payable ledger, matching, debt offsets, credit limits and the reports Số dư công nợ, Sổ chi tiết công nợ and Sổ quỹ) are implemented and go live after Round 3. The remaining debt reports (by document, aging, overdue, by employee, reconciliation) are Round 2B.
+The product is quotation-first. The quotation is the main sales document; revenue is counted when a quotation reaches `Confirmed`. Orders and delivery are outside the scope. Inventory (Round 1: branches, stock vouchers, ledger, costing and reports) and cash & debt (Round 2A: receipts and payments, funds and fund transfers, the receivable/payable ledger, matching, debt offsets, credit limits and the reports Số dư công nợ, Sổ chi tiết công nợ and Sổ quỹ) are implemented and go live after Round 3. The debt reports by document, aging, overdue, by employee and the reconciliation record (Round 2B) are implemented too.
 
 ## Backend Layers
 
@@ -214,6 +214,14 @@ Each key set is taken in one statement, ordered `COLLATE "C"` (shared helper `Ad
 - **Window rule (P29):** in every report window, `Opening` entries and fund `OpeningAmount` count as the opening balance and never as period movements, even when the report starts on the opening date.
 - **Balance sign (P24):** a positive receivable shows as Dư Nợ and a negative one as Dư Có; a positive payable shows as Dư Có and a negative one as Dư Nợ.
 - **Cash book with several funds (P25):** each fund group shows its transfer rows, so its running balance reconciles. In the grand total, a transfer whose two funds are both selected is left out, because the two halves cancel; a transfer with only one selected fund counts.
+
+**Debt position reports (Round 2B).** `DebtPositionReportsController` (route `api/reports`, `reports.debt`) calls `IDebtPositionReportService` (`Application/CashDebt/Reports/Services/DebtPositionReportService`): `GET /api/reports/debt-documents` (open amount per document), `debt-aging` and `debt-overdue` (both take `buckets`, default `30,60,90`) and `debt-by-salesperson` (grouped by `DebtEntry.OwnerUserId`; `Side` defaults to Receivable). `GET /api/reports/debt-reconciliation` (Biên bản đối chiếu of one partner, both sides plus the net balance) lives on `CashDebtReportsController` and `CashDebtReportService`, because it reuses `BuildDebtLedgerAsync` in the same snapshot. Every report runs in `ITransactionRunner.RunSnapshotAsync` and returns zero-filled arrays when there are no rows (B12).
+
+- **Shared loader:** `DebtPositionQuery` (internal static) loads the entries and settlements of one branch for all four position reports; `DebtAging` (`Application/CashDebt/Common`, pure) parses and applies the bucket boundaries.
+- **"As at D" rule (B3):** an entry counts at D when `PostedAt < StartOfNextDay(D)` or its source is `Opening` (P29). A settlement counts at D only when both of its entries count at D. The open amount of an entry at D is its amount minus the settlements that count at D. Hence documents, aging and by-employee totals equal the Số dư công nợ closing balance (B4).
+- **Unallocated (B6):** open Decrease entries (prepayments, unmatched receipts and returns). Documents and aging subtract them; the overdue report only shows them next to the partner total.
+- `GET /api/opening-debts/owners` (`debt.opening_balance`) lists the active users offered as the owner of an opening debt; `/admin/users` needs `users.view`, which the opening-debt screen does not require.
+- Frontend: pages `cash-reports/debt-documents-page`, `debt-aging-page`, `debt-overdue-page`, `debt-by-salesperson-page` and `debt-reconciliation-page` under routes `/reports/debt-documents`, `/reports/debt-aging`, `/reports/debt-overdue`, `/reports/debt-by-salesperson` and `/reports/debt-reconciliation`, with five nav items (permission `reports.debt`).
 
 Other read endpoints: `GET /api/debt/partner-summary` (receivable balance, credit limit, available amount and overdue amount, shown on the stock-out form), `GET /api/debt/open-items` (with `forSourceType` / `forSourceId`, the open amount adds back the edited voucher's own `AtVoucher` settlements, the ones its save replaces, P26) and `GET /api/debt/partners`.
 

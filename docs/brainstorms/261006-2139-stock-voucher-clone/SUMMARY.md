@@ -92,14 +92,14 @@ Thiết kế chi tiết Đợt 1: [section-03-round1-design.md](section-03-round
 
 ## Follow-up — chưa làm (kiểm tra 2026-10-12)
 
-### Đợt 2B (cần plan riêng, không đổi schema 2A)
-- [ ] Báo cáo Công nợ theo chứng từ
-- [ ] Báo cáo Tuổi nợ
-- [ ] Báo cáo Nợ quá hạn
-- [ ] Báo cáo Công nợ theo nhân viên
-- [ ] Biên bản đối chiếu công nợ
-- [ ] Danh sách cảnh báo quá hạn
-- Điều kiện trước khi plan: BA chốt thanh toán liên chi nhánh và tài khoản NH dùng chung nhiều chi nhánh.
+### Đợt 2B (cần plan riêng, không đổi schema 2A) — [plan](../../plans/261012-1709-cash-debt-round2b/SUMMARY.md)
+- [x] Báo cáo Công nợ theo chứng từ
+- [x] Báo cáo Tuổi nợ
+- [x] Báo cáo Nợ quá hạn
+- [x] Báo cáo Công nợ theo nhân viên
+- [x] Biên bản đối chiếu công nợ
+- [x] Danh sách cảnh báo quá hạn
+- Không chặn 2B: các báo cáo 2B theo chi nhánh làm việc; câu hỏi BA vẫn mở cho đợt sau (thanh toán liên chi nhánh, tài khoản NH dùng chung nhiều chi nhánh).
 
 ### Đợt 3
 - [ ] In/Excel theo mẫu 01-VT / 02-VT cho phiếu nhập/xuất kho

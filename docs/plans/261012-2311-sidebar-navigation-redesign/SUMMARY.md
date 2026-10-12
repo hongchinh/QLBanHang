@@ -68,7 +68,7 @@ Make the left sidebar usable with about 40 items: fix the desktop scroll bug, re
 - [x] Phase 03 — Accent-insensitive search (M) — `phase-03-search.md`
 - [x] Phase 04 — Per-user pins and chips (M) — `phase-04-pins.md`
 - [x] Phase 05 — Collapsed rail and flyouts (M) — `phase-05-rail-and-flyouts.md`
-- [ ] Phase 06 — Documentation and final verification (S) — `phase-06-docs-and-verification.md`
+- [x] Phase 06 — Documentation and final verification (S) — `phase-06-docs-and-verification.md`
 
 Phases run in order (Phase 00 is independent and may already be merged when Phase 01 starts). Each phase ends with green targeted tests, `npm run typecheck`, `npm run lint` and `npm run build`.
 

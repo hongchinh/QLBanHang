@@ -1,9 +1,9 @@
 # Thiết kế lại sidebar trái — nhóm chức năng, tìm kiếm, ghim
 
 **Date:** 2026-10-12 21:35:33
-**Status:** Implemented (plan docs/plans/261012-2311-sidebar-navigation-redesign)
+**Status:** Implemented (plan docs/plans/archived/261012-2311-sidebar-navigation-redesign)
 **UI design:** [section-01-ui-design.md](section-01-ui-design.md). File này là nguồn đúng cho giao diện, component, edge case và kiểm thử. Mockup: [mockup-01-visual-styles.html](mockup-01-visual-styles.html) · [mockup-02-option-c-states.html](mockup-02-option-c-states.html)
-**Related:** [261007-2252-cash-debt-round2](../261007-2252-cash-debt-round2/SUMMARY.md) · plan Round 2B `docs/plans/261012-1709-cash-debt-round2b/` (thêm 5 báo cáo công nợ vào sidebar)
+**Related:** [261007-2252-cash-debt-round2](../261007-2252-cash-debt-round2/SUMMARY.md) · plan Round 2B `docs/plans/archived/261012-1709-cash-debt-round2b/` (thêm 5 báo cáo công nợ vào sidebar)
 
 ---
 

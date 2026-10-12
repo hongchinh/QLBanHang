@@ -1,6 +1,6 @@
 # Cash & Debt Round 2B — Debt analysis reports (Đợt 2B — Báo cáo công nợ)
 
-> Created: 2026-10-12 17:09:46 · Source design: [brainstorm SUMMARY](../../brainstorms/261007-2252-cash-debt-round2/SUMMARY.md), [section-02 §11 reports](../../brainstorms/261007-2252-cash-debt-round2/section-02-design.md#11-báo-cáo), [section-03 §3 split](../../brainstorms/261007-2252-cash-debt-round2/section-03-delivery.md#3-phương-án-tách-2a--2b-review-đề-xuất-tách-chốt-khi-viết-plan) · Builds on: [Round 2A plan](../archived/261007-2314-cash-debt-round2a/SUMMARY.md) (F-10), [Round 2A review refactor](../archived/261012-0433-round2a-review-refactor/SUMMARY.md) · Follow-up list: [stock-voucher-clone SUMMARY](../../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md#follow-up--chưa-làm-kiểm-tra-2026-10-12)
+> Created: 2026-10-12 17:09:46 · Source design: [brainstorm SUMMARY](../../../brainstorms/261007-2252-cash-debt-round2/SUMMARY.md), [section-02 §11 reports](../../../brainstorms/261007-2252-cash-debt-round2/section-02-design.md#11-báo-cáo), [section-03 §3 split](../../../brainstorms/261007-2252-cash-debt-round2/section-03-delivery.md#3-phương-án-tách-2a--2b-review-đề-xuất-tách-chốt-khi-viết-plan) · Builds on: [Round 2A plan](../261007-2314-cash-debt-round2a/SUMMARY.md) (F-10), [Round 2A review refactor](../261012-0433-round2a-review-refactor/SUMMARY.md) · Follow-up list: [stock-voucher-clone SUMMARY](../../../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md#follow-up--chưa-làm-kiểm-tra-2026-10-12)
 
 ## Goal
 

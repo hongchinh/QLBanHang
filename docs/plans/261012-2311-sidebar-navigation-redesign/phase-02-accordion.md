@@ -1,6 +1,6 @@
 # Phase 02 — Color tokens, collapsible groups, remembered state, temporary open
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

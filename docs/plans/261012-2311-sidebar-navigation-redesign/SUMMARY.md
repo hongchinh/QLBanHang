@@ -64,7 +64,7 @@ Make the left sidebar usable with about 40 items: fix the desktop scroll bug, re
 
 - [ ] Phase 00 — Scroll hotfix PR to `main` (S) — `phase-00-scroll-hotfix.md`
 - [x] Phase 01 — Branch, baseline, regroup, icons, longest-prefix highlight (M) — `phase-01-regroup-and-active-item.md`
-- [ ] Phase 02 — Color tokens, collapsible groups, remembered state, temporary open (M) — `phase-02-accordion.md`
+- [x] Phase 02 — Color tokens, collapsible groups, remembered state, temporary open (M) — `phase-02-accordion.md`
 - [ ] Phase 03 — Accent-insensitive search (M) — `phase-03-search.md`
 - [ ] Phase 04 — Per-user pins and chips (M) — `phase-04-pins.md`
 - [ ] Phase 05 — Collapsed rail and flyouts (M) — `phase-05-rail-and-flyouts.md`

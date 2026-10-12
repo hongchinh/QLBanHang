@@ -40,7 +40,7 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
                 aria-label={group.label}
                 data-active={group.id === activeGroupId ? 'true' : undefined}
                 className={cn(
-                  'flex h-[34px] w-[34px] items-center justify-center rounded-md text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'flex h-[34px] w-[34px] items-center justify-center rounded-md text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card',
                   group.color,
                   group.id === activeGroupId && 'ring-2 ring-primary ring-offset-2 ring-offset-card',
                 )}

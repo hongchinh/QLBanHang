@@ -30,7 +30,7 @@ describe('SidebarRail', () => {
     const user = userEvent.setup();
     renderSidebar('/');
     await user.click(groupButton('Báo cáo'));
-    const flyout = screen.getByRole('dialog');
+    const flyout = screen.getByRole('dialog', { name: 'Báo cáo' });
     expect(groupButton('Báo cáo')).toHaveAttribute('aria-expanded', 'true');
     expect(within(flyout).getByRole('link', { name: 'Tuổi nợ' })).toBeInTheDocument();
     expect(within(flyout).getAllByRole('heading', { level: 4 }).map((h) => h.textContent))
@@ -55,6 +55,15 @@ describe('SidebarRail', () => {
     expect(within(screen.getByRole('dialog')).getByRole('link', { name: 'Phiếu thu' })).toBeInTheDocument();
   });
 
+  it('focuses the first link on open, so Enter navigates instead of pinning', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    groupButton('Kho').focus();
+    await user.keyboard('{Enter}');
+    const first = within(screen.getByRole('dialog')).getAllByRole('link')[0];
+    expect(first).toHaveFocus();
+  });
+
   it('keeps one flyout open at a time', async () => {
     const user = userEvent.setup();
     renderSidebar('/');
@@ -71,6 +80,15 @@ describe('SidebarRail', () => {
     await user.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Hàng hóa' }));
     expect(pathname()).toBe('/products');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('choosing the item of the current page closes the flyout and returns focus to the icon', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/products');
+    await user.click(groupButton('Danh mục'));
+    await user.click(within(screen.getByRole('dialog')).getByRole('link', { name: 'Hàng hóa' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(groupButton('Danh mục')).toHaveFocus();
   });
 
   it('closes on a route change', async () => {

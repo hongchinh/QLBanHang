@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import type * as React from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -15,6 +16,14 @@ interface SidebarFlyoutProps {
 }
 
 export function SidebarFlyout({ title, icon: Icon, iconClassName, open, onOpenChange, trigger, children }: SidebarFlyoutProps) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  // Radix skips links when choosing the initial focus, which would land on the first star (pin) button.
+  const focusFirstLink = (event: Event) => {
+    event.preventDefault();
+    const content = contentRef.current;
+    (content?.querySelector<HTMLElement>('a[href]') ?? content)?.focus();
+  };
+
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
       <Tooltip>
@@ -24,6 +33,9 @@ export function SidebarFlyout({ title, icon: Icon, iconClassName, open, onOpenCh
         <TooltipContent side="right">{title}</TooltipContent>
       </Tooltip>
       <PopoverContent
+        ref={contentRef}
+        aria-label={title}
+        onOpenAutoFocus={focusFirstLink}
         side="right"
         align="start"
         collisionPadding={8}

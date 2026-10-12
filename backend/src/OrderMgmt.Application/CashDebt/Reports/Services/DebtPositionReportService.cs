@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Reports.Interfaces;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Common.Interfaces;
@@ -107,6 +108,68 @@ public class DebtPositionReportService : IDebtPositionReportService
             TotalRemaining = remaining,
             TotalUnallocated = unallocatedTotal,
             TotalBalance = remaining - unallocatedTotal,
+        };
+    }
+
+    public Task<DebtAgingReportDto> GetAgingAsync(DebtAgingReportRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildAgingAsync(request, c), ct);
+
+    private async Task<DebtAgingReportDto> BuildAgingAsync(DebtAgingReportRequest request, CancellationToken ct)
+    {
+        var boundaries = DebtAging.ParseBoundaries(request.Buckets) ?? DebtAging.DefaultBoundaries;
+        var buckets = DebtAging.Ranges(boundaries, firstFrom: 0);
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.At));
+        var open = (await DebtPositionQuery.LoadAsync(_db, branchId, request.Side, request.PartnerId, end, ct))
+            .Where(i => i.Open > 0m)
+            .ToList();
+
+        var partnerIds = open.Select(i => i.PartnerId).Distinct().ToList();
+        var info = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => partnerIds.Contains(c.Id))
+            .Select(c => new { c.Id, c.Code, c.Name })
+            .ToDictionaryAsync(c => c.Id, ct);
+
+        var rows = new List<DebtAgingRowDto>();
+        foreach (var byPartner in open.GroupBy(i => i.PartnerId))
+        {
+            var amounts = new decimal[buckets.Count];
+            foreach (var item in byPartner.Where(i => i.Direction == DebtDirection.Increase))
+            {
+                var age = Math.Max(0, request.At.DayNumber - item.DocDate.DayNumber);
+                amounts[DebtAging.BucketIndex(age, boundaries)] += item.Open;
+            }
+            var unallocated = byPartner.Where(i => i.Direction == DebtDirection.Decrease).Sum(i => i.Open);
+            var partner = info.GetValueOrDefault(byPartner.Key);
+            var totalOpen = amounts.Sum();
+            rows.Add(new DebtAgingRowDto
+            {
+                PartnerId = byPartner.Key,
+                PartnerCode = partner?.Code,
+                PartnerName = partner?.Name,
+                Amounts = amounts.ToList(),
+                TotalOpen = totalOpen,
+                Unallocated = unallocated,
+                Balance = totalOpen - unallocated,
+            });
+        }
+        rows = rows.OrderBy(r => r.PartnerCode, StringComparer.Ordinal).ToList();
+
+        var totalOpenAll = rows.Sum(r => r.TotalOpen);
+        var unallocatedAll = rows.Sum(r => r.Unallocated);
+        return new DebtAgingReportDto
+        {
+            Side = request.Side,
+            At = request.At,
+            Buckets = buckets.Select(b => new AgingBucketDto { From = b.From, To = b.To }).ToList(),
+            Rows = rows,
+            Totals = new DebtAgingRowDto
+            {
+                Amounts = Enumerable.Range(0, buckets.Count).Select(i => rows.Sum(r => r.Amounts[i])).ToList(),
+                TotalOpen = totalOpenAll,
+                Unallocated = unallocatedAll,
+                Balance = totalOpenAll - unallocatedAll,
+            },
         };
     }
 }

@@ -11,3 +11,12 @@ public class DebtDocumentsReportRequestValidator : AbstractValidator<DebtDocumen
         RuleFor(x => x.At).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Ngày báo cáo không hợp lệ.");
     }
 }
+
+public class DebtAgingReportRequestValidator : AbstractValidator<DebtAgingReportRequest>
+{
+    public DebtAgingReportRequestValidator()
+    {
+        RuleFor(x => x.Side).IsInEnum().WithMessage("Vui lòng chọn loại công nợ.");
+        RuleFor(x => x.At).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Ngày báo cáo không hợp lệ.");
+    }
+}

@@ -61,3 +61,48 @@ public class DebtUnallocatedRowDto
     public decimal Settled { get; set; }
     public decimal Remaining { get; set; }
 }
+
+public class DebtAgingReportRequest
+{
+    public DebtSide Side { get; set; }
+    public DateOnly At { get; set; }
+    public Guid? PartnerId { get; set; }
+
+    /// Comma-separated day boundaries, e.g. "30,60,90"; missing means the defaults.
+    public string? Buckets { get; set; }
+}
+
+/// One age range in days; To null is the open-ended last bucket.
+public class AgingBucketDto
+{
+    public int From { get; set; }
+    public int? To { get; set; }
+}
+
+public class DebtAgingReportDto
+{
+    public DebtSide Side { get; set; }
+    public DateOnly At { get; set; }
+    public List<AgingBucketDto> Buckets { get; set; } = new();
+    public List<DebtAgingRowDto> Rows { get; set; } = new();
+    public DebtAgingRowDto Totals { get; set; } = new();
+}
+
+public class DebtAgingRowDto
+{
+    public Guid? PartnerId { get; set; }
+    public string? PartnerCode { get; set; }
+    public string? PartnerName { get; set; }
+
+    /// One per bucket, same order as the report's Buckets.
+    public List<decimal> Amounts { get; set; } = new();
+
+    /// Sum of Amounts.
+    public decimal TotalOpen { get; set; }
+
+    /// Sum of open Decrease amounts.
+    public decimal Unallocated { get; set; }
+
+    /// TotalOpen - Unallocated.
+    public decimal Balance { get; set; }
+}

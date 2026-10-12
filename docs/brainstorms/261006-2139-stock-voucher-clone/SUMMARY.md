@@ -88,3 +88,42 @@ Thiết kế chi tiết Đợt 1: [section-03-round1-design.md](section-03-round
 1. ~~Cập nhật `docs/project-pdr/product-goals.md` (bỏ non-goal kho/tồn/công nợ)~~ — đã xong 2026-10-06 (mục Planned Scope + Inventory rules).
 2. ~~`write-plan` cho **Đợt 1**~~ — đã xong và merge 2026-10-07 ([plan](../../plans/archived/261006-2259-inventory-round1/SUMMARY.md)).
 3. ~~Brainstorm riêng cho Đợt 2~~ — đã xong 2026-10-07: [cash-debt-round2](../261007-2252-cash-debt-round2/SUMMARY.md).
+4. ~~Đợt 2A (thu/chi, quỹ, công nợ, 3 báo cáo)~~ — đã xong và merge (PR #2 remote `qlbanhang`, 2026-10-12): [plan](../../plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md).
+
+## Follow-up — chưa làm (kiểm tra 2026-10-12)
+
+### Đợt 2B (cần plan riêng, không đổi schema 2A)
+- [ ] Báo cáo Công nợ theo chứng từ
+- [ ] Báo cáo Tuổi nợ
+- [ ] Báo cáo Nợ quá hạn
+- [ ] Báo cáo Công nợ theo nhân viên
+- [ ] Biên bản đối chiếu công nợ
+- [ ] Danh sách cảnh báo quá hạn
+- Điều kiện trước khi plan: BA chốt thanh toán liên chi nhánh và tài khoản NH dùng chung nhiều chi nhánh.
+
+### Đợt 3
+- [ ] In/Excel theo mẫu 01-VT / 02-VT cho phiếu nhập/xuất kho
+- [ ] In/Excel phiếu thu/chi và biên bản đối chiếu
+- [ ] Quyền `stock_in.export` / `stock_out.export` (+ export báo cáo tồn kho)
+- [ ] Nhập Excel dòng hàng của phiếu
+- [ ] Nhập Excel tồn đầu kỳ và công nợ đầu kỳ (PO chốt tay hay Excel trước khi plan)
+- [ ] Sao chép phiếu
+- [ ] Kế hoạch cut-over từ phần mềm cũ
+
+### Backlog (ràng buộc ở [section-05 §5](section-05-review-decisions.md#5-backlog-ghi-vào-plan))
+- [ ] FIFO (`FifoLayer`)
+- [ ] Điều chuyển kho
+- [ ] Kiểm kê
+- [ ] Trả hàng đầy đủ (hiện chỉ có lý do `NTL`/`XTL` ở góc công nợ)
+- [ ] Báo giá → Phiếu bán hàng (đổi nguồn doanh thu dashboard/báo cáo)
+
+### Go-live gates
+- [ ] Kế toán duyệt seed lý do thu/chi và `DebtEffect` (gồm `NTL`/`XTL`)
+- [ ] Kế toán chấp nhận số nhảy của phiếu tự động bị xóa và một dãy số mỗi loại
+- [ ] BA xác nhận mặc định `CreditLimitPolicy` / `NegativeFundPolicy` = Warn và quyền SALES xem panel nợ
+- [ ] Xác nhận VAT đầu vào có tính vào giá nhập (`PurchaseCostIncludesVat`)
+- [ ] Chốt danh sách hàng `TrackInventory = false` và quyền quản lý NCC
+- [ ] Lấy SP cũ `GetSoDuConNo`, `SoTongHopCongNo`, `SoQuyTienMat` từ DB production
+- [ ] Đối chiếu tay 1 tháng số dư công nợ và sổ quỹ với phần mềm cũ
+- [ ] Reset DB dev/test khi deploy 2A (không backfill)
+- [ ] Đồng bộ local `main` (track `origin`) với `qlbanhang/main` — hiện local main chưa có merge PR #2

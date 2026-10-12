@@ -32,6 +32,20 @@
     --header-active: 0 0% 10%;
     --header-brand-bg: 0 0% 100%;
     --header-danger: 0 75% 55%;
+
+    /* Sidebar group colors (same in dark mode) and helpers. */
+    --nav-sales: 221.2 83.2% 53.3%;
+    --nav-inventory: 32.1 94.6% 43.7%;
+    --nav-cash: 161.4 93.5% 30.4%;
+    --nav-debt: 0 72.2% 50.6%;
+    --nav-reports: 262.1 83.3% 57.8%;
+    --nav-catalogs: 191.6 91.4% 36.5%;
+    --nav-system: 215.4 16.3% 34.9%;
+    --nav-group-bg: 210 40% 97%;
+    --nav-pin-bg: 45 100% 95%;
+    --nav-pin-fg: 30 80% 30%;
+    --nav-pin-border: 45 90% 80%;
+    --nav-match: 48 100% 85%;
   }
 
   .dark {
@@ -60,6 +74,12 @@
     --header-active: 0 0% 6%;
     --header-brand-bg: 222.2 84% 9%;
     --header-danger: 0 75% 60%;
+
+    --nav-group-bg: 217 33% 11%;
+    --nav-pin-bg: 37.7 92.1% 50.2% / 0.12;
+    --nav-pin-fg: 43.3 96.4% 56.3%;
+    --nav-pin-border: 37.7 92.1% 50.2% / 0.35;
+    --nav-match: 47.9 95.8% 53.1% / 0.3;
   }
 }
 

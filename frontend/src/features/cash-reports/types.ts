@@ -80,6 +80,62 @@ export interface DebtLedgerReport {
   closingCredit: number;
 }
 
+// GET /api/reports/debt-by-salesperson (reports.debt)
+export interface DebtBySalespersonParams {
+  side: DebtSide;
+  from: string;
+  to: string;
+  partnerId?: string;
+}
+
+export interface DebtBySalespersonRow {
+  ownerUserId?: string | null;
+  ownerName?: string | null;
+  openingOpen: number;
+  increase: number;
+  settled: number;
+  closingOpen: number;
+  closingOverdue: number;
+}
+
+export interface DebtUnallocatedLine {
+  opening: number;
+  closing: number;
+}
+
+export interface DebtBySalespersonReport {
+  side: DebtSide;
+  from: string;
+  to: string;
+  rows: DebtBySalespersonRow[];
+  totals: DebtBySalespersonRow;
+  unallocated: DebtUnallocatedLine;
+  openingBalance: number;
+  closingBalance: number;
+}
+
+// GET /api/reports/debt-reconciliation (reports.debt)
+export interface DebtReconciliationParams {
+  partnerId: string;
+  from: string;
+  to: string;
+}
+
+export interface DebtReconciliationReport {
+  partnerId: string;
+  partnerCode: string;
+  partnerName: string;
+  taxCode?: string | null;
+  address?: string | null;
+  branchName: string;
+  from: string;
+  to: string;
+  // Receivable first, then Payable.
+  sides: DebtLedgerReport[];
+  // > 0: the partner owes us.
+  netBalance?: number | null;
+}
+
 // GET /api/reports/cash-book (reports.cash). fundId set → that fund only (it must match kind unless kind is All).
 export interface CashBookParams {
   kind: FundKindFilter;

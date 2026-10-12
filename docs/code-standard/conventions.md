@@ -23,6 +23,9 @@
 - Use TanStack Query hooks for API-backed state. Keep query keys centralized per feature when a module has more than trivial fetching.
 - Use React Hook Form + Zod for forms that need validation.
 - Use shadcn-style primitives from `components/ui` and layout components from `components/layout`.
+- Sidebar navigation is declared only in `components/layout/nav-config.ts`. Add an item to the group of its type of work (`sales`, `inventory`, `cash`, `debt`, `reports`, `catalogs`, `system`) with `to`, `label`, a lucide `icon` not used by any other item or group, and `permission` / `anyPermission` / `role` for visibility; report items also carry `section` (Doanh thu / Kho / Quỹ / Công nợ) and sit next to the items of the same section. `nav-config.test.ts` asserts the order per role and icon uniqueness; update it with the item. Group colors are the `--nav-*` tokens in `index.css` (bare HSL channels, light and dark), used through the `bg-nav-<id>` classes; components never write color codes.
+- The active sidebar item is the one whose `to` is the longest segment-boundary prefix of the path (`findActiveItem` in `components/layout/sidebar/nav-search.ts`); `/` matches only itself. A detail route needs no nav change as long as it lives under its list route.
+- Sidebar UI state lives in `ui-store`: `sidebarGroupOpen` (only groups the user clicked; others use `defaultOpen`; shared by every user of the browser) and `pinnedNavPaths` (per user id, in pin order; pins of items the user cannot see are hidden, not removed).
 - Gate pages with `ProtectedRoute permission="..."`; use permission-aware helpers for conditional UI.
 - Keep API calls inside feature `api.ts` files and use `lib/api-client.ts` instead of raw Axios instances.
 - Keep shared CSS tokens in `src/styles`; avoid one-off layout CSS when an existing token/helper fits.

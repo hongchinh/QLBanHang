@@ -125,6 +125,9 @@ frontend/src/
 │   ├── activity-history/        # ActivityHistory: activity list of a document
 │   ├── customer-autocomplete/   # quotation customer picker + quick add
 │   ├── layout/                  # app shell, header, sidebar, search, notifications
+│   │   ├── nav-config.ts        # sidebar groups/items, permissions, icons, sections
+│   │   └── sidebar/             # sidebar (wide), sidebar-rail + sidebar-flyout (collapsed), sidebar-search,
+│   │                            # sidebar-pin-chips, sidebar-group, sidebar-item, nav-search.ts (pure filter/highlight/active item)
 │   ├── money-cell/              # MoneyCell, CellError: editable money cell of the line and allocation grids
 │   ├── partner-autocomplete/    # customer/supplier picker for cash and debt screens
 │   ├── search-combobox/         # generic search combobox behind DebtPartnerPicker and the ledger PartnerPicker

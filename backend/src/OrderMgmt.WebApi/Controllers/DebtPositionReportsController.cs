@@ -16,17 +16,20 @@ public class DebtPositionReportsController : ApiControllerBase
     private readonly IValidator<DebtDocumentsReportRequest> _documentsValidator;
     private readonly IValidator<DebtAgingReportRequest> _agingValidator;
     private readonly IValidator<DebtOverdueReportRequest> _overdueValidator;
+    private readonly IValidator<DebtBySalespersonReportRequest> _bySalespersonValidator;
 
     public DebtPositionReportsController(
         IDebtPositionReportService service,
         IValidator<DebtDocumentsReportRequest> documentsValidator,
         IValidator<DebtAgingReportRequest> agingValidator,
-        IValidator<DebtOverdueReportRequest> overdueValidator)
+        IValidator<DebtOverdueReportRequest> overdueValidator,
+        IValidator<DebtBySalespersonReportRequest> bySalespersonValidator)
     {
         _service = service;
         _documentsValidator = documentsValidator;
         _agingValidator = agingValidator;
         _overdueValidator = overdueValidator;
+        _bySalespersonValidator = bySalespersonValidator;
     }
 
     [HttpGet("debt-documents")]
@@ -54,5 +57,14 @@ public class DebtPositionReportsController : ApiControllerBase
     {
         await _overdueValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.GetOverdueAsync(request, ct));
+    }
+
+    [HttpGet("debt-by-salesperson")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtBySalespersonReportDto>>> DebtBySalesperson(
+        [FromQuery] DebtBySalespersonReportRequest request, CancellationToken ct)
+    {
+        await _bySalespersonValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetBySalespersonAsync(request, ct));
     }
 }

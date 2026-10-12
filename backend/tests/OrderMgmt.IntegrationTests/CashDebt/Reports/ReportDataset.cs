@@ -16,6 +16,7 @@ public sealed class ReportIds
 {
     public Guid MainBranchId { get; init; }   // the dataset's main branch (fresh, opening date 2026-10-01)
     public Guid BranchBId { get; init; }      // isolation branch: holds row 12 only
+    public Guid MainWarehouseId { get; init; }  // warehouse of the main branch, for extra stock vouchers
 
     public Guid Kh1Id { get; init; }
     public string Kh1Code { get; init; } = default!;
@@ -134,6 +135,7 @@ public abstract partial class CashDebtTestBase
             {
                 MainBranchId = mainBranchId,
                 BranchBId = branchBId,
+                MainWarehouseId = mainWarehouseId,
                 Kh1Id = kh1,
                 Kh1Code = kh1Code,
                 Ncc1Id = ncc1,

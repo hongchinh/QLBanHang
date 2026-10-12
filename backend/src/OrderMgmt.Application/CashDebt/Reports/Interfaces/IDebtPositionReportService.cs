@@ -13,4 +13,8 @@ public interface IDebtPositionReportService
 
     /// No qua han: open Increase documents past their due date per partner, with days overdue and buckets.
     Task<DebtOverdueReportDto> GetOverdueAsync(DebtOverdueReportRequest request, CancellationToken ct = default);
+
+    /// Cong no theo nhan vien: per owner of the debt document, open at the start, new debt, settled and open at the end
+    /// of a period, with the overdue part and the unallocated amounts.
+    Task<DebtBySalespersonReportDto> GetBySalespersonAsync(DebtBySalespersonReportRequest request, CancellationToken ct = default);
 }

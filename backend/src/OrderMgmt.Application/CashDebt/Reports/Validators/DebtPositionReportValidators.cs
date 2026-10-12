@@ -36,3 +36,7 @@ public class DebtOverdueReportRequestValidator : AbstractValidator<DebtOverdueRe
             .WithMessage("Mốc ngày không hợp lệ: nhập các số nguyên dương tăng dần, cách nhau bởi dấu phẩy, tối đa 6 mốc.");
     }
 }
+
+public class DebtBySalespersonReportRequestValidator : AbstractValidator<DebtBySalespersonReportRequest>
+{
+}

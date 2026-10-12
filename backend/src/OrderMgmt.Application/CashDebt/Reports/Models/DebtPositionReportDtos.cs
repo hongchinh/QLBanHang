@@ -157,3 +157,53 @@ public class DebtOverdueRowDto
     public int DaysOverdue { get; set; }
     public int BucketIndex { get; set; }
 }
+
+public class DebtBySalespersonReportRequest
+{
+    public DebtSide Side { get; set; } = DebtSide.Receivable;
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+    public Guid? PartnerId { get; set; }
+}
+
+public class DebtBySalespersonReportDto
+{
+    public DebtSide Side { get; set; }
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+
+    /// Owners with any non-zero value, ordered by owner name (vi-VN), the row without an owner last.
+    public List<DebtBySalespersonRowDto> Rows { get; set; } = new();
+
+    /// Sum of each column; OwnerUserId and OwnerName are null.
+    public DebtBySalespersonRowDto Totals { get; set; } = new();
+
+    public DebtUnallocatedLineDto Unallocated { get; set; } = new();
+
+    /// Totals.OpeningOpen - Unallocated.Opening.
+    public decimal OpeningBalance { get; set; }
+
+    /// Totals.ClosingOpen - Unallocated.Closing.
+    public decimal ClosingBalance { get; set; }
+}
+
+/// OpeningOpen + Increase - Settled == ClosingOpen (B7).
+public class DebtBySalespersonRowDto
+{
+    public Guid? OwnerUserId { get; set; }
+    public string? OwnerName { get; set; }
+    public decimal OpeningOpen { get; set; }
+    public decimal Increase { get; set; }
+    public decimal Settled { get; set; }
+    public decimal ClosingOpen { get; set; }
+
+    /// Part of ClosingOpen whose due date (or document date) is before To.
+    public decimal ClosingOverdue { get; set; }
+}
+
+/// Open Decrease entries (prepayments, unmatched receipts) at the start and at the end of the period.
+public class DebtUnallocatedLineDto
+{
+    public decimal Opening { get; set; }
+    public decimal Closing { get; set; }
+}

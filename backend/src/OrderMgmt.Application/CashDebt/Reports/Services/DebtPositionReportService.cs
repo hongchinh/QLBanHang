@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Reports.Interfaces;
@@ -253,4 +254,77 @@ public class DebtPositionReportService : IDebtPositionReportService
             },
         };
     }
+
+    public Task<DebtBySalespersonReportDto> GetBySalespersonAsync(DebtBySalespersonReportRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildBySalespersonAsync(request, c), ct);
+
+    private async Task<DebtBySalespersonReportDto> BuildBySalespersonAsync(DebtBySalespersonReportRequest request, CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        // B7: the start is the instant before From; every start item is also an end item.
+        var startItems = await DebtPositionQuery.LoadAsync(_db, branchId, request.Side, request.PartnerId,
+            VnTime.ToUtc(VnTime.StartOfDay(request.From)), ct);
+        var endItems = await DebtPositionQuery.LoadAsync(_db, branchId, request.Side, request.PartnerId,
+            VnTime.ToUtc(VnTime.StartOfNextDay(request.To)), ct);
+        var startById = startItems.ToDictionary(i => i.EntryId);
+
+        var sums = new Dictionary<Guid, DebtBySalespersonRowDto>();
+        var noOwner = new DebtBySalespersonRowDto();
+        foreach (var item in endItems.Where(i => i.Direction == DebtDirection.Increase))
+        {
+            var row = item.OwnerUserId is { } owner
+                ? sums.TryGetValue(owner, out var existing) ? existing : sums[owner] = new DebtBySalespersonRowDto { OwnerUserId = owner }
+                : noOwner;
+            startById.TryGetValue(item.EntryId, out var start);
+            row.OpeningOpen += start?.Open ?? 0m;
+            row.Increase += start is null ? item.Amount : 0m;
+            row.Settled += item.Settled - (start?.Settled ?? 0m);
+            row.ClosingOpen += item.Open;
+            row.ClosingOverdue += (item.DueDate ?? item.DocDate) < request.To ? item.Open : 0m;
+        }
+
+        // Soft-deleted users keep their documents, so they keep their name.
+        var ownerIds = sums.Keys.ToList();
+        var names = await _db.Users.IgnoreQueryFilters().AsNoTracking()
+            .Where(u => ownerIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName })
+            .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
+        foreach (var row in sums.Values)
+            row.OwnerName = names.GetValueOrDefault(row.OwnerUserId!.Value);
+
+        var vietnameseComparer = StringComparer.Create(new CultureInfo("vi-VN"), ignoreCase: true);
+        var rows = sums.Values.Where(HasValue)
+            .OrderBy(r => r.OwnerName, vietnameseComparer).ThenBy(r => r.OwnerUserId)
+            .ToList();
+        if (HasValue(noOwner))
+            rows.Add(noOwner);
+
+        var totals = new DebtBySalespersonRowDto
+        {
+            OpeningOpen = rows.Sum(r => r.OpeningOpen),
+            Increase = rows.Sum(r => r.Increase),
+            Settled = rows.Sum(r => r.Settled),
+            ClosingOpen = rows.Sum(r => r.ClosingOpen),
+            ClosingOverdue = rows.Sum(r => r.ClosingOverdue),
+        };
+        var unallocated = new DebtUnallocatedLineDto
+        {
+            Opening = startItems.Where(i => i.Direction == DebtDirection.Decrease).Sum(i => i.Open),
+            Closing = endItems.Where(i => i.Direction == DebtDirection.Decrease).Sum(i => i.Open),
+        };
+        return new DebtBySalespersonReportDto
+        {
+            Side = request.Side,
+            From = request.From,
+            To = request.To,
+            Rows = rows,
+            Totals = totals,
+            Unallocated = unallocated,
+            OpeningBalance = totals.OpeningOpen - unallocated.Opening,
+            ClosingBalance = totals.ClosingOpen - unallocated.Closing,
+        };
+    }
+
+    private static bool HasValue(DebtBySalespersonRowDto r) =>
+        r.OpeningOpen != 0m || r.Increase != 0m || r.Settled != 0m || r.ClosingOpen != 0m || r.ClosingOverdue != 0m;
 }

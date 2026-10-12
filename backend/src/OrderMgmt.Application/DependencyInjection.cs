@@ -144,6 +144,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryRecalcService, InventoryRecalcService>();
         services.AddScoped<IDocumentCodeAllocator, DocumentCodeAllocator>();
         services.AddScoped<IStockVoucherService, StockVoucherService>();
+        services.AddScoped<IStockVoucherCashDebt, StockVoucherCashDebt>();
         services.AddScoped<IOpeningStockService, OpeningStockService>();
         services.AddScoped<IInventoryReportService, InventoryReportService>();
 

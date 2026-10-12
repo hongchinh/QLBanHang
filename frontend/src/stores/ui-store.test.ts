@@ -101,3 +101,65 @@ describe('useUiStore stockVoucherStatusFilter', () => {
     expect(useUiStore.getState().stockVoucherStatusFilter).toEqual({ In: 'all', Out: null });
   });
 });
+
+describe('useUiStore sidebarGroupOpen', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useUiStore.setState({ sidebarCollapsed: false, sidebarGroupOpen: {} });
+  });
+
+  it('starts empty so groups use their defaults', () => {
+    expect(useUiStore.getState().sidebarGroupOpen).toEqual({});
+  });
+
+  it('records and persists the user choice per group', () => {
+    useUiStore.getState().setSidebarGroupOpen('catalogs', true);
+    useUiStore.getState().setSidebarGroupOpen('sales', false);
+    expect(useUiStore.getState().sidebarGroupOpen).toEqual({ catalogs: true, sales: false });
+    expect(readPersisted()?.state.sidebarGroupOpen).toEqual({ catalogs: true, sales: false });
+  });
+
+  it('loads a version 1 payload that predates the field', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: { sidebarCollapsed: true }, version: 1 }));
+    await useUiStore.persist.rehydrate();
+    expect(useUiStore.getState().sidebarCollapsed).toBe(true);
+    expect(useUiStore.getState().sidebarGroupOpen).toEqual({});
+  });
+});
+
+describe('useUiStore pinnedNavPaths', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useUiStore.setState({ pinnedNavPaths: {} });
+  });
+
+  it('keeps pins per user in the order they were added', () => {
+    const { togglePin } = useUiStore.getState();
+    togglePin('u1', '/receipts');
+    togglePin('u1', '/quotations');
+    togglePin('u2', '/stock-in');
+    expect(useUiStore.getState().pinnedNavPaths).toEqual({
+      u1: ['/receipts', '/quotations'],
+      u2: ['/stock-in'],
+    });
+  });
+
+  it('toggling a pinned path removes it', () => {
+    const { togglePin } = useUiStore.getState();
+    togglePin('u1', '/receipts');
+    togglePin('u1', '/quotations');
+    togglePin('u1', '/receipts');
+    expect(useUiStore.getState().pinnedNavPaths).toEqual({ u1: ['/quotations'] });
+  });
+
+  it('persists the pins', () => {
+    useUiStore.getState().togglePin('u1', '/receipts');
+    expect(readPersisted()?.state.pinnedNavPaths).toEqual({ u1: ['/receipts'] });
+  });
+
+  it('loads a version 1 payload that predates the field', async () => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ state: { sidebarCollapsed: false }, version: 1 }));
+    await useUiStore.persist.rehydrate();
+    expect(useUiStore.getState().pinnedNavPaths).toEqual({});
+  });
+});

@@ -10,9 +10,9 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { PageLoaderOverlay } from '@/components/ui/page-loader-overlay';
 import { cn } from '@/lib/utils';
 import { AppHeader } from './header/app-header';
-import { Sidebar, type SidebarNavItem } from './sidebar/sidebar';
+import { Sidebar } from './sidebar/sidebar';
 import { SkipToContent } from './skip-to-content';
-import { visibleNavGroups } from './nav-config';
+import { visibleNavGroups, type NavItem } from './nav-config';
 
 export function AppLayout() {
   const hasPermission = useAuthStore((s) => s.hasPermission);
@@ -35,7 +35,7 @@ export function AppLayout() {
     closeMobileDrawer();
   }, [location.pathname, closeMobileDrawer]);
 
-  const dashboardItem: SidebarNavItem = hasPermission('quotations.view_all')
+  const dashboardItem: NavItem = hasPermission('quotations.view_all')
     ? { to: '/admin/dashboard', label: 'Tổng quan', icon: LayoutDashboard }
     : { to: '/', label: 'Tổng quan', icon: LayoutDashboard };
 

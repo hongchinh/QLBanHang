@@ -1,6 +1,6 @@
 # Phase 01 — Backend shared helpers
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-12)
 **Complexity:** M
 
 ## Objective

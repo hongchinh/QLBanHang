@@ -63,6 +63,7 @@ import { ButtonLoader } from '@/components/ui/button-loader';
 import { Can } from '@/components/auth/can';
 import { cn } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-client';
+import { toOptionalNumber } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
 import {
@@ -76,7 +77,6 @@ import { createEmptyLine, LineItemsGrid, type LineItemsGridHandle } from './comp
 import { TotalsPanel } from './components/totals-panel';
 import { computeLineQuantity } from './utils/compute-line';
 import type { HeaderLike, LineLike } from './utils/compute-line';
-import { toOptionalNumber } from '@/lib/to-number';
 
 type QuotationSubmitIntent = 'save-exit' | 'save-stay' | 'save-print';
 type QuotationButtonAction = 'send' | 'confirm' | 'cancel' | 'accounting-confirm' | 'clone' | 'print' | 'excel' | 'excel-handover-price' | 'excel-handover-no-price' | 'print-handover-price' | 'print-handover-no-price';

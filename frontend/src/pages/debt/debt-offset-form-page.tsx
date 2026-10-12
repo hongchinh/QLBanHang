@@ -31,6 +31,7 @@ import {
   type ConfirmationRequest,
   type ConfirmFlags,
 } from '@/lib/confirm-required';
+import { formatDateOnly } from '@/lib/date-only';
 import { roundAwayFromZero } from '@/lib/round';
 import { toast } from '@/lib/use-toast';
 import { toDateTimeLocalValue } from '@/lib/vn-datetime';
@@ -38,7 +39,6 @@ import { useAuthStore } from '@/stores/auth-store';
 import { StockVoucherActivityHistory } from '@/pages/stock-vouchers/components/stock-voucher-activity-history';
 import { DebtPartnerPicker } from './components/debt-partner-picker';
 import { OpenItemGrid } from './components/open-item-grid';
-import { formatDateOnly } from '@/lib/date-only';
 
 const BASE_PATH = '/debt/offsets';
 const TITLE = 'Phiếu bù trừ công nợ';

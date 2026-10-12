@@ -16,10 +16,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
+import { formatDateOnly } from '@/lib/date-only';
 import { roundAwayFromZero } from '@/lib/round';
 import { formatStockQuantity, parseQuantityInput, stockUnitName } from '@/lib/stock-quantity';
 import { toast } from '@/lib/use-toast';
-import { formatDateOnly } from '@/lib/date-only';
 
 interface Row {
   key: string;

@@ -60,6 +60,7 @@ import {
   type ConfirmFlags,
   type ConfirmationRequest,
 } from '@/lib/confirm-required';
+import { toOptionalNumber } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
@@ -71,7 +72,6 @@ import { StockTotalsPanel } from './components/stock-totals-panel';
 import { StockVoucherActivityHistory } from './components/stock-voucher-activity-history';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
-import { toOptionalNumber } from '@/lib/to-number';
 
 type SubmitIntent = 'save-stay' | 'save-exit' | 'update';
 type VoucherActionKind = 'cancel' | 'restore' | 'delete';

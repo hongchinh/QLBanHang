@@ -11,11 +11,11 @@ import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import { formatStockQuantity } from '@/lib/stock-quantity';
+import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
 import '@/pages/quotations/components/line-items-grid.css';
-import { toOptionalNumber } from '@/lib/to-number';
 
 const fmt = new Intl.NumberFormat('vi-VN');
 

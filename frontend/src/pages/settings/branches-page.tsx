@@ -12,10 +12,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { getErrorMessage } from '@/lib/api-client';
+import { formatDateOnly } from '@/lib/date-only';
 import { toast } from '@/lib/use-toast';
 import { useBranchStore } from '@/stores/branch-store';
 import { BranchFormDialog, BranchOpeningDateDialog } from './branch-form-dialog';
-import { formatDateOnly } from '@/lib/date-only';
 
 export function BranchesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);

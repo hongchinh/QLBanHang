@@ -21,11 +21,11 @@ import {
 import type { OpeningDebt } from '@/features/opening-debts/types';
 import { getErrorMessage } from '@/lib/api-client';
 import { toConfirmationRequest, withConfirmed, type ConfirmationRequest, type ConfirmFlags } from '@/lib/confirm-required';
+import { formatDateOnly } from '@/lib/date-only';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { toast } from '@/lib/use-toast';
 import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import { OpeningDebtFormDialog } from './opening-debt-form-dialog';
-import { formatDateOnly } from '@/lib/date-only';
 
 const PAGE_SIZE = 20;
 const SELECT_CLASS = 'h-9 rounded-md border border-input bg-background px-3 text-sm';

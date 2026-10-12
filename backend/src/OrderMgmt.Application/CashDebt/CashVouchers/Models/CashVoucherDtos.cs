@@ -19,7 +19,7 @@ public class UpsertCashVoucherRequest
     public string? Note { get; set; }
     public uint? Version { get; set; }                  // required on update
     public bool ConfirmRemoveSettlements { get; set; }
-    public string? ConfirmedSettlements { get; set; }
+    public string? ConfirmedSettlements { get; set; }  // token from the 422; null = confirm everything (legacy)
     public bool AcknowledgeNegativeFund { get; set; }
     public List<UpsertCashVoucherLineRequest> Lines { get; set; } = new();
     public List<AllocationRequest>? Allocations { get; set; }   // null on update: keep the AtVoucher settlements
@@ -43,7 +43,7 @@ public class CashDocumentActionRequest
 {
     public uint? Version { get; set; }
     public bool ConfirmRemoveSettlements { get; set; }
-    public string? ConfirmedSettlements { get; set; }
+    public string? ConfirmedSettlements { get; set; }  // token from the 422; null = confirm everything (legacy)
     public bool AcknowledgeNegativeFund { get; set; }
 }
 

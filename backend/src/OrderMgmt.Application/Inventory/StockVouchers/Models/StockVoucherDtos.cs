@@ -24,7 +24,7 @@ public class UpsertStockVoucherRequest
     public uint? Version { get; set; }                  // required on update
     public bool AcknowledgeNegativeStock { get; set; }
     public bool ConfirmRemoveSettlements { get; set; }
-    public string? ConfirmedSettlements { get; set; }
+    public string? ConfirmedSettlements { get; set; }  // token from the 422; null = confirm everything (legacy)
     public bool AcknowledgeCreditLimit { get; set; }
     public bool AcknowledgeNegativeFund { get; set; }
     public List<UpsertStockVoucherLineRequest> Lines { get; set; } = new();
@@ -54,7 +54,7 @@ public class StockVoucherActionRequest
     public uint? Version { get; set; }
     public bool AcknowledgeNegativeStock { get; set; }
     public bool ConfirmRemoveSettlements { get; set; }
-    public string? ConfirmedSettlements { get; set; }
+    public string? ConfirmedSettlements { get; set; }  // token from the 422; null = confirm everything (legacy)
     public bool AcknowledgeCreditLimit { get; set; }
     public bool AcknowledgeNegativeFund { get; set; }
 }

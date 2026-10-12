@@ -165,7 +165,8 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         var cancel = new StockVoucherActionRequest { Version = sale.Version };
         var (status, _, error) = await ActionAsync(sale.Id, "cancel", cancel);
         status.Should().Be(HttpStatusCode.UnprocessableEntity);
-        error!.Details.Keys.Should().BeEquivalentTo(r1.Code);
+        error!.Code.Should().Be(Removed);
+        error.Details!.Keys.Should().BeEquivalentTo(r1.Code);
         error.Token.Should().Be(SettlementRemovalConfirmation.TokenOf((await SettlementsOfAsync(stockEntry.Id)).Select(x => x.Id)));
 
         var r2 = await CreateReceiptAsync(customer, 500m, (stockEntry.Id, 500m));
@@ -175,7 +176,7 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         var (staleStatus, _, staleError) = await ActionAsync(sale.Id, "cancel", cancel);
         staleStatus.Should().Be(HttpStatusCode.UnprocessableEntity);
         staleError!.Code.Should().Be(Removed);
-        staleError.Details.Keys.Should().BeEquivalentTo(r1.Code, r2.Code);
+        staleError.Details!.Keys.Should().BeEquivalentTo(r1.Code, r2.Code);
         (await GetVoucherAsync(_branchClient, sale.Id)).Status.Should().Be(StockVoucherStatus.Active);
 
         cancel.ConfirmedSettlements = staleError.Token;
@@ -214,7 +215,7 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         var cancel = new StockVoucherActionRequest { Version = paidSale.Version };
         var (status, _, first) = await ActionAsync(paidSale.Id, "cancel", cancel);
         status.Should().Be(HttpStatusCode.UnprocessableEntity);
-        first!.Details.Keys.Should().BeEquivalentTo(r1.Code, "HD1");
+        first!.Details!.Keys.Should().BeEquivalentTo(r1.Code, "HD1");
         first.Token.Should().Be(SettlementRemovalConfirmation.TokenOf(await ForeignIdsAsync()));
 
         await MatchManuallyAsync(debt2.EntryId, autoEntry.Id, 500m);
@@ -224,7 +225,7 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         var (staleStatus, _, stale) = await ActionAsync(paidSale.Id, "cancel", cancel);
         staleStatus.Should().Be(HttpStatusCode.UnprocessableEntity);
         stale!.Code.Should().Be(Removed);
-        stale.Details.Keys.Should().BeEquivalentTo(r1.Code, "HD1", "HD2");
+        stale.Details!.Keys.Should().BeEquivalentTo(r1.Code, "HD1", "HD2");
         SettlementRemovalConfirmation.Covers(stale.Token, await ForeignIdsAsync()).Should().BeTrue();
         (await GetVoucherAsync(_branchClient, paidSale.Id)).Status.Should().Be(StockVoucherStatus.Active);
 
@@ -260,7 +261,7 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         var cancel = new StockVoucherActionRequest { Version = paidSale.Version };
         var (status, _, first) = await ActionAsync(paidSale.Id, "cancel", cancel);
         status.Should().Be(HttpStatusCode.UnprocessableEntity);
-        first!.Details.Keys.Should().BeEquivalentTo(r1.Code, "PH1");
+        first!.Details!.Keys.Should().BeEquivalentTo(r1.Code, "PH1");
         first.Token.Should().Be(SettlementRemovalConfirmation.TokenOf(await ForeignIdsAsync()));
 
         var r2 = await CreateReceiptAsync(customer, 500m, (stockEntry.Id, 500m));
@@ -270,7 +271,7 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         var (staleStatus, _, stale) = await ActionAsync(paidSale.Id, "cancel", cancel);
         staleStatus.Should().Be(HttpStatusCode.UnprocessableEntity);
         stale!.Code.Should().Be(Removed);
-        stale.Details.Keys.Should().BeEquivalentTo(r1.Code, r2.Code, "PH1");
+        stale.Details!.Keys.Should().BeEquivalentTo(r1.Code, r2.Code, "PH1");
         SettlementRemovalConfirmation.Covers(stale.Token, await ForeignIdsAsync()).Should().BeTrue();
         (await GetVoucherAsync(_branchClient, paidSale.Id)).Status.Should().Be(StockVoucherStatus.Active);
 

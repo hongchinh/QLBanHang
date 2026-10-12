@@ -45,9 +45,10 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
     /// Save steps 11–13 (cancel / delete step 7): the voucher's own Auto settlements go first (no confirmation), then
     /// its entry is upserted in place, or removed when the reason has no debt effect or the total is 0 (P11, P21), or
     /// on cancel / delete (`remove`); then the automatic voucher follows (SyncAsync).
-    /// Other settlements of the stock entry and of the automatic entry need one confirmation (P10). Without it, a 422
-    /// from the stock entry is held while the steps go on as confirmed, so that the 422 also lists the automatic
-    /// entry's settlements; throwing it then rolls the transaction back.
+    /// Other settlements of the stock entry and of the automatic entry need one confirmation (P10). The stock step
+    /// always runs unconfirmed first: a 422 from it is held while the steps go on as confirmed, so that the 422 also
+    /// lists the automatic entry's settlements; throwing it then rolls the transaction back. A confirmed token must
+    /// cover the settlements of both entries; a stale one gets a 422 that lists all of them, with a token covering all.
     /// The entries those settlements joined may belong to other stock vouchers, whose Auto settlements are then
     /// recomputed before the commit (AutoRecomputeHook; this voucher's own is set by SyncAsync).
     public async Task SyncDebtAsync(StockVoucher voucher, StockReason reason, bool remove, bool confirmRemoveSettlements,
@@ -61,7 +62,7 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
             : _ledger.PostAsync(sourceType, voucher.Id, DebtDraftsOf(voucher, reason), confirm, token, ct);
 
         // The stock step first runs unconfirmed, so its pending settlements are always known: a 422 is held, and the
-        // steps go on as confirmed with no token (that retry can not throw a second 422).
+        // steps go on as confirmed with no token (that retry cannot throw a second 422).
         ConfirmationRequiredException? stockRemovals = null;
         try
         {
@@ -81,11 +82,8 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
 
         try
         {
-            // When the stock entry is not covered, the automatic voucher is not confirmed (neither flag nor token): it
-            // always throws its pending settlements to be merged below, so the one 422 lists the settlements of both
-            // entries and its token covers them all. When the stock entry is covered but the automatic one is not, the
-            // 422 is still merged with the held stock one, so it lists every pending settlement and a stale token
-            // converges on the next resend instead of alternating between the two entries.
+            // Auto is confirmed only when the stock entry was too; otherwise its pending settlements are thrown and merged.
+            // So the one 422 lists the settlements of both entries, and a stale token converges on the next resend.
             await _auto.SyncAsync(voucher, reason, confirmRemoveSettlements && stockCovered,
                 stockCovered ? confirmedSettlements : null, ct);
         }
@@ -95,8 +93,8 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
             throw SettlementRemovalConfirmation.Merge(stockRemovals, e);
         }
 
-        if (!stockCovered)
-            throw stockRemovals!;
+        if (stockRemovals is not null && !stockCovered)
+            throw stockRemovals;
     }
 
     /// The stock draft: one entry when the reason affects debt and the total is positive, none otherwise.

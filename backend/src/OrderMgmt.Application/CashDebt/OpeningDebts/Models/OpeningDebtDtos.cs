@@ -49,6 +49,6 @@ public sealed class UpsertOpeningDebtRequest
     public Guid? OwnerUserId { get; set; }
     public string? Note { get; set; }
     public bool ConfirmRemoveSettlements { get; set; }
-    public string? ConfirmedSettlements { get; set; }
+    public string? ConfirmedSettlements { get; set; }  // token from the 422; null = confirm everything (legacy)
     public uint? Version { get; set; }                  // required on update
 }

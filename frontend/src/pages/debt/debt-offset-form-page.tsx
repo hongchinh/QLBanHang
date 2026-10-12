@@ -25,13 +25,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
-import {
-  toConfirmationRequest,
-  withConfirmed,
-  type ConfirmationRequest,
-  type ConfirmFlags,
-} from '@/lib/confirm-required';
+import { useDocumentActions } from '@/hooks/useDocumentActions';
+import { formatApiErrorDetails, getErrorMessage } from '@/lib/api-client';
+import type { ConfirmFlags } from '@/lib/confirm-required';
 import { formatDateOnly } from '@/lib/date-only';
 import { roundAwayFromZero } from '@/lib/round';
 import { toast } from '@/lib/use-toast';
@@ -306,16 +302,11 @@ function DebtOffsetCreateForm({ defaults }: { defaults?: DebtOffsetDefaults }) {
 
 type OffsetActionKind = 'cancel' | 'delete';
 
+// `flags` are the confirmations already given for this action (P10); a resend keeps them.
 interface PendingAction {
   kind: OffsetActionKind;
   version: number;
-}
-
-// A 422 waiting for the user: the action and the flags already confirmed are resent on "continue" (P10).
-interface PendingConfirmation {
-  action: PendingAction;
   flags: ConfirmFlags;
-  request: ConfirmationRequest;
 }
 
 const CONFIRM_LABELS: Record<OffsetActionKind, string> = { cancel: 'Vẫn hủy phiếu', delete: 'Vẫn xóa' };
@@ -362,53 +353,43 @@ function DebtOffsetDetail({ offset, refetch, activities }: DetailProps) {
   const navigate = useNavigate();
   const cancel = useCancelDebtOffset();
   const remove = useDeleteDebtOffset();
-  const [busy, setBusy] = useState(false);
   const [confirmKind, setConfirmKind] = useState<OffsetActionKind | null>(null);
-  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirmation | null>(null);
   const isCancelled = offset.status === 'Cancelled';
 
-  async function runAction(action: PendingAction, flags: ConfirmFlags) {
-    setBusy(true);
+  // DEBT_SETTLEMENTS_WILL_BE_REMOVED: another document reused an entry the offset no longer covers.
+  // CONCURRENCY only refetches (the view re-renders from the query); PERIOD_LOCKED and the other errors carry their own message.
+  const { busy, run: runAction, confirmDialogProps } = useDocumentActions<PendingAction>({
+    perform,
+    reload: async () => {
+      refetch();
+      return true;
+    },
+    onReloaded: () => {},
+    errorTitles: ERROR_TITLES,
+    confirmLabels: CONFIRM_LABELS,
+    concurrencyMessage: CONCURRENCY_MESSAGE,
+    concurrencyReloadFailedMessage: CONCURRENCY_MESSAGE,
+  });
+
+  async function perform(action: PendingAction, flags: ConfirmFlags) {
     const body = {
       version: action.version,
       confirmRemoveSettlements: flags.confirmRemoveSettlements ?? false,
       confirmedSettlements: flags.confirmedSettlements,
     };
-    try {
-      if (action.kind === 'delete') {
-        await remove.mutateAsync({ id: offset.id, body });
-        toast({ variant: 'success', title: 'Đã xóa phiếu' });
-        navigate(BASE_PATH);
-      } else {
-        await cancel.mutateAsync({ id: offset.id, body });
-        toast({ variant: 'success', title: 'Đã hủy phiếu' });
-      }
-    } catch (err) {
-      handleError(err, action, flags);
-    } finally {
-      setBusy(false);
+    if (action.kind === 'delete') {
+      await remove.mutateAsync({ id: offset.id, body });
+      toast({ variant: 'success', title: 'Đã xóa phiếu' });
+      navigate(BASE_PATH);
+    } else {
+      await cancel.mutateAsync({ id: offset.id, body });
+      toast({ variant: 'success', title: 'Đã hủy phiếu' });
     }
-  }
-
-  function handleError(err: unknown, action: PendingAction, flags: ConfirmFlags) {
-    // DEBT_SETTLEMENTS_WILL_BE_REMOVED: another document reused an entry the offset no longer covers.
-    const request = toConfirmationRequest(err);
-    if (request) {
-      setPendingConfirm({ action, flags, request });
-      return;
-    }
-    if (getApiError(err)?.code === 'CONCURRENCY') {
-      refetch();
-      toast({ variant: 'destructive', title: CONCURRENCY_MESSAGE });
-      return;
-    }
-    // PERIOD_LOCKED and the other errors carry their own message.
-    toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: formatApiErrorDetails(err) });
   }
 
   function confirmAction(kind: OffsetActionKind) {
     setConfirmKind(null);
-    void runAction({ kind, version: offset.version }, {});
+    void runAction({ kind, version: offset.version, flags: {} });
   }
 
   return (
@@ -530,17 +511,7 @@ function DebtOffsetDetail({ offset, refetch, activities }: DetailProps) {
         onConfirm={() => confirmAction('delete')}
       />
 
-      <ConfirmRequiredDialog
-        request={pendingConfirm?.request ?? null}
-        confirmLabel={pendingConfirm ? CONFIRM_LABELS[pendingConfirm.action.kind] : undefined}
-        onConfirm={() => {
-          if (!pendingConfirm) return;
-          const { action, flags, request } = pendingConfirm;
-          setPendingConfirm(null);
-          void runAction(action, withConfirmed(flags, request));
-        }}
-        onClose={() => setPendingConfirm(null)}
-      />
+      <ConfirmRequiredDialog {...confirmDialogProps} />
     </div>
   );
 }

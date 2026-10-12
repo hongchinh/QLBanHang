@@ -43,8 +43,9 @@ import { Button } from '@/components/ui/button';
 import { ButtonLoader } from '@/components/ui/button-loader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
-import { toConfirmationRequest, withConfirmed, type ConfirmationRequest, type ConfirmFlags } from '@/lib/confirm-required';
+import { useDocumentActions } from '@/hooks/useDocumentActions';
+import { getErrorMessage } from '@/lib/api-client';
+import type { ConfirmFlags } from '@/lib/confirm-required';
 import { formatDateOnly } from '@/lib/date-only';
 import { roundAwayFromZero } from '@/lib/round';
 import { toNumberOrZero } from '@/lib/to-number';
@@ -176,13 +177,9 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   const [selectedPartner, setSelectedPartner] = useState<CashVoucherSelectedPartner | null>(() =>
     partnerOf(voucher),
   );
-  const [busy, setBusy] = useState(false);
   // `busy` is set only after async validation; the ref blocks a second submit (Ctrl+S key repeat) at once.
   const submittingRef = useRef(false);
   const [confirmKind, setConfirmKind] = useState<VoucherActionKind | null>(null);
-  const [confirmation, setConfirmation] = useState<{ action: PendingAction; request: ConfirmationRequest } | null>(
-    null,
-  );
   // Server messages of `allocations[i].*` (by entryId) and of `allocations`.
   const [allocationErrors, setAllocationErrors] = useState<Record<string, string>>({});
   const [allocationRootError, setAllocationRootError] = useState<string | undefined>();
@@ -287,69 +284,43 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     setAllocationRootError(undefined);
   }
 
-  async function runAction(action: PendingAction, flags: ConfirmFlags) {
-    setBusy(true);
-    clearAllocationErrors();
-    try {
-      if (action.kind === 'save') {
-        const payload = { ...action.payload, ...flags };
-        if (id) {
-          const saved = await update.mutateAsync({ id, data: payload });
-          resetTo(saved);
-          toast({ variant: 'success', title: 'Đã cập nhật phiếu', description: saved.code });
-        } else {
-          const saved = await create.mutateAsync(payload);
-          toast({ variant: 'success', title: `Đã tạo ${labels.title.toLowerCase()}`, description: saved.code });
-          if (action.intent === 'save-exit') navigate(labels.basePath);
-          else navigate(`${labels.basePath}/${saved.id}`, { replace: true });
-        }
-      } else if (id) {
-        const body = { version: action.version, ...flags };
-        if (action.kind === 'delete') {
-          await remove.mutateAsync({ id, body });
-          toast({ variant: 'success', title: 'Đã xóa phiếu' });
-          navigate(labels.basePath);
-        } else {
-          const saved = await (action.kind === 'cancel' ? cancel : restore).mutateAsync({ id, body });
-          resetTo(saved);
-          toast({ variant: 'success', title: action.kind === 'cancel' ? 'Đã hủy phiếu' : 'Đã khôi phục phiếu' });
-        }
-      }
-    } catch (err) {
-      await handleError(err, { ...action, flags });
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { busy, run: runAction, confirmDialogProps } = useDocumentActions<PendingAction>({
+    perform,
+    reload: refetchVoucher,
+    onReloaded: (fresh) => resetTo(fresh as CashVoucher),
+    applyValidationErrors,
+    errorTitles: ERROR_TITLES,
+    confirmLabels: CONFIRM_LABELS,
+    concurrencyMessage: CONCURRENCY_MESSAGE,
+    concurrencyReloadFailedMessage: CONCURRENCY_RELOAD_FAILED_MESSAGE,
+  });
 
-  async function handleError(err: unknown, action: PendingAction) {
-    const request = toConfirmationRequest(err);
-    if (request) {
-      setConfirmation({ action, request });
-      return;
-    }
-    const apiError = getApiError(err);
-    switch (apiError?.code) {
-      case 'CONCURRENCY': {
-        // D29: reload and drop local edits; never resend stale values with the new version.
-        const fresh = await refetchVoucher().catch(() => undefined);
-        if (!fresh) {
-          // Nothing reloaded: keep the user's edits rather than resetting to the stale cache.
-          toast({ variant: 'destructive', title: CONCURRENCY_RELOAD_FAILED_MESSAGE });
-          return;
-        }
-        resetTo(fresh);
-        toast({ variant: 'destructive', title: CONCURRENCY_MESSAGE });
-        return;
+  async function perform(action: PendingAction, flags: ConfirmFlags) {
+    clearAllocationErrors();
+    if (action.kind === 'save') {
+      const payload = { ...action.payload, ...flags };
+      if (id) {
+        const saved = await update.mutateAsync({ id, data: payload });
+        resetTo(saved);
+        toast({ variant: 'success', title: 'Đã cập nhật phiếu', description: saved.code });
+      } else {
+        const saved = await create.mutateAsync(payload);
+        toast({ variant: 'success', title: `Đã tạo ${labels.title.toLowerCase()}`, description: saved.code });
+        if (action.intent === 'save-exit') navigate(labels.basePath);
+        else navigate(`${labels.basePath}/${saved.id}`, { replace: true });
       }
-      case 'VALIDATION':
-        if (apiError.details && applyValidationErrors(apiError.details, action)) {
-          toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: apiError.message });
-          return;
-        }
-        break;
+    } else if (id) {
+      const body = { version: action.version, ...flags };
+      if (action.kind === 'delete') {
+        await remove.mutateAsync({ id, body });
+        toast({ variant: 'success', title: 'Đã xóa phiếu' });
+        navigate(labels.basePath);
+      } else {
+        const saved = await (action.kind === 'cancel' ? cancel : restore).mutateAsync({ id, body });
+        resetTo(saved);
+        toast({ variant: 'success', title: action.kind === 'cancel' ? 'Đã hủy phiếu' : 'Đã khôi phục phiếu' });
+      }
     }
-    toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: formatApiErrorDetails(err) });
   }
 
   // Maps line, allocation and header keys onto the form; returns true when every key was mapped.
@@ -392,7 +363,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     dropBlankLines();
     void form
       .handleSubmit((parsed) =>
-        runAction({ kind: 'save', intent, payload: toUpsertPayload(parsed, debtEffect), flags: {} }, {}),
+        runAction({ kind: 'save', intent, payload: toUpsertPayload(parsed, debtEffect), flags: {} }),
       )()
       .finally(() => {
         submittingRef.current = false;
@@ -652,23 +623,13 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
         onConfirm={() => confirmVoucherAction('delete')}
       />
 
-      <ConfirmRequiredDialog
-        request={confirmation?.request ?? null}
-        confirmLabel={confirmation ? CONFIRM_LABELS[confirmation.action.kind] : undefined}
-        onConfirm={() => {
-          if (!confirmation) return;
-          const { action, request } = confirmation;
-          setConfirmation(null);
-          void runAction(action, withConfirmed(action.flags, request));
-        }}
-        onClose={() => setConfirmation(null)}
-      />
+      <ConfirmRequiredDialog {...confirmDialogProps} />
     </div>
   );
 
   function confirmVoucherAction(kind: VoucherActionKind) {
     setConfirmKind(null);
-    void runAction({ kind, version: form.getValues('version'), flags: {} }, {});
+    void runAction({ kind, version: form.getValues('version'), flags: {} });
   }
 }
 

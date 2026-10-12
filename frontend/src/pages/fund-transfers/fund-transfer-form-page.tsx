@@ -34,13 +34,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
-import {
-  toConfirmationRequest,
-  withConfirmed,
-  type ConfirmationRequest,
-  type ConfirmFlags,
-} from '@/lib/confirm-required';
+import { useDocumentActions } from '@/hooks/useDocumentActions';
+import { getErrorMessage } from '@/lib/api-client';
+import type { ConfirmFlags } from '@/lib/confirm-required';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
@@ -50,9 +46,10 @@ const TITLE = 'Phiếu chuyển quỹ';
 
 type SubmitIntent = 'save-stay' | 'save-exit' | 'update';
 type TransferActionKind = 'cancel' | 'restore' | 'delete';
+// `flags` are the confirmations already given for this action (P10); a resend keeps them.
 type PendingAction =
-  | { kind: 'save'; intent: SubmitIntent; values: FundTransferFormParsed }
-  | { kind: TransferActionKind; version?: number };
+  | { kind: 'save'; intent: SubmitIntent; values: FundTransferFormParsed; flags: ConfirmFlags }
+  | { kind: TransferActionKind; version?: number; flags: ConfirmFlags };
 
 const CONFIRM_LABELS: Record<PendingAction['kind'], string> = {
   save: 'Vẫn lưu',
@@ -119,13 +116,6 @@ interface FormProps {
   refetchTransfer: () => Promise<FundTransfer | undefined>;
 }
 
-// A 422 waiting for the user: the action and the flags already confirmed are resent on "continue" (P10).
-interface PendingConfirmation {
-  action: PendingAction;
-  flags: ConfirmFlags;
-  request: ConfirmationRequest;
-}
-
 function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps) {
   const isEdit = !!id;
   const navigate = useNavigate();
@@ -147,11 +137,9 @@ function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps
     defaultValues: toFormDefaults(transfer, defaults),
   });
 
-  const [busy, setBusy] = useState(false);
   // `busy` is set only after async validation; the ref blocks a second submit (Ctrl+S key repeat) at once.
   const submittingRef = useRef(false);
   const [confirmKind, setConfirmKind] = useState<TransferActionKind | null>(null);
-  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirmation | null>(null);
 
   const status = transfer?.status ?? 'Active';
   const readOnly = isEdit ? status === 'Cancelled' || !transfer?.canEdit : !canCreate;
@@ -178,68 +166,42 @@ function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps
     form.reset(toFormDefaults(fresh));
   }
 
-  async function runAction(action: PendingAction, flags: ConfirmFlags) {
-    setBusy(true);
-    try {
-      if (action.kind === 'save') {
-        const payload = toUpsertPayload(action.values, flags);
-        if (id) {
-          const saved = await update.mutateAsync({ id, data: payload });
-          resetTo(saved);
-          toast({ variant: 'success', title: 'Đã cập nhật phiếu', description: saved.code });
-        } else {
-          const saved = await create.mutateAsync(payload);
-          toast({ variant: 'success', title: 'Đã tạo phiếu chuyển quỹ', description: saved.code });
-          if (action.intent === 'save-exit') navigate(BASE_PATH);
-          else navigate(`${BASE_PATH}/${saved.id}`, { replace: true });
-        }
-      } else if (id) {
-        const body = { version: action.version, acknowledgeNegativeFund: flags.acknowledgeNegativeFund ?? false };
-        if (action.kind === 'delete') {
-          await remove.mutateAsync({ id, body });
-          toast({ variant: 'success', title: 'Đã xóa phiếu' });
-          navigate(BASE_PATH);
-        } else {
-          const saved = await (action.kind === 'cancel' ? cancel : restore).mutateAsync({ id, body });
-          resetTo(saved);
-          toast({ variant: 'success', title: action.kind === 'cancel' ? 'Đã hủy phiếu' : 'Đã khôi phục phiếu' });
-        }
-      }
-    } catch (err) {
-      await handleError(err, action, flags);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { busy, run: runAction, confirmDialogProps } = useDocumentActions<PendingAction>({
+    perform,
+    reload: refetchTransfer,
+    onReloaded: (fresh) => resetTo(fresh as FundTransfer),
+    applyValidationErrors: applyFieldErrors,
+    errorTitles: ERROR_TITLES,
+    confirmLabels: CONFIRM_LABELS,
+    concurrencyMessage: CONCURRENCY_MESSAGE,
+    concurrencyReloadFailedMessage: CONCURRENCY_RELOAD_FAILED_MESSAGE,
+  });
 
-  async function handleError(err: unknown, action: PendingAction, flags: ConfirmFlags) {
-    const request = toConfirmationRequest(err);
-    if (request) {
-      setPendingConfirm({ action, flags, request });
-      return;
-    }
-    const apiError = getApiError(err);
-    switch (apiError?.code) {
-      case 'CONCURRENCY': {
-        // D29: reload and drop local edits; never resend stale values with the new version.
-        const fresh = await refetchTransfer().catch(() => undefined);
-        if (!fresh) {
-          // Nothing reloaded: keep the user's edits rather than resetting to the stale cache.
-          toast({ variant: 'destructive', title: CONCURRENCY_RELOAD_FAILED_MESSAGE });
-          return;
-        }
-        resetTo(fresh);
-        toast({ variant: 'destructive', title: CONCURRENCY_MESSAGE });
-        return;
+  async function perform(action: PendingAction, flags: ConfirmFlags) {
+    if (action.kind === 'save') {
+      const payload = toUpsertPayload(action.values, flags);
+      if (id) {
+        const saved = await update.mutateAsync({ id, data: payload });
+        resetTo(saved);
+        toast({ variant: 'success', title: 'Đã cập nhật phiếu', description: saved.code });
+      } else {
+        const saved = await create.mutateAsync(payload);
+        toast({ variant: 'success', title: 'Đã tạo phiếu chuyển quỹ', description: saved.code });
+        if (action.intent === 'save-exit') navigate(BASE_PATH);
+        else navigate(`${BASE_PATH}/${saved.id}`, { replace: true });
       }
-      case 'VALIDATION':
-        if (apiError.details && applyFieldErrors(apiError.details)) {
-          toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: apiError.message });
-          return;
-        }
-        break;
+    } else if (id) {
+      const body = { version: action.version, acknowledgeNegativeFund: flags.acknowledgeNegativeFund ?? false };
+      if (action.kind === 'delete') {
+        await remove.mutateAsync({ id, body });
+        toast({ variant: 'success', title: 'Đã xóa phiếu' });
+        navigate(BASE_PATH);
+      } else {
+        const saved = await (action.kind === 'cancel' ? cancel : restore).mutateAsync({ id, body });
+        resetTo(saved);
+        toast({ variant: 'success', title: action.kind === 'cancel' ? 'Đã hủy phiếu' : 'Đã khôi phục phiếu' });
+      }
     }
-    toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: formatApiErrorDetails(err) });
   }
 
   // Maps header keys onto the fields; returns true when every key was a header key.
@@ -259,7 +221,7 @@ function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps
     if (submittingRef.current || busy || readOnly) return;
     submittingRef.current = true;
     void form
-      .handleSubmit((values) => runAction({ kind: 'save', intent, values }, {}))()
+      .handleSubmit((values) => runAction({ kind: 'save', intent, values, flags: {} }))()
       .finally(() => {
         submittingRef.current = false;
       });
@@ -275,7 +237,7 @@ function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps
 
   function confirmTransferAction(kind: TransferActionKind) {
     setConfirmKind(null);
-    void runAction({ kind, version: form.getValues('version') }, {});
+    void runAction({ kind, version: form.getValues('version'), flags: {} });
   }
 
   const errors = form.formState.errors;
@@ -510,17 +472,7 @@ function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps
         onConfirm={() => confirmTransferAction('delete')}
       />
 
-      <ConfirmRequiredDialog
-        request={pendingConfirm?.request ?? null}
-        confirmLabel={pendingConfirm ? CONFIRM_LABELS[pendingConfirm.action.kind] : undefined}
-        onConfirm={() => {
-          if (!pendingConfirm) return;
-          const { action, flags, request } = pendingConfirm;
-          setPendingConfirm(null);
-          void runAction(action, withConfirmed(flags, request));
-        }}
-        onClose={() => setPendingConfirm(null)}
-      />
+      <ConfirmRequiredDialog {...confirmDialogProps} />
     </div>
   );
 }

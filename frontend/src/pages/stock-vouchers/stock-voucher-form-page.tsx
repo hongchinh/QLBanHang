@@ -54,13 +54,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
-import {
-  toConfirmationRequest,
-  withConfirmed,
-  type ConfirmFlags,
-  type ConfirmationRequest,
-} from '@/lib/confirm-required';
+import { useDocumentActions } from '@/hooks/useDocumentActions';
+import { getErrorMessage } from '@/lib/api-client';
+import type { ConfirmFlags } from '@/lib/confirm-required';
 import { toOptionalNumber } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
@@ -202,14 +198,9 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const [selectedPartner, setSelectedPartner] = useState<StockVoucherDraftPartner | null>(
     () => mountData.draft?.selectedPartner ?? partnerOf(voucher),
   );
-  const [busy, setBusy] = useState(false);
   // `busy` is set only after async validation; the ref blocks a second submit (Ctrl+S key repeat) at once.
   const submittingRef = useRef(false);
   const [confirmKind, setConfirmKind] = useState<VoucherActionKind | null>(null);
-  const [confirmation, setConfirmation] = useState<{
-    action: PendingAction;
-    request: ConfirmationRequest;
-  } | null>(null);
 
   const { hasDraft, draftSavedAt, clearDraft } = useStockVoucherDraft({
     form,
@@ -342,69 +333,43 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     setSelectedPartner(partnerOf(fresh));
   }
 
-  async function runAction(action: PendingAction) {
-    setBusy(true);
-    try {
-      if (action.kind === 'save') {
-        const payload = { ...action.payload, ...action.flags };
-        if (id) {
-          const saved = await update.mutateAsync({ id, data: payload });
-          resetTo(saved);
-          toast({ variant: 'success', title: 'Đã cập nhật phiếu', description: saved.code });
-        } else {
-          const saved = await create.mutateAsync(payload);
-          clearDraft();
-          toast({ variant: 'success', title: `Đã tạo ${labels.title.toLowerCase()}`, description: saved.code });
-          if (action.intent === 'save-exit') navigate(labels.basePath);
-          else navigate(`${labels.basePath}/${saved.id}`, { replace: true });
-        }
-      } else if (id) {
-        const body = { version: action.version, ...action.flags };
-        if (action.kind === 'delete') {
-          await remove.mutateAsync({ id, type, body });
-          toast({ variant: 'success', title: 'Đã xóa phiếu' });
-          navigate(labels.basePath);
-        } else {
-          const saved = await (action.kind === 'cancel' ? cancel : restore).mutateAsync({ id, body });
-          resetTo(saved);
-          toast({ variant: 'success', title: action.kind === 'cancel' ? 'Đã hủy phiếu' : 'Đã khôi phục phiếu' });
-        }
-      }
-    } catch (err) {
-      await handleError(err, action);
-    } finally {
-      setBusy(false);
-    }
-  }
+  const { busy, run: runAction, confirmDialogProps } = useDocumentActions<PendingAction>({
+    perform,
+    reload: refetchVoucher,
+    onReloaded: (fresh) => resetTo(fresh as StockVoucher),
+    applyValidationErrors: applyServerErrors,
+    errorTitles: ERROR_TITLES,
+    confirmLabels: CONFIRM_LABELS,
+    concurrencyMessage: CONCURRENCY_MESSAGE,
+    concurrencyReloadFailedMessage: CONCURRENCY_RELOAD_FAILED_MESSAGE,
+  });
 
-  async function handleError(err: unknown, action: PendingAction) {
-    const request = toConfirmationRequest(err);
-    if (request) {
-      setConfirmation({ action, request });
-      return;
-    }
-    const apiError = getApiError(err);
-    switch (apiError?.code) {
-      case 'CONCURRENCY': {
-        // D29: reload and drop local edits; never resend stale values with the new version.
-        const fresh = await refetchVoucher().catch(() => undefined);
-        if (!fresh) {
-          // Nothing reloaded: keep the user's edits rather than resetting to the stale cache.
-          toast({ variant: 'destructive', title: CONCURRENCY_RELOAD_FAILED_MESSAGE });
-          return;
-        }
-        resetTo(fresh);
-        toast({ variant: 'destructive', title: CONCURRENCY_MESSAGE });
-        return;
+  async function perform(action: PendingAction) {
+    if (action.kind === 'save') {
+      const payload = { ...action.payload, ...action.flags };
+      if (id) {
+        const saved = await update.mutateAsync({ id, data: payload });
+        resetTo(saved);
+        toast({ variant: 'success', title: 'Đã cập nhật phiếu', description: saved.code });
+      } else {
+        const saved = await create.mutateAsync(payload);
+        clearDraft();
+        toast({ variant: 'success', title: `Đã tạo ${labels.title.toLowerCase()}`, description: saved.code });
+        if (action.intent === 'save-exit') navigate(labels.basePath);
+        else navigate(`${labels.basePath}/${saved.id}`, { replace: true });
       }
-      case 'VALIDATION':
-        if (apiError.details && applyServerErrors(apiError.details)) {
-          toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: apiError.message });
-          return;
-        }
-        break;
+    } else if (id) {
+      const body = { version: action.version, ...action.flags };
+      if (action.kind === 'delete') {
+        await remove.mutateAsync({ id, type, body });
+        toast({ variant: 'success', title: 'Đã xóa phiếu' });
+        navigate(labels.basePath);
+      } else {
+        const saved = await (action.kind === 'cancel' ? cancel : restore).mutateAsync({ id, body });
+        resetTo(saved);
+        toast({ variant: 'success', title: action.kind === 'cancel' ? 'Đã hủy phiếu' : 'Đã khôi phục phiếu' });
+      }
     }
-    toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: formatApiErrorDetails(err) });
   }
 
   // Maps `lines[i].field` keys onto the grid and the header keys onto their fields; returns true when every key was mapped.
@@ -839,18 +804,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
         onConfirm={() => confirmVoucherAction('delete')}
       />
 
-      <ConfirmRequiredDialog
-        request={confirmation?.request ?? null}
-        confirmLabel={confirmation ? CONFIRM_LABELS[confirmation.action.kind] : undefined}
-        onConfirm={() => {
-          if (!confirmation) return;
-          const { action, request } = confirmation;
-          setConfirmation(null);
-          // Same action, same version, plus the flag just confirmed.
-          void runAction({ ...action, flags: withConfirmed(action.flags, request) });
-        }}
-        onClose={() => setConfirmation(null)}
-      />
+      <ConfirmRequiredDialog {...confirmDialogProps} />
     </div>
   );
 

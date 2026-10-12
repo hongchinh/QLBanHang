@@ -23,6 +23,12 @@ export interface OpeningDebt {
   version: number;
 }
 
+// GET /api/opening-debts/owners: the active users who can own an opening debt (B1).
+export interface OpeningDebtOwner {
+  id: string;
+  fullName: string;
+}
+
 // GET /api/opening-debts: the rows plus the branch opening date (null while it is not set).
 export interface OpeningDebtListResult extends PagedResult<OpeningDebt> {
   openingDate?: string | null;
@@ -46,7 +52,7 @@ export interface UpsertOpeningDebtRequest {
   // Always null for a prepayment.
   dueDate: string | null;
   amount: number;
-  // Not shown in 2A (P2). The server replaces it on save, so an edit sends back the loaded value.
+  // The salesperson who owns the debt (B1); null clears it.
   ownerUserId?: string | null;
   note?: string;
   confirmRemoveSettlements: boolean;

@@ -199,6 +199,11 @@ describe('cash and debt routes', () => {
     expectRule('/debt/opening', 'debt.opening_balance');
     expectRule('/reports/debt-balance', 'reports.debt');
     expectRule('/reports/debt-ledger', 'reports.debt');
+    expectRule('/reports/debt-documents', 'reports.debt');
+    expectRule('/reports/debt-aging', 'reports.debt');
+    expectRule('/reports/debt-overdue', 'reports.debt');
+    expectRule('/reports/debt-by-salesperson', 'reports.debt');
+    expectRule('/reports/debt-reconciliation', 'reports.debt');
     expectRule('/reports/cash-book', 'reports.cash');
     expect(canAccessRoute('/reports/cash-book', ['reports.debt'], [])).toBe(false);
     expectRule('/cash-reasons', 'cash.catalogs.manage');

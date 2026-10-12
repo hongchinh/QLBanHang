@@ -71,6 +71,11 @@ import { VehicleRevenuePage } from '@/pages/reports/vehicle-revenue-page';
 // Round 2A: 12.5 debt balance, debt ledger and cash book reports
 import { DebtBalancePage } from '@/pages/cash-reports/debt-balance-page';
 import { DebtLedgerPage } from '@/pages/cash-reports/debt-ledger-page';
+import { DebtDocumentsPage } from '@/pages/cash-reports/debt-documents-page';
+import { DebtAgingPage } from '@/pages/cash-reports/debt-aging-page';
+import { DebtOverduePage } from '@/pages/cash-reports/debt-overdue-page';
+import { DebtBySalespersonPage } from '@/pages/cash-reports/debt-by-salesperson-page';
+import { DebtReconciliationPage } from '@/pages/cash-reports/debt-reconciliation-page';
 import { CashBookPage } from '@/pages/cash-reports/cash-book-page';
 import { ForbiddenPage, NotFoundPage } from '@/pages/error-pages';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -656,6 +661,46 @@ export function App() {
                     element={
                       <ProtectedRoute permission="reports.debt">
                         <DebtLedgerPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-documents"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtDocumentsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-aging"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtAgingPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-overdue"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtOverduePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-by-salesperson"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtBySalespersonPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-reconciliation"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtReconciliationPage />
                       </ProtectedRoute>
                     }
                   />

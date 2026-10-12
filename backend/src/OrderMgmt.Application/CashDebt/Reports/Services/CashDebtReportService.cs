@@ -201,6 +201,58 @@ public class CashDebtReportService : ICashDebtReportService
         };
     }
 
+    /// One REPEATABLE READ snapshot, so both ledgers see the same state.
+    public Task<DebtReconciliationReportDto> GetDebtReconciliationAsync(DebtReconciliationReportRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildDebtReconciliationAsync(request, c), ct);
+
+    private async Task<DebtReconciliationReportDto> BuildDebtReconciliationAsync(DebtReconciliationReportRequest request, CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var partner = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+            .Where(c => c.Id == request.PartnerId)
+            .Select(c => new { c.Code, c.Name, c.TaxCode, c.CompanyAddress, c.IsCustomer, c.IsSupplier })
+            .SingleOrDefaultAsync(ct)
+            ?? throw new NotFoundException(nameof(Customer), request.PartnerId);
+        var branchName = await _db.Branches.AsNoTracking()
+            .Where(b => b.Id == branchId)
+            .Select(b => b.Name)
+            .SingleAsync(ct);
+        var sidesWithEntries = await _db.DebtEntries.AsNoTracking()
+            .Where(e => e.BranchId == branchId && e.PartnerId == request.PartnerId)
+            .Select(e => e.Side)
+            .Distinct()
+            .ToListAsync(ct);
+
+        // B8: a side is listed for the partner's role or when it has any entry there (a former customer keeps its history).
+        var sides = new List<DebtLedgerReportDto>();
+        foreach (var side in new[] { DebtSide.Receivable, DebtSide.Payable })
+        {
+            var hasRole = side == DebtSide.Receivable ? partner.IsCustomer : partner.IsSupplier;
+            if (!hasRole && !sidesWithEntries.Contains(side))
+                continue;
+            sides.Add(await BuildDebtLedgerAsync(new DebtLedgerReportRequest
+            {
+                Side = side, PartnerId = request.PartnerId, From = request.From, To = request.To,
+            }, ct));
+        }
+
+        var receivable = sides.SingleOrDefault(s => s.Side == DebtSide.Receivable);
+        var payable = sides.SingleOrDefault(s => s.Side == DebtSide.Payable);
+        return new DebtReconciliationReportDto
+        {
+            PartnerId = request.PartnerId,
+            PartnerCode = partner.Code,
+            PartnerName = partner.Name,
+            TaxCode = partner.TaxCode,
+            Address = partner.CompanyAddress,
+            BranchName = branchName,
+            From = request.From,
+            To = request.To,
+            Sides = sides,
+            NetBalance = receivable is not null && payable is not null ? receivable.ClosingBalance - payable.ClosingBalance : null,
+        };
+    }
+
     /// One REPEATABLE READ snapshot, so the funds and their movements are read from the same state.
     public Task<CashBookReportDto> GetCashBookAsync(CashBookReportRequest request, CancellationToken ct = default) =>
         _transaction.RunSnapshotAsync(c => BuildCashBookAsync(request, c), ct);

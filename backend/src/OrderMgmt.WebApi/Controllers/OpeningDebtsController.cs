@@ -34,6 +34,11 @@ public class OpeningDebtsController : ApiControllerBase
         return Success(await _service.ListAsync(request, ct));
     }
 
+    [HttpGet("owners")]
+    [HasPermission(Permissions.Debt.OpeningBalance)]
+    public async Task<ActionResult<ApiResponse<List<OpeningDebtOwnerDto>>>> ListOwners(CancellationToken ct) =>
+        Success(await _service.ListOwnersAsync(ct));
+
     [HttpPost]
     [HasPermission(Permissions.Debt.OpeningBalance)]
     public async Task<ActionResult<ApiResponse<OpeningDebtDto>>> Create(

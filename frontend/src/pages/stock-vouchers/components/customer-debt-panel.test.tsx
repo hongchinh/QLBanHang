@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render as rtlRender, screen } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth-store';
 import { CustomerDebtPanel } from './customer-debt-panel';
 import type { PartnerDebtSummary } from '@/features/debt/types';
 
@@ -22,6 +25,16 @@ function summary(overrides: Partial<PartnerDebtSummary> = {}): PartnerDebtSummar
   };
 }
 
+function render(ui: ReactElement) {
+  return rtlRender(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
+function setPermissions(permissions: string[]) {
+  useAuthStore.setState({
+    user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions },
+  });
+}
+
 function result(data: PartnerDebtSummary | undefined, extra: { isLoading?: boolean; isError?: boolean } = {}) {
   return { data, isLoading: false, isError: false, ...extra };
 }
@@ -29,6 +42,7 @@ function result(data: PartnerDebtSummary | undefined, extra: { isLoading?: boole
 describe('CustomerDebtPanel', () => {
   beforeEach(() => {
     summaryMock.mockReset();
+    setPermissions([]);
   });
 
   it('shows balance limit available and overdue', () => {
@@ -70,7 +84,32 @@ describe('CustomerDebtPanel', () => {
     expect(screen.queryByTestId('customer-debt-balance')).not.toBeInTheDocument();
 
     summaryMock.mockReturnValue(result(undefined, { isError: true }));
-    rerender(<CustomerDebtPanel partnerId={P1} />);
+    rerender(<MemoryRouter><CustomerDebtPanel partnerId={P1} /></MemoryRouter>);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('links to the overdue report in a new tab when overdue and reports.debt', () => {
+    setPermissions(['reports.debt']);
+    summaryMock.mockReturnValue(result(summary()));
+    render(<CustomerDebtPanel partnerId={P1} />);
+
+    const link = screen.getByRole('link', { name: 'Xem nợ quá hạn' });
+    expect(link).toHaveAttribute('href', `/reports/debt-overdue?side=Receivable&partnerId=${P1}`);
+    expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+  });
+
+  it('hides the overdue link when nothing is overdue', () => {
+    setPermissions(['reports.debt']);
+    summaryMock.mockReturnValue(result(summary({ overdueAmount: 0 })));
+    render(<CustomerDebtPanel partnerId={P1} />);
+    expect(screen.queryByRole('link', { name: 'Xem nợ quá hạn' })).not.toBeInTheDocument();
+  });
+
+  it('hides the overdue link without reports.debt', () => {
+    setPermissions(['debt.partner_summary']);
+    summaryMock.mockReturnValue(result(summary()));
+    render(<CustomerDebtPanel partnerId={P1} />);
+    expect(screen.queryByRole('link', { name: 'Xem nợ quá hạn' })).not.toBeInTheDocument();
   });
 });

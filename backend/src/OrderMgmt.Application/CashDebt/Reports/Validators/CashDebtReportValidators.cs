@@ -27,6 +27,17 @@ public class DebtLedgerReportRequestValidator : AbstractValidator<DebtLedgerRepo
     }
 }
 
+public class DebtReconciliationReportRequestValidator : AbstractValidator<DebtReconciliationReportRequest>
+{
+    public DebtReconciliationReportRequestValidator()
+    {
+        RuleFor(x => x.PartnerId).NotEmpty().WithMessage("Vui lòng chọn đối tượng.");
+        RuleFor(x => x.From).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Từ ngày không hợp lệ.");
+        RuleFor(x => x.To).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Đến ngày không hợp lệ.");
+        RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From).WithMessage("Đến ngày phải sau hoặc bằng từ ngày.");
+    }
+}
+
 public class CashBookReportRequestValidator : AbstractValidator<CashBookReportRequest>
 {
     public CashBookReportRequestValidator()

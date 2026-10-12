@@ -113,6 +113,11 @@ describe('cash and debt navigation', () => {
       '/debt/opening',
       '/reports/debt-balance',
       '/reports/debt-ledger',
+      '/reports/debt-documents',
+      '/reports/debt-aging',
+      '/reports/debt-overdue',
+      '/reports/debt-by-salesperson',
+      '/reports/debt-reconciliation',
       '/reports/cash-book',
     ]);
     expect(groups.find((g) => g.label === CASH_GROUP)?.items.map((i) => i.label)).toEqual([
@@ -124,6 +129,11 @@ describe('cash and debt navigation', () => {
       'Nợ đầu kỳ',
       'Số dư công nợ',
       'Sổ chi tiết công nợ',
+      'Công nợ theo chứng từ',
+      'Tuổi nợ',
+      'Nợ quá hạn',
+      'Công nợ theo nhân viên',
+      'Biên bản đối chiếu',
       'Sổ quỹ',
     ]);
   });

@@ -1,0 +1,70 @@
+using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
+using OrderMgmt.Application.CashDebt.Reports.Interfaces;
+using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Domain.Constants;
+using OrderMgmt.WebApi.Authorization;
+
+namespace OrderMgmt.WebApi.Controllers;
+
+/// Debt position reports of the working branch (Round 2B).
+[Route("api/reports")]
+public class DebtPositionReportsController : ApiControllerBase
+{
+    private readonly IDebtPositionReportService _service;
+    private readonly IValidator<DebtDocumentsReportRequest> _documentsValidator;
+    private readonly IValidator<DebtAgingReportRequest> _agingValidator;
+    private readonly IValidator<DebtOverdueReportRequest> _overdueValidator;
+    private readonly IValidator<DebtBySalespersonReportRequest> _bySalespersonValidator;
+
+    public DebtPositionReportsController(
+        IDebtPositionReportService service,
+        IValidator<DebtDocumentsReportRequest> documentsValidator,
+        IValidator<DebtAgingReportRequest> agingValidator,
+        IValidator<DebtOverdueReportRequest> overdueValidator,
+        IValidator<DebtBySalespersonReportRequest> bySalespersonValidator)
+    {
+        _service = service;
+        _documentsValidator = documentsValidator;
+        _agingValidator = agingValidator;
+        _overdueValidator = overdueValidator;
+        _bySalespersonValidator = bySalespersonValidator;
+    }
+
+    [HttpGet("debt-documents")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtDocumentsReportDto>>> DebtDocuments(
+        [FromQuery] DebtDocumentsReportRequest request, CancellationToken ct)
+    {
+        await _documentsValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetDocumentsAsync(request, ct));
+    }
+
+    [HttpGet("debt-aging")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtAgingReportDto>>> DebtAging(
+        [FromQuery] DebtAgingReportRequest request, CancellationToken ct)
+    {
+        await _agingValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetAgingAsync(request, ct));
+    }
+
+    [HttpGet("debt-overdue")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtOverdueReportDto>>> DebtOverdue(
+        [FromQuery] DebtOverdueReportRequest request, CancellationToken ct)
+    {
+        await _overdueValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetOverdueAsync(request, ct));
+    }
+
+    [HttpGet("debt-by-salesperson")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtBySalespersonReportDto>>> DebtBySalesperson(
+        [FromQuery] DebtBySalespersonReportRequest request, CancellationToken ct)
+    {
+        await _bySalespersonValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.GetBySalespersonAsync(request, ct));
+    }
+}

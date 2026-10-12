@@ -64,6 +64,18 @@ const PARTNERS = [
   },
 ];
 
+const OWNERS = [
+  { id: '99999999-9999-4999-8999-999999999999', fullName: 'Nguyễn Văn A' },
+  { id: '88888888-8888-4888-8888-888888888888', fullName: 'Trần Thị B' },
+];
+
+const GONE_OWNER_ID = '77777777-7777-4777-8777-777777777777';
+function goneOwnerRow(ownerName: string | null): OpeningDebt {
+  return { ...ROWS[1], id: 'o3', docNo: 'HD777', kind: 'Debt', ownerUserId: GONE_OWNER_ID, ownerName, version: 13 };
+}
+
+let extraRows: OpeningDebt[] = [];
+let cachedRows: OpeningDebt[] | null = null;
 let openingDate: string | null = '2026-01-01';
 const listParams = vi.fn<(params: OpeningDebtListParams) => void>();
 const createMock = vi.fn();
@@ -72,10 +84,11 @@ const deleteMock = vi.fn();
 
 function listResult(): OpeningDebtListResult {
   return {
-    items: ROWS,
+    // Stable reference per render: a fresh array on every call would loop useReactTable.
+    items: extraRows.length === 0 ? ROWS : (cachedRows ??= [...ROWS, ...extraRows]),
     page: 1,
     pageSize: 20,
-    totalItems: ROWS.length,
+    totalItems: ROWS.length + extraRows.length,
     totalPages: 1,
     hasNextPage: false,
     hasPreviousPage: false,
@@ -90,6 +103,7 @@ vi.mock('@/features/opening-debts/hooks', async (importOriginal) => ({
     listParams(params);
     return { data: listResult(), isLoading: false, isError: false, error: null };
   },
+  useOpeningDebtOwners: () => ({ data: OWNERS, isLoading: false, isError: false }),
   useCreateOpeningDebt: () => ({ mutateAsync: createMock, isPending: false }),
   useUpdateOpeningDebt: () => ({ mutateAsync: updateMock, isPending: false }),
   useDeleteOpeningDebt: () => ({ mutateAsync: deleteMock, isPending: false }),
@@ -140,6 +154,8 @@ function renderPage() {
 describe('OpeningDebtPage', () => {
   beforeEach(() => {
     openingDate = '2026-01-01';
+    extraRows = [];
+    cachedRows = null;
     listParams.mockReset();
     sideSearches.mockReset();
     createMock.mockReset().mockResolvedValue({});
@@ -153,7 +169,7 @@ describe('OpeningDebtPage', () => {
     renderPage();
 
     expect(screen.getByText('Ngày đầu kỳ: 01/01/2026')).toBeInTheDocument();
-    for (const header of ['Đối tượng', 'Phía', 'Loại', 'Số CT', 'Ngày CT', 'Hạn TT', 'Số tiền', 'Đã đối trừ', 'Ghi chú']) {
+    for (const header of ['Đối tượng', 'Phía', 'Loại', 'Số CT', 'Ngày CT', 'Hạn TT', 'Số tiền', 'Đã đối trừ', 'Nhân viên', 'Ghi chú']) {
       expect(screen.getByRole('columnheader', { name: header })).toBeInTheDocument();
     }
 
@@ -166,12 +182,12 @@ describe('OpeningDebtPage', () => {
     expect(within(debtRow).getByText('5.000.000')).toBeInTheDocument();
     expect(within(debtRow).getByText('2.000.000')).toBeInTheDocument();
     expect(within(debtRow).getByText('Nợ cũ')).toBeInTheDocument();
-    // The owner is not shown in 2A (P2).
-    expect(screen.queryByText('Nguyễn Văn A')).not.toBeInTheDocument();
+    expect(within(debtRow).getByText('Nguyễn Văn A')).toBeInTheDocument();
 
     const prepaymentRow = screen.getByText('UT01').closest('tr')!;
     expect(within(prepaymentRow).getByText('Phải trả')).toBeInTheDocument();
     expect(within(prepaymentRow).getByText('Trả trước')).toBeInTheDocument();
+    expect(within(prepaymentRow).getByText('—')).toBeInTheDocument();
 
     expect(listParams).toHaveBeenLastCalledWith({ page: 1, pageSize: 20 });
 
@@ -228,6 +244,112 @@ describe('OpeningDebtPage', () => {
     );
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }));
+  });
+
+  it('creates with the picked owner', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: /Thêm/ }));
+    const dialog = await screen.findByRole('dialog');
+    const owner = within(dialog).getByLabelText('Nhân viên');
+    expect(within(owner).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Không chọn',
+      'Nguyễn Văn A',
+      'Trần Thị B',
+    ]);
+    expect(owner).toHaveValue('');
+
+    await user.type(within(dialog).getByRole('combobox', { name: 'Đối tượng *' }), 'cat');
+    await user.click(await within(dialog).findByRole('option', { name: /KH003/ }));
+    await user.type(within(dialog).getByLabelText('Số CT *'), 'HD010');
+    await user.type(within(dialog).getByLabelText('Số tiền *'), '100000');
+    await user.selectOptions(owner, '88888888-8888-4888-8888-888888888888');
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+
+    await waitFor(() =>
+      expect(createMock).toHaveBeenCalledWith(
+        expect.objectContaining({ docNo: 'HD010', ownerUserId: '88888888-8888-4888-8888-888888888888' }),
+      ),
+    );
+  });
+
+  it('editing preselects the owner and Không chọn sends null', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const row = screen.getByText('HD001').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: 'Sửa nợ đầu kỳ' }));
+    const dialog = await screen.findByRole('dialog');
+    const owner = within(dialog).getByLabelText('Nhân viên');
+    expect(owner).toHaveValue('99999999-9999-4999-8999-999999999999');
+
+    await user.selectOptions(owner, '');
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+    await waitFor(() =>
+      expect(updateMock).toHaveBeenCalledWith({
+        id: 'o1',
+        data: expect.objectContaining({ ownerUserId: null, version: 11 }),
+      }),
+    );
+  });
+
+  it.each([
+    ['Lê Văn Cũ', 'Lê Văn Cũ'],
+    [null, 'Nhân viên đã bị xóa — vui lòng chọn lại'],
+  ])('an owner missing from the options (name %s) stays selectable and is kept', async (ownerName, label) => {
+    const user = userEvent.setup();
+    extraRows = [goneOwnerRow(ownerName)];
+    cachedRows = null;
+    renderPage();
+
+    const row = screen.getByText('HD777').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: 'Sửa nợ đầu kỳ' }));
+    const dialog = await screen.findByRole('dialog');
+    const owner = within(dialog).getByLabelText('Nhân viên');
+    expect(within(owner).getAllByRole('option').map((o) => o.textContent)).toEqual([
+      'Không chọn',
+      'Nguyễn Văn A',
+      'Trần Thị B',
+      label,
+    ]);
+    expect(owner).toHaveValue(GONE_OWNER_ID);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+    await waitFor(() =>
+      expect(updateMock).toHaveBeenCalledWith({
+        id: 'o3',
+        data: expect.objectContaining({ ownerUserId: GONE_OWNER_ID }),
+      }),
+    );
+  });
+
+  it('lists a row whose owner user was deleted as inactive, not as having no owner', () => {
+    extraRows = [goneOwnerRow(null)];
+    cachedRows = null;
+    renderPage();
+
+    const row = screen.getByText('HD777').closest('tr')!;
+    expect(within(row).getByText('Nhân viên đã ngừng hoạt động')).toBeInTheDocument();
+  });
+
+  it('shows the server owner error under the select and clears it on change', async () => {
+    const user = userEvent.setup();
+    extraRows = [goneOwnerRow(null)];
+    cachedRows = null;
+    updateMock.mockRejectedValueOnce(
+      apiError(400, 'VALIDATION_ERROR', 'Dữ liệu không hợp lệ.', { ownerUserId: ['Nhân viên không tồn tại.'] }),
+    );
+    renderPage();
+
+    const row = screen.getByText('HD777').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: 'Sửa nợ đầu kỳ' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+
+    expect(await within(dialog).findByText('Nhân viên không tồn tại.')).toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText('Nhân viên'), '');
+    expect(within(dialog).queryByText('Nhân viên không tồn tại.')).not.toBeInTheDocument();
   });
 
   it('prepayment hides due date', async () => {
@@ -296,7 +418,7 @@ describe('OpeningDebtPage', () => {
       docDate: '2025-12-15',
       dueDate: '2026-01-15',
       amount: 1000000,
-      // The owner is kept as loaded: the server replaces it on save.
+      // Unchanged: the loaded owner is sent back.
       ownerUserId: '99999999-9999-4999-8999-999999999999',
       note: 'Nợ cũ',
     };

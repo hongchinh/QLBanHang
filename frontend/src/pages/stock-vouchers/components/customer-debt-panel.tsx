@@ -1,6 +1,8 @@
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePartnerDebtSummary } from '@/features/debt/hooks';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/stores/auth-store';
 
 const fmt = new Intl.NumberFormat('vi-VN');
 const UNLIMITED = 'Không giới hạn';
@@ -9,6 +11,7 @@ const UNLIMITED = 'Không giới hạn';
 // Display only; the form decides when it is shown (sale reason, partner picked, permission).
 export function CustomerDebtPanel({ partnerId }: { partnerId: string }) {
   const { data, isLoading, isError } = usePartnerDebtSummary(partnerId, { enabled: true });
+  const canViewOverdueReport = useAuthStore((s) => s.hasPermission('reports.debt'));
 
   if (isError) return null;
   if (!data && !isLoading) return null;
@@ -45,6 +48,18 @@ export function CustomerDebtPanel({ partnerId }: { partnerId: string }) {
               value={fmt.format(data.overdueAmount)}
               danger={data.overdueAmount > 0}
             />
+            {data.overdueAmount > 0 && canViewOverdueReport && (
+              <div className="text-right text-xs">
+                <Link
+                  to={`/reports/debt-overdue?side=Receivable&partnerId=${partnerId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-destructive underline"
+                >
+                  Xem nợ quá hạn
+                </Link>
+              </div>
+            )}
             <DebtRow
               label="Số ngày được nợ"
               testId="customer-debt-credit-days"

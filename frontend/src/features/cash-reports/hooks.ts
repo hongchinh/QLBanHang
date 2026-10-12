@@ -1,7 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { cashReportsApi } from './api';
 import { cashReportKeys } from './keys';
-import type { CashBookParams, DebtBalanceParams, DebtLedgerParams } from './types';
+import type {
+  CashBookParams,
+  DebtAgingParams,
+  DebtBalanceParams,
+  DebtBySalespersonParams,
+  DebtDocumentsParams,
+  DebtLedgerParams,
+  DebtOverdueParams,
+  DebtReconciliationParams,
+} from './types';
 
 // `enabled: false` lets a page hold the request while its filters are invalid (e.g. from > to).
 
@@ -13,10 +22,50 @@ export function useDebtBalance(params: DebtBalanceParams, options: { enabled?: b
   });
 }
 
+export function useDebtDocuments(params: DebtDocumentsParams, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: cashReportKeys.debtDocuments(params),
+    queryFn: () => cashReportsApi.debtDocuments(params),
+    enabled: options.enabled ?? true,
+  });
+}
+
+export function useDebtAging(params: DebtAgingParams, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: cashReportKeys.debtAging(params),
+    queryFn: () => cashReportsApi.debtAging(params),
+    enabled: options.enabled ?? true,
+  });
+}
+
+export function useDebtOverdue(params: DebtOverdueParams, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: cashReportKeys.debtOverdue(params),
+    queryFn: () => cashReportsApi.debtOverdue(params),
+    enabled: options.enabled ?? true,
+  });
+}
+
 export function useDebtLedger(params: DebtLedgerParams, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: cashReportKeys.debtLedger(params),
     queryFn: () => cashReportsApi.debtLedger(params),
+    enabled: !!params.partnerId && (options.enabled ?? true),
+  });
+}
+
+export function useDebtBySalesperson(params: DebtBySalespersonParams, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: cashReportKeys.debtBySalesperson(params),
+    queryFn: () => cashReportsApi.debtBySalesperson(params),
+    enabled: options.enabled ?? true,
+  });
+}
+
+export function useDebtReconciliation(params: DebtReconciliationParams, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: cashReportKeys.debtReconciliation(params),
+    queryFn: () => cashReportsApi.debtReconciliation(params),
     enabled: !!params.partnerId && (options.enabled ?? true),
   });
 }

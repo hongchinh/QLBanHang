@@ -49,3 +49,7 @@ export const OPENING_DEBT_KIND_LABELS: Record<OpeningDebtKind, string> = {
   Debt: 'Nợ',
   Prepayment: 'Trả trước',
 };
+
+// Opening-debt owner whose user was deleted: the list keeps the owner id but has no name.
+export const GONE_OWNER_LABEL = 'Nhân viên đã ngừng hoạt động';
+export const GONE_OWNER_PICK_LABEL = 'Nhân viên đã bị xóa — vui lòng chọn lại';

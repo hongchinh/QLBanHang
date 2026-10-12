@@ -4,11 +4,13 @@ import type {
   OpeningDebt,
   OpeningDebtListParams,
   OpeningDebtListResult,
+  OpeningDebtOwner,
   UpsertOpeningDebtRequest,
 } from './types';
 
 export const openingDebtsApi = {
   list: (params: OpeningDebtListParams) => apiGet<OpeningDebtListResult>('/opening-debts', params),
+  owners: () => apiGet<OpeningDebtOwner[]>('/opening-debts/owners'),
   create: (data: UpsertOpeningDebtRequest) => apiPost<OpeningDebt>('/opening-debts', data),
   update: (id: string, data: UpsertOpeningDebtRequest) => apiPut<OpeningDebt>(`/opening-debts/${id}`, data),
   // DELETE binds version, confirmRemoveSettlements and confirmedSettlements from the query string.

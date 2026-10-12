@@ -10,12 +10,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DEBT_SIDE_LABELS, OPENING_DEBT_KIND_LABELS } from '@/features/cash-common/labels';
+import { DEBT_SIDE_LABELS, GONE_OWNER_PICK_LABEL, OPENING_DEBT_KIND_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide, OpeningDebtKind } from '@/features/cash-common/types';
 import { useDebtPartnerSearch } from '@/features/debt/hooks';
 import {
   useCreateOpeningDebt,
   useOpeningDateNotSetHandler,
+  useOpeningDebtOwners,
   useUpdateOpeningDebt,
 } from '@/features/opening-debts/hooks';
 import {
@@ -83,6 +84,9 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
   const saving = create.isPending || update.isPending;
 
   const [partner, setPartner] = useState<PickedPartner | null>(null);
+  const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [ownerError, setOwnerError] = useState<string | null>(null);
+  const { data: owners } = useOpeningDebtOwners();
   const [pending, setPending] = useState<PendingConfirmation | null>(null);
 
   const form = useForm<OpeningDebtFormValues, unknown, OpeningDebtFormParsed>({
@@ -98,17 +102,24 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
     if (!open) return;
     form.reset(toDefaults(initial, openingDate));
     setPartner(initial ? { id: initial.partnerId, code: initial.partnerCode, name: initial.partnerName } : null);
+    setOwnerUserId(initial?.ownerUserId ?? null);
+    setOwnerError(null);
     setPending(null);
   }, [open, initial, openingDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const side = useWatch({ control: form.control, name: 'side' });
   const kind = useWatch({ control: form.control, name: 'kind' });
   const errors = form.formState.errors;
+  // The loaded owner may be missing from the active options (deactivated or deleted user): keep it selectable.
+  const ownerOptions = owners ?? [];
+  const missingOwner =
+    initial?.ownerUserId && !ownerOptions.some((o) => o.id === initial.ownerUserId)
+      ? { id: initial.ownerUserId, fullName: initial.ownerName ?? GONE_OWNER_PICK_LABEL }
+      : null;
 
   const submit = async (values: OpeningDebtFormParsed, flags: ConfirmFlags = {}) => {
-    // The owner field is not shown in 2A (P2); an edit keeps the loaded owner.
     const data = toUpsertOpeningDebtRequest(values, {
-      ownerUserId: initial ? (initial.ownerUserId ?? null) : undefined,
+      ownerUserId: initial ? ownerUserId : (ownerUserId ?? undefined),
       confirmRemoveSettlements: flags.confirmRemoveSettlements ?? false,
       confirmedSettlements: flags.confirmedSettlements,
       version: initial?.version,
@@ -132,6 +143,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
         return;
       }
       applyApiFieldErrors(err, form.setError, SERVER_FIELDS);
+      setOwnerError(getApiError(err)?.details?.ownerUserId?.[0] ?? null);
       toast({ variant: 'destructive', title: 'Không thể lưu', description: formatApiErrorDetails(err) });
     }
   };
@@ -210,6 +222,28 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
             />
             {partner && <p className="text-sm text-muted-foreground">{partner.name}</p>}
             {errors.partnerId && <p className="text-sm text-destructive">{errors.partnerId.message}</p>}
+          </div>
+
+          <div className="space-y-2 sm:col-span-2">
+            <Label htmlFor="opening-debt-owner">Nhân viên</Label>
+            <select
+              id="opening-debt-owner"
+              className={SELECT_CLASS}
+              value={ownerUserId ?? ''}
+              onChange={(e) => {
+                setOwnerUserId(e.target.value || null);
+                setOwnerError(null);
+              }}
+            >
+              <option value="">Không chọn</option>
+              {ownerOptions.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.fullName}
+                </option>
+              ))}
+              {missingOwner && <option value={missingOwner.id}>{missingOwner.fullName}</option>}
+            </select>
+            {ownerError && <p className="text-sm text-destructive">{ownerError}</p>}
           </div>
 
           <div className="space-y-2">

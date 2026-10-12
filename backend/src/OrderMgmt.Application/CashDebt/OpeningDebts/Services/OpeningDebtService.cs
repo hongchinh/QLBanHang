@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Interfaces;
@@ -38,6 +39,17 @@ public class OpeningDebtService : IOpeningDebtService
         _inventoryLock = inventoryLock;
         _cashDebtLock = cashDebtLock;
         _ledger = ledger;
+    }
+
+    public async Task<List<OpeningDebtOwnerDto>> ListOwnersAsync(CancellationToken ct = default)
+    {
+        // The soft-delete filter hides deleted users; a disabled user cannot own new documents either.
+        var owners = await _db.Users.AsNoTracking()
+            .Where(u => u.Status == UserStatus.Active)
+            .Select(u => new OpeningDebtOwnerDto { Id = u.Id, FullName = u.FullName })
+            .ToListAsync(ct);
+        var vietnameseComparer = StringComparer.Create(new CultureInfo("vi-VN"), ignoreCase: true);
+        return owners.OrderBy(o => o.FullName, vietnameseComparer).ThenBy(o => o.Id).ToList();
     }
 
     public async Task<OpeningDebtListResult> ListAsync(OpeningDebtListRequest request, CancellationToken ct = default)

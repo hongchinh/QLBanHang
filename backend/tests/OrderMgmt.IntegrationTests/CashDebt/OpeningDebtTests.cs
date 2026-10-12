@@ -1,6 +1,8 @@
 using System.Net;
+using System.Globalization;
 using System.Net.Http.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Models;
@@ -277,6 +279,75 @@ public class OpeningDebtTests : CashDebtTestBase
         var post = await SendAsync(sales, HttpMethod.Post, "/api/opening-debts",
             Request(partnerId, DebtSide.Receivable, OpeningDebtKind.Debt, "X9", new DateOnly(2026, 9, 1), 1_000m));
         post.Status.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Owner_options_list_active_users()
+    {
+        var second = await CreateUserAsync("od_own_" + _suffix);
+        var disabled = await CreateUserAsync("od_off_" + _suffix);
+        var deleted = await CreateUserAsync("od_del_" + _suffix);
+        await InDbAsync(async db =>
+        {
+            var users = await db.Users.Where(u => u.Id == disabled.Id || u.Id == deleted.Id).ToListAsync();
+            users.Single(u => u.Id == disabled.Id).Status = UserStatus.Disabled;
+            users.Single(u => u.Id == deleted.Id).IsDeleted = true;
+            await db.SaveChangesAsync();
+        });
+        var adminId = await InDbAsync(db => db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync());
+
+        var owners = await ReadDataAsync<List<OpeningDebtOwnerDto>>(await _client.GetAsync("/api/opening-debts/owners"));
+
+        owners.Should().Contain(o => o.Id == adminId);
+        owners.Should().ContainSingle(o => o.Id == second.Id).Which.FullName.Should().Be(second.FullName);
+        owners.Select(o => o.Id).Should().NotContain(new[] { disabled.Id, deleted.Id });
+        var comparer = StringComparer.Create(new CultureInfo("vi-VN"), ignoreCase: true);
+        owners.Should().BeEquivalentTo(owners.OrderBy(o => o.FullName, comparer).ThenBy(o => o.Id).ToList(),
+            o => o.WithStrictOrdering());
+    }
+
+    [Fact]
+    public async Task Owner_options_need_the_opening_balance_permission()
+    {
+        var debtOnly = await CreateClientWithPermissionsAsync("od_rd_" + _suffix, null, Permissions.Reports.Debt);
+        (await debtOnly.GetAsync("/api/opening-debts/owners")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var accountant = await CreateClientWithPermissionsAsync("od_ob_" + _suffix, null, Permissions.Debt.OpeningBalance);
+        (await accountant.GetAsync("/api/opening-debts/owners")).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Opening_debt_keeps_the_picked_owner()
+    {
+        var (_, client) = await BranchWithDateAsync("W", Oct1);
+        var partnerId = await CreatePartnerAsync("OW" + _suffix, isCustomer: true, isSupplier: false);
+        var second = await CreateUserAsync("od_pick_" + _suffix);
+        var request = Request(partnerId, DebtSide.Receivable, OpeningDebtKind.Debt, "HD-W", new DateOnly(2026, 9, 10), 700m);
+        request.OwnerUserId = second.Id;
+
+        var created = await SendAsync(client, HttpMethod.Post, "/api/opening-debts", request);
+        created.Status.Should().Be(HttpStatusCode.OK, created.Error?.Message);
+        var list = await ReadDataAsync<OpeningDebtListResult>(await client.GetAsync($"/api/opening-debts?partnerId={partnerId}"));
+        var item = list.Items.Should().ContainSingle().Subject;
+        item.OwnerUserId.Should().Be(second.Id);
+        item.OwnerName.Should().Be(second.FullName);
+
+        request.OwnerUserId = null;
+        request.Version = created.Debt!.Version;
+        var updated = await SendAsync(client, HttpMethod.Put, $"/api/opening-debts/{created.Debt.Id}", request);
+        updated.Status.Should().Be(HttpStatusCode.OK, updated.Error?.Message);
+        updated.Debt!.OwnerUserId.Should().BeNull();
+        updated.Debt.OwnerName.Should().BeNull();
+        var relisted = await ReadDataAsync<OpeningDebtListResult>(await client.GetAsync($"/api/opening-debts?partnerId={partnerId}"));
+        relisted.Items.Should().ContainSingle().Which.OwnerUserId.Should().BeNull();
+        (await EntriesOfAsync(DebtSourceType.Opening, created.Debt.Id)).Single().OwnerUserId.Should().BeNull();
+    }
+
+    private async Task<(Guid Id, string FullName)> CreateUserAsync(string username)
+    {
+        await CreateClientWithPermissionsAsync(username, null, Permissions.Reports.Debt);
+        var user = await InDbAsync(db => db.Users.Where(u => u.Username == username).Select(u => new { u.Id, u.FullName }).SingleAsync());
+        return (user.Id, user.FullName);
     }
 
     private static UpsertOpeningDebtRequest Request(Guid partnerId, DebtSide side, OpeningDebtKind kind, string docNo,

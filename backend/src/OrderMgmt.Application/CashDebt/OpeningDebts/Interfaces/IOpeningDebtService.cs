@@ -7,6 +7,9 @@ namespace OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 public interface IOpeningDebtService
 {
     Task<OpeningDebtListResult> ListAsync(OpeningDebtListRequest request, CancellationToken ct = default);
+    /// Active users the owner picker offers, ordered by name (vi-VN), then id.
+    Task<List<OpeningDebtOwnerDto>> ListOwnersAsync(CancellationToken ct = default);
+
     Task<OpeningDebtDto> CreateAsync(UpsertOpeningDebtRequest request, CancellationToken ct = default);
     Task<OpeningDebtDto> UpdateAsync(Guid id, UpsertOpeningDebtRequest request, CancellationToken ct = default);
     Task DeleteAsync(Guid id, uint? version, bool confirmRemoveSettlements, string? confirmedSettlements,

@@ -5,5 +5,6 @@ import type { OpeningDebtListParams } from './types';
 export const openingDebtKeys = {
   all: [...cashKeys.all, 'opening-debts'] as const,
   list: (params: OpeningDebtListParams) => [...openingDebtKeys.all, 'list', params] as const,
+  owners: () => [...openingDebtKeys.all, 'owners'] as const,
   partners: (keyword: string) => [...openingDebtKeys.all, 'partners', keyword] as const,
 };

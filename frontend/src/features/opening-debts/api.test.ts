@@ -15,3 +15,18 @@ describe('openingDebtsApi.remove', () => {
     });
   });
 });
+
+describe('openingDebtsApi.owners', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('GETs the owner options', async () => {
+    const get = vi.spyOn(api, 'get').mockResolvedValue({
+      data: { success: true, data: [{ id: 'u1', fullName: 'A' }], timestamp: '' },
+    });
+
+    const result = await openingDebtsApi.owners();
+
+    expect(get).toHaveBeenCalledWith('/opening-debts/owners', { params: undefined });
+    expect(result).toEqual([{ id: 'u1', fullName: 'A' }]);
+  });
+});

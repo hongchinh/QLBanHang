@@ -5,14 +5,8 @@ import { inventoryKeys } from '@/features/stock-vouchers/keys';
 import { getApiError } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { openingDebtsApi } from './api';
+import { openingDebtKeys } from './keys';
 import type { OpeningDebtListParams, UpsertOpeningDebtRequest } from './types';
-
-// Branch-scoped, so under the ['cash'] root (P28).
-export const openingDebtKeys = {
-  all: [...cashKeys.all, 'opening-debts'] as const,
-  list: (params: OpeningDebtListParams) => [...openingDebtKeys.all, 'list', params] as const,
-  partners: (keyword: string) => [...openingDebtKeys.all, 'partners', keyword] as const,
-};
 
 export function useOpeningDebts(params: OpeningDebtListParams) {
   return useQuery({

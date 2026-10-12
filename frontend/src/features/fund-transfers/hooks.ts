@@ -1,5 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cashKeys } from '@/features/cash-common/keys';
+import { inventoryKeys } from '@/features/stock-vouchers/keys';
 import { fundTransfersApi } from './api';
 import { fundTransferKeys } from './keys';
 import type { FundTransferActionRequest, FundTransferListParams, UpsertFundTransferRequest } from './types';
@@ -40,11 +41,13 @@ export function useFundTransferDefaults(opts: { enabled?: boolean } = {}) {
   });
 }
 
-// A transfer moves money between two funds and the numbering: refresh the whole cash root (fund balances,
-// cash book). It has no debt or stock side, so the inventory root is left alone.
+// Same as the other cash mutations: refresh the whole cash root (fund balances, cash book) and the inventory root.
 function useInvalidateCash() {
   const qc = useQueryClient();
-  return () => void qc.invalidateQueries({ queryKey: cashKeys.all });
+  return () => {
+    void qc.invalidateQueries({ queryKey: cashKeys.all });
+    void qc.invalidateQueries({ queryKey: inventoryKeys.all });
+  };
 }
 
 export function useCreateFundTransfer() {

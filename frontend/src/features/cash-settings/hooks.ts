@@ -1,9 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cashSettingsApi } from './api';
+import { cashSettingsKeys } from './keys';
 import type { UpdateCashSettingsRequest } from './types';
-
-// A global singleton (not branch-scoped), so it sits outside the ['cash'] root (P28).
-export const cashSettingsKeys = { all: ['cash-settings'] as const };
 
 export function useCashSettings() {
   return useQuery({

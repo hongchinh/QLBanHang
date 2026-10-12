@@ -1,13 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { cashKeys } from '@/features/cash-common/keys';
 import { creditLimitsApi } from './api';
+import { creditLimitKeys } from './keys';
 import type { CreditLimitListParams } from './types';
-
-// Branch-scoped, so under the ['cash'] root (P28).
-export const creditLimitKeys = {
-  all: [...cashKeys.all, 'credit-limits'] as const,
-  list: (params: CreditLimitListParams) => [...creditLimitKeys.all, 'list', params] as const,
-};
 
 export function useCreditLimits(params: CreditLimitListParams) {
   return useQuery({

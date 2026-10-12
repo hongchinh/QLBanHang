@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Common.References;
 using OrderMgmt.Application.Inventory.PaymentMethods.Interfaces;
 using OrderMgmt.Application.Inventory.PaymentMethods.Models;
 using OrderMgmt.Domain.Common;
@@ -12,12 +13,14 @@ public class PaymentMethodService : IPaymentMethodService
     private readonly IAppDbContext _db;
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
+    private readonly IReferenceUsage _usage;
 
-    public PaymentMethodService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser)
+    public PaymentMethodService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, IReferenceUsage usage)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
+        _usage = usage;
     }
 
     public async Task<IReadOnlyList<PaymentMethodDto>> ListAsync(CancellationToken ct = default) =>
@@ -47,7 +50,7 @@ public class PaymentMethodService : IPaymentMethodService
         // A paid stock voucher stores a fund of the method's kind (P9): changing the kind would leave it invalid and
         // its next save rejected.
         if (request.FundKind != method.FundKind
-            && await _db.StockVouchers.AnyAsync(v => v.PaymentMethodId == id && v.PaidAmount > 0, ct))
+            && await _usage.PaymentMethodUsedByPaidStockVouchersAsync(id, ct))
             throw new ValidationDomainException(new Dictionary<string, string[]>
             {
                 ["fundKind"] = new[] { "Phương thức thanh toán đã được dùng trên phiếu kho có thanh toán, không đổi được loại quỹ." },
@@ -62,7 +65,7 @@ public class PaymentMethodService : IPaymentMethodService
     public async Task DeleteAsync(Guid id, CancellationToken ct = default)
     {
         var method = await FindAsync(id, ct);
-        if (await _db.StockVouchers.AnyAsync(v => v.PaymentMethodId == id, ct))
+        if (await _usage.PaymentMethodUsedByStockVouchersAsync(id, ct))
             throw new ConflictException("Phương thức thanh toán đã được dùng trên phiếu kho, không thể xóa.");
 
         method.IsDeleted = true;

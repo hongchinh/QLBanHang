@@ -4,6 +4,7 @@ using OrderMgmt.Application.CashDebt.Funds.Models;
 using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Common.References;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Organization.Branches;
 using OrderMgmt.Domain.Common;
@@ -26,10 +27,11 @@ public class FundService : IFundService
     private readonly IInventoryLock _inventoryLock;
     private readonly ICashDebtLock _cashDebtLock;
     private readonly IFundBalanceGuard _fundGuard;
+    private readonly IReferenceUsage _usage;
 
     public FundService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
         ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock,
-        IFundBalanceGuard fundGuard)
+        IFundBalanceGuard fundGuard, IReferenceUsage usage)
     {
         _db = db;
         _clock = clock;
@@ -39,6 +41,7 @@ public class FundService : IFundService
         _inventoryLock = inventoryLock;
         _cashDebtLock = cashDebtLock;
         _fundGuard = fundGuard;
+        _usage = usage;
     }
 
     private bool CanSeeOpeningAmount =>
@@ -184,11 +187,12 @@ public class FundService : IFundService
     {
         if (fund.OpeningAmount != 0)
             throw new ConflictException("Quỹ đã có số dư đầu kỳ, không thể xóa hoặc đổi loại.");
-        if (await _db.CashVouchers.AnyAsync(v => v.FundId == fund.Id, ct))
+        var usage = await _usage.FundUsageAsync(fund.Id, ct);
+        if (usage == FundUsage.CashVouchers)
             throw new ConflictException("Quỹ đã có phiếu thu/chi, không thể xóa hoặc đổi loại.");
-        if (await _db.FundTransfers.AnyAsync(t => t.FromFundId == fund.Id || t.ToFundId == fund.Id, ct))
+        if (usage == FundUsage.FundTransfers)
             throw new ConflictException("Quỹ đã có phiếu chuyển quỹ, không thể xóa hoặc đổi loại.");
-        if (await _db.StockVouchers.AnyAsync(v => v.FundId == fund.Id, ct))
+        if (usage == FundUsage.StockVouchers)
             throw new ConflictException("Quỹ đã có phiếu nhập/xuất kho, không thể xóa hoặc đổi loại.");
     }
 

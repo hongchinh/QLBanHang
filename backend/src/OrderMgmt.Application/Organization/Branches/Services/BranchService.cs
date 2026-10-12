@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Common.References;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
@@ -28,10 +29,11 @@ public class BranchService : IBranchService
     private readonly IOpeningStockService _openingStock;
     private readonly IOpeningDebtService _openingDebt;
     private readonly IAutoCashVoucherService _autoVouchers;
+    private readonly IReferenceUsage _usage;
 
     public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
         ITransactionRunner transaction, IInventoryLock inventoryLock, IOpeningStockService openingStock,
-        IOpeningDebtService openingDebt, IAutoCashVoucherService autoVouchers)
+        IOpeningDebtService openingDebt, IAutoCashVoucherService autoVouchers, IReferenceUsage usage)
     {
         _db = db;
         _clock = clock;
@@ -42,6 +44,7 @@ public class BranchService : IBranchService
         _openingStock = openingStock;
         _openingDebt = openingDebt;
         _autoVouchers = autoVouchers;
+        _usage = usage;
     }
 
     public async Task<MyBranchesDto> GetMyBranchesAsync(CancellationToken ct = default)
@@ -126,7 +129,7 @@ public class BranchService : IBranchService
         if (await _db.Warehouses.AnyAsync(w => w.BranchId == id, ct))
             throw new ConflictException("Chi nhánh đang có kho, không thể xóa.");
         // Cash documents need no warehouse: without this the branch's cash book and debt ledger become unreachable.
-        if (await HasDocumentsAsync(id, ct) || await HasOpeningDataAsync(id, ct))
+        if (await _usage.BranchHasDocumentsAsync(id, ct) || await _usage.BranchHasOpeningDataAsync(id, ct))
             throw new ConflictException("Chi nhánh đã có chứng từ hoặc số dư đầu kỳ, không thể xóa.");
 
         branch.IsDeleted = true;
@@ -173,13 +176,13 @@ public class BranchService : IBranchService
             var newDate = request.OpeningDate;
             PeriodLockGuard.EnsureNotLocked(branch.LockedUntil,
                 new[] { oldDate, newDate }.Where(d => d is not null).Select(d => d!.Value));
-            if (await HasDocumentsAsync(id, c))
+            if (await _usage.BranchHasDocumentsAsync(id, c))
             {
                 // A branch that started without an opening date may still take its first one, on or before its
                 // earliest document: it has no opening data to repost, and no document falls before the new date.
-                if (oldDate is not null || newDate is not { } first || await HasOpeningDataAsync(id, c))
+                if (oldDate is not null || newDate is not { } first || await _usage.BranchHasOpeningDataAsync(id, c))
                     throw new ConflictException("BRANCH_HAS_DOCUMENTS", "Chi nhánh đã có chứng từ, không đổi được ngày đầu kỳ.");
-                var earliest = await EarliestDocumentDateAsync(id, c);
+                var earliest = await _usage.EarliestDocumentDateAsync(id, c);
                 if (first > earliest)
                     throw new ValidationDomainException(new Dictionary<string, string[]>
                     {
@@ -218,31 +221,6 @@ public class BranchService : IBranchService
             return ToDto(branch);
         }, ct);
     }
-
-    private async Task<bool> HasOpeningDataAsync(Guid branchId, CancellationToken ct) =>
-        await _db.OpeningStocks.AnyAsync(o => o.BranchId == branchId, ct)
-        || await _db.OpeningDebts.AnyAsync(o => o.BranchId == branchId, ct)
-        || await _db.Funds.AnyAsync(f => f.BranchId == branchId && f.OpeningAmount != 0, ct);
-
-    /// The VN date of the branch's earliest non-deleted document, of any status. Call it only when one exists.
-    private async Task<DateOnly> EarliestDocumentDateAsync(Guid branchId, CancellationToken ct)
-    {
-        var firsts = new[]
-        {
-            await _db.StockVouchers.Where(v => v.BranchId == branchId).MinAsync(v => (DateTimeOffset?)v.VoucherAt, ct),
-            await _db.CashVouchers.Where(v => v.BranchId == branchId).MinAsync(v => (DateTimeOffset?)v.VoucherAt, ct),
-            await _db.FundTransfers.Where(t => t.BranchId == branchId).MinAsync(t => (DateTimeOffset?)t.VoucherAt, ct),
-            await _db.DebtOffsetVouchers.Where(o => o.BranchId == branchId).MinAsync(o => (DateTimeOffset?)o.VoucherAt, ct),
-        };
-        return VnTime.ToVnDate(firsts.OfType<DateTimeOffset>().Min());
-    }
-
-    // Non-deleted documents of any status (the query filters skip deleted ones).
-    private async Task<bool> HasDocumentsAsync(Guid branchId, CancellationToken ct) =>
-        await _db.StockVouchers.AnyAsync(v => v.BranchId == branchId, ct)
-        || await _db.CashVouchers.AnyAsync(v => v.BranchId == branchId, ct)
-        || await _db.FundTransfers.AnyAsync(t => t.BranchId == branchId, ct)
-        || await _db.DebtOffsetVouchers.AnyAsync(o => o.BranchId == branchId, ct);
 
     private async Task<Branch> FindAsync(Guid id, CancellationToken ct) =>
         await _db.Branches.FirstOrDefaultAsync(b => b.Id == id, ct)

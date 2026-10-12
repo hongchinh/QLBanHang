@@ -48,6 +48,7 @@ using OrderMgmt.Application.CashDebt.Reports.Interfaces;
 using OrderMgmt.Application.CashDebt.Reports.Services;
 using OrderMgmt.Application.CashDebt.Settings.Interfaces;
 using OrderMgmt.Application.CashDebt.Settings.Services;
+using OrderMgmt.Application.Common.References;
 using OrderMgmt.Application.Inventory.Costing;
 using OrderMgmt.Application.Inventory.Ledger;
 using OrderMgmt.Application.Inventory.Numbering;
@@ -115,6 +116,7 @@ public static class DependencyInjection
         services.AddScoped<IBankLookupService, BankLookupService>();
         services.AddScoped<IPaymentQrService, PaymentQrService>();
         services.AddScoped<IUserBankAccountService, UserBankAccountService>();
+        services.AddScoped<IReferenceUsage, ReferenceUsage>();
         services.AddScoped<IBranchService, BranchService>();
         services.AddScoped<IWarehouseService, WarehouseService>();
         services.AddScoped<IStockReasonService, StockReasonService>();

@@ -4,6 +4,7 @@ using OrderMgmt.Application.Catalog.Customers.Interfaces;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Common.References;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
@@ -15,12 +16,14 @@ public class CustomerService : ICustomerService
     private readonly IAppDbContext _db;
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
+    private readonly IReferenceUsage _usage;
 
-    public CustomerService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser)
+    public CustomerService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, IReferenceUsage usage)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
+        _usage = usage;
     }
 
     public async Task<PagedResult<CustomerListItemDto>> ListAsync(CustomerListRequest request, PartnerRole role, CancellationToken ct = default)
@@ -228,9 +231,9 @@ public class CustomerService : ICustomerService
         var customer = await WithRole(_db.Customers, role).FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Customer), id);
         PartnerPermissionGuard.EnsureCanDelete(_currentUser, customer.IsCustomer, customer.IsSupplier);
-        if (await _db.StockVouchers.AnyAsync(v => v.PartnerId == id, ct))
+        if (await _usage.PartnerHasStockVouchersAsync(id, ct))
             throw new ConflictException("Đối tượng đã có phiếu nhập/xuất kho, không thể xóa.");
-        if (await HasCashOrDebtDataAsync(id, ct))
+        if (await _usage.PartnerHasCashOrDebtDataAsync(id, ct))
             throw new ConflictException("Đối tượng đã có phiếu thu/chi hoặc công nợ, không thể xóa.");
 
         customer.IsDeleted = true;
@@ -246,24 +249,13 @@ public class CustomerService : ICustomerService
         CancellationToken ct)
     {
         var errors = new Dictionary<string, string[]>();
-        if (customer.IsCustomer && !isCustomer && await HasDebtAsync(customer.Id, DebtSide.Receivable, ct))
+        if (customer.IsCustomer && !isCustomer && await _usage.PartnerHasDebtOnSideAsync(customer.Id, DebtSide.Receivable, ct))
             errors["isCustomer"] = new[] { "Đối tượng đã có công nợ phải thu, không bỏ được vai trò khách hàng." };
-        if (customer.IsSupplier && !isSupplier && await HasDebtAsync(customer.Id, DebtSide.Payable, ct))
+        if (customer.IsSupplier && !isSupplier && await _usage.PartnerHasDebtOnSideAsync(customer.Id, DebtSide.Payable, ct))
             errors["isSupplier"] = new[] { "Đối tượng đã có công nợ phải trả, không bỏ được vai trò nhà cung cấp." };
         if (errors.Count > 0)
             throw new ValidationDomainException(errors, null);
     }
-
-    private Task<bool> HasDebtAsync(Guid partnerId, DebtSide side, CancellationToken ct) =>
-        _db.DebtEntries.AnyAsync(e => e.PartnerId == partnerId && e.Side == side, ct);
-
-    /// Non-deleted cash vouchers, opening debts and offsets of any status (a cancelled one can be restored), and any
-    /// debt entry. Deleting the partner would leave them uneditable and its debt unreachable.
-    private async Task<bool> HasCashOrDebtDataAsync(Guid partnerId, CancellationToken ct) =>
-        await _db.DebtEntries.AnyAsync(e => e.PartnerId == partnerId, ct)
-        || await _db.CashVouchers.AnyAsync(v => v.PartnerId == partnerId, ct)
-        || await _db.OpeningDebts.AnyAsync(d => d.PartnerId == partnerId, ct)
-        || await _db.DebtOffsetVouchers.AnyAsync(o => o.PartnerId == partnerId, ct);
 
     private static IQueryable<Customer> WithRole(IQueryable<Customer> query, PartnerRole role) =>
         role == PartnerRole.Supplier ? query.Where(c => c.IsSupplier) : query.Where(c => c.IsCustomer);

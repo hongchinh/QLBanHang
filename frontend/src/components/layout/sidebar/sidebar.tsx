@@ -3,21 +3,11 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-
-export interface SidebarNavItem {
-  to: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-export interface SidebarNavGroup {
-  label: string;
-  items: SidebarNavItem[];
-}
+import type { NavGroup, NavItem } from '../nav-config';
 
 interface SidebarProps {
-  dashboardItem: SidebarNavItem;
-  groups: SidebarNavGroup[];
+  dashboardItem: NavItem;
+  groups: NavGroup[];
   collapsed: boolean;
   onClose?: () => void;
 }
@@ -42,7 +32,7 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
           <SidebarLink item={dashboardItem} collapsed={collapsed} />
         </div>
         {groups.map((group) => (
-          <div key={group.label} className="mt-4 space-y-1">
+          <div key={group.id} className="mt-4 space-y-1">
             {!collapsed && (
               <div className="px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {group.label}
@@ -59,7 +49,7 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
 }
 
 interface SidebarLinkProps {
-  item: SidebarNavItem;
+  item: NavItem;
   collapsed: boolean;
 }
 

@@ -75,6 +75,7 @@ import { DebtDocumentsPage } from '@/pages/cash-reports/debt-documents-page';
 import { DebtAgingPage } from '@/pages/cash-reports/debt-aging-page';
 import { DebtOverduePage } from '@/pages/cash-reports/debt-overdue-page';
 import { DebtBySalespersonPage } from '@/pages/cash-reports/debt-by-salesperson-page';
+import { DebtReconciliationPage } from '@/pages/cash-reports/debt-reconciliation-page';
 import { CashBookPage } from '@/pages/cash-reports/cash-book-page';
 import { ForbiddenPage, NotFoundPage } from '@/pages/error-pages';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -692,6 +693,14 @@ export function App() {
                     element={
                       <ProtectedRoute permission="reports.debt">
                         <DebtBySalespersonPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-reconciliation"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtReconciliationPage />
                       </ProtectedRoute>
                     }
                   />

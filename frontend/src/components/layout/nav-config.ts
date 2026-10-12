@@ -1,4 +1,5 @@
 import {
+  FileCheck,
   Users,
   Package,
   Tag,
@@ -95,6 +96,7 @@ const navGroups: NavGroup[] = [
       { to: '/reports/debt-aging', label: 'Tuổi nợ', icon: Hourglass, permission: 'reports.debt' },
       { to: '/reports/debt-overdue', label: 'Nợ quá hạn', icon: AlarmClock, permission: 'reports.debt' },
       { to: '/reports/debt-by-salesperson', label: 'Công nợ theo nhân viên', icon: UserRound, permission: 'reports.debt' },
+      { to: '/reports/debt-reconciliation', label: 'Biên bản đối chiếu', icon: FileCheck, permission: 'reports.debt' },
       { to: '/reports/cash-book', label: 'Sổ quỹ', icon: Wallet, permission: 'reports.cash' },
     ],
   },

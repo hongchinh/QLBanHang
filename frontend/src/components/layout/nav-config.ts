@@ -34,9 +34,17 @@ import {
   UserRound,
 } from 'lucide-react';
 import type { Permission, Role } from '@/lib/permissions';
-import type { SidebarNavGroup, SidebarNavItem } from './sidebar/sidebar';
+import type { SidebarNavGroup } from './sidebar/sidebar';
 
-interface NavItem extends SidebarNavItem {
+export interface NavItem {
+  to: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  // Sub-heading inside a group (Báo cáo only).
+  section?: string;
+}
+
+interface NavItemConfig extends NavItem {
   permission?: Permission;
   // Visible when the user has at least one of these.
   anyPermission?: Permission[];
@@ -45,7 +53,7 @@ interface NavItem extends SidebarNavItem {
 
 interface NavGroup {
   label: string;
-  items: NavItem[];
+  items: NavItemConfig[];
 }
 
 const navGroups: NavGroup[] = [

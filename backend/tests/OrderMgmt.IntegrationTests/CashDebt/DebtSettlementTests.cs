@@ -264,22 +264,17 @@ public class DebtSettlementTests : CashDebtTestBase
 
         var stale = (await FluentActions.Awaiting(() => RepostAsync(source, shrunk, confirm: true, first.Token))
             .Should().ThrowAsync<ConfirmationRequiredException>()).Which;
+        stale.Code.Should().Be("DEBT_SETTLEMENTS_WILL_BE_REMOVED");
+        stale.Details.Keys.Should().BeEquivalentTo("Y" + _suffix, "Z" + _suffix);
         SettlementRemovalConfirmation.Covers(stale.Token, new[] { s1.Id, s2.Id }).Should().BeTrue();
         (await SettlementsOfAsync(x)).Should().HaveCount(2);
 
         await RepostAsync(source, shrunk, confirm: true, stale.Token);
 
         (await SettlementsOfAsync(x)).Should().BeEmpty();
+        (await EntriesOfAsync(DebtSourceType.Opening, source)).Single().Amount.Should().Be(100m);
         await AssertCashDebtInvariantsAsync();
     }
-
-    private Task RepostAsync(Guid source, DebtEntryDraft draft, bool confirm, string? confirmedSettlements = null) =>
-        InTransactionAsync(async (sp, ct) =>
-        {
-            await sp.GetRequiredService<IDebtLedgerService>()
-                .PostAsync(DebtSourceType.Opening, source, new[] { draft }, confirm, confirmedSettlements, ct);
-            return true;
-        });
 
     [Fact]
     public async Task Settled_amounts_can_exclude_an_origin()
@@ -330,6 +325,14 @@ public class DebtSettlementTests : CashDebtTestBase
         InTransactionAsync(async (sp, ct) =>
         {
             await sp.GetRequiredService<IDebtLedgerService>().RemoveSourceAsync(DebtSourceType.Opening, sourceId, confirm, confirmedSettlements, ct);
+            return true;
+        });
+
+    private Task RepostAsync(Guid source, DebtEntryDraft draft, bool confirm, string? confirmedSettlements = null) =>
+        InTransactionAsync(async (sp, ct) =>
+        {
+            await sp.GetRequiredService<IDebtLedgerService>()
+                .PostAsync(DebtSourceType.Opening, source, new[] { draft }, confirm, confirmedSettlements, ct);
             return true;
         });
 

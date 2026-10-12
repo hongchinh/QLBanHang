@@ -1,6 +1,6 @@
 # Phase 02 — Aging & overdue reports
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 
 ## Objective

@@ -129,3 +129,132 @@ export interface CashBookReport {
   grandOut: number;
   grandClosing: number;
 }
+
+// Phase 01-02 position reports (Application/CashDebt/Reports/Models/DebtPositionReportDtos.cs). "as at" dates are yyyy-MM-dd.
+
+export interface AgingBucket {
+  from: number;
+  to?: number | null;
+}
+
+// GET /api/reports/debt-documents (reports.debt)
+export interface DebtDocumentsParams {
+  side: DebtSide;
+  at: string;
+  partnerId?: string;
+}
+
+export interface DebtDocumentRow {
+  entryId: string;
+  sourceType: DebtSourceType;
+  sourceId: string;
+  docCode: string;
+  docDate: string;
+  dueDate: string;
+  description?: string | null;
+  amount: number;
+  settled: number;
+  remaining: number;
+  daysOutstanding: number;
+  daysOverdue: number;
+}
+
+export interface DebtUnallocatedRow {
+  entryId: string;
+  sourceType: DebtSourceType;
+  sourceId: string;
+  docCode: string;
+  docDate: string;
+  description?: string | null;
+  amount: number;
+  settled: number;
+  remaining: number;
+}
+
+export interface DebtDocumentsGroup {
+  partnerId: string;
+  partnerCode?: string | null;
+  partnerName?: string | null;
+  items: DebtDocumentRow[];
+  unallocated: DebtUnallocatedRow[];
+  totalRemaining: number;
+  totalUnallocated: number;
+  balance: number;
+}
+
+export interface DebtDocumentsReport {
+  side: DebtSide;
+  at: string;
+  groups: DebtDocumentsGroup[];
+  totalRemaining: number;
+  totalUnallocated: number;
+  totalBalance: number;
+}
+
+// GET /api/reports/debt-aging (reports.debt) - buckets: "30,60,90"
+export interface DebtAgingParams {
+  side: DebtSide;
+  at: string;
+  partnerId?: string;
+  buckets?: string;
+}
+
+export interface DebtAgingRow {
+  partnerId?: string | null;
+  partnerCode?: string | null;
+  partnerName?: string | null;
+  amounts: number[];
+  totalOpen: number;
+  unallocated: number;
+  balance: number;
+}
+
+export interface DebtAgingReport {
+  side: DebtSide;
+  at: string;
+  buckets: AgingBucket[];
+  rows: DebtAgingRow[];
+  totals: DebtAgingRow;
+}
+
+// GET /api/reports/debt-overdue (reports.debt)
+export interface DebtOverdueParams {
+  side: DebtSide;
+  at: string;
+  partnerId?: string;
+  buckets?: string;
+}
+
+export interface DebtOverdueRow {
+  entryId: string;
+  sourceType: DebtSourceType;
+  sourceId: string;
+  docCode: string;
+  docDate: string;
+  dueDate: string;
+  description?: string | null;
+  amount: number;
+  remaining: number;
+  daysOverdue: number;
+  bucketIndex: number;
+}
+
+export interface DebtOverdueGroup {
+  partnerId: string;
+  partnerCode?: string | null;
+  partnerName?: string | null;
+  items: DebtOverdueRow[];
+  amounts: number[];
+  totalOverdue: number;
+  unallocated: number;
+}
+
+export interface DebtOverdueReport {
+  side: DebtSide;
+  at: string;
+  buckets: AgingBucket[];
+  groups: DebtOverdueGroup[];
+  totalAmounts: number[];
+  totalOverdue: number;
+  totalUnallocated: number;
+}

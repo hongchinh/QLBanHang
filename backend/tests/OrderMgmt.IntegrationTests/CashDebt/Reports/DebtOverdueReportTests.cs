@@ -1,3 +1,7 @@
+using OrderMgmt.Domain.Constants;
+using OrderMgmt.Application.Common.Models;
+using System.Net.Http.Json;
+using System.Net;
 using FluentAssertions;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Domain.Enums;
@@ -94,6 +98,28 @@ public class DebtOverdueReportTests : CashDebtTestBase
         item.Remaining.Should().Be(4_000m);
         item.DaysOverdue.Should().Be(21);
         group.Unallocated.Should().Be(3_000m);
+    }
+
+    [Fact]
+    public async Task Validation_and_permission()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+
+        await AssertBadRequestKeyAsync(client, "side=Receivable&at=2026-10-31&buckets=0,30", "buckets");
+        await AssertBadRequestKeyAsync(client, "side=Receivable&at=2026-10-31&buckets=1,2,3,4,5,6,7", "buckets");
+        await AssertBadRequestKeyAsync(client, "side=Receivable", "at");
+
+        var cashOnly = await CreateClientWithPermissionsAsync("do_cash_" + ids.Kh1Code[3..], ids.MainBranchId, Permissions.Reports.Cash);
+        (await cashOnly.GetAsync("/api/reports/debt-overdue?side=Receivable&at=2026-10-31"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    private static async Task AssertBadRequestKeyAsync(HttpClient client, string query, string key)
+    {
+        var response = await client.GetAsync($"/api/reports/debt-overdue?{query}");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, query);
+        (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey(key, query);
     }
 
     private HttpClient MainBranchClient(ReportIds ids)

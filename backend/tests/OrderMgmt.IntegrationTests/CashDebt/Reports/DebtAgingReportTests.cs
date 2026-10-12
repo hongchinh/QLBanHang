@@ -1,3 +1,7 @@
+using OrderMgmt.Domain.Constants;
+using OrderMgmt.Application.Common.Models;
+using System.Net.Http.Json;
+using System.Net;
 using FluentAssertions;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Domain.Enums;
@@ -108,6 +112,29 @@ public class DebtAgingReportTests : CashDebtTestBase
                     row.Balance.Should().Be(documents.Groups.Single(g => g.PartnerId == row.PartnerId).Balance, context);
             }
         }
+    }
+
+    [Fact]
+    public async Task Validation_and_permission()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+
+        await AssertBadRequestKeyAsync(client, "side=Receivable&at=2026-10-31&buckets=60,30", "buckets");
+        await AssertBadRequestKeyAsync(client, "side=Receivable&at=2026-10-31&buckets=abc", "buckets");
+        await AssertBadRequestKeyAsync(client, "side=Receivable&at=2026-10-31&buckets=2147483647", "buckets");
+        await AssertBadRequestKeyAsync(client, "side=Receivable", "at");
+
+        var cashOnly = await CreateClientWithPermissionsAsync("da_cash_" + ids.Kh1Code[3..], ids.MainBranchId, Permissions.Reports.Cash);
+        (await cashOnly.GetAsync("/api/reports/debt-aging?side=Receivable&at=2026-10-31"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    private static async Task AssertBadRequestKeyAsync(HttpClient client, string query, string key)
+    {
+        var response = await client.GetAsync($"/api/reports/debt-aging?{query}");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, query);
+        (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey(key, query);
     }
 
     private HttpClient MainBranchClient(ReportIds ids)

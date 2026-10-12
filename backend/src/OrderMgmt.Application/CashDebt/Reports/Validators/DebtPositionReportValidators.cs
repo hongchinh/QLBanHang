@@ -1,4 +1,5 @@
 using FluentValidation;
+using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 
 namespace OrderMgmt.Application.CashDebt.Reports.Validators;
@@ -18,6 +19,9 @@ public class DebtAgingReportRequestValidator : AbstractValidator<DebtAgingReport
     {
         RuleFor(x => x.Side).IsInEnum().WithMessage("Vui lòng chọn loại công nợ.");
         RuleFor(x => x.At).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Ngày báo cáo không hợp lệ.");
+        RuleFor(x => x.Buckets)
+            .Must(b => DebtAging.ParseBoundaries(b) is not null)
+            .WithMessage("Mốc ngày không hợp lệ: nhập các số nguyên dương tăng dần, cách nhau bởi dấu phẩy, tối đa 6 mốc.");
     }
 }
 
@@ -27,5 +31,8 @@ public class DebtOverdueReportRequestValidator : AbstractValidator<DebtOverdueRe
     {
         RuleFor(x => x.Side).IsInEnum().WithMessage("Vui lòng chọn loại công nợ.");
         RuleFor(x => x.At).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Ngày báo cáo không hợp lệ.");
+        RuleFor(x => x.Buckets)
+            .Must(b => DebtAging.ParseBoundaries(b) is not null)
+            .WithMessage("Mốc ngày không hợp lệ: nhập các số nguyên dương tăng dần, cách nhau bởi dấu phẩy, tối đa 6 mốc.");
     }
 }

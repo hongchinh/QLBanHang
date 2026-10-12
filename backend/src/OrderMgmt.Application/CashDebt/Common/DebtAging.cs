@@ -6,10 +6,12 @@ namespace OrderMgmt.Application.CashDebt.Common;
 public static class DebtAging
 {
     public const int MaxBoundaries = 6;
+    /// 100 years of days; keeps boundary + 1 far from int overflow.
+    public const int MaxBoundaryDays = 36500;
     public static readonly IReadOnlyList<int> DefaultBoundaries = new[] { 30, 60, 90 };
 
     /// null/blank → DefaultBoundaries. "30,60,90" (spaces allowed) → [30, 60, 90].
-    /// null when any part is not an int, a value is ≤ 0, values are not strictly ascending, or there are more than MaxBoundaries.
+    /// null when any part is not an int, a value is ≤ 0 or above MaxBoundaryDays, values are not strictly ascending, or there are more than MaxBoundaries.
     public static IReadOnlyList<int>? ParseBoundaries(string? text)
     {
         if (string.IsNullOrWhiteSpace(text)) return DefaultBoundaries;
@@ -21,7 +23,7 @@ public static class DebtAging
         foreach (var part in parts)
         {
             if (!int.TryParse(part.Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out var value)
-                || value <= 0
+                || value <= 0 || value > MaxBoundaryDays
                 || (result.Count > 0 && value <= result[^1]))
                 return null;
             result.Add(value);

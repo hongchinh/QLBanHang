@@ -62,8 +62,8 @@ public class DebtPositionReportService : IDebtPositionReportService
                         Amount = i.Amount,
                         Settled = i.Settled,
                         Remaining = i.Open,
-                        DaysOutstanding = Math.Max(0, request.At.DayNumber - i.DocDate.DayNumber),
-                        DaysOverdue = due < request.At ? request.At.DayNumber - due.DayNumber : 0,
+                        DaysOutstanding = DebtDates.DaysOutstanding(request.At, i.DocDate),
+                        DaysOverdue = DebtDates.DaysOverdue(request.At, due),
                     };
                 }).ToList();
             var unallocated = byPartner.Where(i => i.Direction == DebtDirection.Decrease)
@@ -116,7 +116,7 @@ public class DebtPositionReportService : IDebtPositionReportService
 
     private async Task<DebtOverdueReportDto> BuildOverdueAsync(DebtOverdueReportRequest request, CancellationToken ct)
     {
-        var boundaries = DebtAging.ParseBoundaries(request.Buckets) ?? DebtAging.DefaultBoundaries;
+        var boundaries = DebtAging.ParseBoundaries(request.Buckets)!;
         var buckets = DebtAging.Ranges(boundaries, firstFrom: 1);
         var branchId = await _currentBranch.GetIdAsync(ct);
         var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.At));
@@ -147,7 +147,7 @@ public class DebtPositionReportService : IDebtPositionReportService
                 .ThenBy(x => x.Entry.DocCode, StringComparer.Ordinal).ThenBy(x => x.Entry.EntryId)
                 .Select(x =>
                 {
-                    var days = request.At.DayNumber - x.Due.DayNumber;
+                    var days = DebtDates.DaysOverdue(request.At, x.Due);
                     var bucket = DebtAging.BucketIndex(days, boundaries);
                     amounts[bucket] += x.Entry.Open;
                     return new DebtOverdueRowDto
@@ -197,7 +197,7 @@ public class DebtPositionReportService : IDebtPositionReportService
 
     private async Task<DebtAgingReportDto> BuildAgingAsync(DebtAgingReportRequest request, CancellationToken ct)
     {
-        var boundaries = DebtAging.ParseBoundaries(request.Buckets) ?? DebtAging.DefaultBoundaries;
+        var boundaries = DebtAging.ParseBoundaries(request.Buckets)!;
         var buckets = DebtAging.Ranges(boundaries, firstFrom: 0);
         var branchId = await _currentBranch.GetIdAsync(ct);
         var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.At));
@@ -217,7 +217,7 @@ public class DebtPositionReportService : IDebtPositionReportService
             var amounts = new decimal[buckets.Count];
             foreach (var item in byPartner.Where(i => i.Direction == DebtDirection.Increase))
             {
-                var age = Math.Max(0, request.At.DayNumber - item.DocDate.DayNumber);
+                var age = DebtDates.DaysOutstanding(request.At, item.DocDate);
                 amounts[DebtAging.BucketIndex(age, boundaries)] += item.Open;
             }
             var unallocated = byPartner.Where(i => i.Direction == DebtDirection.Decrease).Sum(i => i.Open);

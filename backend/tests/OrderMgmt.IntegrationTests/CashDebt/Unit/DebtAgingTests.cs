@@ -24,6 +24,8 @@ public class DebtAgingTests
     [InlineData("60,30")]
     [InlineData("30,30")]
     [InlineData("1,2,3,4,5,6,7")]
+    [InlineData("36501")]
+    [InlineData("30,2147483647")]
     public void Parse_rejects_invalid_input(string text)
     {
         DebtAging.ParseBoundaries(text).Should().BeNull();

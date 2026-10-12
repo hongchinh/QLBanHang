@@ -1,0 +1,42 @@
+import type * as React from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
+
+interface SidebarFlyoutProps {
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  // Background + text classes of the title icon block.
+  iconClassName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trigger: React.ReactElement;
+  children: React.ReactNode;
+}
+
+export function SidebarFlyout({ title, icon: Icon, iconClassName, open, onOpenChange, trigger, children }: SidebarFlyoutProps) {
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent side="right">{title}</TooltipContent>
+      </Tooltip>
+      <PopoverContent
+        side="right"
+        align="start"
+        collisionPadding={8}
+        className="max-h-[var(--radix-popover-content-available-height)] w-60 overflow-y-auto p-2"
+      >
+        <div className="mb-1 flex items-center gap-2 px-1 py-1 text-sm font-semibold">
+          <span aria-hidden className={cn('flex h-[26px] w-[26px] items-center justify-center rounded-md', iconClassName)}>
+            <Icon className="h-4 w-4" />
+          </span>
+          {title}
+        </div>
+        {children}
+      </PopoverContent>
+    </Popover>
+  );
+}

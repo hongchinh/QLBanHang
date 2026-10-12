@@ -9,6 +9,7 @@ import { filterNavGroups, findActiveItem, resolvePinnedItems } from './nav-searc
 import { SidebarGroup } from './sidebar-group';
 import { SidebarItem, type PinControls } from './sidebar-item';
 import { SidebarPinChips } from './sidebar-pin-chips';
+import { SidebarRail } from './sidebar-rail';
 import { SidebarSearch } from './sidebar-search';
 
 const EMPTY_PINS: string[] = []; // module scope: a stable fallback for the selector
@@ -118,18 +119,13 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
         </div>
       )}
       {collapsed ? (
-        <nav className="flex-1 overflow-y-auto overflow-x-hidden px-2 py-3">
-          <div className="space-y-1">
-            <SidebarItem item={dashboardItem} active={dashboardItem.to === activePath} collapsed />
-          </div>
-          {groups.map((group) => (
-            <div key={group.id} className="mt-4 space-y-1">
-              {group.items.map((item) => (
-                <SidebarItem key={item.to} item={item} active={item.to === activePath} collapsed />
-              ))}
-            </div>
-          ))}
-        </nav>
+        <SidebarRail
+          dashboardItem={dashboardItem}
+          groups={groups}
+          activePath={activePath}
+          activeGroupId={activeGroupId}
+          pins={pins}
+        />
       ) : (
         <>
           <SidebarSearch

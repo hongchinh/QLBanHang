@@ -16,6 +16,7 @@ interface SidebarItemProps {
   collapsed?: boolean;
   match?: MatchRange;
   pins?: PinControls;
+  onNavigate?: () => void;
 }
 
 function Highlight({ text, match }: { text: string; match?: MatchRange }) {
@@ -30,12 +31,13 @@ function Highlight({ text, match }: { text: string; match?: MatchRange }) {
   );
 }
 
-export function SidebarItem({ item, active, collapsed = false, match, pins }: SidebarItemProps) {
+export function SidebarItem({ item, active, collapsed = false, match, pins, onNavigate }: SidebarItemProps) {
   const { to, label, icon: Icon } = item;
   const pinned = pins?.pinned.has(to) ?? false;
   const link = (
     <Link
       to={to}
+      onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed ? label : undefined}
       className={cn(
@@ -92,19 +94,32 @@ interface SidebarItemListProps {
   hidden?: boolean;
   matches?: ReadonlyMap<string, MatchRange>;
   pins?: PinControls;
+  onNavigate?: () => void;
+  showSections?: boolean;
 }
 
-export function SidebarItemList({ label, items, activePath, id, hidden, matches, pins }: SidebarItemListProps) {
+export function SidebarItemList({
+  label,
+  items,
+  activePath,
+  id,
+  hidden,
+  matches,
+  pins,
+  onNavigate,
+  showSections = true,
+}: SidebarItemListProps) {
   return (
     <ul aria-label={label} id={id} hidden={hidden} className="space-y-0.5 pl-2">
       {items.map((item, index) => (
         <SectionedItem
           key={item.to}
           item={item}
-          showHeading={item.section !== undefined && item.section !== items[index - 1]?.section}
+          showHeading={showSections && item.section !== undefined && item.section !== items[index - 1]?.section}
           active={item.to === activePath}
           match={matches?.get(item.to)}
           pins={pins}
+          onNavigate={onNavigate}
         />
       ))}
     </ul>
@@ -117,9 +132,10 @@ interface SectionedItemProps {
   active: boolean;
   match?: MatchRange;
   pins?: PinControls;
+  onNavigate?: () => void;
 }
 
-function SectionedItem({ item, showHeading, active, match, pins }: SectionedItemProps) {
+function SectionedItem({ item, showHeading, active, match, pins, onNavigate }: SectionedItemProps) {
   return (
     <>
       {showHeading && (
@@ -127,7 +143,7 @@ function SectionedItem({ item, showHeading, active, match, pins }: SectionedItem
           <h4 className="px-3 pb-0.5 pt-2 text-[11px] font-semibold text-muted-foreground">{item.section}</h4>
         </li>
       )}
-      <SidebarItem item={item} active={active} match={match} pins={pins} />
+      <SidebarItem item={item} active={active} match={match} pins={pins} onNavigate={onNavigate} />
     </>
   );
 }

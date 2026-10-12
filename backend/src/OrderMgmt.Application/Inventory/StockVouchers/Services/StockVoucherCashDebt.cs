@@ -1,10 +1,8 @@
-using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
-using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
 using OrderMgmt.Domain.Common;
@@ -16,17 +14,15 @@ namespace OrderMgmt.Application.Inventory.StockVouchers.Services;
 /// The cash and debt steps of a stock voucher save (section-03 §5).
 public class StockVoucherCashDebt : IStockVoucherCashDebt
 {
-    private readonly IAppDbContext _db;
     private readonly ICashDebtLock _cashDebtLock;
     private readonly IDebtLedgerService _ledger;
     private readonly IAutoCashVoucherService _auto;
     private readonly ICreditLimitGuard _creditGuard;
     private readonly IFundBalanceGuard _fundGuard;
 
-    public StockVoucherCashDebt(IAppDbContext db, ICashDebtLock cashDebtLock, IDebtLedgerService ledger,
+    public StockVoucherCashDebt(ICashDebtLock cashDebtLock, IDebtLedgerService ledger,
         IAutoCashVoucherService auto, ICreditLimitGuard creditGuard, IFundBalanceGuard fundGuard)
     {
-        _db = db;
         _cashDebtLock = cashDebtLock;
         _ledger = ledger;
         _auto = auto;
@@ -53,15 +49,12 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
     /// from the stock entry is held while the steps go on as confirmed, so that the 422 also lists the automatic
     /// entry's settlements; throwing it then rolls the transaction back.
     /// The entries those settlements joined may belong to other stock vouchers, whose Auto settlements are then
-    /// recomputed (this voucher's own is set by SyncAsync).
+    /// recomputed before the commit (AutoRecomputeHook; this voucher's own is set by SyncAsync).
     public async Task SyncDebtAsync(StockVoucher voucher, StockReason reason, bool remove, bool confirmRemoveSettlements,
         CancellationToken ct)
     {
         var sourceType = DebtSourceOf(voucher.Type);
         await _ledger.RemoveOwnSettlementsAsync(sourceType, voucher.Id, SettlementOrigin.Auto, ct);
-        // Read once the own Auto settlement is gone, so this voucher's own entries are not among them (only a Manual
-        // settlement between the two could bring them back, and recomputing this voucher again changes nothing).
-        var counterparts = await CounterpartEntryIdsAsync(voucher, sourceType, ct);
 
         Task PostOrRemoveAsync(bool confirm) => remove
             ? _ledger.RemoveSourceAsync(sourceType, voucher.Id, confirm, ct)
@@ -90,22 +83,6 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
 
         if (stockRemovals is not null)
             throw stockRemovals;
-
-        await _auto.RecomputeAutoAsync(counterparts, ct);
-    }
-
-    /// The entries settled against the voucher's stock entry or its automatic voucher's entry.
-    private async Task<IReadOnlyList<Guid>> CounterpartEntryIdsAsync(StockVoucher voucher, DebtSourceType sourceType,
-        CancellationToken ct)
-    {
-        var ids = (await _ledger.CounterpartEntryIdsAsync(sourceType, voucher.Id, ct)).ToList();
-        var auto = await _db.CashVouchers.Where(v => v.SourceStockVoucherId == voucher.Id)
-            .Select(v => new { v.Id, v.Type })
-            .FirstOrDefaultAsync(ct);
-        if (auto is not null)
-            ids.AddRange(await _ledger.CounterpartEntryIdsAsync(
-                auto.Type == CashVoucherType.Receipt ? DebtSourceType.Receipt : DebtSourceType.Payment, auto.Id, ct));
-        return ids;
     }
 
     /// The stock draft: one entry when the reason affects debt and the total is positive, none otherwise.

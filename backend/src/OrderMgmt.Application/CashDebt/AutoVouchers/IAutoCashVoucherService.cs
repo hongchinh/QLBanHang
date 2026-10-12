@@ -25,8 +25,9 @@ public interface IAutoCashVoucherService
     /// An Auto settlement dated on or before the branch's LockedUntil is left unchanged (user decision 2026-10-09,
     /// brainstorm section-02 §5): the open-period write goes through, and RecomputeReopenedAsync recomputes it when
     /// its period reopens.
-    /// A write that may remove settlements reads the entries they join first (the ledger's CounterpartEntryIdsAsync)
-    /// and calls this after its own new settlements, so Auto takes only what is left; saves.
+    /// AutoRecomputeHook calls this just before the commit with the entries joined by the settlements a request removed
+    /// (SettlementChangeCollector), so Auto takes only what is left after the request's own new settlements; saves.
+    /// An id that needs nothing changes nothing.
     /// Locks: a settlement joins entries of one branch, partner and side, so the partner key the caller holds for the
     /// removed settlements covers these stock vouchers too. Settlements move no money, so no fund key is needed.
     Task RecomputeAutoAsync(IEnumerable<Guid> entryIds, CancellationToken ct = default);

@@ -37,12 +37,10 @@ public class DebtOffsetService : IDebtOffsetService
     private readonly IDocumentCodeAllocator _codes;
     private readonly IDebtLedgerService _ledger;
     private readonly IDebtQueryService _debtQuery;
-    private readonly IAutoCashVoucherService _auto;
 
     public DebtOffsetService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch, IDateTime clock,
         ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock,
-        IDocumentCodeAllocator codes, IDebtLedgerService ledger, IDebtQueryService debtQuery,
-        IAutoCashVoucherService auto)
+        IDocumentCodeAllocator codes, IDebtLedgerService ledger, IDebtQueryService debtQuery)
     {
         _db = db;
         _currentUser = currentUser;
@@ -54,7 +52,6 @@ public class DebtOffsetService : IDebtOffsetService
         _codes = codes;
         _ledger = ledger;
         _debtQuery = debtQuery;
-        _auto = auto;
     }
 
     public async Task<DebtOffsetListResult> ListAsync(DebtOffsetListRequest request, CancellationToken ct = default)
@@ -239,15 +236,13 @@ public class DebtOffsetService : IDebtOffsetService
 
     /// Removes the offset's Offset settlements (its own: no confirmation, P23) and its two entries. Any other
     /// settlement on its entries (an entry freed when a settled document was cancelled or shrunk, brainstorm §5, then
-    /// matched manually or allocated by a voucher) belongs to another document, so it asks first (P10, P21). The
-    /// entries they were settled against are read first: a stock voucher among them gets its Auto settlement
-    /// recomputed, since the freed room goes back to its paid amount (Phase 07 rule, 2026-10-09).
+    /// matched manually or allocated by a voucher) belongs to another document, so it asks first (P10, P21). A stock
+    /// voucher among the entries those settlements joined gets its Auto settlement recomputed before the commit
+    /// (AutoRecomputeHook), since the freed room goes back to its paid amount (Phase 07 rule, 2026-10-09).
     private async Task RemoveDebtAsync(DebtOffsetVoucher offset, bool confirmRemoveSettlements, CancellationToken ct)
     {
-        var counterparts = await _ledger.CounterpartEntryIdsAsync(DebtSourceType.Offset, offset.Id, ct);
         await _ledger.RemoveOwnSettlementsAsync(DebtSourceType.Offset, offset.Id, SettlementOrigin.Offset, ct);
         await _ledger.RemoveSourceAsync(DebtSourceType.Offset, offset.Id, confirmRemoveSettlements, ct);
-        await _auto.RecomputeAutoAsync(counterparts, ct);
     }
 
     /// Cancel and delete (the controller checks their permission): working branch, status and version. There is no

@@ -37,12 +37,11 @@ public class CashVoucherService : ICashVoucherService
     private readonly IDebtQueryService _debtQuery;
     private readonly IFundBalanceGuard _fundGuard;
     private readonly ICustomerService _customers;
-    private readonly IAutoCashVoucherService _auto;
 
     public CashVoucherService(IAppDbContext db, ICurrentUser currentUser, ICurrentBranch currentBranch, IDateTime clock,
         ITransactionRunner transaction, IInventoryLock inventoryLock, ICashDebtLock cashDebtLock,
         IDocumentCodeAllocator codes, IDebtLedgerService ledger, IDebtQueryService debtQuery, IFundBalanceGuard fundGuard,
-        ICustomerService customers, IAutoCashVoucherService auto)
+        ICustomerService customers)
     {
         _db = db;
         _currentUser = currentUser;
@@ -56,7 +55,6 @@ public class CashVoucherService : ICashVoucherService
         _debtQuery = debtQuery;
         _fundGuard = fundGuard;
         _customers = customers;
-        _auto = auto;
     }
 
     public async Task<CashVoucherListResult> ListAsync(CashVoucherListRequest request, CancellationToken ct = default)
@@ -273,10 +271,9 @@ public class CashVoucherService : ICashVoucherService
             var fundCapture = await _fundGuard.CaptureAsync(new[] { (voucher.FundId, from), (request.FundId, from) }, c);
 
             // A list replaces the voucher's own AtVoucher settlements (C8); null keeps them. Every other origin stays
-            // and is subject to the shrink and partner rules of PostAsync (P10, P11). The entries they join are read
-            // first: a stock voucher among them gets its Auto settlement recomputed once the new allocations are in.
+            // and is subject to the shrink and partner rules of PostAsync (P10, P11). A stock voucher among the entries
+            // of a removed settlement gets its Auto settlement recomputed before the commit (AutoRecomputeHook).
             var sourceType = SourceTypeOf(voucher.Type);
-            var counterparts = await _ledger.CounterpartEntryIdsAsync(sourceType, voucher.Id, c);
             if (request.Allocations is not null)
                 await _ledger.RemoveOwnSettlementsAsync(sourceType, voucher.Id, SettlementOrigin.AtVoucher, c);
 
@@ -286,7 +283,6 @@ public class CashVoucherService : ICashVoucherService
             var entries = await _ledger.PostAsync(sourceType, voucher.Id, DraftsOf(voucher, reason),
                 request.ConfirmRemoveSettlements, c);
             await AllocateAsync(entries, request.Allocations, c);
-            await _auto.RecomputeAutoAsync(counterparts, c);
             await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, CashDocumentActivityAction.Updated, "Cập nhật phiếu");
             await _db.SaveChangesAsync(c);
@@ -335,15 +331,10 @@ public class CashVoucherService : ICashVoucherService
                 v.IsDeleted = true;
             }, ct);
 
-    /// Cancel / delete: removes the voucher's entry (its settlements need confirmation, P10), then recomputes the Auto
-    /// settlement of the stock vouchers whose entries it was settled against.
-    private async Task RemoveDebtAsync(CashVoucher voucher, bool confirmRemoveSettlements, CancellationToken ct)
-    {
-        var sourceType = SourceTypeOf(voucher.Type);
-        var counterparts = await _ledger.CounterpartEntryIdsAsync(sourceType, voucher.Id, ct);
-        await _ledger.RemoveSourceAsync(sourceType, voucher.Id, confirmRemoveSettlements, ct);
-        await _auto.RecomputeAutoAsync(counterparts, ct);
-    }
+    /// Cancel / delete: removes the voucher's entry (its settlements need confirmation, P10). The Auto settlement of
+    /// the stock vouchers whose entries it was settled against is recomputed before the commit (AutoRecomputeHook).
+    private Task RemoveDebtAsync(CashVoucher voucher, bool confirmRemoveSettlements, CancellationToken ct) =>
+        _ledger.RemoveSourceAsync(SourceTypeOf(voucher.Type), voucher.Id, confirmRemoveSettlements, ct);
 
     /// Cancel / restore / delete per the steps table: locks, period lock on the stored date, fund capture, the
     /// operation's own steps (`apply`), save, the negative-fund check on the voucher's fund, then the activity.

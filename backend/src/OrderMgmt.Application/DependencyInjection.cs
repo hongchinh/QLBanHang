@@ -48,6 +48,7 @@ using OrderMgmt.Application.CashDebt.Reports.Interfaces;
 using OrderMgmt.Application.CashDebt.Reports.Services;
 using OrderMgmt.Application.CashDebt.Settings.Interfaces;
 using OrderMgmt.Application.CashDebt.Settings.Services;
+using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.References;
 using OrderMgmt.Application.Inventory.Costing;
 using OrderMgmt.Application.Inventory.Ledger;
@@ -127,6 +128,7 @@ public static class DependencyInjection
         services.AddScoped<IFundService, FundService>();
         services.AddScoped<ICreditLimitService, CreditLimitService>();
         services.AddScoped<IDebtActivityLog, DebtActivityLog>();
+        services.AddScoped<SettlementChangeCollector>();
         services.AddScoped<IDebtLedgerService, DebtLedgerService>();
         services.AddScoped<IDebtQueryService, DebtQueryService>();
         services.AddScoped<ICreditLimitGuard, CreditLimitGuard>();
@@ -135,6 +137,7 @@ public static class DependencyInjection
         services.AddScoped<ICashVoucherService, CashVoucherService>();
         services.AddScoped<IFundTransferService, FundTransferService>();
         services.AddScoped<IAutoCashVoucherService, AutoCashVoucherService>();
+        services.AddScoped<IBeforeCommitHook, AutoRecomputeHook>();
         services.AddScoped<IDebtService, DebtService>();
         services.AddScoped<IDebtOffsetService, DebtOffsetService>();
         services.AddScoped<ICashDebtReportService, CashDebtReportService>();

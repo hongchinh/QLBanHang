@@ -5,6 +5,8 @@ namespace OrderMgmt.Application.CashDebt.Ledger;
 
 /// Writes debt entries and settlements. Callers run inside ITransactionRunner and hold the branch gate and
 /// partner locks (P14).
+/// Every removal of a non-Auto settlement is recorded in SettlementChangeCollector, and AutoRecomputeHook recomputes the
+/// Auto settlements of the stock vouchers involved just before the commit, so callers do not.
 public interface IDebtLedgerService
 {
     /// Save path (P21, P11). At most one draft per side (else ArgumentException). Upserts in place by
@@ -35,9 +37,4 @@ public interface IDebtLedgerService
     /// Σ settlement amounts per entry, optionally excluding one origin.
     Task<IReadOnlyDictionary<Guid, decimal>> SettledAmountsAsync(IEnumerable<Guid> entryIds,
         SettlementOrigin? excludeOrigin = null, CancellationToken ct = default);
-
-    /// Ids of the entries settled against the source's entries (the other entry of each settlement). A write that may
-    /// remove those settlements reads them first, then passes them to IAutoCashVoucherService.RecomputeAutoAsync.
-    Task<IReadOnlyList<Guid>> CounterpartEntryIdsAsync(DebtSourceType sourceType, Guid sourceId,
-        CancellationToken ct = default);
 }

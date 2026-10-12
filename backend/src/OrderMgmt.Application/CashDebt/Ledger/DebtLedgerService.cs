@@ -17,13 +17,16 @@ public class DebtLedgerService : IDebtLedgerService
     private readonly IDebtActivityLog _activityLog;
     private readonly ICurrentUser _currentUser;
     private readonly IDateTime _clock;
+    private readonly SettlementChangeCollector _changes;
 
-    public DebtLedgerService(IAppDbContext db, IDebtActivityLog activityLog, ICurrentUser currentUser, IDateTime clock)
+    public DebtLedgerService(IAppDbContext db, IDebtActivityLog activityLog, ICurrentUser currentUser, IDateTime clock,
+        SettlementChangeCollector changes)
     {
         _db = db;
         _activityLog = activityLog;
         _currentUser = currentUser;
         _clock = clock;
+        _changes = changes;
     }
 
     public async Task<IReadOnlyList<DebtEntry>> PostAsync(DebtSourceType sourceType, Guid sourceId,
@@ -134,6 +137,7 @@ public class DebtLedgerService : IDebtLedgerService
             return;
 
         _db.DebtSettlements.RemoveRange(own);
+        RecordRemoved(own);
         await _db.SaveChangesAsync(ct);
     }
 
@@ -244,25 +248,6 @@ public class DebtLedgerService : IDebtLedgerService
         return result;
     }
 
-    public async Task<IReadOnlyList<Guid>> CounterpartEntryIdsAsync(DebtSourceType sourceType, Guid sourceId,
-        CancellationToken ct = default)
-    {
-        var own = await _db.DebtEntries
-            .Where(e => e.SourceType == sourceType && e.SourceId == sourceId)
-            .Select(e => e.Id)
-            .ToListAsync(ct);
-        if (own.Count == 0)
-            return Array.Empty<Guid>();
-
-        var pairs = await _db.DebtSettlements
-            .Where(s => own.Contains(s.IncreaseEntryId) || own.Contains(s.DecreaseEntryId))
-            .Select(s => new { s.IncreaseEntryId, s.DecreaseEntryId })
-            .ToListAsync(ct);
-        return pairs.Select(p => own.Contains(p.IncreaseEntryId) ? p.DecreaseEntryId : p.IncreaseEntryId)
-            .Distinct()
-            .ToList();
-    }
-
     /// The first slot holds an Increase entry and the second a Decrease entry of the same branch, partner and side.
     private static (string Field, string Message)? PairError(DebtEntry? increase, DebtEntry? decrease)
     {
@@ -302,10 +287,19 @@ public class DebtLedgerService : IDebtLedgerService
             await _activityLog.SettlementRemovedAsync(increase, decrease, s.Amount, ct);
             await _activityLog.SettlementRemovedAsync(decrease, increase, s.Amount, ct);
             _db.DebtSettlements.Remove(s);
+            RecordRemoved(new[] { s });
             removed.Add(new RemovedSettlement(s.Id, s.IncreaseEntryId, s.DecreaseEntryId, s.Amount, s.Origin));
         }
 
         return removed;
+    }
+
+    /// Notes the entries of a removed settlement for AutoRecomputeHook. An Auto settlement is the recompute's own work,
+    /// so it never feeds it again.
+    private void RecordRemoved(IEnumerable<DebtSettlement> settlements)
+    {
+        foreach (var s in settlements.Where(s => s.Origin != SettlementOrigin.Auto))
+            _changes.Record(s.IncreaseEntryId, s.DecreaseEntryId);
     }
 
     /// `entries` keyed by id, plus the other entry of every settlement.

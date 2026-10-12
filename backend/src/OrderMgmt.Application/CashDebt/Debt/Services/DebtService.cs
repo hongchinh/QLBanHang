@@ -23,7 +23,6 @@ public class DebtService : IDebtService
     private readonly IAppDbContext _db;
     private readonly IDebtQueryService _debtQuery;
     private readonly IDebtLedgerService _ledger;
-    private readonly IAutoCashVoucherService _auto;
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryLock _inventoryLock;
     private readonly ICashDebtLock _cashDebtLock;
@@ -32,13 +31,12 @@ public class DebtService : IDebtService
     private readonly ICurrentBranch _currentBranch;
 
     public DebtService(IAppDbContext db, IDebtQueryService debtQuery, IDebtLedgerService ledger,
-        IAutoCashVoucherService auto, ITransactionRunner transaction, IInventoryLock inventoryLock,
+        ITransactionRunner transaction, IInventoryLock inventoryLock,
         ICashDebtLock cashDebtLock, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch)
     {
         _db = db;
         _debtQuery = debtQuery;
         _ledger = ledger;
-        _auto = auto;
         _transaction = transaction;
         _inventoryLock = inventoryLock;
         _cashDebtLock = cashDebtLock;
@@ -220,10 +218,10 @@ public class DebtService : IDebtService
             PeriodLockGuard.EnsureNotLocked(lockedUntil, settlements.Select(s => s.EffectiveAt));
 
             // Logs SettlementRemoved on both documents. The freed room goes back to the Auto settlement of any stock
-            // voucher whose entry (or automatic voucher's entry) was matched here (Phase 07 rule, 2026-10-09).
+            // voucher whose entry (or automatic voucher's entry) was matched here, before the commit
+            // (AutoRecomputeHook; Phase 07 rule, 2026-10-09).
             var removed = await _ledger.RemoveSettlementsAsync(settlements.Select(s => s.Id).ToList(), c);
             var entryIds = removed.SelectMany(r => new[] { r.IncreaseEntryId, r.DecreaseEntryId }).ToList();
-            await _auto.RecomputeAutoAsync(entryIds, c);
             await TouchCashVouchersAsync(entryIds, c);
         }, ct);
     }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { LayoutDashboard } from 'lucide-react';
 import type { NavItem } from '../nav-config';
 import { allNavGroups } from './sidebar-test-utils';
-import { filterNavGroups, findActiveItem, normalizeVi } from './nav-search';
+import { filterNavGroups, findActiveItem, normalizeVi, resolvePinnedItems } from './nav-search';
 
 const item = (to: string): NavItem => ({ to, label: to, icon: LayoutDashboard });
 const ITEMS = [
@@ -93,5 +93,18 @@ describe('filterNavGroups', () => {
 
   it('returns nothing for an unknown word', () => {
     expect(filterNavGroups(groups, 'xyz')).toEqual({ groups: [], matches: new Map(), count: 0 });
+  });
+});
+
+describe('resolvePinnedItems', () => {
+  const groups = allNavGroups();
+
+  it('returns visible items in pin order', () => {
+    expect(resolvePinnedItems(['/receipts', '/quotations'], groups).map((i) => i.label)).toEqual(['Phiếu thu', 'Báo giá']);
+  });
+
+  it('skips paths without a visible item', () => {
+    const salesOnly = groups.filter((g) => g.id === 'sales');
+    expect(resolvePinnedItems(['/receipts', '/gone', '/quotations'], salesOnly).map((i) => i.to)).toEqual(['/quotations']);
   });
 });

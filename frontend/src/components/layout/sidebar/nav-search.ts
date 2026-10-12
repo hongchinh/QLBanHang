@@ -59,3 +59,10 @@ export function filterNavGroups(groups: readonly NavGroup[], query: string): Nav
   }
   return { groups: result, matches, count: countItems(result) };
 }
+
+// Items for the stored pin paths, in pin order. Paths the user can no longer see
+// (lost permission, removed route) are skipped here but stay in the store.
+export function resolvePinnedItems(paths: readonly string[], groups: readonly NavGroup[]): NavItem[] {
+  const byPath = new Map(groups.flatMap((g) => g.items.map((i) => [i.to, i] as const)));
+  return paths.flatMap((p) => byPath.get(p) ?? []);
+}

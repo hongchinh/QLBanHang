@@ -54,11 +54,14 @@ public class StockVoucherHelpersTests : InventoryTestBase
         // The current user's latest voucher of the type gives the selections.
         var supplier = await CreatePartnerAsync("DF-NCC", isCustomer: false, isSupplier: true);
         var ck = await InDbAsync(db => db.PaymentMethods.Where(m => m.Code == "CK").Select(m => m.Id).SingleAsync());
+        await CreateBankFundAsync(); // CK pays the total through the default bank fund (P9).
         await CreateVoucherAsync(_client, StockDirection.In, "NMH", "2026-10-02 08:00", r =>
         {
             r.WarehouseId = kho02;
             r.PartnerId = supplier;
             r.PaymentMethodId = ck;
+            // The automatic payment overdraws the new, empty bank fund (P17): acknowledged.
+            r.AcknowledgeNegativeFund = true;
         }, LineRequest(p, 1, 10_000));
 
         (await GetDefaultsAsync(_client, "type=In")).Should().BeEquivalentTo(new

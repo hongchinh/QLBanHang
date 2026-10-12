@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch, type FieldPath, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { addDays, format } from 'date-fns';
 import { ArrowLeft, Ban, RotateCcw, Save, Trash2, X } from 'lucide-react';
 import {
   useCancelStockVoucher,
@@ -27,6 +28,7 @@ import {
   type StockVoucherDraftPartner,
   type StockVoucherDraftStorage,
 } from '@/features/stock-vouchers/use-stock-voucher-draft';
+import type { FundKind } from '@/features/cash-common/types';
 import type { PartnerType } from '@/features/stock-reasons/types';
 import type {
   PartnerSearchItem,
@@ -39,8 +41,12 @@ import type {
 import { useWarehouses } from '@/features/warehouses/hooks';
 import { useStockReasons } from '@/features/stock-reasons/hooks';
 import { usePaymentMethods } from '@/features/payment-methods/hooks';
+import { useFunds } from '@/features/funds/hooks';
+import { defaultFund, selectableFunds } from '@/features/funds/utils';
 import { useInventorySettings } from '@/features/inventory-settings/hooks';
+import { ActivityHistory } from '@/components/activity-history/activity-history';
 import { PartnerAutocomplete } from '@/components/partner-autocomplete/partner-autocomplete';
+import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonLoader } from '@/components/ui/button-loader';
@@ -48,25 +54,27 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
+import { useDocumentActions } from '@/hooks/useDocumentActions';
+import { getErrorMessage } from '@/lib/api-client';
+import type { ConfirmFlags } from '@/lib/confirm-required';
+import { toOptionalNumber } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
+import { CustomerDebtPanel } from './components/customer-debt-panel';
 import { StockLineGrid } from './components/stock-line-grid';
 import { StockTotalsPanel } from './components/stock-totals-panel';
-import { NegativeStockDialog } from './components/negative-stock-dialog';
-import { toShortages, type NegativeStockShortage } from './components/negative-stock';
-import { StockVoucherActivityHistory } from './components/stock-voucher-activity-history';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
 
 type SubmitIntent = 'save-stay' | 'save-exit' | 'update';
 type VoucherActionKind = 'cancel' | 'restore' | 'delete';
+// `flags` accumulates the confirmations (P10) the user already accepted; every resend carries all of them.
 type PendingAction =
-  | { kind: 'save'; intent: SubmitIntent; payload: UpsertStockVoucherRequest }
-  | { kind: VoucherActionKind; version?: number };
+  | { kind: 'save'; intent: SubmitIntent; payload: UpsertStockVoucherRequest; flags: ConfirmFlags }
+  | { kind: VoucherActionKind; version?: number; flags: ConfirmFlags };
 
 const CONFIRM_LABELS: Record<PendingAction['kind'], string> = {
   save: 'Vẫn lưu',
@@ -86,6 +94,9 @@ const CONCURRENCY_MESSAGE =
   'Phiếu đã được người khác cập nhật. Đã tải lại dữ liệu — các thay đổi chưa lưu đã bị bỏ.';
 const CONCURRENCY_RELOAD_FAILED_MESSAGE =
   'Phiếu đã được người khác cập nhật nhưng không tải lại được dữ liệu. Các thay đổi của bạn vẫn được giữ — vui lòng thử lại.';
+
+// Header fields that show their own error message.
+const HEADER_ERROR_FIELDS = new Set<string>(['fundId', 'dueDate', 'paidAmount', 'paymentMethodId']);
 
 const LINE_ERROR_FIELDS = new Set<string>([
   'productId',
@@ -169,27 +180,27 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     return { draft: isEdit ? null : readStockVoucherDraft(type, userId, branchId), userId, branchId };
   });
 
+  const [initialValues] = useState<StockVoucherFormValues>(
+    () => mountData.draft?.values ?? toFormDefaults(voucher, defaults),
+  );
   const form = useForm<StockVoucherFormValues, unknown, StockVoucherFormParsed>({
     resolver: zodResolver(stockVoucherSchema) as unknown as Resolver<
       StockVoucherFormValues,
       unknown,
       StockVoucherFormParsed
     >,
-    defaultValues: mountData.draft?.values ?? toFormDefaults(voucher, defaults),
+    defaultValues: initialValues,
   });
+  // A fund or due date that is already set counts as chosen by the user: defaults never overwrite it.
+  const fundPickedRef = useRef(!!initialValues.fundId);
+  const dueDateTouchedRef = useRef(!!initialValues.dueDate);
 
   const [selectedPartner, setSelectedPartner] = useState<StockVoucherDraftPartner | null>(
     () => mountData.draft?.selectedPartner ?? partnerOf(voucher),
   );
-  const [busy, setBusy] = useState(false);
   // `busy` is set only after async validation; the ref blocks a second submit (Ctrl+S key repeat) at once.
   const submittingRef = useRef(false);
   const [confirmKind, setConfirmKind] = useState<VoucherActionKind | null>(null);
-  const [negative, setNegative] = useState<{
-    action: PendingAction;
-    blocked: boolean;
-    shortages: NegativeStockShortage[];
-  } | null>(null);
 
   const { hasDraft, draftSavedAt, clearDraft } = useStockVoucherDraft({
     form,
@@ -212,8 +223,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     if (!voucher || voucher.version === lastVersionRef.current) return;
     lastVersionRef.current = voucher.version;
     if (isDirty) return;
-    form.reset(toFormDefaults(voucher));
-    setSelectedPartner(partnerOf(voucher));
+    resetTo(voucher);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voucher?.version]);
 
@@ -221,18 +231,25 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const { data: allReasons = [] } = useStockReasons({ direction: type });
   const reasons = allReasons.filter((r) => r.direction === type);
   const { data: paymentMethods = [] } = usePaymentMethods();
+  const { data: funds } = useFunds();
   const { data: settings } = useInventorySettings();
 
   const watchedLines = (useWatch({ control: form.control, name: 'lines' }) ?? []) as StockLineFormValues[];
-  const freight = toNum(useWatch({ control: form.control, name: 'freight' })) ?? 0;
-  const orderDiscount = toNum(useWatch({ control: form.control, name: 'orderDiscount' })) ?? 0;
-  const paidAmount = toNum(useWatch({ control: form.control, name: 'paidAmount' }));
+  const freight = toOptionalNumber(useWatch({ control: form.control, name: 'freight' })) ?? 0;
+  const orderDiscount = toOptionalNumber(useWatch({ control: form.control, name: 'orderDiscount' })) ?? 0;
+  const paidAmount = toOptionalNumber(useWatch({ control: form.control, name: 'paidAmount' }));
   const paidAmountTouched = useWatch({ control: form.control, name: 'paidAmountTouched' });
   const voucherAt = useWatch({ control: form.control, name: 'voucherAt' });
   const warehouseId = useWatch({ control: form.control, name: 'warehouseId' });
   const reasonId = useWatch({ control: form.control, name: 'reasonId' });
   const paymentMethodId = useWatch({ control: form.control, name: 'paymentMethodId' });
+  const fundId = useWatch({ control: form.control, name: 'fundId' }) ?? '';
   const selectedReason = reasons.find((r) => r.id === reasonId);
+  // undefined while the chosen method is not loaded yet: the paid amount and fund are then left alone.
+  const methodFundKind: FundKind | undefined = paymentMethodId
+    ? paymentMethods.find((m) => m.id === paymentMethodId)?.fundKind
+    : 'None';
+  const methodHasFund = methodFundKind === 'Cash' || methodFundKind === 'Bank';
 
   const computed = computeStockVoucher(
     { direction: type, freight, orderDiscount, netExcludesVat: settings?.netExcludesVat ?? false },
@@ -240,11 +257,44 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   );
   const total = computed.totals.total;
 
-  // paidAmount follows the total until the user edits it.
+  // Until the user edits it, paidAmount follows the total for a method with a fund and is 0 otherwise (P9).
+  // A read-only voucher always shows what is stored.
+  const defaultPaid = readOnly || methodFundKind === undefined ? undefined : methodHasFund ? total : 0;
+  // A method without a fund moves no money: the server rejects a paid amount for it, so the input is locked at 0.
+  const paidLocked = !readOnly && methodFundKind !== undefined && !methodHasFund;
   useEffect(() => {
-    if (paidAmountTouched || paidAmount === total) return;
-    form.setValue('paidAmount', total);
-  }, [form, paidAmountTouched, paidAmount, total]);
+    // An edit made under another method is dropped; the amount follows the default again.
+    if (paidLocked && paidAmountTouched) {
+      form.setValue('paidAmountTouched', false);
+      return;
+    }
+    if (paidAmountTouched || defaultPaid === undefined || paidAmount === defaultPaid) return;
+    form.setValue('paidAmount', defaultPaid);
+  }, [form, paidLocked, paidAmountTouched, paidAmount, defaultPaid]);
+  const effectivePaid = (paidAmountTouched && !paidLocked) || defaultPaid === undefined ? (paidAmount ?? 0) : defaultPaid;
+
+  // "Quỹ": only money that moves needs a fund. The branch's default fund of the method's kind is used
+  // until the user picks one; a picked fund of another kind gives way to the new kind's default.
+  const fundShown = effectivePaid > 0 && methodHasFund;
+  const fundOptions = funds && methodHasFund ? selectableFunds(funds, methodFundKind, fundId) : [];
+  useEffect(() => {
+    if (readOnly || !funds || !methodHasFund) return;
+    const current = funds.find((f) => f.id === fundId);
+    if (fundPickedRef.current && current?.kind === methodFundKind) return;
+    fundPickedRef.current = false;
+    const next = defaultFund(funds, methodFundKind)?.id ?? '';
+    if (next !== fundId) form.setValue('fundId', next);
+  }, [form, readOnly, funds, methodHasFund, methodFundKind, fundId]);
+
+  // "Hạn thanh toán" (P27): debt-increasing reasons only; pre-filled with voucher date + partner credit days.
+  const dueDateShown =
+    selectedReason?.debtEffect === 'ReceivableIncrease' || selectedReason?.debtEffect === 'PayableIncrease';
+  const creditDays = selectedPartner?.creditDays;
+  useEffect(() => {
+    if (readOnly || dueDateTouchedRef.current || !dueDateShown) return;
+    const next = creditDays == null ? '' : addDaysToLocalDate(voucherAt, creditDays);
+    if (next !== (form.getValues('dueDate') ?? '')) form.setValue('dueDate', next, { shouldDirty: true });
+  }, [form, readOnly, dueDateShown, creditDays, voucherAt]);
 
   // Expected number for the chosen date; never resets or unmounts the form (review m5).
   // `defaults` holds the number for server "now"; any other date (a restored draft's included) asks again.
@@ -266,88 +316,72 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   const activitiesQuery = useStockVoucherActivities(id, isEdit);
 
+  // Customer debt panel (P6): stock-out sales to a picked partner, for debt.partner_summary or reports.debt.
+  const hasPermission = useAuthStore((s) => s.hasPermission);
+  const canSeePartnerDebt = hasPermission('debt.partner_summary') || hasPermission('reports.debt');
+  const debtPanelPartnerId =
+    type === 'Out' && selectedReason?.debtEffect === 'ReceivableIncrease' && canSeePartnerDebt
+      ? selectedPartner?.id
+      : undefined;
+
   function resetTo(fresh: StockVoucher) {
     lastVersionRef.current = fresh.version;
-    form.reset(toFormDefaults(fresh));
+    const values = toFormDefaults(fresh);
+    fundPickedRef.current = !!values.fundId;
+    dueDateTouchedRef.current = !!values.dueDate;
+    form.reset(values);
     setSelectedPartner(partnerOf(fresh));
   }
 
-  async function runAction(action: PendingAction, acknowledgeNegativeStock: boolean) {
-    setBusy(true);
-    try {
-      if (action.kind === 'save') {
-        const payload = { ...action.payload, acknowledgeNegativeStock };
-        if (id) {
-          const saved = await update.mutateAsync({ id, data: payload });
-          resetTo(saved);
-          toast({ variant: 'success', title: 'Đã cập nhật phiếu', description: saved.code });
-        } else {
-          const saved = await create.mutateAsync(payload);
-          clearDraft();
-          toast({ variant: 'success', title: `Đã tạo ${labels.title.toLowerCase()}`, description: saved.code });
-          if (action.intent === 'save-exit') navigate(labels.basePath);
-          else navigate(`${labels.basePath}/${saved.id}`, { replace: true });
-        }
-      } else if (id) {
-        const body = { version: action.version, acknowledgeNegativeStock };
-        if (action.kind === 'delete') {
-          await remove.mutateAsync({ id, type, body });
-          toast({ variant: 'success', title: 'Đã xóa phiếu' });
-          navigate(labels.basePath);
-        } else {
-          const saved = await (action.kind === 'cancel' ? cancel : restore).mutateAsync({ id, body });
-          resetTo(saved);
-          toast({ variant: 'success', title: action.kind === 'cancel' ? 'Đã hủy phiếu' : 'Đã khôi phục phiếu' });
-        }
+  const { busy, run: runAction, confirmDialogProps } = useDocumentActions<PendingAction>({
+    perform,
+    reload: refetchVoucher,
+    onReloaded: (fresh) => resetTo(fresh as StockVoucher),
+    applyValidationErrors: applyServerErrors,
+    errorTitles: ERROR_TITLES,
+    confirmLabels: CONFIRM_LABELS,
+    concurrencyMessage: CONCURRENCY_MESSAGE,
+    concurrencyReloadFailedMessage: CONCURRENCY_RELOAD_FAILED_MESSAGE,
+  });
+
+  async function perform(action: PendingAction) {
+    if (action.kind === 'save') {
+      const payload = { ...action.payload, ...action.flags };
+      if (id) {
+        const saved = await update.mutateAsync({ id, data: payload });
+        resetTo(saved);
+        toast({ variant: 'success', title: 'Đã cập nhật phiếu', description: saved.code });
+      } else {
+        const saved = await create.mutateAsync(payload);
+        clearDraft();
+        toast({ variant: 'success', title: `Đã tạo ${labels.title.toLowerCase()}`, description: saved.code });
+        if (action.intent === 'save-exit') navigate(labels.basePath);
+        else navigate(`${labels.basePath}/${saved.id}`, { replace: true });
       }
-    } catch (err) {
-      await handleError(err, action);
-    } finally {
-      setBusy(false);
+    } else if (id) {
+      const body = { version: action.version, ...action.flags };
+      if (action.kind === 'delete') {
+        await remove.mutateAsync({ id, type, body });
+        toast({ variant: 'success', title: 'Đã xóa phiếu' });
+        navigate(labels.basePath);
+      } else {
+        const saved = await (action.kind === 'cancel' ? cancel : restore).mutateAsync({ id, body });
+        resetTo(saved);
+        toast({ variant: 'success', title: action.kind === 'cancel' ? 'Đã hủy phiếu' : 'Đã khôi phục phiếu' });
+      }
     }
   }
 
-  async function handleError(err: unknown, action: PendingAction) {
-    const apiError = getApiError(err);
-    switch (apiError?.code) {
-      case 'NEGATIVE_STOCK_WARNING':
-      case 'NEGATIVE_STOCK_BLOCKED':
-        setNegative({
-          action,
-          blocked: apiError.code === 'NEGATIVE_STOCK_BLOCKED',
-          shortages: toShortages(apiError.details),
-        });
-        return;
-      case 'CONCURRENCY': {
-        // D29: reload and drop local edits; never resend stale values with the new version.
-        const fresh = await refetchVoucher().catch(() => undefined);
-        if (!fresh) {
-          // Nothing reloaded: keep the user's edits rather than resetting to the stale cache.
-          toast({ variant: 'destructive', title: CONCURRENCY_RELOAD_FAILED_MESSAGE });
-          return;
-        }
-        resetTo(fresh);
-        toast({ variant: 'destructive', title: CONCURRENCY_MESSAGE });
-        return;
-      }
-      case 'VALIDATION':
-        if (apiError.details && applyLineErrors(apiError.details)) {
-          toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: apiError.message });
-          return;
-        }
-        break;
-    }
-    toast({ variant: 'destructive', title: ERROR_TITLES[action.kind], description: formatApiErrorDetails(err) });
-  }
-
-  // Maps `lines[i].field` keys onto the grid; returns true when every key was a line key.
-  function applyLineErrors(details: Record<string, string[]>): boolean {
+  // Maps `lines[i].field` keys onto the grid and the header keys onto their fields; returns true when every key was mapped.
+  function applyServerErrors(details: Record<string, string[]>): boolean {
     let allMapped = true;
     for (const [key, messages] of Object.entries(details)) {
       const match = /^lines\[(\d+)\]\.(\w+)$/.exec(key);
       if (match && LINE_ERROR_FIELDS.has(match[2])) {
         const path = `lines.${match[1]}.${match[2]}` as FieldPath<StockVoucherFormValues>;
         form.setError(path, { type: 'server', message: messages[0] });
+      } else if (HEADER_ERROR_FIELDS.has(key)) {
+        form.setError(key as FieldPath<StockVoucherFormValues>, { type: 'server', message: messages[0] });
       } else {
         allMapped = false;
       }
@@ -367,7 +401,15 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     submittingRef.current = true;
     dropBlankLines();
     void form
-      .handleSubmit((parsed) => runAction({ kind: 'save', intent, payload: toUpsertPayload(type, parsed) }, false))()
+      .handleSubmit((parsed) => {
+        // Hidden fields are not sent: the server applies its own defaults.
+        const visible = {
+          ...parsed,
+          fundId: fundShown ? parsed.fundId : undefined,
+          dueDate: dueDateShown ? parsed.dueDate : undefined,
+        };
+        return runAction({ kind: 'save', intent, payload: toUpsertPayload(type, visible), flags: {} });
+      })()
       .finally(() => {
         submittingRef.current = false;
       });
@@ -390,7 +432,14 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     form.setValue('partnerName', p.name, { shouldDirty: true });
     form.setValue('partnerAddress', p.companyAddress ?? '', { shouldDirty: true });
     form.setValue('partnerTaxCode', p.taxCode ?? '', { shouldDirty: true });
-    setSelectedPartner({ id: p.id, code: p.code, name: p.name, isCustomer: p.isCustomer, isSupplier: p.isSupplier });
+    setSelectedPartner({
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      isCustomer: p.isCustomer,
+      isSupplier: p.isSupplier,
+      creditDays: p.creditDays,
+    });
   }
 
   function clearPartner() {
@@ -450,6 +499,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                   className="ml-0.5 hover:text-amber-900"
                   onClick={() => {
                     clearDraft();
+                    fundPickedRef.current = false;
+                    dueDateTouchedRef.current = false;
                     form.reset(toFormDefaults(undefined, defaults));
                     setSelectedPartner(null);
                   }}
@@ -608,7 +659,50 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                       </option>
                     ))}
                   </select>
+                  <FieldError message={errors.paymentMethodId?.message} />
                 </div>
+
+                {(fundShown || dueDateShown) && (
+                  <div className="form-inline-grid form-cols-2">
+                    {fundShown && (
+                      <>
+                        <Label htmlFor="stock-fund" className="field-label">Quỹ</Label>
+                        <select
+                          id="stock-fund"
+                          className={SELECT_CLASS}
+                          value={fundId}
+                          onChange={(e) => {
+                            fundPickedRef.current = true;
+                            form.setValue('fundId', e.target.value, { shouldDirty: true });
+                          }}
+                        >
+                          {!fundId && <option value="">-- Chọn quỹ --</option>}
+                          {fundOptions.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {`${f.code} - ${f.name}`}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                    {dueDateShown && (
+                      <>
+                        <Label htmlFor="stock-due-date" className="field-label">Hạn thanh toán</Label>
+                        <Input
+                          id="stock-due-date"
+                          type="date"
+                          className="h-7"
+                          {...form.register('dueDate', {
+                            onChange: () => {
+                              dueDateTouchedRef.current = true;
+                            },
+                          })}
+                        />
+                      </>
+                    )}
+                    <FieldError message={errors.fundId?.message ?? errors.dueDate?.message} />
+                  </div>
+                )}
 
                 <div className="form-inline-grid">
                   <Label htmlFor="stock-voucher-note" className="field-label">Ghi chú</Label>
@@ -618,28 +712,34 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
             </CardContent>
           </Card>
 
-          <StockTotalsPanel
-            type={type}
-            totals={computed.totals}
-            freight={freight}
-            orderDiscount={orderDiscount}
-            paidAmount={paidAmountTouched ? (paidAmount ?? 0) : total}
-            onFreightChange={(v) => form.setValue('freight', v, { shouldDirty: true })}
-            onOrderDiscountChange={(v) => form.setValue('orderDiscount', v, { shouldDirty: true })}
-            onPaidAmountChange={(v) => {
-              form.setValue('paidAmount', v, { shouldDirty: true });
-              form.setValue('paidAmountTouched', true, { shouldDirty: true });
-            }}
-            onApplyVatToAll={
-              type === 'In'
-                ? (rate) =>
-                    form.getValues('lines').forEach((_, i) =>
-                      form.setValue(`lines.${i}.vatRate`, rate, { shouldDirty: true }),
-                    )
-                : undefined
-            }
-            readOnly={readOnly}
-          />
+          <div className="flex flex-col gap-4 [&>*:first-child]:flex-1">
+            <StockTotalsPanel
+              type={type}
+              totals={computed.totals}
+              freight={freight}
+              orderDiscount={orderDiscount}
+              paidAmount={effectivePaid}
+              paidAmountDisabled={paidLocked}
+              paidAmountError={errors.paidAmount?.message}
+              onFreightChange={(v) => form.setValue('freight', v, { shouldDirty: true })}
+              onOrderDiscountChange={(v) => form.setValue('orderDiscount', v, { shouldDirty: true })}
+              onPaidAmountChange={(v) => {
+                form.setValue('paidAmount', v, { shouldDirty: true });
+                form.setValue('paidAmountTouched', true, { shouldDirty: true });
+              }}
+              onApplyVatToAll={
+                type === 'In'
+                  ? (rate) =>
+                      form.getValues('lines').forEach((_, i) =>
+                        form.setValue(`lines.${i}.vatRate`, rate, { shouldDirty: true }),
+                      )
+                  : undefined
+              }
+              autoVoucher={autoVoucherOf(voucher)}
+              readOnly={readOnly}
+            />
+            {debtPanelPartnerId && <CustomerDebtPanel partnerId={debtPanelPartnerId} />}
+          </div>
         </div>
 
         <Card>
@@ -663,7 +763,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
             <CardTitle>Lịch sử</CardTitle>
           </CardHeader>
           <CardContent className="pt-3">
-            <StockVoucherActivityHistory
+            <ActivityHistory
               activities={activitiesQuery.data ?? []}
               isLoading={activitiesQuery.isLoading}
               isError={activitiesQuery.isError}
@@ -704,31 +804,31 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
         onConfirm={() => confirmVoucherAction('delete')}
       />
 
-      <NegativeStockDialog
-        open={!!negative}
-        blocked={negative?.blocked ?? false}
-        shortages={negative?.shortages ?? []}
-        confirmLabel={negative ? CONFIRM_LABELS[negative.action.kind] : undefined}
-        onConfirm={() => {
-          if (!negative) return;
-          const { action } = negative;
-          setNegative(null);
-          void runAction(action, true);
-        }}
-        onClose={() => setNegative(null)}
-      />
+      <ConfirmRequiredDialog {...confirmDialogProps} />
     </div>
   );
 
   function confirmVoucherAction(kind: VoucherActionKind) {
     setConfirmKind(null);
-    void runAction({ kind, version: form.getValues('version') }, false);
+    void runAction({ kind, version: form.getValues('version'), flags: {} });
   }
 }
 
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="field-message field-message-code text-destructive">{message}</p>;
+}
+
+function autoVoucherOf(voucher?: StockVoucher) {
+  if (!voucher?.autoCashVoucherId || !voucher.autoCashVoucherCode || !voucher.autoCashVoucherType) return undefined;
+  return { id: voucher.autoCashVoucherId, code: voucher.autoCashVoucherCode, type: voucher.autoCashVoucherType };
+}
+
+// datetime-local value (local VN time) + days → yyyy-MM-dd, without going through UTC.
+function addDaysToLocalDate(local: string | undefined, days: number): string {
+  if (!local) return '';
+  const date = new Date(local);
+  return Number.isNaN(date.getTime()) ? '' : format(addDays(date, days), 'yyyy-MM-dd');
 }
 
 function partnerOf(voucher?: StockVoucher): StockVoucherDraftPartner | null {
@@ -748,27 +848,21 @@ function partnerFits(
   return role ?? nextType === previousType;
 }
 
-function toNum(v: unknown): number | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : undefined;
-}
-
 function toStockLineLike(line: StockLineFormValues): StockLineLike {
   return {
     trackInventory: line.trackInventory,
     pricingMode: line.pricingMode,
     priceIncludesVat: line.priceIncludesVat,
-    sheetCount: toNum(line.sheetCount),
-    length: toNum(line.length),
-    width: toNum(line.width),
-    thickness: toNum(line.thickness),
-    quantity: toNum(line.quantity) ?? 0,
-    unitPrice: toNum(line.unitPrice) ?? 0,
-    discountRate: toNum(line.discountRate) ?? 0,
-    discountAmount: toNum(line.discountAmount),
+    sheetCount: toOptionalNumber(line.sheetCount),
+    length: toOptionalNumber(line.length),
+    width: toOptionalNumber(line.width),
+    thickness: toOptionalNumber(line.thickness),
+    quantity: toOptionalNumber(line.quantity) ?? 0,
+    unitPrice: toOptionalNumber(line.unitPrice) ?? 0,
+    discountRate: toOptionalNumber(line.discountRate) ?? 0,
+    discountAmount: toOptionalNumber(line.discountAmount),
     discountManual: line.discountManual,
-    vatRate: toNum(line.vatRate) ?? 0,
+    vatRate: toOptionalNumber(line.vatRate) ?? 0,
   };
 }
 

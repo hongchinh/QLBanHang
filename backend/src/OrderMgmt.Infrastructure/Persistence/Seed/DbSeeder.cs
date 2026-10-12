@@ -6,6 +6,7 @@ using Microsoft.Extensions.Options;
 using OrderMgmt.Application.Identity.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
 using OrderMgmt.Domain.Entities.Inventory;
@@ -137,6 +138,37 @@ public static class DbSeeder
             (Permissions.Inventory.ManageCatalogs, Permissions.InventoryModule, "Quản lý kho, lý do nhập xuất, hình thức thanh toán"),
             (Permissions.Inventory.Settings, Permissions.InventoryModule, "Cấu hình kho, đánh số chứng từ"),
             (Permissions.Inventory.RecalcCost, Permissions.InventoryModule, "Tính lại giá vốn"),
+
+            (Permissions.Receipts.View, Permissions.CashModule, "Phiếu thu - Xem"),
+            (Permissions.Receipts.Create, Permissions.CashModule, "Phiếu thu - Tạo"),
+            (Permissions.Receipts.Edit, Permissions.CashModule, "Phiếu thu - Sửa"),
+            (Permissions.Receipts.Delete, Permissions.CashModule, "Phiếu thu - Xóa"),
+            (Permissions.Receipts.Cancel, Permissions.CashModule, "Phiếu thu - Hủy"),
+            (Permissions.Receipts.EditAll, Permissions.CashModule, "Phiếu thu - Sửa của người khác"),
+            (Permissions.Payments.View, Permissions.CashModule, "Phiếu chi - Xem"),
+            (Permissions.Payments.Create, Permissions.CashModule, "Phiếu chi - Tạo"),
+            (Permissions.Payments.Edit, Permissions.CashModule, "Phiếu chi - Sửa"),
+            (Permissions.Payments.Delete, Permissions.CashModule, "Phiếu chi - Xóa"),
+            (Permissions.Payments.Cancel, Permissions.CashModule, "Phiếu chi - Hủy"),
+            (Permissions.Payments.EditAll, Permissions.CashModule, "Phiếu chi - Sửa của người khác"),
+            (Permissions.FundTransfers.View, Permissions.CashModule, "Chuyển quỹ - Xem"),
+            (Permissions.FundTransfers.Create, Permissions.CashModule, "Chuyển quỹ - Tạo"),
+            (Permissions.FundTransfers.Edit, Permissions.CashModule, "Chuyển quỹ - Sửa"),
+            (Permissions.FundTransfers.Delete, Permissions.CashModule, "Chuyển quỹ - Xóa"),
+            (Permissions.FundTransfers.Cancel, Permissions.CashModule, "Chuyển quỹ - Hủy"),
+            (Permissions.FundTransfers.EditAll, Permissions.CashModule, "Chuyển quỹ - Sửa của người khác"),
+            (Permissions.DebtOffsets.View, Permissions.CashModule, "Bù trừ công nợ - Xem"),
+            (Permissions.DebtOffsets.Create, Permissions.CashModule, "Bù trừ công nợ - Tạo"),
+            (Permissions.DebtOffsets.Cancel, Permissions.CashModule, "Bù trừ công nợ - Hủy"),
+            (Permissions.DebtOffsets.Delete, Permissions.CashModule, "Bù trừ công nợ - Xóa"),
+            (Permissions.Debt.Matching, Permissions.CashModule, "Đối trừ chứng từ"),
+            (Permissions.Debt.OpeningBalance, Permissions.CashModule, "Nợ đầu kỳ"),
+            (Permissions.Debt.PartnerSummary, Permissions.CashModule, "Xem công nợ khách trên phiếu xuất"),
+            (Permissions.Cash.OpeningBalance, Permissions.CashModule, "Số dư quỹ đầu kỳ"),
+            (Permissions.Cash.ManageCatalogs, Permissions.CashModule, "Danh mục lý do thu/chi và quỹ"),
+            (Permissions.Cash.Settings, Permissions.CashModule, "Cấu hình tiền & công nợ"),
+            (Permissions.CreditLimits.Manage, Permissions.CashModule, "Hạn mức nợ"),
+            (Permissions.Reports.Cash, Permissions.ReportModule, "Sổ quỹ"),
         };
 
         var inserted = new HashSet<string>();
@@ -165,6 +197,7 @@ public static class DbSeeder
                 Permissions.Quotations.View, Permissions.Quotations.Create, Permissions.Quotations.Update,
                 Permissions.Quotations.Print,
                 Permissions.Quotations.TransferOwn,
+                Permissions.Debt.PartnerSummary,
             }),
             (RoleCodes.Accountant, "Kế toán", new[]
             {
@@ -175,6 +208,17 @@ public static class DbSeeder
                 // it still need it granted manually via the UI.
                 Permissions.Quotations.AccountingConfirm,
                 Permissions.Reports.Revenue, Permissions.Reports.Debt,
+                Permissions.Receipts.View, Permissions.Receipts.Create, Permissions.Receipts.Edit,
+                Permissions.Receipts.Delete, Permissions.Receipts.Cancel, Permissions.Receipts.EditAll,
+                Permissions.Payments.View, Permissions.Payments.Create, Permissions.Payments.Edit,
+                Permissions.Payments.Delete, Permissions.Payments.Cancel, Permissions.Payments.EditAll,
+                Permissions.FundTransfers.View, Permissions.FundTransfers.Create, Permissions.FundTransfers.Edit,
+                Permissions.FundTransfers.Delete, Permissions.FundTransfers.Cancel, Permissions.FundTransfers.EditAll,
+                Permissions.DebtOffsets.View, Permissions.DebtOffsets.Create, Permissions.DebtOffsets.Cancel,
+                Permissions.DebtOffsets.Delete,
+                Permissions.Debt.Matching, Permissions.Debt.OpeningBalance, Permissions.Debt.PartnerSummary,
+                Permissions.Cash.OpeningBalance, Permissions.Cash.ManageCatalogs, Permissions.Cash.Settings,
+                Permissions.CreditLimits.Manage, Permissions.Reports.Cash,
             }),
             (RoleCodes.Warehouse, "Kho / giao hàng", new[]
             {
@@ -286,24 +330,54 @@ public static class DbSeeder
         if (!await db.Warehouses.IgnoreQueryFilters().AnyAsync(ct))
             db.Warehouses.Add(new Warehouse { Code = "KHO01", Name = "Kho chính", BranchId = BranchDefaults.MainBranchId });
 
-        if (!await db.StockReasons.IgnoreQueryFilters().AnyAsync(ct))
+        // System stock reasons: each is inserted only when its code is missing (soft-deleted rows count).
+        var stockReasonCodes = await db.StockReasons.IgnoreQueryFilters().Select(r => r.Code).ToListAsync(ct);
+        var stockReasonSeeds = new[]
         {
-            db.StockReasons.AddRange(
-                new StockReason { Code = "NMH", Name = "Nhập mua hàng", Direction = StockDirection.In, PartnerType = PartnerType.Supplier, IsSystem = true },
-                new StockReason { Code = "NKH", Name = "Nhập khác", Direction = StockDirection.In, PartnerType = PartnerType.Any, IsSystem = true },
-                new StockReason { Code = "XBH", Name = "Xuất bán hàng", Direction = StockDirection.Out, PartnerType = PartnerType.Customer, IsSystem = true },
-                new StockReason { Code = "XKH", Name = "Xuất khác", Direction = StockDirection.Out, PartnerType = PartnerType.Any, IsSystem = true });
-        }
+            NewStockReason("NMH", "Nhập mua hàng", StockDirection.In, PartnerType.Supplier, DebtEffect.PayableIncrease),
+            NewStockReason("NKH", "Nhập khác", StockDirection.In, PartnerType.Any, DebtEffect.None),
+            NewStockReason("XBH", "Xuất bán hàng", StockDirection.Out, PartnerType.Customer, DebtEffect.ReceivableIncrease),
+            NewStockReason("XKH", "Xuất khác", StockDirection.Out, PartnerType.Any, DebtEffect.None),
+            NewStockReason("NTL", "Nhập hàng bán bị trả lại", StockDirection.In, PartnerType.Customer, DebtEffect.ReceivableDecrease),
+            NewStockReason("XTL", "Xuất trả hàng NCC", StockDirection.Out, PartnerType.Supplier, DebtEffect.PayableDecrease),
+        };
+        db.StockReasons.AddRange(stockReasonSeeds.Where(r => !stockReasonCodes.Contains(r.Code)));
 
         if (!await db.PaymentMethods.IgnoreQueryFilters().AnyAsync(ct))
         {
             db.PaymentMethods.AddRange(
-                new PaymentMethod { Code = "TM", Name = "Tiền mặt", IsCash = true },
-                new PaymentMethod { Code = "CK", Name = "Chuyển khoản", IsCash = false });
+                new PaymentMethod { Code = "TM", Name = "Tiền mặt", FundKind = FundKind.Cash },
+                new PaymentMethod { Code = "CK", Name = "Chuyển khoản", FundKind = FundKind.Bank });
         }
+
+        // System cash reasons: each is inserted only when its code is missing (soft-deleted rows count).
+        var cashReasonCodes = await db.CashReasons.IgnoreQueryFilters().Select(r => r.Code).ToListAsync(ct);
+        var cashReasonSeeds = new[]
+        {
+            NewCashReason("TKH", "Thu tiền khách hàng", CashVoucherType.Receipt, PartnerType.Customer, DebtEffect.ReceivableDecrease, false),
+            NewCashReason("THNCC", "Thu hoàn tiền NCC", CashVoucherType.Receipt, PartnerType.Supplier, DebtEffect.PayableIncrease, false),
+            NewCashReason("TK", "Thu khác", CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None, false),
+            NewCashReason("TNCC", "Trả tiền nhà cung cấp", CashVoucherType.Payment, PartnerType.Supplier, DebtEffect.PayableDecrease, false),
+            NewCashReason("CHKH", "Chi hoàn tiền khách hàng", CashVoucherType.Payment, PartnerType.Customer, DebtEffect.ReceivableIncrease, false),
+            NewCashReason("CK", "Chi khác", CashVoucherType.Payment, PartnerType.Any, DebtEffect.None, false),
+            NewCashReason("TPX", "Thu tiền theo phiếu xuất", CashVoucherType.Receipt, PartnerType.Any, DebtEffect.None, true),
+            NewCashReason("CPN", "Chi tiền theo phiếu nhập", CashVoucherType.Payment, PartnerType.Any, DebtEffect.None, true),
+        };
+        db.CashReasons.AddRange(cashReasonSeeds.Where(r => !cashReasonCodes.Contains(r.Code)));
+
+        // Every branch without any fund (soft-deleted ones count) gets the default cash fund QTM (P18).
+        var branchesWithFund = await db.Funds.IgnoreQueryFilters().Select(f => f.BranchId).Distinct().ToListAsync(ct);
+        foreach (var branchId in branchIds.Except(branchesWithFund))
+            db.Funds.Add(new Fund { BranchId = branchId, Code = "QTM", Name = "Quỹ tiền mặt", Kind = FundKind.Cash, IsDefault = true });
 
         await db.SaveChangesAsync(ct);
     }
+
+    private static StockReason NewStockReason(string code, string name, StockDirection direction, PartnerType partnerType, DebtEffect effect)
+        => new() { Code = code, Name = name, Direction = direction, PartnerType = partnerType, DebtEffect = effect, IsSystem = true };
+
+    private static CashReason NewCashReason(string code, string name, CashVoucherType type, PartnerType partnerType, DebtEffect effect, bool isAuto)
+        => new() { Code = code, Name = name, Type = type, PartnerType = partnerType, DebtEffect = effect, IsSystem = true, IsAuto = isAuto };
 
     private static async Task SeedReferenceDataAsync(AppDbContext db, CancellationToken ct)
     {

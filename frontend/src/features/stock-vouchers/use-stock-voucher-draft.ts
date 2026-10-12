@@ -10,6 +10,8 @@ export interface StockVoucherDraftPartner {
   // Known only when the partner was picked from the search (not for a loaded voucher).
   isCustomer?: boolean;
   isSupplier?: boolean;
+  // Pre-fills the due date (P27); known only for a partner picked from the search.
+  creditDays?: number | null;
 }
 
 export interface StockVoucherDraftStorage {

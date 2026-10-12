@@ -242,16 +242,32 @@ describe('RolesMatrixPage', () => {
     );
   });
 
-  it('renders an unknown module at the end with its raw name', async () => {
+  it('shows the cash module group', async () => {
     listPermissionsMock.mockResolvedValue([
+      { code: 'receipts.view', name: 'Xem phiếu thu', module: 'cash' },
       ...PERMISSIONS,
-      { code: 'cash.view', name: 'Xem phiếu thu chi', module: 'cash' },
+      { code: 'stock_in.view', name: 'Xem phiếu nhập kho', module: 'inventory' },
     ]);
     renderPage();
     await waitForMatrix();
 
-    expect(screen.getByText('cash')).toBeInTheDocument();
-    expect(screen.getByRole('checkbox', { name: /SALES cash\.view/i })).toBeInTheDocument();
+    const cash = screen.getByText('Tiền & Công nợ');
+    const kho = screen.getByText('Kho');
+    // "Tiền & Công nợ" is rendered after "Kho".
+    expect(kho.compareDocumentPosition(cash) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: /SALES receipts\.view/i })).toBeInTheDocument();
+  });
+
+  it('renders an unknown module at the end with its raw name', async () => {
+    listPermissionsMock.mockResolvedValue([
+      ...PERMISSIONS,
+      { code: 'misc.view', name: 'Quyền khác', module: 'misc' },
+    ]);
+    renderPage();
+    await waitForMatrix();
+
+    expect(screen.getByText('misc')).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /SALES misc\.view/i })).toBeInTheDocument();
   });
 
   it('opens create dialog and submits POST', async () => {

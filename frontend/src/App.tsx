@@ -20,10 +20,22 @@ import { ProductGroupListPage } from '@/pages/product-groups/product-group-list-
 import { WarehouseListPage } from '@/pages/warehouses/warehouse-list-page';
 import { StockReasonListPage } from '@/pages/stock-reasons/stock-reason-list-page';
 import { PaymentMethodListPage } from '@/pages/payment-methods/payment-method-list-page';
+// Round 2A: 10.4 cash reasons
+import { CashReasonListPage } from '@/pages/cash-reasons/cash-reason-list-page';
+// Round 2A: 10.5 funds
+import { FundListPage } from '@/pages/funds/fund-list-page';
+// Round 2A: 12.4 opening debts
+import { OpeningDebtPage } from '@/pages/debt/opening-debt-page';
+// Round 2A: 10.7 credit limits
+import { CreditLimitListPage } from '@/pages/credit-limits/credit-limit-list-page';
 import { QuotationListPage } from '@/pages/quotations/quotation-list-page';
 import { QuotationFormPage } from '@/pages/quotations/quotation-form-page';
 import { StockVoucherFormPage } from '@/pages/stock-vouchers/stock-voucher-form-page';
 import { StockVoucherListPage } from '@/pages/stock-vouchers/stock-voucher-list-page';
+// Round 2A: 11.3 receipts and payments
+import { CashVoucherListPage } from '@/pages/cash-vouchers/cash-voucher-list-page';
+// Round 2A: 11.4 receipt and payment form
+import { CashVoucherFormPage } from '@/pages/cash-vouchers/cash-voucher-form-page';
 import { MyQuotationSettingsPage } from '@/pages/settings/my-quotation-settings-page';
 import { PaymentQrPage } from '@/pages/payment-qr/payment-qr-page';
 import { QuotationSystemSettingsPage } from '@/pages/settings/quotation-system-settings-page';
@@ -33,9 +45,19 @@ import { PeriodLockPage } from '@/pages/settings/period-lock-page';
 import { InventorySettingsPage } from '@/pages/settings/inventory-settings-page';
 import { NumberingSettingsPage } from '@/pages/settings/numbering-settings-page';
 import { RecalcCostPage } from '@/pages/settings/recalc-cost-page';
+// Round 2A: 10.8 cash settings
+import { CashSettingsPage } from '@/pages/settings/cash-settings-page';
 import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
 import { StockOnHandPage } from '@/pages/inventory/stock-on-hand-page';
 import { StockCardPage } from '@/pages/inventory/stock-card-page';
+// Round 2A: 11.5 fund transfers
+import { FundTransferListPage } from '@/pages/fund-transfers/fund-transfer-list-page';
+import { FundTransferFormPage } from '@/pages/fund-transfers/fund-transfer-form-page';
+// Round 2A: 12.2 debt matching
+import { DebtMatchingPage } from '@/pages/debt/debt-matching-page';
+// Round 2A: 12.3 debt offsets
+import { DebtOffsetListPage } from '@/pages/debt/debt-offset-list-page';
+import { DebtOffsetFormPage } from '@/pages/debt/debt-offset-form-page';
 import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
@@ -46,6 +68,10 @@ import { SalesPerformancePage } from '@/pages/reports/sales-performance-page';
 import { SalesRevenuePage } from '@/pages/reports/sales-revenue-page';
 import { SalesRevenueDetailPage } from '@/pages/reports/sales-revenue-detail-page';
 import { VehicleRevenuePage } from '@/pages/reports/vehicle-revenue-page';
+// Round 2A: 12.5 debt balance, debt ledger and cash book reports
+import { DebtBalancePage } from '@/pages/cash-reports/debt-balance-page';
+import { DebtLedgerPage } from '@/pages/cash-reports/debt-ledger-page';
+import { CashBookPage } from '@/pages/cash-reports/cash-book-page';
 import { ForbiddenPage, NotFoundPage } from '@/pages/error-pages';
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useBeforeInstallPrompt } from '@/hooks/useBeforeInstallPrompt';
@@ -215,6 +241,43 @@ export function App() {
                     </ProtectedRoute>
                   }
                 />
+                {/* Round 2A: 10.4 cash reasons */}
+                <Route
+                  path="cash-reasons"
+                  element={
+                    <ProtectedRoute permission="cash.catalogs.manage">
+                      <CashReasonListPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Round 2A: 10.5 funds */}
+                <Route
+                  path="funds"
+                  element={
+                    // Either permission (route rule); the page hides the actions the user lacks.
+                    <ProtectedRoute anyPermission={['cash.catalogs.manage', 'cash.opening_balance']}>
+                      <FundListPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Round 2A: 12.4 opening debts */}
+                <Route
+                  path="debt/opening"
+                  element={
+                    <ProtectedRoute permission="debt.opening_balance">
+                      <OpeningDebtPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Round 2A: 10.7 credit limits */}
+                <Route
+                  path="credit-limits"
+                  element={
+                    <ProtectedRoute permission="credit_limit.manage">
+                      <CreditLimitListPage />
+                    </ProtectedRoute>
+                  }
+                />
                 <Route path="quotations">
                   <Route
                     index
@@ -246,7 +309,7 @@ export function App() {
                     index
                     element={
                       <ProtectedRoute permission="stock_in.view">
-                        <StockVoucherListPage type="In" />
+                        <StockVoucherListPage key="In" type="In" />
                       </ProtectedRoute>
                     }
                   />
@@ -254,7 +317,7 @@ export function App() {
                     path="new"
                     element={
                       <ProtectedRoute permission="stock_in.create">
-                        <StockVoucherFormPage type="In" />
+                        <StockVoucherFormPage key="In" type="In" />
                       </ProtectedRoute>
                     }
                   />
@@ -262,7 +325,7 @@ export function App() {
                     path=":id"
                     element={
                       <ProtectedRoute permission="stock_in.view">
-                        <StockVoucherFormPage type="In" />
+                        <StockVoucherFormPage key="In" type="In" />
                       </ProtectedRoute>
                     }
                   />
@@ -272,7 +335,7 @@ export function App() {
                     index
                     element={
                       <ProtectedRoute permission="stock_out.view">
-                        <StockVoucherListPage type="Out" />
+                        <StockVoucherListPage key="Out" type="Out" />
                       </ProtectedRoute>
                     }
                   />
@@ -280,7 +343,7 @@ export function App() {
                     path="new"
                     element={
                       <ProtectedRoute permission="stock_out.create">
-                        <StockVoucherFormPage type="Out" />
+                        <StockVoucherFormPage key="Out" type="Out" />
                       </ProtectedRoute>
                     }
                   />
@@ -288,7 +351,60 @@ export function App() {
                     path=":id"
                     element={
                       <ProtectedRoute permission="stock_out.view">
-                        <StockVoucherFormPage type="Out" />
+                        <StockVoucherFormPage key="Out" type="Out" />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                {/* Round 2A: 11.3 receipts and payments (list); 11.4 form for new and :id. Both types share one page component, so each element is keyed by type to never reuse the other's state. */}
+                <Route path="receipts">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="receipts.view">
+                        <CashVoucherListPage key="Receipt" type="Receipt" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="receipts.create">
+                        <CashVoucherFormPage key="Receipt" type="Receipt" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="receipts.view">
+                        <CashVoucherFormPage key="Receipt" type="Receipt" />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                <Route path="payments">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="payments.view">
+                        <CashVoucherListPage key="Payment" type="Payment" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="payments.create">
+                        <CashVoucherFormPage key="Payment" type="Payment" />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="payments.view">
+                        <CashVoucherFormPage key="Payment" type="Payment" />
                       </ProtectedRoute>
                     }
                   />
@@ -317,6 +433,70 @@ export function App() {
                     </ProtectedRoute>
                   }
                 />
+                {/* Round 2A: 11.5 fund transfers */}
+                <Route path="fund-transfers">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="fund_transfers.view">
+                        <FundTransferListPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="fund_transfers.create">
+                        <FundTransferFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      // Readable with view; the form hides the actions the user lacks.
+                      <ProtectedRoute permission="fund_transfers.view">
+                        <FundTransferFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
+                {/* Round 2A: 12.2 debt matching */}
+                <Route
+                  path="debt/matching"
+                  element={
+                    <ProtectedRoute permission="debt.matching">
+                      <DebtMatchingPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Round 2A: 12.3 debt offsets */}
+                <Route path="debt/offsets">
+                  <Route
+                    index
+                    element={
+                      <ProtectedRoute permission="debt_offset.view">
+                        <DebtOffsetListPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="new"
+                    element={
+                      <ProtectedRoute permission="debt_offset.create">
+                        <DebtOffsetFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path=":id"
+                    element={
+                      <ProtectedRoute permission="debt_offset.view">
+                        <DebtOffsetFormPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                </Route>
                 <Route
                   path="settings/my-quotation-settings"
                   element={<MyQuotationSettingsPage />}
@@ -357,7 +537,7 @@ export function App() {
                 <Route
                   path="settings/numbering"
                   element={
-                    <ProtectedRoute permission="inventory.settings">
+                    <ProtectedRoute anyPermission={['inventory.settings', 'cash.settings']}>
                       <NumberingSettingsPage />
                     </ProtectedRoute>
                   }
@@ -368,6 +548,15 @@ export function App() {
                     // The optional product picker also needs products.view (hidden without it).
                     <ProtectedRoute permission="inventory.recalc_cost">
                       <RecalcCostPage />
+                    </ProtectedRoute>
+                  }
+                />
+                {/* Round 2A: 10.8 cash settings */}
+                <Route
+                  path="settings/cash"
+                  element={
+                    <ProtectedRoute permission="cash.settings">
+                      <CashSettingsPage />
                     </ProtectedRoute>
                   }
                 />
@@ -450,6 +639,31 @@ export function App() {
                     element={
                       <ProtectedRoute permission="reports.revenue">
                         <VehicleRevenuePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  {/* Round 2A: 12.5 debt balance, debt ledger and cash book reports */}
+                  <Route
+                    path="debt-balance"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtBalancePage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-ledger"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtLedgerPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="cash-book"
+                    element={
+                      <ProtectedRoute permission="reports.cash">
+                        <CashBookPage />
                       </ProtectedRoute>
                     }
                   />

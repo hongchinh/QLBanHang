@@ -1,6 +1,8 @@
 # OS
 .DS_Store
 Thumbs.db
+#Source cu
+source/
 
 # IDE
 .vs/
@@ -42,3 +44,11 @@ logs/
 
 # Docker
 .docker/
+
+# Legacy VB.NET source: databases, build output, local IDE state
+*.mdf
+bin.zip
+*.suo
+*.user
+*.pdb
+*.exe

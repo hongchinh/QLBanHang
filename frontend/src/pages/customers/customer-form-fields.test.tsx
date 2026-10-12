@@ -92,3 +92,68 @@ describe('CustomerFormFields roles', () => {
     expect(screen.getByRole('button', { name: 'Cập nhật' })).toBeDisabled();
   });
 });
+
+describe('CustomerFormFields credit days', () => {
+  beforeEach(() => {
+    granted = new Set(['customers.create', 'customers.update', 'suppliers.create', 'suppliers.update']);
+  });
+
+  async function renderCreditDays() {
+    const user = userEvent.setup();
+    const { onSubmit } = renderFields();
+    await user.type(screen.getByLabelText('Tên khách hàng *'), 'A');
+    const input = screen.getByLabelText('Số ngày được nợ');
+    const submitWith = async (typed: string) => {
+      onSubmit.mockClear();
+      await user.clear(input);
+      if (typed) await user.type(input, typed);
+      await user.click(screen.getByRole('button', { name: 'Tạo mới' }));
+    };
+    return { onSubmit, submitWith };
+  }
+
+  it('credit days accepts 0..3650', async () => {
+    const { onSubmit, submitWith } = await renderCreditDays();
+
+    for (const [typed, expected] of [
+      ['0', 0],
+      ['3650', 3650],
+      ['', undefined],
+    ] as const) {
+      await submitWith(typed);
+      await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+      expect(onSubmit.mock.calls[0][0].creditDays).toBe(expected);
+    }
+    expect(screen.queryByTestId('creditDays-error')).not.toBeInTheDocument();
+  });
+
+  it('credit days rejects values outside 0..3650 and fractions', async () => {
+    const { onSubmit, submitWith } = await renderCreditDays();
+
+    for (const typed of ['-1', '3651']) {
+      await submitWith(typed);
+      expect(await screen.findByTestId('creditDays-error')).toBeInTheDocument();
+      expect(onSubmit).not.toHaveBeenCalled();
+    }
+
+    // A fraction is stopped by the number input's own step check (and by the schema, see schema.test.ts).
+    await submitWith('1.5');
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('supplier form submits credit days', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = renderFields({ role: 'supplier' });
+    await user.type(screen.getByLabelText('Tên nhà cung cấp *'), 'ACME');
+    await user.type(screen.getByLabelText('Số ngày được nợ'), '45');
+    await user.click(screen.getByRole('button', { name: 'Tạo mới' }));
+
+    await waitFor(() => expect(onSubmit).toHaveBeenCalled());
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'ACME', isSupplier: true, creditDays: 45 });
+  });
+
+  it('edit starts from the stored credit days', () => {
+    renderFields({ isEdit: true, initial: { ...DUAL_ROLE, creditDays: 30 } });
+    expect(screen.getByLabelText('Số ngày được nợ')).toHaveValue(30);
+  });
+});

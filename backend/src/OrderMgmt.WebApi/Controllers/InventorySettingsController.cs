@@ -42,12 +42,12 @@ public class InventorySettingsController : ApiControllerBase
     }
 
     [HttpGet("numbering")]
-    [HasPermission(Permissions.Inventory.Settings)]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<DocumentNumberingDto>>>> ListNumbering(CancellationToken ct)
         => Success(await _settings.ListNumberingAsync(ct));
 
     [HttpPut("numbering/{docType}")]
-    [HasPermission(Permissions.Inventory.Settings)]
+    [Authorize]
     public async Task<ActionResult<ApiResponse<DocumentNumberingDto>>> UpdateNumbering(
         DocumentType docType, [FromBody] UpdateNumberingRequest request, CancellationToken ct)
     {

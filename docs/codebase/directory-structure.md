@@ -54,15 +54,23 @@ QLDonHang/
 | Branding | `Domain/Branding`, `Application/Branding`, `SettingsController.cs` |
 | Notifications | `Domain/Notifications`, `Application/Notifications`, `NotificationsController.cs` |
 | Payments / VietQR | `Domain/Entities/Payments`, `Application/Payments`, `BanksController.cs`, `PaymentQrController.cs`, `MeBankAccountsController.cs` |
-| Branches and period lock | `Domain/Entities/Organization`, `Application/Organization/Branches`, `ICurrentBranch` (`WebApi/Services/CurrentBranch.cs`), `BranchesController.cs`, `MeBranchesController.cs` |
+| Branches, period lock and opening date | `Domain/Entities/Organization` (`Branch.OpeningDate`, `LockedUntil`), `Application/Organization/Branches` (`PeriodLockGuard` shared by Round 2A code), `ICurrentBranch` (`WebApi/Services/CurrentBranch.cs`), `BranchesController.cs`, `MeBranchesController.cs` |
 | Suppliers (partner roles) | `Application/Catalog/Customers` (`PartnerRole`, `PartnerPermissionGuard`), `SuppliersController.cs` |
 | Inventory catalogs | `Domain/Entities/Inventory`, `Application/Inventory/{Warehouses,StockReasons,PaymentMethods}` |
-| Inventory settings and numbering | `Application/Inventory/{Settings,Numbering}`, `InventorySettingsController.cs` |
-| Stock vouchers | `Application/Inventory/StockVouchers`, `StockVouchersController.cs` |
+| Inventory settings and numbering | `Application/Inventory/{Settings,Numbering}` (`IDocumentCodeAllocator` issues the codes of stock and cash documents), `InventorySettingsController.cs` |
+| Stock vouchers | `Application/Inventory/StockVouchers` (`Services/StockVoucherCashDebt.cs` with `Interfaces/IStockVoucherCashDebt.cs`: the cash and debt steps of a save), `StockVouchersController.cs` |
 | Ledger, costing and posting engine | `Application/Inventory/{Common,Ledger,Costing,Posting,Interfaces}`, `Infrastructure/Inventory` (advisory locks, document counter), `Infrastructure/Persistence/EfTransactionRunner.cs` |
 | Opening stock | `Application/Inventory/OpeningStocks`, `OpeningStocksController.cs` |
 | Cost recalculation | `Application/Inventory/Costing` (`InventoryRecalcService`), `InventoryCostController.cs` |
 | Inventory reports | `Application/Inventory/Reports`, `InventoryReportsController.cs` |
+| Cash & debt domain (Round 2A) | `Domain/Entities/CashDebt` (`CashReason`, `Fund`, `CashVoucher`/`CashVoucherLine`, `FundTransfer`, `DebtEntry`, `DebtSettlement`, `DebtOffsetVoucher`, `OpeningDebt`, `CreditLimit`, `CashDocumentActivity`, `CashDebtSettings`), `Domain/Enums/CashDebtEnums.cs`, `Infrastructure/Persistence/Configurations/CashDebtConfiguration.cs` |
+| Cash & debt shared engine | `Application/CashDebt/Common` (`CashDocuments` shared by the three cash document services, `DebtEffectRules`, `DebtSettlementMath`, `AllocationValidator`, `RunningBalance`, `DebtBalanceSign`, `LimitPolicyDecision`), `Application/CashDebt/Ledger` (`IDebtLedgerService`, `IDebtQueryService`, `IDebtActivityLog`, `SettlementRemovalConfirmation` for the 422 token, `SettlementChangeCollector` for the removed settlements of a request), `Application/CashDebt/Guards` (`CreditLimitGuard`, `FundBalanceGuard`, `FundMovementQuery`), `Application/CashDebt/Interfaces/ICashDebtLock.cs`, `Infrastructure/CashDebt/PostgresCashDebtLock.cs` |
+| Cash settings and catalogs | `Application/CashDebt/{Settings,CashReasons,Funds,CreditLimits}`, `CashSettingsController.cs`, `CashReasonsController.cs`, `FundsController.cs`, `CreditLimitsController.cs` |
+| Receipts/payments and fund transfers | `Application/CashDebt/{CashVouchers,FundTransfers}`, `CashVouchersController.cs`, `FundTransfersController.cs` |
+| Automatic receipt/payment of stock vouchers | `Application/CashDebt/AutoVouchers` (`IAutoCashVoucherService`; `AutoRecomputeHook` recomputes the `Auto` settlements before the commit of every request that removed settlements) |
+| Opening debts, matching and offsets | `Application/CashDebt/{OpeningDebts,Debt,DebtOffsets}`, `OpeningDebtsController.cs`, `DebtController.cs`, `DebtOffsetsController.cs` |
+| Cross-feature application helpers | `Application/Common/LikePattern.cs` (ILike escaping), `Application/Common/References` (`IReferenceUsage`: every "is used" check of partners, payment methods, branches and funds), `Application/Common/Interfaces/IBeforeCommitHook.cs` (run by `EfTransactionRunner` before the outermost commit) |
+| Cash & debt reports | `Application/CashDebt/Reports`, `CashDebtReportsController.cs` |
 
 ## API Controllers
 
@@ -85,17 +93,27 @@ QLDonHang/
 | `BanksController` | `/api/banks` — seeded Vietnamese bank list |
 | `PaymentQrController` | `/api/payment-qr/generate` — builds a VietQR payload string |
 | `MeBankAccountsController` | `/api/me/bank-accounts` CRUD + `/default`, scoped to the current user |
-| `BranchesController` | `/api/branches` CRUD, `/api/branches/{id}/lock` (period lock) |
+| `BranchesController` | `/api/branches` CRUD, `/api/branches/{id}/lock` (period lock), `/api/branches/{id}/opening-date` |
 | `MeBranchesController` | `/api/me/branches` — default/working branch and switchable branches |
 | `WarehousesController` | `/api/warehouses` CRUD, scoped to the working branch |
 | `StockReasonsController` | `/api/stock-reasons` CRUD |
 | `PaymentMethodsController` | `/api/payment-methods` CRUD |
 | `SuppliersController` | `/api/suppliers` CRUD and `/search` (partners with the supplier role) |
-| `InventorySettingsController` | `/api/inventory/settings`, `/api/inventory/numbering`, `/api/inventory/numbering/{docType}` |
+| `InventorySettingsController` | `/api/inventory/settings`, `/api/inventory/numbering`, `/api/inventory/numbering/{docType}` (stock types need `inventory.settings`, the cash types `Receipt`/`Payment`/`FundTransfer`/`DebtOffset` need `cash.settings`; checked in the service) |
 | `StockVouchersController` | `/api/stock-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/owners`, `/defaults`, `/stock-at`, `/partners` |
 | `OpeningStocksController` | `/api/inventory/opening-stock` (GET grid, PUT save) |
 | `InventoryCostController` | `/api/inventory/recalc-cost` |
 | `InventoryReportsController` | `/api/reports/stock-on-hand`, `/api/reports/stock-card` |
+| `CashSettingsController` | `/api/cash/settings` (credit-limit and negative-fund policies) |
+| `CashReasonsController` | `/api/cash-reasons` CRUD (`includeAuto` shows the automatic reasons) |
+| `FundsController` | `/api/funds` CRUD, `/{id}/opening-balance`, scoped to the working branch |
+| `CreditLimitsController` | `/api/credit-limits` list, `PUT`/`DELETE /{customerId}` |
+| `OpeningDebtsController` | `/api/opening-debts` list/CRUD |
+| `CashVouchersController` | `/api/cash-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults`, `/partners` |
+| `FundTransfersController` | `/api/fund-transfers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults` |
+| `DebtController` | `/api/debt/partner-summary`, `/open-items`, `/partners`, `/settlements` (GET, POST), `DELETE /settlements/{id}`, `DELETE /settlement-batches/{batchId}` |
+| `DebtOffsetsController` | `/api/debt-offsets` list/create/view, `/{id}/cancel`, `DELETE /{id}`, `/{id}/activities`, `/defaults` |
+| `CashDebtReportsController` | `/api/reports/debt-balance`, `/api/reports/debt-ledger`, `/api/reports/cash-book` |
 
 ## Frontend Structure
 
@@ -103,8 +121,13 @@ QLDonHang/
 frontend/src/
 ├── components/
 │   ├── auth/                    # permission-aware UI helpers
+│   ├── confirm-required-dialog/ # dialog for confirmable/blocked 422 responses
+│   ├── activity-history/        # ActivityHistory: activity list of a document
 │   ├── customer-autocomplete/   # quotation customer picker + quick add
 │   ├── layout/                  # app shell, header, sidebar, search, notifications
+│   ├── money-cell/              # MoneyCell, CellError: editable money cell of the line and allocation grids
+│   ├── partner-autocomplete/    # customer/supplier picker for cash and debt screens
+│   ├── search-combobox/         # generic search combobox behind DebtPartnerPicker and the ledger PartnerPicker
 │   └── ui/                      # shadcn-style primitives
 ├── features/
 │   ├── admin-roles/
@@ -115,12 +138,23 @@ frontend/src/
 │   ├── banks/                   # read-only seeded bank list
 │   ├── branches/                # branches, /me/branches, useBranchContext, useSwitchWorkingBranch
 │   ├── branding/
+│   ├── cash-common/             # ['cash'] root key, shared cash/debt types and labels
+│   ├── cash-reasons/
+│   ├── cash-reports/            # debt balance, debt ledger and cash book queries
+│   ├── cash-settings/           # credit-limit and negative-fund policies
+│   ├── cash-vouchers/           # receipts/payments, allocation helpers, schema, payload
+│   ├── credit-limits/
 │   ├── customers/
 │   ├── dashboard/
+│   ├── debt/                    # partner summary, open items, matching helpers, settlements
+│   ├── debt-offsets/
+│   ├── fund-transfers/
+│   ├── funds/
 │   ├── inventory-reports/       # stock-on-hand and stock-card queries
 │   ├── inventory-settings/      # costing settings, numbering, cost recalculation
 │   ├── me-settings/
 │   ├── notifications/
+│   ├── opening-debts/
 │   ├── opening-stock/
 │   ├── payment-methods/
 │   ├── payment-qr/              # VietQR payload generation
@@ -134,26 +168,34 @@ frontend/src/
 │   └── warehouses/              # warehouse queries, selectableWarehouses
 ├── pages/
 │   ├── admin/
+│   ├── cash-reasons/
+│   ├── cash-reports/            # /reports/debt-balance, /reports/debt-ledger, /reports/cash-book
+│   ├── cash-vouchers/           # /receipts and /payments list + form, allocation grid
+│   ├── credit-limits/
 │   ├── customers/
+│   ├── debt/                    # /debt/opening, /debt/matching, /debt/offsets list + form
+│   ├── fund-transfers/          # /fund-transfers list + form
+│   ├── funds/                   # funds and fund opening balance
 │   ├── inventory/               # opening stock, stock-on-hand, stock card
 │   ├── payment-methods/
 │   ├── payment-qr/              # /qr-thanh-toan standalone page
 │   ├── products/
 │   ├── quotations/
 │   ├── reports/
-│   ├── settings/                # also branches, period lock, inventory settings, numbering, recalc
+│   ├── settings/                # also branches (period lock, opening date), inventory and cash settings, numbering, recalc
 │   ├── stock-reasons/
-│   ├── stock-vouchers/          # /stock-in and /stock-out list + form
+│   ├── stock-vouchers/          # /stock-in and /stock-out list + form, customer debt panel
 │   ├── suppliers/
 │   └── warehouses/
+├── hooks/                       # useDocumentActions (shared save flow of the four document forms), route access hooks
 ├── routes/
 ├── stores/
-├── lib/
+├── lib/                         # includes date-only.ts, to-number.ts, money-input.ts, vn-datetime.ts
 ├── styles/
 └── test/
 ```
 
-Feature folders generally contain `api.ts`, `hooks.ts`, `types.ts`, optional `schema.ts` and `keys.ts`. Pages compose those hooks with reusable UI components.
+Feature folders generally contain `api.ts`, `hooks.ts`, `types.ts`, optional `schema.ts` and `keys.ts` (every feature keeps its query keys there, `credit-limits`, `opening-debts` and `cash-settings` included). Pages compose those hooks with reusable UI components.
 
 ## Route Entry Points
 

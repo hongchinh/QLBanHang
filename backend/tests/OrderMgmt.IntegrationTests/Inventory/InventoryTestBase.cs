@@ -40,6 +40,11 @@ public abstract class InventoryTestBase : QuotationTestBase
         DefaultWarehouseId = await InDbAsync(db => db.Warehouses.Where(w => w.Code == "KHO01").Select(w => w.Id).SingleAsync());
     }
 
+    /// Sets a branch's opening date straight in the DB (the API refuses once the branch has documents).
+    protected Task SetBranchOpeningDateAsync(Guid branchId, DateOnly? date) =>
+        InDbAsync(db => db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.OpeningDate, date)));
+
     protected async Task InDbAsync(Func<AppDbContext, Task> work)
     {
         using var scope = _factory.Services.CreateScope();
@@ -276,6 +281,8 @@ public abstract class InventoryTestBase : QuotationTestBase
         Freight = v.Freight,
         OrderDiscount = v.OrderDiscount,
         PaidAmount = v.PaidAmount,
+        DueDate = v.DueDate,
+        FundId = v.FundId,
         Version = v.Version,
         Lines = v.Lines.Select(l => new UpsertStockVoucherLineRequest
         {
@@ -349,6 +356,27 @@ public abstract class InventoryTestBase : QuotationTestBase
             db.Customers.Add(partner);
             await db.SaveChangesAsync();
             return partner.Id;
+        });
+
+    /// Inserts a bank fund straight into the DB (default: the main branch). Like FundService, the first bank fund of
+    /// the branch becomes its default, so a stock voucher paid by CK finds it (P9, P18).
+    protected Task<Guid> CreateBankFundAsync(string code = "NH01", Guid? branchId = null, decimal opening = 0) =>
+        InDbAsync(async db =>
+        {
+            var branch = branchId ?? MainBranchId;
+            var fund = new OrderMgmt.Domain.Entities.CashDebt.Fund
+            {
+                BranchId = branch,
+                Code = code,
+                Name = $"Ngân hàng {code}",
+                Kind = FundKind.Bank,
+                IsDefault = !await db.Funds.AnyAsync(f => f.BranchId == branch && f.Kind == FundKind.Bank),
+                OpeningAmount = opening,
+                IsActive = true,
+            };
+            db.Funds.Add(fund);
+            await db.SaveChangesAsync();
+            return fund.Id;
         });
 
     protected static async Task<T> ReadDataAsync<T>(HttpResponseMessage response)

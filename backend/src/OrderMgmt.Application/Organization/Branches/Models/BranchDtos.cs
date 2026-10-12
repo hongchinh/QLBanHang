@@ -7,6 +7,7 @@ public class BranchDto
     public string Name { get; set; } = default!;
     public string? Address { get; set; }
     public DateOnly? LockedUntil { get; set; }
+    public DateOnly? OpeningDate { get; set; }
 }
 
 public class CreateBranchRequest
@@ -25,6 +26,11 @@ public class UpdateBranchRequest
 public class SetPeriodLockRequest
 {
     public DateOnly? LockedUntil { get; set; }
+}
+
+public class SetOpeningDateRequest
+{
+    public DateOnly? OpeningDate { get; set; }
 }
 
 public class MyBranchesDto

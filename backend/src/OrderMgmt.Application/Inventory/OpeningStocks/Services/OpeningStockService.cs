@@ -42,7 +42,9 @@ public class OpeningStockService : IOpeningStockService
 
     public async Task<OpeningStockGridDto> GetAsync(Guid warehouseId, CancellationToken ct = default)
     {
-        await EnsureWarehouseAsync(warehouseId, ct);
+        var branchId = await EnsureWarehouseAsync(warehouseId, ct);
+        var branchOpeningDate = await _db.Branches.AsNoTracking().Where(b => b.Id == branchId)
+            .Select(b => b.OpeningDate).SingleAsync(ct);
 
         var rows = await _db.OpeningStocks.AsNoTracking()
             .Where(o => o.WarehouseId == warehouseId)
@@ -54,7 +56,6 @@ public class OpeningStockService : IOpeningStockService
                 o.Product.Name,
                 o.Product.PricingMode,
                 UnitName = o.Product.Unit != null ? o.Product.Unit.Name : null,
-                o.OpeningDate,
                 o.Quantity,
                 o.Amount,
             })
@@ -63,7 +64,7 @@ public class OpeningStockService : IOpeningStockService
         return new OpeningStockGridDto
         {
             WarehouseId = warehouseId,
-            OpeningDate = rows.Count > 0 ? rows[0].OpeningDate : null,
+            OpeningDate = branchOpeningDate,
             Lines = rows.Select(r => new OpeningStockLineDto
             {
                 ProductId = r.ProductId,
@@ -109,11 +110,15 @@ public class OpeningStockService : IOpeningStockService
             if (existing.Any(o => !lockedProductIds.Contains(o.ProductId)))
                 throw new ConflictException("Tồn đầu kỳ vừa được người khác cập nhật. Vui lòng tải lại.");
 
-            // Read after the shared branch gate, so a concurrent period lock change is serialized.
+            // Read after the locks, so a concurrent opening date or period lock change is serialized (P14).
+            var branch = await _db.Branches.AsNoTracking().Where(b => b.Id == branchId)
+                .Select(b => new { b.OpeningDate, b.LockedUntil }).SingleAsync(c);
+            var openingDate = branch.OpeningDate
+                ?? throw new DomainException("OPENING_DATE_NOT_SET", "Chưa đặt ngày đầu kỳ của chi nhánh.");
             var dates = existing.Select(o => o.OpeningDate).Distinct().ToList();
             if (request.Lines.Count > 0)
-                dates.Add(request.OpeningDate);
-            await EnsureNotLockedAsync(branchId, dates, c);
+                dates.Add(openingDate);
+            EnsureNotLocked(branch.LockedUntil, dates);
 
             var byProduct = existing.ToDictionary(o => o.ProductId);
             var rows = new List<OpeningStock>(request.Lines.Count);
@@ -125,7 +130,7 @@ public class OpeningStockService : IOpeningStockService
                     row = new OpeningStock { BranchId = branchId, WarehouseId = request.WarehouseId, ProductId = line.ProductId };
                     _db.OpeningStocks.Add(row);
                 }
-                row.OpeningDate = request.OpeningDate;
+                row.OpeningDate = openingDate;
                 row.Quantity = line.Quantity;
                 row.Amount = line.Amount;
                 rows.Add(row);
@@ -138,17 +143,45 @@ public class OpeningStockService : IOpeningStockService
             }
             await _db.SaveChangesAsync(c);
 
-            var postedAt = VnTime.StartOfDay(request.OpeningDate);
-            var drafts = rows.Select((row, index) => new LedgerEntryDraft(
-                    row.ProductId, row.WarehouseId, branchId, postedAt,
-                    LedgerSourceType.Opening, request.WarehouseId, row.Id, SourceCode, index,
-                    row.Quantity, 0m, row.Amount))
-                .ToList();
+            var drafts = BuildDrafts(branchId, request.WarehouseId, VnTime.StartOfDay(openingDate), rows);
             await _posting.PostAsync(LedgerSourceType.Opening, request.WarehouseId, drafts, request.AcknowledgeNegativeStock, c);
         }, ct);
 
         return await GetAsync(request.WarehouseId, ct);
     }
+
+    public async Task RepostBranchAsync(Guid branchId, DateOnly newDate, CancellationToken ct = default)
+    {
+        await _transaction.RunAsync(async c =>
+        {
+            var rows = await _db.OpeningStocks.Where(o => o.BranchId == branchId)
+                .OrderBy(o => o.ProductId).ThenBy(o => o.Id).ToListAsync(c);
+            if (rows.Count == 0)
+                return;
+
+            // Same order as SaveAsync: branch gate (held by the caller), warehouse keys, then product keys.
+            foreach (var warehouseId in rows.Select(o => o.WarehouseId).Distinct().OrderBy(id => id))
+                await _inventoryLock.AcquireOpeningStockAsync(warehouseId, c);
+            await _posting.AcquireLocksAsync(branchId, rows.Select(o => o.ProductId).Distinct(), c);
+            foreach (var row in rows)
+                row.OpeningDate = newDate;
+            await _db.SaveChangesAsync(c);
+
+            var postedAt = VnTime.StartOfDay(newDate);
+            foreach (var group in rows.GroupBy(o => o.WarehouseId).OrderBy(g => g.Key))
+            {
+                var drafts = BuildDrafts(branchId, group.Key, postedAt, group);
+                await _posting.PostAsync(LedgerSourceType.Opening, group.Key, drafts, acknowledgeNegativeStock: true, c);
+            }
+        }, ct);
+    }
+
+    private static List<LedgerEntryDraft> BuildDrafts(Guid branchId, Guid warehouseId, DateTimeOffset postedAt, IEnumerable<OpeningStock> rows) =>
+        rows.Select((row, index) => new LedgerEntryDraft(
+                row.ProductId, row.WarehouseId, branchId, postedAt,
+                LedgerSourceType.Opening, warehouseId, row.Id, SourceCode, index,
+                row.Quantity, 0m, row.Amount))
+            .ToList();
 
     /// The warehouse must exist and belong to the working branch; returns that branch.
     private async Task<Guid> EnsureWarehouseAsync(Guid warehouseId, CancellationToken ct)
@@ -188,9 +221,8 @@ public class OpeningStockService : IOpeningStockService
             throw new ValidationDomainException(errors, null);
     }
 
-    private async Task EnsureNotLockedAsync(Guid branchId, IEnumerable<DateOnly> dates, CancellationToken ct)
+    private static void EnsureNotLocked(DateOnly? lockedUntil, IEnumerable<DateOnly> dates)
     {
-        var lockedUntil = await _db.Branches.Where(b => b.Id == branchId).Select(b => b.LockedUntil).SingleAsync(ct);
         if (lockedUntil is { } locked && dates.Any(d => d <= locked))
             throw new DomainException("PERIOD_LOCKED",
                 string.Create(CultureInfo.InvariantCulture, $"Ngày tồn đầu kỳ đã khóa sổ (đến {locked:dd/MM/yyyy})."));

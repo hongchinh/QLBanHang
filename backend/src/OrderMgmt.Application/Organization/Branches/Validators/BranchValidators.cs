@@ -21,3 +21,15 @@ public class UpdateBranchRequestValidator : AbstractValidator<UpdateBranchReques
         RuleFor(x => x.Address).MaximumLength(1000);
     }
 }
+
+public class SetOpeningDateRequestValidator : AbstractValidator<SetOpeningDateRequest>
+{
+    public SetOpeningDateRequestValidator()
+    {
+        RuleFor(x => x.OpeningDate!.Value)
+            .InclusiveBetween(new DateOnly(2000, 1, 1), new DateOnly(2100, 12, 31))
+            .When(x => x.OpeningDate is not null)
+            .OverridePropertyName("openingDate")
+            .WithMessage("Ngày đầu kỳ phải từ 01/01/2000 đến 31/12/2100.");
+    }
+}

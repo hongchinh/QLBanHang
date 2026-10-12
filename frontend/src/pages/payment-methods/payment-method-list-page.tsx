@@ -3,8 +3,8 @@ import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tan
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useDeletePaymentMethod, usePaymentMethods } from '@/features/payment-methods/hooks';
 import type { PaymentMethod } from '@/features/payment-methods/types';
+import { FUND_KIND_LABELS } from '@/features/cash-common/labels';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -31,9 +31,9 @@ export function PaymentMethodListPage() {
       { header: 'Mã', accessorKey: 'code' },
       { header: 'Tên phương thức', accessorKey: 'name' },
       {
-        header: 'Tiền mặt',
-        accessorKey: 'isCash',
-        cell: ({ row }) => (row.original.isCash ? <Badge variant="success">Có</Badge> : null),
+        header: 'Loại quỹ',
+        accessorKey: 'fundKind',
+        cell: ({ row }) => FUND_KIND_LABELS[row.original.fundKind],
       },
       {
         id: 'actions',

@@ -7,6 +7,7 @@ import {
   STOCK_DIRECTION_LABELS,
   type StockReason,
 } from '@/features/stock-reasons/types';
+import { DEBT_EFFECT_LABELS } from '@/features/cash-common/labels';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -43,6 +44,11 @@ export function StockReasonListPage() {
         header: 'Đối tượng',
         accessorKey: 'partnerType',
         cell: ({ row }) => PARTNER_TYPE_LABELS[row.original.partnerType],
+      },
+      {
+        header: 'Ảnh hưởng công nợ',
+        accessorKey: 'debtEffect',
+        cell: ({ row }) => DEBT_EFFECT_LABELS[row.original.debtEffect],
       },
       {
         header: 'Hệ thống',

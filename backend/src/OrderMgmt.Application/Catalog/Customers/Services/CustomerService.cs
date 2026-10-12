@@ -4,6 +4,7 @@ using OrderMgmt.Application.Catalog.Customers.Interfaces;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Common.References;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
@@ -15,12 +16,14 @@ public class CustomerService : ICustomerService
     private readonly IAppDbContext _db;
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
+    private readonly IReferenceUsage _usage;
 
-    public CustomerService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser)
+    public CustomerService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, IReferenceUsage usage)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
+        _usage = usage;
     }
 
     public async Task<PagedResult<CustomerListItemDto>> ListAsync(CustomerListRequest request, PartnerRole role, CancellationToken ct = default)
@@ -120,6 +123,7 @@ public class CustomerService : ICustomerService
                 Status = c.Status,
                 IsCustomer = c.IsCustomer,
                 IsSupplier = c.IsSupplier,
+                CreditDays = c.CreditDays,
             })
             .ToListAsync(ct);
     }
@@ -161,6 +165,7 @@ public class CustomerService : ICustomerService
                 Status = CustomerStatus.Active,
                 IsCustomer = isCustomer,
                 IsSupplier = isSupplier,
+                CreditDays = request.CreditDays,
             };
 
             _db.Customers.Add(customer);
@@ -201,6 +206,7 @@ public class CustomerService : ICustomerService
         if (!isCustomer && !isSupplier)
             throw new DomainException("PARTNER_ROLE_REQUIRED", "Đối tượng phải là khách hàng hoặc nhà cung cấp.");
         PartnerPermissionGuard.EnsureCanUpdate(_currentUser, customer.IsCustomer, customer.IsSupplier, isCustomer, isSupplier);
+        await EnsureRolesKeepTheirDebtAsync(customer, isCustomer, isSupplier, ct);
 
         customer.Name = request.Name.Trim();
         customer.TaxCode = request.TaxCode?.Trim();
@@ -214,6 +220,7 @@ public class CustomerService : ICustomerService
         customer.Status = request.Status;
         customer.IsCustomer = isCustomer;
         customer.IsSupplier = isSupplier;
+        customer.CreditDays = request.CreditDays;
 
         await _db.SaveChangesAsync(ct);
         return customer.Adapt<CustomerDto>();
@@ -224,14 +231,30 @@ public class CustomerService : ICustomerService
         var customer = await WithRole(_db.Customers, role).FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Customer), id);
         PartnerPermissionGuard.EnsureCanDelete(_currentUser, customer.IsCustomer, customer.IsSupplier);
-        if (await _db.StockVouchers.AnyAsync(v => v.PartnerId == id, ct))
+        if (await _usage.PartnerHasStockVouchersAsync(id, ct))
             throw new ConflictException("Đối tượng đã có phiếu nhập/xuất kho, không thể xóa.");
+        if (await _usage.PartnerHasCashOrDebtDataAsync(id, ct))
+            throw new ConflictException("Đối tượng đã có phiếu thu/chi hoặc công nợ, không thể xóa.");
 
         customer.IsDeleted = true;
         customer.DeletedAt = _clock.UtcNow;
         customer.DeletedBy = _currentUser.UserId;
 
         await _db.SaveChangesAsync(ct);
+    }
+
+    /// Debt of a side needs the role of that side on every later save of its documents (P19), and the matching and
+    /// offset screens search partners by role: a side with debt entries keeps its role.
+    private async Task EnsureRolesKeepTheirDebtAsync(Customer customer, bool isCustomer, bool isSupplier,
+        CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (customer.IsCustomer && !isCustomer && await _usage.PartnerHasDebtOnSideAsync(customer.Id, DebtSide.Receivable, ct))
+            errors["isCustomer"] = new[] { "Đối tượng đã có công nợ phải thu, không bỏ được vai trò khách hàng." };
+        if (customer.IsSupplier && !isSupplier && await _usage.PartnerHasDebtOnSideAsync(customer.Id, DebtSide.Payable, ct))
+            errors["isSupplier"] = new[] { "Đối tượng đã có công nợ phải trả, không bỏ được vai trò nhà cung cấp." };
+        if (errors.Count > 0)
+            throw new ValidationDomainException(errors, null);
     }
 
     private static IQueryable<Customer> WithRole(IQueryable<Customer> query, PartnerRole role) =>

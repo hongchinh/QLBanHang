@@ -7,6 +7,7 @@ public static class Permissions
     public const string SalesModule = "sales";
     public const string ReportModule = "report";
     public const string InventoryModule = "inventory";
+    public const string CashModule = "cash";
 
     public static class Users
     {
@@ -73,6 +74,7 @@ public static class Permissions
         public const string Debt = "reports.debt";
         public const string Delivery = "reports.delivery";
         public const string Inventory = "reports.inventory";
+        public const string Cash = "reports.cash";
     }
 
     public static class Branches
@@ -121,6 +123,63 @@ public static class Permissions
         public const string ManageCatalogs = "inventory.catalogs.manage";
         public const string Settings = "inventory.settings";
         public const string RecalcCost = "inventory.recalc_cost";
+    }
+
+    public static class Receipts
+    {
+        public const string View = "receipts.view";
+        public const string Create = "receipts.create";
+        public const string Edit = "receipts.edit";
+        public const string Delete = "receipts.delete";
+        public const string Cancel = "receipts.cancel";
+        public const string EditAll = "receipts.edit_all";
+    }
+
+    public static class Payments
+    {
+        public const string View = "payments.view";
+        public const string Create = "payments.create";
+        public const string Edit = "payments.edit";
+        public const string Delete = "payments.delete";
+        public const string Cancel = "payments.cancel";
+        public const string EditAll = "payments.edit_all";
+    }
+
+    public static class FundTransfers
+    {
+        public const string View = "fund_transfers.view";
+        public const string Create = "fund_transfers.create";
+        public const string Edit = "fund_transfers.edit";
+        public const string Delete = "fund_transfers.delete";
+        public const string Cancel = "fund_transfers.cancel";
+        public const string EditAll = "fund_transfers.edit_all";
+    }
+
+    public static class DebtOffsets
+    {
+        public const string View = "debt_offset.view";
+        public const string Create = "debt_offset.create";
+        public const string Cancel = "debt_offset.cancel";
+        public const string Delete = "debt_offset.delete";
+    }
+
+    public static class Debt
+    {
+        public const string Matching = "debt.matching";
+        public const string OpeningBalance = "debt.opening_balance";
+        public const string PartnerSummary = "debt.partner_summary";
+    }
+
+    public static class Cash
+    {
+        public const string OpeningBalance = "cash.opening_balance";
+        public const string ManageCatalogs = "cash.catalogs.manage";
+        public const string Settings = "cash.settings";
+    }
+
+    public static class CreditLimits
+    {
+        public const string Manage = "credit_limit.manage";
     }
 }
 

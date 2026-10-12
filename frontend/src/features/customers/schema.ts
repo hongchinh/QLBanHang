@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { optionalEmail, optionalString } from '@/lib/zod-helpers';
+import { optionalEmail, optionalNumber, optionalString } from '@/lib/zod-helpers';
 
 // One partner catalog with two roles (customer / supplier); only the name message differs.
 function createPartnerSchema(nameRequiredMessage: string) {
@@ -18,6 +18,10 @@ function createPartnerSchema(nameRequiredMessage: string) {
       status: z.enum(['Active', 'Inactive']).optional(),
       isCustomer: z.boolean().default(true),
       isSupplier: z.boolean().default(false),
+      // The backend field is an int: reject fractions here instead of a 400 on deserialization.
+      creditDays: optionalNumber({ min: 0, max: 3650 }).refine((v) => v === undefined || Number.isInteger(v), {
+        message: 'Phải là số nguyên',
+      }),
     })
     .refine((v) => v.isCustomer || v.isSupplier, {
       message: 'Chọn ít nhất một vai trò',

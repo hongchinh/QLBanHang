@@ -42,7 +42,7 @@ export const stockVouchersApi = {
     apiPost<StockVoucher>(`/stock-vouchers/${id}/cancel`, body),
   restore: (id: string, body: StockVoucherActionRequest) =>
     apiPost<StockVoucher>(`/stock-vouchers/${id}/restore`, body),
-  // DELETE carries version and acknowledgeNegativeStock in the query string.
+  // DELETE carries the version and the confirmation flags in the query string.
   remove: (id: string, body: StockVoucherActionRequest) =>
     apiDelete(`/stock-vouchers/${id}`, { params: body }),
 };

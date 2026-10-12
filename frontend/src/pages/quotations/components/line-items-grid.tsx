@@ -7,9 +7,10 @@ import type {
   QuotationFormValues,
   QuotationLineFormValues,
 } from '@/features/quotations/schema';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
+import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
 import { computeLineCost, computeLineQuantity, computeLineTotal } from '@/pages/quotations/utils/compute-line';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import { useAuthStore } from '@/stores/auth-store';
 import './line-items-grid.css';
 
@@ -564,21 +565,15 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
 function toLineLike(line: QuotationLineFormValues) {
   return {
     pricingMode: line.pricingMode,
-    length: toNum(line.length),
-    width: toNum(line.width),
-    thickness: toNum(line.thickness),
-    density: toNum(line.density),
-    sheetCount: toNum(line.sheetCount),
-    quantity: toNum(line.quantity) ?? 0,
-    unitPrice: toNum(line.unitPrice) ?? 0,
-    unitCost: toNum(line.unitCost),
+    length: toOptionalNumber(line.length),
+    width: toOptionalNumber(line.width),
+    thickness: toOptionalNumber(line.thickness),
+    density: toOptionalNumber(line.density),
+    sheetCount: toOptionalNumber(line.sheetCount),
+    quantity: toOptionalNumber(line.quantity) ?? 0,
+    unitPrice: toOptionalNumber(line.unitPrice) ?? 0,
+    unitCost: toOptionalNumber(line.unitCost),
   };
-}
-
-function toNum(v: unknown): number | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : undefined;
 }
 
 function parseNum(v: string): number | undefined {

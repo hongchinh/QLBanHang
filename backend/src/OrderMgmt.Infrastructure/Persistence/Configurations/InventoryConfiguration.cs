@@ -87,6 +87,7 @@ public class StockReasonConfiguration : IEntityTypeConfiguration<StockReason>
         b.HasKey(x => x.Id);
         b.Property(x => x.Code).IsRequired().HasMaxLength(50);
         b.Property(x => x.Name).IsRequired().HasMaxLength(255);
+        b.Property(x => x.DebtEffect).HasDefaultValue(DebtEffect.None);
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
@@ -116,6 +117,7 @@ public class StockVoucherConfiguration : IEntityTypeConfiguration<StockVoucher>
         b.Property(x => x.Total).HasColumnType("numeric(18,2)");
         b.Property(x => x.PaidAmount).HasColumnType("numeric(18,2)");
         b.Property(x => x.CancelledAt).HasColumnType("timestamptz");
+        b.Property(x => x.DueDate).HasColumnType("date");
 
         // Npgsql maps a uint row version to the xmin system column (no DDL is emitted for it).
         b.Property(x => x.Version).IsRowVersion();
@@ -125,6 +127,7 @@ public class StockVoucherConfiguration : IEntityTypeConfiguration<StockVoucher>
         b.HasOne(x => x.Partner).WithMany().HasForeignKey(x => x.PartnerId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Reason).WithMany().HasForeignKey(x => x.ReasonId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.PaymentMethod).WithMany().HasForeignKey(x => x.PaymentMethodId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Fund).WithMany().HasForeignKey(x => x.FundId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerUserId).OnDelete(DeleteBehavior.Restrict);
 
         // Soft delete: AppDbContext propagates IsDeleted through Lines and Activities.

@@ -1,5 +1,6 @@
 using System.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Common.Interfaces;
 
 namespace OrderMgmt.Infrastructure.Persistence;
@@ -7,8 +8,15 @@ namespace OrderMgmt.Infrastructure.Persistence;
 public sealed class EfTransactionRunner : ITransactionRunner
 {
     private readonly AppDbContext _db;
+    private readonly IServiceProvider _provider;
 
-    public EfTransactionRunner(AppDbContext db) => _db = db;
+    /// The provider resolves the before-commit hooks at commit time: hooks depend on services that depend on
+    /// ITransactionRunner, so injecting them here would be a DI cycle.
+    public EfTransactionRunner(AppDbContext db, IServiceProvider provider)
+    {
+        _db = db;
+        _provider = provider;
+    }
 
     public async Task<T> RunAsync<T>(Func<CancellationToken, Task<T>> work, CancellationToken ct = default)
     {
@@ -19,6 +27,8 @@ public sealed class EfTransactionRunner : ITransactionRunner
         try
         {
             var result = await work(ct);
+            foreach (var hook in _provider.GetServices<IBeforeCommitHook>())
+                await hook.BeforeCommitAsync(ct);
             await tx.CommitAsync(ct);
             return result;
         }

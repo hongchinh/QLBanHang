@@ -1,3 +1,4 @@
+import type { CashVoucherType, DebtEffect } from '@/features/cash-common/types';
 import type { CustomerSearchItem, PagedResult } from '@/features/customers/types';
 import type { PricingMode } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
@@ -5,7 +6,14 @@ import type { StockDirection } from '@/features/stock-reasons/types';
 export type StockVoucherStatus = 'Active' | 'Cancelled';
 // 'all' is a real filter value; api.ts maps it to "no status param".
 export type StockVoucherStatusFilter = StockVoucherStatus | 'all';
-export type StockVoucherActivityAction = 'Created' | 'Updated' | 'Cancelled' | 'Restored' | 'Deleted';
+export type StockVoucherActivityAction =
+  | 'Created'
+  | 'Updated'
+  | 'Cancelled'
+  | 'Restored'
+  | 'Deleted'
+  | 'SettlementRemoved'
+  | 'AutoVoucherChanged';
 
 export interface StockVoucherLine {
   id: string;
@@ -54,8 +62,18 @@ export interface StockVoucher {
   handlerName?: string;
   reasonId: string;
   reasonName?: string;
+  reasonDebtEffect: DebtEffect;
   paymentMethodId?: string;
   paymentMethodName?: string;
+  // yyyy-MM-dd
+  dueDate?: string | null;
+  fundId?: string | null;
+  fundCode?: string | null;
+  fundName?: string | null;
+  // The automatic receipt (stock-out) or payment (stock-in) of the paid amount (P20).
+  autoCashVoucherId?: string | null;
+  autoCashVoucherCode?: string | null;
+  autoCashVoucherType?: CashVoucherType | null;
   note?: string;
   freight: number;
   orderDiscount: number;
@@ -208,23 +226,36 @@ export interface UpsertStockVoucherRequest {
   note?: string;
   freight: number;
   orderDiscount: number;
-  // Omitted → Total.
+  // Omitted → Total when the payment method has a fund kind, else 0 (P9).
   paidAmount?: number;
+  // yyyy-MM-dd; omitted → VN date + partner credit days on debt-increasing reasons (P27).
+  dueDate?: string;
+  // Omitted → the branch's default fund of the payment method's kind.
+  fundId?: string;
   // Required on update (D16).
   version?: number;
   acknowledgeNegativeStock: boolean;
+  confirmRemoveSettlements?: boolean;
+  confirmedSettlements?: string;
+  acknowledgeCreditLimit?: boolean;
+  acknowledgeNegativeFund?: boolean;
   lines: UpsertStockVoucherLineRequest[];
 }
 
 export interface StockVoucherActionRequest {
   version?: number;
   acknowledgeNegativeStock?: boolean;
+  confirmRemoveSettlements?: boolean;
+  confirmedSettlements?: string;
+  acknowledgeCreditLimit?: boolean;
+  acknowledgeNegativeFund?: boolean;
 }
 
 // GET /stock-vouchers/partners returns the customer search shape with the partner roles.
 export interface PartnerSearchItem extends CustomerSearchItem {
   isCustomer: boolean;
   isSupplier: boolean;
+  creditDays?: number | null;
 }
 
 export type { StockDirection };

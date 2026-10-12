@@ -21,5 +21,8 @@ public class Customer : BaseEntity
     public bool IsCustomer { get; set; } = true;
     public bool IsSupplier { get; set; }
 
+    /// Default payment term in days; used to default a voucher due date.
+    public int? CreditDays { get; set; }
+
     public ICollection<CustomerAddress> Addresses { get; set; } = new List<CustomerAddress>();
 }

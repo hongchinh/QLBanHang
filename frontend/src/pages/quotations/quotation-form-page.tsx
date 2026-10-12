@@ -63,6 +63,7 @@ import { ButtonLoader } from '@/components/ui/button-loader';
 import { Can } from '@/components/auth/can';
 import { cn } from '@/lib/utils';
 import { getErrorMessage } from '@/lib/api-client';
+import { toOptionalNumber } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
 import {
@@ -1198,21 +1199,15 @@ function toFormDefaults(q?: Quotation): QuotationFormValues {
 function toLineLike(line: QuotationLineFormValues): LineLike {
   return {
     pricingMode: line.pricingMode,
-    length: toNum(line.length),
-    width: toNum(line.width),
-    thickness: toNum(line.thickness),
-    density: toNum(line.density),
-    sheetCount: toNum(line.sheetCount),
-    quantity: toNum(line.quantity) ?? 0,
-    unitPrice: toNum(line.unitPrice) ?? 0,
-    unitCost: toNum(line.unitCost),
+    length: toOptionalNumber(line.length),
+    width: toOptionalNumber(line.width),
+    thickness: toOptionalNumber(line.thickness),
+    density: toOptionalNumber(line.density),
+    sheetCount: toOptionalNumber(line.sheetCount),
+    quantity: toOptionalNumber(line.quantity) ?? 0,
+    unitPrice: toOptionalNumber(line.unitPrice) ?? 0,
+    unitCost: toOptionalNumber(line.unitCost),
   };
-}
-
-function toNum(v: unknown): number | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : undefined;
 }
 
 function toPayload(parsed: QuotationFormParsed): UpsertQuotationRequest {

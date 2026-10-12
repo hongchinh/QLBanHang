@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
+import { CellError } from '@/components/money-cell/money-cell';
 import { createEmptyStockLine } from '@/features/stock-vouchers/payload';
 import type {
   StockLineFormValues,
@@ -10,9 +11,10 @@ import type {
 import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
+import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
 import '@/pages/quotations/components/line-items-grid.css';
 
@@ -95,12 +97,6 @@ function isFieldDisabled(mode: PricingMode, field: LineFocusField): boolean {
   }
 }
 
-function toNum(v: unknown): number | undefined {
-  if (v === undefined || v === null || v === '') return undefined;
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : undefined;
-}
-
 function parseQuantityInput(text: string): number | undefined {
   const trimmed = text.trim();
   if (trimmed === '' || !/^-?\d*(?:\.\d*)?$/.test(trimmed)) return undefined;
@@ -147,15 +143,6 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
   );
 }
 
-function CellError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
-  return (
-    <div id={id} className="px-1 text-[11px] leading-tight text-destructive">
-      {message}
-    </div>
-  );
-}
-
 // %CK / %VAT: an emptied cell stays empty while typing and counts as 0 (written back on blur).
 function PercentCell({
   field,
@@ -189,7 +176,7 @@ function PercentCell({
       value={editing ?? value ?? ''}
       onChange={(e) => {
         setEditing(e.target.value);
-        onCommit(toNum(e.target.value) ?? 0);
+        onCommit(toOptionalNumber(e.target.value) ?? 0);
       }}
       onBlur={() => setEditing(null)}
     />
@@ -312,7 +299,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           {...errorProps(focusField, idx, error)}
           disabled={disabled}
           value={(line?.[field] ?? '') as number | string}
-          onChange={(e) => setLineField(idx, field, toNum(e.target.value) ?? '')}
+          onChange={(e) => setLineField(idx, field, toOptionalNumber(e.target.value) ?? '')}
         />
         <CellError id={errorId(focusField, idx)} message={error} />
       </td>
@@ -327,7 +314,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           field={focusField}
           rowIndex={idx}
           label={label}
-          value={toNum(rows[idx]?.[field])}
+          value={toOptionalNumber(rows[idx]?.[field])}
           disabled={readOnly}
           error={error}
           onCommit={(value) => {
@@ -401,7 +388,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
               const stockKey = `${line.productId}:${line.warehouseId}`;
               const productError = errorOf(idx, 'productId');
               const warehouseError = errorOf(idx, 'warehouseId');
-              const quantityValue = mode === 'PerUnit' ? toNum(line.quantity) : result?.quantity;
+              const quantityValue = mode === 'PerUnit' ? toOptionalNumber(line.quantity) : result?.quantity;
               return (
                 <tr key={line._uiKey ?? field.id}>
                   <td className="row-no">{idx + 1}</td>
@@ -485,7 +472,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                       field="unit-price"
                       rowIndex={idx}
                       label="Đơn giá"
-                      value={toNum(line.unitPrice)}
+                      value={toOptionalNumber(line.unitPrice)}
                       format={formatMoneyForDisplay}
                       parse={parseMoneyInput}
                       onCommit={(v) => setLineField(idx, 'unitPrice', v ?? 0)}
@@ -503,7 +490,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                       field="discount-amount"
                       rowIndex={idx}
                       label="Tiền CK"
-                      value={line.discountManual ? toNum(line.discountAmount) : result?.discountAmount}
+                      value={line.discountManual ? toOptionalNumber(line.discountAmount) : result?.discountAmount}
                       format={formatMoneyForDisplay}
                       parse={parseMoneyInput}
                       onCommit={(v) => {

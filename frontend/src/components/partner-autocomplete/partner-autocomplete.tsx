@@ -8,8 +8,23 @@ import { usePartnerSearch } from '@/features/stock-vouchers/hooks';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 import type { PartnerType, StockDirection } from '@/features/stock-reasons/types';
 
-export interface PartnerAutocompleteProps {
-  type: StockDirection;
+// A partner search hook: `useSearch(keyword, reasonId)`, e.g. the cash voucher partner search.
+export type PartnerSearchHook = (
+  keyword: string,
+  reasonId?: string,
+) => { data?: PartnerSearchItem[]; isFetching: boolean; isLoading?: boolean; isError?: boolean };
+
+// Default: GET /stock-vouchers/partners of the voucher direction.
+function useStockPartnerSearch(keyword: string, reasonId: string | undefined, type: StockDirection | undefined) {
+  return usePartnerSearch(type ?? 'In', keyword, reasonId);
+}
+
+// `type` picks the default stock voucher search; a caller with its own `useSearch` needs no type.
+type PartnerSearchSource =
+  | { type: StockDirection; useSearch?: undefined }
+  | { type?: StockDirection; useSearch: PartnerSearchHook };
+
+export type PartnerAutocompleteProps = PartnerSearchSource & {
   reasonId?: string;
   partnerType?: PartnerType;
   // Form mode (default): needs a reason and searches the reason's partner role.
@@ -20,7 +35,7 @@ export interface PartnerAutocompleteProps {
   disabled?: boolean;
   inputId?: string;
   placeholder?: string;
-}
+};
 
 // Same interaction as CustomerAutocomplete, backed by GET /stock-vouchers/partners (D3).
 export function PartnerAutocomplete({
@@ -33,17 +48,20 @@ export function PartnerAutocomplete({
   disabled,
   inputId,
   placeholder = 'Nhập mã / tên / MST đối tượng...',
+  useSearch,
 }: PartnerAutocompleteProps) {
   const [keyword, setKeyword] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
 
   const debouncedKeyword = useDebouncedValue(keyword, 250);
-  const { data, isLoading, isError } = usePartnerSearch(
-    type,
-    debouncedKeyword,
-    requireReason ? reasonId : undefined,
-  );
+  // Exactly one search hook call per render, so the hook order stays stable.
+  const usePartnerResults: (keyword: string, reasonId: string | undefined, type: StockDirection | undefined) =>
+    ReturnType<PartnerSearchHook> = useSearch ?? useStockPartnerSearch;
+  const search = usePartnerResults(debouncedKeyword, requireReason ? reasonId : undefined, type);
+  const { data } = search;
+  const isLoading = search.isLoading ?? (search.isFetching && !data);
+  const isError = search.isError ?? false;
   const results: PartnerSearchItem[] = data ?? [];
 
   const inputRef = useRef<HTMLInputElement>(null);

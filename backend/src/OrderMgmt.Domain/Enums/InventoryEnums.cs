@@ -52,6 +52,10 @@ public enum DocumentType
 {
     StockIn = 1,
     StockOut = 2,
+    Receipt = 3,
+    Payment = 4,
+    FundTransfer = 5,
+    DebtOffset = 6,
 }
 
 public enum NumberingResetPolicy
@@ -82,4 +86,6 @@ public enum StockVoucherActivityAction
     Cancelled = 3,
     Restored = 4,
     Deleted = 5,
+    SettlementRemoved = 6,
+    AutoVoucherChanged = 7,
 }

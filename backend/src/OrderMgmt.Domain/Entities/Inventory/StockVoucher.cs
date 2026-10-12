@@ -1,4 +1,5 @@
 using OrderMgmt.Domain.Common;
+using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Entities.Identity;
 using OrderMgmt.Domain.Entities.Organization;
@@ -41,6 +42,13 @@ public class StockVoucher : BaseEntity
     public decimal VatTotal { get; set; }
     public decimal Total { get; set; }
     public decimal PaidAmount { get; set; }
+
+    /// Hạn thanh toán (P27); the debt entry's due date on Increase rows.
+    public DateOnly? DueDate { get; set; }
+
+    /// The fund the paid amount moves through (P9); null when nothing is paid.
+    public Guid? FundId { get; set; }
+    public Fund? Fund { get; set; }
 
     public StockVoucherStatus Status { get; set; } = StockVoucherStatus.Active;
     public DateTimeOffset? CancelledAt { get; set; }

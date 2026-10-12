@@ -5,6 +5,8 @@ export interface Branch {
   address?: string | null;
   // DateOnly `yyyy-MM-dd`; null = no period lock.
   lockedUntil?: string | null;
+  // DateOnly `yyyy-MM-dd`: opening stock, opening debt and fund opening balances use it (P8).
+  openingDate?: string | null;
 }
 
 export interface MyBranches {

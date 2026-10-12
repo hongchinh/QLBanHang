@@ -80,11 +80,11 @@ Thiết kế chi tiết Đợt 1: [section-03-round1-design.md](section-03-round
 
 ## Open questions
 
-- Đợt 2 (thu/chi, công nợ, hạn mức, bù trừ): 10 câu hỏi nghiệp vụ — xem [section-04](section-04-round2-open-questions.md).
+- ~~Đợt 2: 10 câu hỏi ở [section-04](section-04-round2-open-questions.md)~~ — đã chốt ở [cash-debt-round2/section-01](../261007-2252-cash-debt-round2/section-01-decisions.md).
 - Sau review — xem [section-05 §6](section-05-review-decisions.md#6-còn-mở): VAT đầu vào trong giá nhập (xác nhận với kế toán), danh sách hàng không theo dõi tồn, kế hoạch cut-over, quyền quản lý NCC.
 
 ## Next steps
 
 1. ~~Cập nhật `docs/project-pdr/product-goals.md` (bỏ non-goal kho/tồn/công nợ)~~ — đã xong 2026-10-06 (mục Planned Scope + Inventory rules).
-2. `write-plan` cho **Đợt 1** dựa trên section-03; đưa backlog section-05 §5 vào plan.
-3. Brainstorm riêng cho Đợt 2 để chốt open questions section-04.
+2. ~~`write-plan` cho **Đợt 1**~~ — đã xong và merge 2026-10-07 ([plan](../../plans/archived/261006-2259-inventory-round1/SUMMARY.md)).
+3. ~~Brainstorm riêng cho Đợt 2~~ — đã xong 2026-10-07: [cash-debt-round2](../261007-2252-cash-debt-round2/SUMMARY.md).

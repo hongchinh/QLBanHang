@@ -19,6 +19,7 @@ public sealed class NotFoundException : DomainException
 public sealed class ConflictException : DomainException
 {
     public ConflictException(string message) : base("CONFLICT", message) { }
+    public ConflictException(string code, string message) : base(code, message) { }
 }
 
 public sealed class ForbiddenException : DomainException
@@ -48,6 +49,25 @@ public sealed class NegativeStockException : DomainException
         IsWarning = isWarning;
         Shortages = shortages;
     }
+}
+
+public sealed class ConfirmationRequiredException : DomainException
+{
+    public ConfirmationRequiredException(string code, string message, IDictionary<string, string[]> details, bool canConfirm,
+        string? token = null)
+        : base(code, message)
+    {
+        Details = details;
+        CanConfirm = canConfirm;
+        Token = token;
+    }
+
+    /// What the user was shown, to be echoed back on the confirmed retry; null when the confirmation has none.
+    public string? Token { get; }
+
+    public IDictionary<string, string[]> Details { get; }
+
+    public bool CanConfirm { get; }
 }
 
 public sealed class ValidationDomainException : DomainException

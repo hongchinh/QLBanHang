@@ -17,6 +17,8 @@ export interface Customer {
   createdAt: string;
   isCustomer: boolean;
   isSupplier: boolean;
+  // Days of credit: the default due date of an Increase stock voucher is its date + this (P27).
+  creditDays?: number | null;
 }
 
 export interface CustomerListItem {
@@ -67,6 +69,8 @@ export interface UpsertCustomerRequest {
   // Partner roles (D2): turning a role on needs that role's permission.
   isCustomer?: boolean;
   isSupplier?: boolean;
+  // Omitted (empty input) clears the value.
+  creditDays?: number | null;
 }
 
 export interface CustomerSearchItem {

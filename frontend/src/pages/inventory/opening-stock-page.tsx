@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Plus, Save, Trash2 } from 'lucide-react';
+import { AlertTriangle, Plus, Save, Trash2 } from 'lucide-react';
 import { useOpeningStock, useSaveOpeningStock } from '@/features/opening-stock/hooks';
 import type { OpeningStockGrid, SaveOpeningStockRequest } from '@/features/opening-stock/types';
 import type { ProductSuggestion } from '@/features/products/types';
 import { useWarehouses } from '@/features/warehouses/hooks';
 import { selectableWarehouses } from '@/features/warehouses/utils';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import { NegativeStockDialog } from '@/pages/stock-vouchers/components/negative-stock-dialog';
 import { toShortages, type NegativeStockShortage } from '@/pages/stock-vouchers/components/negative-stock';
 import { Button } from '@/components/ui/button';
@@ -16,10 +15,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
+import { formatDateOnly } from '@/lib/date-only';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { roundAwayFromZero } from '@/lib/round';
 import { formatStockQuantity, parseQuantityInput, stockUnitName } from '@/lib/stock-quantity';
 import { toast } from '@/lib/use-toast';
-import { firstDayOfMonthYmd } from '@/lib/vn-datetime';
 
 interface Row {
   key: string;
@@ -73,7 +73,6 @@ export function OpeningStockPage() {
   const grid = useOpeningStock(warehouseId);
   const save = useSaveOpeningStock();
 
-  const [openingDate, setOpeningDate] = useState(() => firstDayOfMonthYmd());
   const [rows, setRows] = useState<Row[]>([]);
   // The warehouse whose grid is in `rows`; saving is allowed only once it matches the selection,
   // so lines of one warehouse can never be saved under another.
@@ -90,12 +89,14 @@ export function OpeningStockPage() {
   useEffect(() => {
     if (!grid.data || grid.data.warehouseId !== warehouseId) return;
     setRows(toRows(grid.data));
-    setOpeningDate(grid.data.openingDate ?? firstDayOfMonthYmd());
     setLineErrors({});
     setLoadedFor(warehouseId);
   }, [grid.data, warehouseId]);
 
   const loaded = !!warehouseId && loadedFor === warehouseId;
+  // The date belongs to the branch (P8): it is read from the grid and edited in Settings → Chi nhánh.
+  const openingDate = loaded ? grid.data?.openingDate : undefined;
+  const canSave = loaded && !!openingDate;
 
   const changeWarehouse = (id: string) => {
     if (id === warehouseId) return;
@@ -128,14 +129,13 @@ export function OpeningStockPage() {
   const filled = rows.filter((r) => r.productId);
 
   const submit = async (acknowledgeNegativeStock: boolean) => {
-    if (!warehouseId || !loaded) return;
+    if (!warehouseId || !canSave) return;
     if (filled.some((r) => quantityError(r) || amountError(r))) {
       toast({ variant: 'destructive', title: 'Số liệu không hợp lệ', description: 'Kiểm tra lại các ô được đánh dấu' });
       return;
     }
     const body: SaveOpeningStockRequest = {
       warehouseId,
-      openingDate,
       acknowledgeNegativeStock,
       lines: filled.map((r) => ({ productId: r.productId, quantity: quantityOf(r), amount: amountOf(r) })),
     };
@@ -173,7 +173,7 @@ export function OpeningStockPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">Tồn đầu kỳ</h1>
-        <Button onClick={() => void submit(false)} disabled={!loaded || save.isPending}>
+        <Button onClick={() => void submit(false)} disabled={!canSave || save.isPending}>
           {save.isPending ? <ButtonLoader /> : <Save className="h-4 w-4" />}
           Lưu
         </Button>
@@ -196,15 +196,18 @@ export function OpeningStockPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="opening-date">Ngày tồn đầu</Label>
-            <Input
-              id="opening-date"
-              type="date"
-              value={openingDate}
-              onChange={(e) => setOpeningDate(e.target.value)}
-            />
-          </div>
+          {loaded && openingDate && (
+            <div className="flex items-end pb-2 text-sm">Ngày đầu kỳ: {formatDateOnly(openingDate)}</div>
+          )}
+          {loaded && !openingDate && (
+            <div
+              role="alert"
+              className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2 lg:col-span-3"
+            >
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>Chi nhánh chưa có ngày đầu kỳ. Vào Cấu hình → Chi nhánh để đặt ngày đầu kỳ trước khi lưu.</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 

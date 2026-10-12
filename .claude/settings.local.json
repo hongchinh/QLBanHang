@@ -195,7 +195,7 @@
       "Bash(wget:*)",
       "Bash(format:*)",
       "Bash(del:*)",
-      "Bash(git push:*)",
+
       "Bash(git push --force:*)",
       "Bash(git reset --hard:*)",
       "Bash(git clean -fd:*)",
@@ -210,7 +210,7 @@
       "PowerShell(iwr:*)",
       "PowerShell(curl:*)",
       "PowerShell(wget:*)",
-      "PowerShell(git push:*)",
+
       "PowerShell(git push --force:*)",
       "PowerShell(git reset --hard:*)",
       "PowerShell(git clean -fd:*)",

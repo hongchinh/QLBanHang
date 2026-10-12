@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OpeningStockPage } from './opening-stock-page';
@@ -102,15 +102,11 @@ describe('OpeningStockPage', () => {
     catalogItems.items = [];
   });
 
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
   it('loads the grid, adds a tracked product, rejects an untracked one and saves the payload', async () => {
     saveMock.mockResolvedValue(GRID);
     render(<OpeningStockPage />);
 
-    expect(byId('opening-date')).toHaveValue('2026-09-01');
+    expect(screen.getByText('Ngày đầu kỳ: 01/09/2026')).toBeInTheDocument();
     expect(byId('opening-product-code-0')).toHaveValue('TON01');
     expect(screen.getByText('100.000')).toBeInTheDocument(); // read-only unit value = amount / quantity (vi-VN)
 
@@ -136,7 +132,6 @@ describe('OpeningStockPage', () => {
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     expect(saveMock).toHaveBeenCalledWith({
       warehouseId: WH1,
-      openingDate: '2026-09-01',
       acknowledgeNegativeStock: false,
       lines: [
         { productId: P1, quantity: 10, amount: 1_000_000 },
@@ -173,14 +168,26 @@ describe('OpeningStockPage', () => {
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ title: 'Hàng đã có trong danh sách' }));
   });
 
-  it('default opening date is the first day of the current VN month', () => {
-    vi.useFakeTimers({ toFake: ['Date'] });
-    vi.setSystemTime(new Date(2026, 9, 1, 6, 0)); // 2026-10-01 06:00 local (VN) = 2026-09-30 23:00 UTC
-    grids[WH1] = { data: { warehouseId: WH1, openingDate: null, lines: [] } };
+  it('shows the branch opening date read-only', () => {
+    render(<OpeningStockPage />);
+
+    expect(screen.getByText('Ngày đầu kỳ: 01/09/2026')).toBeInTheDocument();
+    expect(document.getElementById('opening-date')).toBeNull();
+    expect(document.querySelector('input[type="date"]')).toBeNull();
+    expect(screen.queryByText(/chưa có ngày đầu kỳ/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lưu' })).toBeEnabled();
+  });
+
+  it('disables save without an opening date', () => {
+    grids[WH1] = { data: { ...GRID, openingDate: null } };
 
     render(<OpeningStockPage />);
 
-    expect(byId('opening-date')).toHaveValue('2026-10-01');
+    expect(screen.getByText(/chưa có ngày đầu kỳ/)).toHaveTextContent('Cấu hình → Chi nhánh');
+    expect(screen.queryByText(/^Ngày đầu kỳ:/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Lưu' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu' }));
+    expect(saveMock).not.toHaveBeenCalled();
   });
 
   it('negative stock warning resends with acknowledgement', async () => {
@@ -225,7 +232,7 @@ describe('OpeningStockPage', () => {
     rerender(<OpeningStockPage />);
 
     await waitFor(() => expect(byId('opening-product-code-0')).toHaveValue('GO01'));
-    expect(byId('opening-date')).toHaveValue('2026-08-01');
+    expect(screen.getByText('Ngày đầu kỳ: 01/08/2026')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Lưu' }));
     await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
     expect(saveMock.mock.calls[0][0]).toMatchObject({

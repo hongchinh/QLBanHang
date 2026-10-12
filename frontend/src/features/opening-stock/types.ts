@@ -10,14 +10,13 @@ export interface OpeningStockLine {
 
 export interface OpeningStockGrid {
   warehouseId: string;
-  /** VN date `yyyy-MM-dd`; absent when the warehouse has no opening stock yet. */
+  /** The branch opening date (P8), VN date `yyyy-MM-dd`; null until it is set in Settings → Chi nhánh. */
   openingDate?: string | null;
   lines: OpeningStockLine[];
 }
 
 export interface SaveOpeningStockRequest {
   warehouseId: string;
-  openingDate: string;
   acknowledgeNegativeStock: boolean;
   lines: { productId: string; quantity: number; amount: number }[];
 }

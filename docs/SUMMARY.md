@@ -16,7 +16,7 @@ Directory structure, entry points, API patterns, and key modules.
 
 | File | Description |
 | ---- | ----------- |
-| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules, API controllers, entry points, runtime artifacts and production configuration keys |
+| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory and cash & debt), API controllers, entry points, runtime artifacts and production configuration keys |
 
 ## Code Standard
 
@@ -24,7 +24,7 @@ Conventions, naming rules, tech stack versions, and development workflows.
 
 | File | Description |
 | ---- | ----------- |
-| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests and deployment notes |
+| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1) and cash & debt (Round 2A) patterns |
 
 ## Project PDR
 
@@ -54,10 +54,14 @@ Repository-specific docs outside the standard topic folders.
 | [brainstorms/260523-1430-sales-revenue-drilldown/SUMMARY.md](brainstorms/260523-1430-sales-revenue-drilldown/SUMMARY.md) | Brainstorm for drilling down the sales revenue report by salesperson |
 | [brainstorms/260523-1500-pwa-progressive-web-app/SUMMARY.md](brainstorms/260523-1500-pwa-progressive-web-app/SUMMARY.md) | Brainstorm for PWA — installable, offline cache, push notifications |
 | [brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md](brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md) | Brainstorm for cloning legacy stock in/out vouchers (PhieuNhapXuat) — inventory ledger, costing, cash vouchers & debt in 3 rounds |
+| [brainstorms/261007-2252-cash-debt-round2/SUMMARY.md](brainstorms/261007-2252-cash-debt-round2/SUMMARY.md) | Brainstorm for Round 2 — cash vouchers, funds (multiple bank accounts) and fund transfers, receivables/payables with document matching and returns, credit limits, debt offset and debt/cash reports (reviewed) |
+| [brainstorms/261007-2304-pwa-mobile-learn-from-crm/SUMMARY.md](brainstorms/261007-2304-pwa-mobile-learn-from-crm/SUMMARY.md) | Brainstorm for mobile improvements learned from CRMProjects — SW push handler, mobile card view, iOS PWA support, platform-limits docs |
 | [plans/archived/260517-0749-quotation-list-totals-footer/SUMMARY.md](plans/archived/260517-0749-quotation-list-totals-footer/SUMMARY.md) | Archived plan for quotation-list totals footer |
 | [plans/archived/260517-0833-quotation-list-owner-filter/SUMMARY.md](plans/archived/260517-0833-quotation-list-owner-filter/SUMMARY.md) | Archived plan for quotation-list owner filter |
 | [plans/260522-2326-zalo-send-quotation/SUMMARY.md](plans/260522-2326-zalo-send-quotation/SUMMARY.md) | Plan for sending quotation files to a Zalo group via Zalo OA |
 | [plans/archived/260523-1530-pwa-progressive-web-app/SUMMARY.md](plans/archived/260523-1530-pwa-progressive-web-app/SUMMARY.md) | Implementation plan for PWA — 4 phases: installable, API cache, push backend, push frontend |
 | [plans/260528-1833-product-form-dialog/SUMMARY.md](plans/260528-1833-product-form-dialog/SUMMARY.md) | Plan for create/edit actions in the product catalog dialog |
 | [plans/archived/261006-2259-inventory-round1/SUMMARY.md](plans/archived/261006-2259-inventory-round1/SUMMARY.md) | Implementation plan for inventory Round 1 — stock vouchers, ledger, costing, reports |
+| [plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md](plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md) | Implementation plan for Round 2A — receipts/payments, funds, fund transfers, receivables/payables with matching and offset, credit limits, debt balance/ledger and cash book reports |
+| [plans/archived/261012-0433-round2a-review-refactor/SUMMARY.md](plans/archived/261012-0433-round2a-review-refactor/SUMMARY.md) | Archived plan for the last Round 2A review findings — settlement confirmation token, shared backend helpers, Auto recompute before commit, frontend refactors |
 | [plans/archived/](plans/archived/) | Archived implementation plans and execution reports |

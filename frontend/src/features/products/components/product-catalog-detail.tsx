@@ -1,6 +1,6 @@
 import { useProduct } from '@/features/products/hooks';
+import { formatMoneyForDisplay } from '@/lib/money-input';
 import { useAuthStore } from '@/stores/auth-store';
-import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import type { ProductSuggestion } from '@/features/products/types';
 import { toProductSuggestion } from '@/features/products/to-product-suggestion';
 import { Button } from '@/components/ui/button';

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using OrderMgmt.Domain.Branding;
 using OrderMgmt.Domain.Entities.Catalog;
+using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Entities.Identity;
 using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Entities.Organization;
@@ -26,6 +27,18 @@ public interface IAppDbContext
     DbSet<StockReason> StockReasons { get; }
     DbSet<PaymentMethod> PaymentMethods { get; }
     DbSet<InventorySettings> InventorySettings { get; }
+    DbSet<CashDebtSettings> CashDebtSettings { get; }
+    DbSet<CashReason> CashReasons { get; }
+    DbSet<Fund> Funds { get; }
+    DbSet<CreditLimit> CreditLimits { get; }
+    DbSet<DebtEntry> DebtEntries { get; }
+    DbSet<DebtSettlement> DebtSettlements { get; }
+    DbSet<OpeningDebt> OpeningDebts { get; }
+    DbSet<CashVoucher> CashVouchers { get; }
+    DbSet<CashVoucherLine> CashVoucherLines { get; }
+    DbSet<CashDocumentActivity> CashDocumentActivities { get; }
+    DbSet<FundTransfer> FundTransfers { get; }
+    DbSet<DebtOffsetVoucher> DebtOffsetVouchers { get; }
     DbSet<DocumentNumbering> DocumentNumberings { get; }
     DbSet<StockVoucher> StockVouchers { get; }
     DbSet<StockVoucherLine> StockVoucherLines { get; }

@@ -8,6 +8,13 @@ export interface ToastItem {
   description?: string;
   variant?: ToastVariant;
   durationMs?: number;
+  // A button in the toast (e.g. navigate to a settings page); the toast closes after it runs.
+  action?: ToastAction;
+}
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
 }
 
 type Listener = (toasts: ToastItem[]) => void;

@@ -111,4 +111,19 @@ describe('stockVoucherSchema', () => {
     );
     expect(result.success).toBe(true);
   });
+
+  it('due date is an optional yyyy-MM-dd and fund an optional uuid', () => {
+    const empty = stockVoucherSchema.parse(voucher({ dueDate: '', fundId: '' }));
+    expect(empty.dueDate).toBeUndefined();
+    expect(empty.fundId).toBeUndefined();
+
+    const filled = stockVoucherSchema.parse(
+      voucher({ dueDate: '2026-11-05', fundId: '99999999-9999-4999-8999-999999999999' }),
+    );
+    expect(filled.dueDate).toBe('2026-11-05');
+    expect(filled.fundId).toBe('99999999-9999-4999-8999-999999999999');
+
+    expect(issuePaths(voucher({ dueDate: '05/11/2026' }))).toContain('dueDate');
+    expect(issuePaths(voucher({ fundId: 'not-a-uuid' }))).toContain('fundId');
+  });
 });

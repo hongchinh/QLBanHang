@@ -9,6 +9,7 @@ public class CreatePaymentMethodRequestValidator : AbstractValidator<CreatePayme
     {
         RuleFor(x => x.Code).NotEmpty().MaximumLength(50);
         RuleFor(x => x.Name).NotEmpty().MaximumLength(255);
+        RuleFor(x => x.FundKind).IsInEnum();
     }
 }
 
@@ -17,5 +18,6 @@ public class UpdatePaymentMethodRequestValidator : AbstractValidator<UpdatePayme
     public UpdatePaymentMethodRequestValidator()
     {
         RuleFor(x => x.Name).NotEmpty().MaximumLength(255);
+        RuleFor(x => x.FundKind).IsInEnum();
     }
 }

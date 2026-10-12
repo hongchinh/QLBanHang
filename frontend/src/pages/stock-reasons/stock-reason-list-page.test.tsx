@@ -6,15 +6,32 @@ import { StockReasonListPage } from './stock-reason-list-page';
 import type { StockReason } from '@/features/stock-reasons/types';
 
 const createMock = vi.fn();
+const updateMock = vi.fn();
 const REASONS: StockReason[] = [
-  { id: 'r1', code: 'NMH', name: 'Nhập mua hàng', direction: 'In', partnerType: 'Supplier', isSystem: true },
-  { id: 'r2', code: 'XTL', name: 'Xuất thanh lý', direction: 'Out', partnerType: 'Any', isSystem: false },
+  {
+    id: 'r1',
+    code: 'NMH',
+    name: 'Nhập mua hàng',
+    direction: 'In',
+    partnerType: 'Supplier',
+    debtEffect: 'PayableIncrease',
+    isSystem: true,
+  },
+  {
+    id: 'r2',
+    code: 'XTL',
+    name: 'Xuất thanh lý',
+    direction: 'Out',
+    partnerType: 'Any',
+    debtEffect: 'None',
+    isSystem: false,
+  },
 ];
 
 vi.mock('@/features/stock-reasons/hooks', () => ({
   useStockReasons: () => ({ data: REASONS, isLoading: false, isError: false }),
   useCreateStockReason: () => ({ mutateAsync: createMock, isPending: false }),
-  useUpdateStockReason: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUpdateStockReason: () => ({ mutateAsync: updateMock, isPending: false }),
   useDeleteStockReason: () => ({ mutate: vi.fn(), isPending: false }),
 }));
 
@@ -37,6 +54,7 @@ function renderPage() {
 describe('StockReasonListPage', () => {
   beforeEach(() => {
     createMock.mockReset().mockResolvedValue({});
+    updateMock.mockReset().mockResolvedValue({});
   });
 
   it('renders reasons and creates one with direction and partner type', async () => {
@@ -62,6 +80,7 @@ describe('StockReasonListPage', () => {
         name: 'Xuất hàng hỏng',
         direction: 'Out',
         partnerType: 'Customer',
+        debtEffect: 'None',
       }),
     );
   });
@@ -79,5 +98,49 @@ describe('StockReasonListPage', () => {
     expect(screen.getByRole('combobox', { name: 'Loại' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'Đối tượng' })).toBeDisabled();
     expect(screen.getByLabelText('Tên lý do *')).toBeEnabled();
+  });
+
+  it('debt effect options follow direction', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(screen.getByRole('columnheader', { name: 'Ảnh hưởng công nợ' })).toBeInTheDocument();
+    expect(within(screen.getByText('Nhập mua hàng').closest('tr')!).getByText('Tăng phải trả')).toBeInTheDocument();
+    expect(within(screen.getByText('Xuất thanh lý').closest('tr')!).getByText('Không ảnh hưởng')).toBeInTheDocument();
+
+    await user.click(within(screen.getByText('Xuất thanh lý').closest('tr')!).getByRole('button', { name: 'Sửa lý do' }));
+
+    // Stock-out: None / ReceivableIncrease / PayableDecrease.
+    const effect = () => screen.getByRole('combobox', { name: 'Ảnh hưởng công nợ' });
+    expect(effect()).toHaveTextContent('Không ảnh hưởng');
+    await user.click(effect());
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Không ảnh hưởng',
+      'Tăng phải thu',
+      'Giảm phải trả',
+    ]);
+    await user.click(screen.getByRole('option', { name: 'Tăng phải thu' }));
+
+    // Switching to stock-in drops the effect that is no longer allowed.
+    await user.click(screen.getByRole('combobox', { name: 'Loại' }));
+    await user.click(await screen.findByRole('option', { name: 'Nhập' }));
+    expect(effect()).toHaveTextContent('Không ảnh hưởng');
+
+    // Stock-in: None / PayableIncrease / ReceivableDecrease.
+    await user.click(effect());
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Không ảnh hưởng',
+      'Tăng phải trả',
+      'Giảm phải thu',
+    ]);
+    await user.click(screen.getByRole('option', { name: 'Giảm phải thu' }));
+    await user.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+    await waitFor(() =>
+      expect(updateMock).toHaveBeenCalledWith({
+        id: 'r2',
+        data: { name: 'Xuất thanh lý', direction: 'In', partnerType: 'Any', debtEffect: 'ReceivableDecrease' },
+      }),
+    );
   });
 });

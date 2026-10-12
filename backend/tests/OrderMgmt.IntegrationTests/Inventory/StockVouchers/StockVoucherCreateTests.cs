@@ -27,6 +27,10 @@ public class StockVoucherCreateTests : InventoryTestBase
             LineRequest(p3, 1, 300_000));
         request.VoucherAt = voucherAt;
         request.PartnerId = supplierId;
+        // TM has a cash fund, so the paid amount defaults to the total (P9).
+        request.PaymentMethodId = await InDbAsync(db => db.PaymentMethods.Where(m => m.Code == "TM").Select(m => m.Id).SingleAsync());
+        // The automatic payment overdraws the empty cash fund (P17): acknowledged.
+        request.AcknowledgeNegativeFund = true;
         request.Freight = 200_000;
         request.OrderDiscount = 100_000;
         request.Lines[0].VatRate = 10;
@@ -64,8 +68,13 @@ public class StockVoucherCreateTests : InventoryTestBase
         products.Single(p => p.Id == p3).CostPrice.Should().Be(300_000m);
         products.Should().OnlyContain(p => p.CostPriceUpdatedOn == voucherAt);
 
+        // The paid amount also creates the automatic payment PC00001 (P20), logged on the voucher.
         var activities = await InDbAsync(db => db.StockVoucherActivities.Where(a => a.StockVoucherId == voucher.Id).ToListAsync());
-        activities.Should().ContainSingle().Which.Action.Should().Be(StockVoucherActivityAction.Created);
+        activities.Select(a => (a.Action, a.Description)).Should().BeEquivalentTo(new[]
+        {
+            (StockVoucherActivityAction.Created, "Tạo phiếu"),
+            (StockVoucherActivityAction.AutoVoucherChanged, "Tạo phiếu chi tự động PC00001"),
+        });
         await AssertInvariantsAsync();
     }
 

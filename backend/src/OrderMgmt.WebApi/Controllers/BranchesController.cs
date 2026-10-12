@@ -15,15 +15,18 @@ public class BranchesController : ApiControllerBase
     private readonly IBranchService _service;
     private readonly IValidator<CreateBranchRequest> _createValidator;
     private readonly IValidator<UpdateBranchRequest> _updateValidator;
+    private readonly IValidator<SetOpeningDateRequest> _openingDateValidator;
 
     public BranchesController(
         IBranchService service,
         IValidator<CreateBranchRequest> createValidator,
-        IValidator<UpdateBranchRequest> updateValidator)
+        IValidator<UpdateBranchRequest> updateValidator,
+        IValidator<SetOpeningDateRequest> openingDateValidator)
     {
         _service = service;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
+        _openingDateValidator = openingDateValidator;
     }
 
     [HttpGet]
@@ -67,4 +70,13 @@ public class BranchesController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<BranchDto>>> SetLock(
         Guid id, [FromBody] SetPeriodLockRequest request, CancellationToken ct)
         => Success(await _service.SetLockAsync(id, request, ct));
+
+    [HttpPut("{id:guid}/opening-date")]
+    [HasPermission(Permissions.Branches.Manage)]
+    public async Task<ActionResult<ApiResponse<BranchDto>>> SetOpeningDate(
+        Guid id, [FromBody] SetOpeningDateRequest request, CancellationToken ct)
+    {
+        await _openingDateValidator.ValidateAndThrowAsync(request, ct);
+        return Success(await _service.SetOpeningDateAsync(id, request, ct));
+    }
 }

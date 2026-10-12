@@ -21,7 +21,6 @@ public class OpeningStockLineDto
 public class SaveOpeningStockRequest
 {
     public Guid WarehouseId { get; set; }
-    public DateOnly OpeningDate { get; set; }
     public bool AcknowledgeNegativeStock { get; set; }
     public List<SaveOpeningStockLine> Lines { get; set; } = new();
 }

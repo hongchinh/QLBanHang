@@ -1,3 +1,4 @@
+import type { ConfirmFlags } from '@/lib/confirm-required';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
 import type { StockLineFormValues, StockVoucherFormParsed, StockVoucherFormValues } from './schema';
 import type {
@@ -10,7 +11,7 @@ import type {
 export function toUpsertPayload(
   type: StockDirection,
   values: StockVoucherFormParsed,
-  acknowledgeNegativeStock = false,
+  flags: ConfirmFlags = {},
 ): UpsertStockVoucherRequest {
   const isEdit = values.version !== undefined;
   return {
@@ -29,8 +30,11 @@ export function toUpsertPayload(
     orderDiscount: values.orderDiscount,
     // An untouched new voucher lets the server use Total; an edit keeps what is stored (review M13).
     paidAmount: values.paidAmountTouched || isEdit ? values.paidAmount : undefined,
+    dueDate: values.dueDate,
+    fundId: values.fundId,
     version: values.version,
-    acknowledgeNegativeStock,
+    acknowledgeNegativeStock: false,
+    ...flags,
     lines: values.lines.map((line, idx) => ({
       id: line.id,
       sortOrder: idx,
@@ -99,6 +103,8 @@ export function toFormDefaults(
       orderDiscount: 0,
       paidAmount: undefined,
       paidAmountTouched: false,
+      dueDate: '',
+      fundId: '',
       version: undefined,
       lines: [createEmptyStockLine(0, warehouseId)],
     };
@@ -120,6 +126,8 @@ export function toFormDefaults(
     paidAmount: voucher.paidAmount,
     // A partial payment stays as entered; a full payment keeps following the total (review M13).
     paidAmountTouched: voucher.paidAmount !== voucher.total,
+    dueDate: voucher.dueDate ?? '',
+    fundId: voucher.fundId ?? '',
     version: voucher.version,
     lines: voucher.lines.map((line) => ({
       _uiKey: line.id,

@@ -3,6 +3,8 @@ import type { Permission, Role } from '@/lib/permissions';
 interface RouteRule {
   pattern: RegExp;
   permission?: Permission;
+  // Accessible when the user has at least one of these.
+  anyPermission?: Permission[];
   role?: Role;
 }
 
@@ -43,18 +45,46 @@ const RULES: RouteRule[] = [
   { pattern: /^\/settings\/quotation$/, permission: 'system.manage_settings' },
   { pattern: /^\/settings\/branches$/, permission: 'branches.manage' },
   { pattern: /^\/settings\/period-lock$/, permission: 'period_lock.manage' },
-  { pattern: /^\/settings\/(inventory|numbering)$/, permission: 'inventory.settings' },
+  { pattern: /^\/settings\/inventory$/, permission: 'inventory.settings' },
+  // Each numbering card needs its own permission (StockIn/StockOut vs the cash types, P7).
+  { pattern: /^\/settings\/numbering$/, anyPermission: ['inventory.settings', 'cash.settings'] },
   { pattern: /^\/settings\/recalc-cost$/, permission: 'inventory.recalc_cost' },
+  // Round 2A: cash and debt. Voucher detail pages stay readable with *.view.
+  ...listNewDetail('receipts', 'receipts.view', 'receipts.create', 'receipts.view'),
+  ...listNewDetail('payments', 'payments.view', 'payments.create', 'payments.view'),
+  ...listNewDetail('fund-transfers', 'fund_transfers.view', 'fund_transfers.create', 'fund_transfers.view'),
+  { pattern: /^\/debt\/matching$/, permission: 'debt.matching' },
+  { pattern: /^\/debt\/opening$/, permission: 'debt.opening_balance' },
+  ...listNewDetail('debt/offsets', 'debt_offset.view', 'debt_offset.create', 'debt_offset.view'),
+  { pattern: /^\/reports\/(debt-balance|debt-ledger)$/, permission: 'reports.debt' },
+  { pattern: /^\/reports\/cash-book$/, permission: 'reports.cash' },
+  { pattern: /^\/cash-reasons$/, permission: 'cash.catalogs.manage' },
+  { pattern: /^\/funds$/, anyPermission: ['cash.catalogs.manage', 'cash.opening_balance'] },
+  { pattern: /^\/credit-limits$/, permission: 'credit_limit.manage' },
+  { pattern: /^\/settings\/cash$/, permission: 'cash.settings' },
 ];
+
+export function canAccessRouteWith(
+  pathname: string,
+  hasPermission: (permission: string) => boolean,
+  isInRole: (role: string) => boolean,
+): boolean {
+  const rule = RULES.find((r) => r.pattern.test(pathname));
+  if (!rule) return true;
+  if (rule.permission && !hasPermission(rule.permission)) return false;
+  if (rule.anyPermission && !rule.anyPermission.some((p) => hasPermission(p))) return false;
+  if (rule.role && !isInRole(rule.role)) return false;
+  return true;
+}
 
 export function canAccessRoute(
   pathname: string,
   perms: readonly string[],
   roles: readonly string[],
 ): boolean {
-  const rule = RULES.find((r) => r.pattern.test(pathname));
-  if (!rule) return true;
-  if (rule.permission && !perms.includes(rule.permission)) return false;
-  if (rule.role && !roles.includes(rule.role)) return false;
-  return true;
+  return canAccessRouteWith(
+    pathname,
+    (p) => perms.includes(p),
+    (r) => roles.includes(r),
+  );
 }

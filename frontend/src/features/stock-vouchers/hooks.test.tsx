@@ -1,8 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cashKeys } from '@/features/cash-common/keys';
 import { productKeys } from '@/features/products/keys';
-import { useCreateStockVoucher, useDeleteStockVoucher, usePartnerSearch } from './hooks';
+import {
+  useCancelStockVoucher,
+  useCreateStockVoucher,
+  useDeleteStockVoucher,
+  usePartnerSearch,
+  useRestoreStockVoucher,
+  useUpdateStockVoucher,
+} from './hooks';
 import { inventoryKeys } from './keys';
 import { stockVouchersApi } from './api';
 import type { PartnerSearchItem, StockVoucher, UpsertStockVoucherRequest } from './types';
@@ -11,6 +19,9 @@ vi.mock('./api', () => ({
   stockVouchersApi: {
     partners: vi.fn(),
     create: vi.fn(),
+    update: vi.fn(),
+    cancel: vi.fn(),
+    restore: vi.fn(),
     remove: vi.fn(),
   },
 }));
@@ -57,6 +68,13 @@ describe('usePartnerSearch', () => {
   });
 });
 
+async function invalidations<T>(useHook: () => T, call: (mutation: T) => Promise<unknown>) {
+  const { wrapper, invalidate } = setup();
+  const { result } = renderHook(useHook, { wrapper });
+  await act(() => call(result.current));
+  return invalidate.mock.calls.map((c) => c[0]);
+}
+
 describe('stock voucher mutations', () => {
   it('a stock-in change also refreshes products (cost price, D35); a stock-out change does not', async () => {
     const { wrapper, invalidate } = setup();
@@ -80,5 +98,29 @@ describe('stock voucher mutations', () => {
     await act(() => result.current.mutateAsync({ id: 'v1', type: 'In', body: { version: 1 } }));
 
     expect(invalidate).toHaveBeenCalledWith({ queryKey: productKeys.all });
+  });
+
+  // P28: automatic receipts/payments and debt entries follow every stock voucher change.
+  it('mutations invalidate the cash root too', async () => {
+    const saved = { type: 'Out' } as StockVoucher;
+    vi.mocked(stockVouchersApi.create).mockResolvedValueOnce(saved);
+    vi.mocked(stockVouchersApi.update).mockResolvedValueOnce(saved);
+    vi.mocked(stockVouchersApi.cancel).mockResolvedValueOnce(saved);
+    vi.mocked(stockVouchersApi.restore).mockResolvedValueOnce(saved);
+    vi.mocked(stockVouchersApi.remove).mockResolvedValueOnce(undefined as never);
+    const body = { version: 1 };
+
+    const calls = [
+      await invalidations(useCreateStockVoucher, (m) => m.mutateAsync({} as UpsertStockVoucherRequest)),
+      await invalidations(useUpdateStockVoucher, (m) => m.mutateAsync({ id: 'v1', data: {} as UpsertStockVoucherRequest })),
+      await invalidations(useCancelStockVoucher, (m) => m.mutateAsync({ id: 'v1', body })),
+      await invalidations(useRestoreStockVoucher, (m) => m.mutateAsync({ id: 'v1', body })),
+      await invalidations(useDeleteStockVoucher, (m) => m.mutateAsync({ id: 'v1', type: 'Out', body })),
+    ];
+
+    for (const keys of calls) {
+      expect(keys).toContainEqual({ queryKey: inventoryKeys.all });
+      expect(keys).toContainEqual({ queryKey: cashKeys.all });
+    }
   });
 });

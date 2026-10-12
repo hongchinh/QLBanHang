@@ -1,12 +1,26 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useCanAccessRoute } from '@/hooks/useCanAccessRoute';
+import type { CashVoucherType } from '@/features/cash-common/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import type { StockTotals } from '@/pages/stock-vouchers/utils/compute-stock-line';
 
 const fmt = new Intl.NumberFormat('vi-VN');
+
+export interface AutoCashVoucherLink {
+  id: string;
+  code: string;
+  type: CashVoucherType;
+}
+
+const AUTO_VOUCHER_LINKS: Record<CashVoucherType, { label: string; basePath: string }> = {
+  Receipt: { label: 'Phiếu thu tự động', basePath: '/receipts' },
+  Payment: { label: 'Phiếu chi tự động', basePath: '/payments' },
+};
 
 export interface StockTotalsPanelProps {
   type: StockDirection;
@@ -14,11 +28,17 @@ export interface StockTotalsPanelProps {
   freight: number;
   orderDiscount: number;
   paidAmount: number;
+  // The chosen payment method has no fund: nothing can be paid.
+  paidAmountDisabled?: boolean;
+  // Server message for the paid amount.
+  paidAmountError?: string;
   onFreightChange: (value: number) => void;
   onOrderDiscountChange: (value: number) => void;
   onPaidAmountChange: (value: number) => void;
   // Stock-in only (section-02 #2).
   onApplyVatToAll?: (rate: number) => void;
+  // The automatic receipt/payment of the paid amount (P20), shown under the totals.
+  autoVoucher?: AutoCashVoucherLink;
   readOnly: boolean;
 }
 
@@ -28,14 +48,21 @@ export function StockTotalsPanel({
   freight,
   orderDiscount,
   paidAmount,
+  paidAmountDisabled = false,
+  paidAmountError,
   onFreightChange,
   onOrderDiscountChange,
   onPaidAmountChange,
   onApplyVatToAll,
+  autoVoucher,
   readOnly,
 }: StockTotalsPanelProps) {
+  const canAccess = useCanAccessRoute();
   const [vatToAll, setVatToAll] = useState('');
   const vatToAllRate = Number(vatToAll);
+  const autoVoucherText = autoVoucher
+    ? `${AUTO_VOUCHER_LINKS[autoVoucher.type].label}: ${autoVoucher.code}`
+    : '';
   const canApplyVat = vatToAll.trim() !== '' && Number.isFinite(vatToAllRate) && vatToAllRate >= 0 && vatToAllRate <= 100;
 
   return (
@@ -69,8 +96,24 @@ export function StockTotalsPanel({
           label="Số tiền thanh toán"
           value={paidAmount}
           onChange={onPaidAmountChange}
-          disabled={readOnly}
+          disabled={readOnly || paidAmountDisabled}
         />
+        {paidAmountError && <p className="text-right text-xs text-destructive">{paidAmountError}</p>}
+
+        {autoVoucher && (
+          <div className="text-right text-sm">
+            {canAccess(`${AUTO_VOUCHER_LINKS[autoVoucher.type].basePath}/${autoVoucher.id}`) ? (
+              <Link
+                to={`${AUTO_VOUCHER_LINKS[autoVoucher.type].basePath}/${autoVoucher.id}`}
+                className="text-blue-600 hover:underline"
+              >
+                {autoVoucherText}
+              </Link>
+            ) : (
+              <span>{autoVoucherText}</span>
+            )}
+          </div>
+        )}
 
         {type === 'In' && onApplyVatToAll && !readOnly && (
           <div className="flex items-center justify-between gap-2 border-t pt-1.5 mt-0.5">
@@ -139,7 +182,7 @@ function EditableRow({ id, label, value, onChange, disabled }: EditableRowProps)
         inputMode="decimal"
         autoComplete="off"
         disabled={disabled}
-        value={draft ?? formatMoneyForDisplay(value)}
+        value={!disabled && draft !== null ? draft : formatMoneyForDisplay(value)}
         onFocus={(e) => {
           setDraft(String(value ?? ''));
           e.currentTarget.select();

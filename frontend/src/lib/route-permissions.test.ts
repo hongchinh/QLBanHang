@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PERMISSIONS } from './permissions';
 import { canAccessRoute } from './route-permissions';
 
 const SALES_PERMS = [
@@ -123,9 +124,11 @@ describe('inventory routes', () => {
     expectRule('/settings/period-lock', 'period_lock.manage');
   });
 
-  it('/settings/inventory và /settings/numbering cần inventory.settings', () => {
+  it('/settings/inventory cần inventory.settings; /settings/numbering cần inventory.settings hoặc cash.settings', () => {
     expectRule('/settings/inventory', 'inventory.settings');
+    expect(canAccessRoute('/settings/inventory', ['cash.settings'], [])).toBe(false);
     expectRule('/settings/numbering', 'inventory.settings');
+    expectRule('/settings/numbering', 'cash.settings');
   });
 
   it('/settings/recalc-cost cần inventory.recalc_cost', () => {
@@ -153,5 +156,57 @@ describe('rules mirror App.tsx guards', () => {
     expect(canAccessRoute('/settings/quotation', ['system.manage_settings'], [])).toBe(true);
     expect(canAccessRoute('/reports/sales-revenue/u1', [], [])).toBe(false);
     expect(canAccessRoute('/reports/sales-revenue/u1', ['reports.revenue'], [])).toBe(true);
+  });
+});
+
+describe('PERMISSIONS', () => {
+  it('PERMISSIONS includes every round 2A code', () => {
+    const codes: readonly string[] = PERMISSIONS;
+    for (const code of [
+      'receipts.view',
+      'debt.partner_summary',
+      'reports.cash',
+      'credit_limit.manage',
+    ]) {
+      expect(codes).toContain(code);
+    }
+  });
+});
+
+describe('cash and debt routes', () => {
+  function expectRule(path: string, permission: string) {
+    expect(canAccessRoute(path, [], [])).toBe(false);
+    expect(canAccessRoute(path, SALES_PERMS, ['SALES'])).toBe(false);
+    expect(canAccessRoute(path, [permission], [])).toBe(true);
+  }
+
+  it('cash routes require their permissions', () => {
+    expectRule('/receipts', 'receipts.view');
+    expectRule('/receipts/new', 'receipts.create');
+    expect(canAccessRoute('/receipts/new', ['receipts.view'], [])).toBe(false);
+    expectRule('/receipts/abc-123', 'receipts.view');
+    expectRule('/payments', 'payments.view');
+    expectRule('/payments/new', 'payments.create');
+    expectRule('/payments/abc-123', 'payments.view');
+    expectRule('/fund-transfers', 'fund_transfers.view');
+    expectRule('/fund-transfers/new', 'fund_transfers.create');
+    expectRule('/fund-transfers/abc-123', 'fund_transfers.view');
+    expectRule('/debt/offsets', 'debt_offset.view');
+    expectRule('/debt/offsets/new', 'debt_offset.create');
+    expectRule('/debt/offsets/abc-123', 'debt_offset.view');
+    expectRule('/debt/matching', 'debt.matching');
+    expect(canAccessRoute('/debt/matching', ['debt_offset.view'], [])).toBe(false);
+    expectRule('/debt/opening', 'debt.opening_balance');
+    expectRule('/reports/debt-balance', 'reports.debt');
+    expectRule('/reports/debt-ledger', 'reports.debt');
+    expectRule('/reports/cash-book', 'reports.cash');
+    expect(canAccessRoute('/reports/cash-book', ['reports.debt'], [])).toBe(false);
+    expectRule('/cash-reasons', 'cash.catalogs.manage');
+    expectRule('/funds', 'cash.catalogs.manage');
+    expectRule('/funds', 'cash.opening_balance');
+    expect(canAccessRoute('/funds', ['credit_limit.manage'], [])).toBe(false);
+    expectRule('/credit-limits', 'credit_limit.manage');
+    expectRule('/settings/cash', 'cash.settings');
+    expect(canAccessRoute('/settings/cash', ['inventory.settings'], [])).toBe(false);
   });
 });

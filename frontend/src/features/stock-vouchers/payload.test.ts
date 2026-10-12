@@ -17,6 +17,7 @@ const PRODUCT = '33333333-3333-3333-3333-333333333333';
 const LINE_ID = '44444444-4444-4444-4444-444444444444';
 const VOUCHER_ID = '55555555-5555-5555-5555-555555555555';
 const PAYMENT = '66666666-6666-6666-6666-666666666666';
+const FUND = '99999999-9999-4999-8999-999999999999';
 
 function serverLine(overrides: Partial<StockVoucherLine> = {}): StockVoucherLine {
   return {
@@ -139,10 +140,47 @@ describe('toUpsertPayload', () => {
   it('omits paidAmount for an untouched new voucher', () => {
     const values = newVoucherValues();
     values.paidAmount = 162_000;
-    const payload = toUpsertPayload('In', parse(values), true);
+    const payload = toUpsertPayload('In', parse(values), { acknowledgeNegativeStock: true });
     expect(payload.paidAmount).toBeUndefined();
     expect(payload.version).toBeUndefined();
     expect(payload.acknowledgeNegativeStock).toBe(true);
+  });
+
+  it('flags are spread into the payload', () => {
+    const payload = toUpsertPayload('In', parse(newVoucherValues()), {
+      confirmRemoveSettlements: true,
+      acknowledgeCreditLimit: true,
+      acknowledgeNegativeFund: true,
+    });
+    expect(payload).toMatchObject({
+      acknowledgeNegativeStock: false,
+      confirmRemoveSettlements: true,
+      acknowledgeCreditLimit: true,
+      acknowledgeNegativeFund: true,
+    });
+  });
+
+  it('without flags only acknowledgeNegativeStock=false is sent', () => {
+    const payload = toUpsertPayload('In', parse(newVoucherValues()));
+    expect(payload.acknowledgeNegativeStock).toBe(false);
+    expect(payload).not.toHaveProperty('confirmRemoveSettlements');
+    expect(payload).not.toHaveProperty('acknowledgeCreditLimit');
+    expect(payload).not.toHaveProperty('acknowledgeNegativeFund');
+  });
+
+  it('fund and due date are sent', () => {
+    const values = newVoucherValues();
+    values.fundId = FUND;
+    values.dueDate = '2026-11-06';
+    const payload = toUpsertPayload('In', parse(values));
+    expect(payload.fundId).toBe(FUND);
+    expect(payload.dueDate).toBe('2026-11-06');
+  });
+
+  it('empty fund and due date are omitted', () => {
+    const payload = toUpsertPayload('In', parse(newVoucherValues()));
+    expect(payload.fundId).toBeUndefined();
+    expect(payload.dueDate).toBeUndefined();
   });
 
   it('edit of a partially paid voucher keeps paidAmount', () => {
@@ -205,5 +243,14 @@ describe('toFormDefaults', () => {
       paidAmountTouched: false,
     });
     expect(edited.lines[0]).toMatchObject({ _uiKey: LINE_ID, id: LINE_ID, quantity: 2, unitPrice: 100_000 });
+  });
+
+  it('new voucher starts without fund and due date; an edit loads them', () => {
+    expect(toFormDefaults(undefined, defaults)).toMatchObject({ fundId: '', dueDate: '' });
+    expect(toFormDefaults(serverVoucher({ fundId: FUND, dueDate: '2026-11-05' }))).toMatchObject({
+      fundId: FUND,
+      dueDate: '2026-11-05',
+    });
+    expect(toFormDefaults(serverVoucher())).toMatchObject({ fundId: '', dueDate: '' });
   });
 });

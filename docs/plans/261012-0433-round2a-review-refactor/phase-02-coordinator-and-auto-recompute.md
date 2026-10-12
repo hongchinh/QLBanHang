@@ -1,6 +1,6 @@
 # Phase 02 — Stock voucher coordinator & automatic Auto recompute
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-12)
 **Complexity:** L
 
 ## Objective

@@ -44,7 +44,7 @@ Finish the last review findings of Round 2A:
 ## Phases
 
 - [x] Phase 01 — Backend shared helpers (M) — `phase-01-backend-shared-helpers.md`
-- [ ] Phase 02 — Stock voucher coordinator & automatic Auto recompute (L) — `phase-02-coordinator-and-auto-recompute.md`
+- [x] Phase 02 — Stock voucher coordinator & automatic Auto recompute (L) — `phase-02-coordinator-and-auto-recompute.md`
 - [ ] Phase 03 — Settlement confirmation token (L) — `phase-03-confirmation-token.md`
 - [ ] Phase 04 — Frontend refactors (L) — `phase-04-frontend-refactors.md`
 - [ ] Phase 05 — Docs & final verification (S) — `phase-05-docs-and-verification.md`

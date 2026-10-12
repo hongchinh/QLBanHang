@@ -1,12 +1,13 @@
-import { useId, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { SearchX, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUiStore } from '@/stores/ui-store';
 import type { NavGroup, NavItem } from '../nav-config';
-import { findActiveItem } from './nav-search';
+import { filterNavGroups, findActiveItem } from './nav-search';
 import { SidebarGroup } from './sidebar-group';
 import { SidebarItem } from './sidebar-item';
+import { SidebarSearch } from './sidebar-search';
 
 interface SidebarProps {
   dashboardItem: NavItem;
@@ -43,6 +44,30 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
     if (g.id === tempGroupId) setTempOpen({ pathname, groupId: null });
   };
 
+  const navigate = useNavigate();
+  const navId = `${idPrefix}-nav`;
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [query, setQuery] = useState('');
+  const searching = query.trim() !== '';
+  const filtered = useMemo(() => (searching ? filterNavGroups(groups, query) : null), [searching, groups, query]);
+
+  // The box clears on navigation and when the sidebar collapses.
+  useEffect(() => {
+    setQuery('');
+  }, [pathname, collapsed]);
+
+  const clearSearch = useCallback(() => {
+    setQuery('');
+    inputRef.current?.focus();
+  }, []);
+  const openFirstResult = () => {
+    const first = filtered?.groups[0]?.items[0];
+    if (first) navigate(first.to);
+  };
+  const focusFirstResult = () => {
+    document.getElementById(navId)?.querySelector<HTMLAnchorElement>('a[href]')?.focus();
+  };
+
   return (
     <>
       {onClose && (
@@ -66,21 +91,58 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
           ))}
         </nav>
       ) : (
-        <nav aria-label="Chức năng" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3">
-          <ul>
-            <SidebarItem item={dashboardItem} active={dashboardItem.to === activePath} />
-          </ul>
-          {groups.map((g) => (
-            <SidebarGroup
-              key={g.id}
-              group={g}
-              open={isOpen(g)}
-              onToggle={() => toggleGroup(g)}
-              activePath={activePath}
-              listId={`${idPrefix}-group-${g.id}`}
-            />
-          ))}
-        </nav>
+        <>
+          <SidebarSearch
+            value={query}
+            onChange={setQuery}
+            onEnter={openFirstResult}
+            onArrowDown={focusFirstResult}
+            onClear={clearSearch}
+            resultCount={filtered?.count ?? null}
+            inputRef={inputRef}
+            controlsId={navId}
+          />
+          <nav id={navId} aria-label="Chức năng" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3">
+            {filtered ? (
+              filtered.count === 0 ? (
+                <div className="flex flex-col items-center gap-1 py-8 text-center text-sm text-muted-foreground">
+                  <SearchX className="h-6 w-6" aria-hidden />
+                  <p>Không tìm thấy chức năng</p>
+                  <p className="text-xs">Thử từ khóa ngắn hơn</p>
+                </div>
+              ) : (
+                filtered.groups.map((g) => (
+                  <SidebarGroup
+                    key={g.id}
+                    group={g}
+                    open
+                    onToggle={() => {}}
+                    resultCount={g.items.length}
+                    matches={filtered.matches}
+                    activePath={activePath}
+                    listId={`${idPrefix}-group-${g.id}`}
+                  />
+                ))
+              )
+            ) : (
+              <>
+                <ul>
+                  <SidebarItem item={dashboardItem} active={dashboardItem.to === activePath} />
+                </ul>
+                {groups.map((g) => (
+                  <SidebarGroup
+                    key={g.id}
+                    group={g}
+                    open={isOpen(g)}
+                    onToggle={() => toggleGroup(g)}
+                    activePath={activePath}
+                    listId={`${idPrefix}-group-${g.id}`}
+                  />
+                ))}
+              </>
+            )}
+          </nav>
+        </>
       )}
     </>
   );

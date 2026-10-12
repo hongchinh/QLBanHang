@@ -2,14 +2,28 @@ import { Link } from 'react-router-dom';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { NavItem } from '../nav-config';
+import type { MatchRange } from './nav-search';
 
 interface SidebarItemProps {
   item: NavItem;
   active: boolean;
   collapsed?: boolean;
+  match?: MatchRange;
 }
 
-export function SidebarItem({ item, active, collapsed = false }: SidebarItemProps) {
+function Highlight({ text, match }: { text: string; match?: MatchRange }) {
+  if (!match) return <>{text}</>;
+  const nfc = text.normalize('NFC');
+  return (
+    <>
+      {nfc.slice(0, match.start)}
+      <mark className="rounded-sm bg-nav-match text-inherit">{nfc.slice(match.start, match.end)}</mark>
+      {nfc.slice(match.end)}
+    </>
+  );
+}
+
+export function SidebarItem({ item, active, collapsed = false, match }: SidebarItemProps) {
   const { to, label, icon: Icon } = item;
   const link = (
     <Link
@@ -25,7 +39,7 @@ export function SidebarItem({ item, active, collapsed = false }: SidebarItemProp
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      {!collapsed && <span className="truncate">{label}</span>}
+      {!collapsed && <span className="truncate"><Highlight text={label} match={match} /></span>}
     </Link>
   );
 
@@ -51,9 +65,10 @@ interface SidebarItemListProps {
   activePath: string | null;
   id?: string;
   hidden?: boolean;
+  matches?: ReadonlyMap<string, MatchRange>;
 }
 
-export function SidebarItemList({ label, items, activePath, id, hidden }: SidebarItemListProps) {
+export function SidebarItemList({ label, items, activePath, id, hidden, matches }: SidebarItemListProps) {
   return (
     <ul aria-label={label} id={id} hidden={hidden} className="space-y-0.5 pl-2">
       {items.map((item, index) => (
@@ -62,13 +77,21 @@ export function SidebarItemList({ label, items, activePath, id, hidden }: Sideba
           item={item}
           showHeading={item.section !== undefined && item.section !== items[index - 1]?.section}
           active={item.to === activePath}
+          match={matches?.get(item.to)}
         />
       ))}
     </ul>
   );
 }
 
-function SectionedItem({ item, showHeading, active }: { item: NavItem; showHeading: boolean; active: boolean }) {
+interface SectionedItemProps {
+  item: NavItem;
+  showHeading: boolean;
+  active: boolean;
+  match?: MatchRange;
+}
+
+function SectionedItem({ item, showHeading, active, match }: SectionedItemProps) {
   return (
     <>
       {showHeading && (
@@ -76,7 +99,7 @@ function SectionedItem({ item, showHeading, active }: { item: NavItem; showHeadi
           <h4 className="px-3 pb-0.5 pt-2 text-[11px] font-semibold text-muted-foreground">{item.section}</h4>
         </li>
       )}
-      <SidebarItem item={item} active={active} />
+      <SidebarItem item={item} active={active} match={match} />
     </>
   );
 }

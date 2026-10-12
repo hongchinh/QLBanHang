@@ -106,3 +106,67 @@ describe('Sidebar groups', () => {
     expect(header('Bán hàng')).toHaveAttribute('aria-expanded', 'true');
   });
 });
+
+const searchBox = () => screen.getByRole('searchbox', { name: 'Tìm chức năng' });
+
+describe('Sidebar search', () => {
+  it('filters items, hides Tổng quan and highlights the match', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.type(searchBox(), 'doi tru');
+    expect(screen.getByRole('link', { name: 'Đối trừ chứng từ' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Phiếu thu' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Tổng quan' })).not.toBeInTheDocument();
+    expect(screen.getByText('Đối trừ', { selector: 'mark' })).toBeInTheDocument();
+    expect(screen.getByText('1 kết quả')).toBeInTheDocument();
+  });
+
+  it('opens collapsed groups that have results and shows their count', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.type(searchBox(), 'hang hoa');
+    expect(screen.getByRole('link', { name: 'Hàng hóa' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Nhóm hàng hóa' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Danh mục' })).not.toBeInTheDocument();
+    expect(screen.getByText('Danh mục').parentElement).toHaveTextContent('Danh mục2');
+    expect(useUiStore.getState().sidebarGroupOpen).toEqual({});
+  });
+
+  it('shows a section match', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.type(searchBox(), 'cong no');
+    expect(screen.getByRole('link', { name: 'Tuổi nợ' })).toBeInTheDocument();
+  });
+
+  it('shows an empty state', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.type(searchBox(), 'xyz');
+    expect(screen.getByText('Không tìm thấy chức năng')).toBeInTheDocument();
+    expect(screen.getByText('Thử từ khóa ngắn hơn')).toBeInTheDocument();
+  });
+
+  it('treats a blank query as no search', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.type(searchBox(), '   ');
+    expect(screen.getByRole('link', { name: 'Tổng quan' })).toBeInTheDocument();
+  });
+
+  it('Enter opens the first result and the box clears after navigation', async () => {
+    const user = userEvent.setup();
+    const { pathname } = renderSidebar('/');
+    await user.type(searchBox(), 'phieu{Enter}');
+    expect(pathname()).toBe('/stock-in');
+    expect(searchBox()).toHaveValue('');
+  });
+
+  it('clears when another route is opened', async () => {
+    const user = userEvent.setup();
+    const { navigate } = renderSidebar('/');
+    await user.type(searchBox(), 'thu');
+    navigate('/receipts');
+    expect(searchBox()).toHaveValue('');
+  });
+});

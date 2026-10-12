@@ -53,12 +53,17 @@ public sealed class NegativeStockException : DomainException
 
 public sealed class ConfirmationRequiredException : DomainException
 {
-    public ConfirmationRequiredException(string code, string message, IDictionary<string, string[]> details, bool canConfirm)
+    public ConfirmationRequiredException(string code, string message, IDictionary<string, string[]> details, bool canConfirm,
+        string? token = null)
         : base(code, message)
     {
         Details = details;
         CanConfirm = canConfirm;
+        Token = token;
     }
+
+    /// What the user was shown, to be echoed back on the confirmed retry; null when the confirmation has none.
+    public string? Token { get; }
 
     public IDictionary<string, string[]> Details { get; }
 

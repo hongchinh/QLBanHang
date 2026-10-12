@@ -22,4 +22,5 @@ public class ApiError
     public string Code { get; init; } = default!;
     public string Message { get; init; } = default!;
     public IDictionary<string, string[]>? Details { get; init; }
+    public string? Token { get; init; }
 }

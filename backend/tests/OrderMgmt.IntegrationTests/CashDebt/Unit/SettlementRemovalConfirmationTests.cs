@@ -48,4 +48,73 @@ public class SettlementRemovalConfirmationTests
         merged.Details["PT-3"].Should().Equal("d");
         merged.Details.Should().HaveCount(3);
     }
+
+    private static (Guid Low, Guid High) TwoIds()
+    {
+        var x = Guid.NewGuid();
+        var y = Guid.NewGuid();
+        return x.CompareTo(y) < 0 ? (x, y) : (y, x);
+    }
+
+    [Fact]
+    public void TokenOf_is_distinct_sorted_N_format_and_comma_separated()
+    {
+        var (a, b) = TwoIds();
+
+        SettlementRemovalConfirmation.TokenOf(new[] { b, a, b }).Should().Be($"{a:N},{b:N}");
+    }
+
+    [Fact]
+    public void Covers_is_true_without_a_token()
+    {
+        SettlementRemovalConfirmation.Covers(null, new[] { Guid.NewGuid() }).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Covers_is_true_when_the_token_lists_every_id()
+    {
+        var (a, b) = TwoIds();
+
+        SettlementRemovalConfirmation.Covers(SettlementRemovalConfirmation.TokenOf(new[] { a, b }), new[] { a })
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public void Covers_is_false_when_an_id_is_missing_from_the_token()
+    {
+        var (a, b) = TwoIds();
+
+        SettlementRemovalConfirmation.Covers(SettlementRemovalConfirmation.TokenOf(new[] { a }), new[] { a, b })
+            .Should().BeFalse();
+    }
+
+    [Fact]
+    public void Covers_is_false_for_an_unparsable_token()
+    {
+        SettlementRemovalConfirmation.Covers("garbage", new[] { Guid.NewGuid() }).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Create_with_ids_sets_the_token()
+    {
+        var (a, b) = TwoIds();
+        var details = new Dictionary<string, string[]> { ["PT-1"] = new[] { "x" } };
+
+        SettlementRemovalConfirmation.Create(details, new[] { a, b }).Token
+            .Should().Be(SettlementRemovalConfirmation.TokenOf(new[] { a, b }));
+    }
+
+    [Fact]
+    public void Merge_unions_the_tokens()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var c = Guid.NewGuid();
+        var details = new Dictionary<string, string[]> { ["PT-1"] = new[] { "x" } };
+        var first = SettlementRemovalConfirmation.Create(details, new[] { a, b });
+        var second = SettlementRemovalConfirmation.Create(details, new[] { b, c });
+
+        SettlementRemovalConfirmation.Merge(first, second).Token
+            .Should().Be(SettlementRemovalConfirmation.TokenOf(new[] { a, b, c }));
+    }
 }

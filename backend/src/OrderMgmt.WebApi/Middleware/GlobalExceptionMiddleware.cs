@@ -88,6 +88,7 @@ public class GlobalExceptionMiddleware
                 Code = cre.Code,
                 Message = cre.Message,
                 Details = cre.Details,
+                Token = cre.Token,
             }),
             DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, new ApiError
             {

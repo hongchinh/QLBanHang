@@ -116,6 +116,7 @@ describe('cash and debt navigation', () => {
       '/reports/debt-documents',
       '/reports/debt-aging',
       '/reports/debt-overdue',
+      '/reports/debt-by-salesperson',
       '/reports/cash-book',
     ]);
     expect(groups.find((g) => g.label === CASH_GROUP)?.items.map((i) => i.label)).toEqual([
@@ -130,6 +131,7 @@ describe('cash and debt navigation', () => {
       'Công nợ theo chứng từ',
       'Tuổi nợ',
       'Nợ quá hạn',
+      'Công nợ theo nhân viên',
       'Sổ quỹ',
     ]);
   });

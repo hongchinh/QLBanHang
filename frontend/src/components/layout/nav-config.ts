@@ -30,6 +30,7 @@ import {
   Gauge,
   Hourglass,
   AlarmClock,
+  UserRound,
 } from 'lucide-react';
 import type { Permission, Role } from '@/lib/permissions';
 import type { SidebarNavGroup, SidebarNavItem } from './sidebar/sidebar';
@@ -93,6 +94,7 @@ const navGroups: NavGroup[] = [
       { to: '/reports/debt-documents', label: 'Công nợ theo chứng từ', icon: FileText, permission: 'reports.debt' },
       { to: '/reports/debt-aging', label: 'Tuổi nợ', icon: Hourglass, permission: 'reports.debt' },
       { to: '/reports/debt-overdue', label: 'Nợ quá hạn', icon: AlarmClock, permission: 'reports.debt' },
+      { to: '/reports/debt-by-salesperson', label: 'Công nợ theo nhân viên', icon: UserRound, permission: 'reports.debt' },
       { to: '/reports/cash-book', label: 'Sổ quỹ', icon: Wallet, permission: 'reports.cash' },
     ],
   },

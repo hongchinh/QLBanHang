@@ -6,6 +6,7 @@ using OrderMgmt.Application.CashDebt.DebtOffsets.Interfaces;
 using OrderMgmt.Application.CashDebt.DebtOffsets.Models;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
@@ -85,10 +86,10 @@ public class DebtOffsetService : IDebtOffsetService
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var pattern = $"%{EscapeLike(request.Search.Trim())}%";
-            query = query.Where(o => EF.Functions.ILike(o.Code, pattern, LikeEscape)
-                || EF.Functions.ILike(o.PartnerName, pattern, LikeEscape)
-                || EF.Functions.ILike(o.Note!, pattern, LikeEscape));
+            var pattern = $"%{LikePattern.Escape(request.Search.Trim())}%";
+            query = query.Where(o => EF.Functions.ILike(o.Code, pattern, LikePattern.EscapeCharacter)
+                || EF.Functions.ILike(o.PartnerName, pattern, LikePattern.EscapeCharacter)
+                || EF.Functions.ILike(o.Note!, pattern, LikePattern.EscapeCharacter));
         }
 
         var totalItems = await query.CountAsync(ct);
@@ -490,12 +491,4 @@ public class DebtOffsetService : IDebtOffsetService
         if (branchId != await _currentBranch.GetIdAsync(ct))
             throw new ForbiddenException("Chứng từ thuộc chi nhánh khác.");
     }
-
-    // The escape character EscapeLike uses. Every ILike must pass it: without an escape argument Npgsql sends
-    // ESCAPE '' (no escape character), the added backslashes stay literal and a search containing %, _ or \
-    // misses the rows that contain it.
-    private const string LikeEscape = "\\";
-
-    private static string EscapeLike(string input) =>
-        input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }

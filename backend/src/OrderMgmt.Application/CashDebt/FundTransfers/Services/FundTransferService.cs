@@ -4,6 +4,7 @@ using OrderMgmt.Application.CashDebt.FundTransfers.Interfaces;
 using OrderMgmt.Application.CashDebt.FundTransfers.Models;
 using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Interfaces;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
@@ -79,9 +80,9 @@ public class FundTransferService : IFundTransferService
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var pattern = $"%{EscapeLike(request.Search.Trim())}%";
-            query = query.Where(t => EF.Functions.ILike(t.Code, pattern, LikeEscape)
-                || EF.Functions.ILike(t.Description!, pattern, LikeEscape));
+            var pattern = $"%{LikePattern.Escape(request.Search.Trim())}%";
+            query = query.Where(t => EF.Functions.ILike(t.Code, pattern, LikePattern.EscapeCharacter)
+                || EF.Functions.ILike(t.Description!, pattern, LikePattern.EscapeCharacter));
         }
 
         var totalItems = await query.CountAsync(ct);
@@ -481,12 +482,4 @@ public class FundTransferService : IFundTransferService
         if (branchId != await _currentBranch.GetIdAsync(ct))
             throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
     }
-
-    // The escape character EscapeLike uses. Every ILike must pass it: without an escape argument Npgsql sends
-    // ESCAPE '' (no escape character), the added backslashes stay literal and a search containing %, _ or \
-    // misses the rows that contain it.
-    private const string LikeEscape = "\\";
-
-    private static string EscapeLike(string input) =>
-        input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 }

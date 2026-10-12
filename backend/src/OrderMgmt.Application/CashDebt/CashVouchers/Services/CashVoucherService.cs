@@ -8,6 +8,7 @@ using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Interfaces;
 using OrderMgmt.Application.CashDebt.Ledger;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
@@ -96,11 +97,11 @@ public class CashVoucherService : ICashVoucherService
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
-            var pattern = $"%{EscapeLike(request.Search.Trim())}%";
-            query = query.Where(v => EF.Functions.ILike(v.Code, pattern, LikeEscape)
-                || EF.Functions.ILike(v.PartnerName!, pattern, LikeEscape)
-                || EF.Functions.ILike(v.PersonName!, pattern, LikeEscape)
-                || EF.Functions.ILike(v.Description!, pattern, LikeEscape));
+            var pattern = $"%{LikePattern.Escape(request.Search.Trim())}%";
+            query = query.Where(v => EF.Functions.ILike(v.Code, pattern, LikePattern.EscapeCharacter)
+                || EF.Functions.ILike(v.PartnerName!, pattern, LikePattern.EscapeCharacter)
+                || EF.Functions.ILike(v.PersonName!, pattern, LikePattern.EscapeCharacter)
+                || EF.Functions.ILike(v.Description!, pattern, LikePattern.EscapeCharacter));
         }
 
         var totalItems = await query.CountAsync(ct);
@@ -829,14 +830,6 @@ public class CashVoucherService : ICashVoucherService
         if (branchId != await _currentBranch.GetIdAsync(ct))
             throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
     }
-
-    // The escape character EscapeLike uses. Every ILike must pass it: without an escape argument Npgsql sends
-    // ESCAPE '' (no escape character), the added backslashes stay literal and a search containing %, _ or \
-    // misses the rows that contain it.
-    private const string LikeEscape = "\\";
-
-    private static string EscapeLike(string input) =>
-        input.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_");
 
     private static DocumentType DocTypeOf(CashVoucherType type) =>
         type == CashVoucherType.Receipt ? DocumentType.Receipt : DocumentType.Payment;

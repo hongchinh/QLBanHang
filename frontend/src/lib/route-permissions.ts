@@ -56,7 +56,7 @@ const RULES: RouteRule[] = [
   { pattern: /^\/debt\/matching$/, permission: 'debt.matching' },
   { pattern: /^\/debt\/opening$/, permission: 'debt.opening_balance' },
   ...listNewDetail('debt/offsets', 'debt_offset.view', 'debt_offset.create', 'debt_offset.view'),
-  { pattern: /^\/reports\/(debt-balance|debt-ledger)$/, permission: 'reports.debt' },
+  { pattern: /^\/reports\/(debt-balance|debt-ledger|debt-documents|debt-aging|debt-overdue|debt-by-salesperson|debt-reconciliation)$/, permission: 'reports.debt' },
   { pattern: /^\/reports\/cash-book$/, permission: 'reports.cash' },
   { pattern: /^\/cash-reasons$/, permission: 'cash.catalogs.manage' },
   { pattern: /^\/funds$/, anyPermission: ['cash.catalogs.manage', 'cash.opening_balance'] },

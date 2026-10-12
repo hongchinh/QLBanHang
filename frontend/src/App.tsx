@@ -71,6 +71,7 @@ import { VehicleRevenuePage } from '@/pages/reports/vehicle-revenue-page';
 // Round 2A: 12.5 debt balance, debt ledger and cash book reports
 import { DebtBalancePage } from '@/pages/cash-reports/debt-balance-page';
 import { DebtLedgerPage } from '@/pages/cash-reports/debt-ledger-page';
+import { DebtDocumentsPage } from '@/pages/cash-reports/debt-documents-page';
 import { CashBookPage } from '@/pages/cash-reports/cash-book-page';
 import { ForbiddenPage, NotFoundPage } from '@/pages/error-pages';
 import { useRegisterSW } from 'virtual:pwa-register/react';
@@ -656,6 +657,14 @@ export function App() {
                     element={
                       <ProtectedRoute permission="reports.debt">
                         <DebtLedgerPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="debt-documents"
+                    element={
+                      <ProtectedRoute permission="reports.debt">
+                        <DebtDocumentsPage />
                       </ProtectedRoute>
                     }
                   />

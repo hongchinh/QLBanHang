@@ -88,6 +88,7 @@ const navGroups: NavGroup[] = [
       { to: '/debt/opening', label: 'Nợ đầu kỳ', icon: History, permission: 'debt.opening_balance' },
       { to: '/reports/debt-balance', label: 'Số dư công nợ', icon: BookOpen, permission: 'reports.debt' },
       { to: '/reports/debt-ledger', label: 'Sổ chi tiết công nợ', icon: BookText, permission: 'reports.debt' },
+      { to: '/reports/debt-documents', label: 'Công nợ theo chứng từ', icon: FileText, permission: 'reports.debt' },
       { to: '/reports/cash-book', label: 'Sổ quỹ', icon: Wallet, permission: 'reports.cash' },
     ],
   },

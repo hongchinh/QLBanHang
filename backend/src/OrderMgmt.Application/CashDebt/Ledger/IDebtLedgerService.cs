@@ -15,11 +15,13 @@ public interface IDebtLedgerService
     /// (SourceType, SourceId, Side); a side missing from drafts is deleted, and settlements on it give 409. A draft with
     /// Amount 0 also deletes the side, but as a shrink to 0: its settlements ask for confirmation (P10) instead.
     Task<IReadOnlyList<DebtEntry>> PostAsync(DebtSourceType sourceType, Guid sourceId,
-        IReadOnlyList<DebtEntryDraft> drafts, bool confirmRemoveSettlements, CancellationToken ct = default);
+        IReadOnlyList<DebtEntryDraft> drafts, bool confirmRemoveSettlements, string? confirmedSettlements = null,
+        CancellationToken ct = default);
 
     /// Cancel/delete path: removes every entry of the source after removing its settlements (needs confirmation).
+    /// A confirmed token (SettlementRemovalConfirmation) must list every settlement removed, else the 422 is thrown again.
     Task RemoveSourceAsync(DebtSourceType sourceType, Guid sourceId, bool confirmRemoveSettlements,
-        CancellationToken ct = default);
+        string? confirmedSettlements = null, CancellationToken ct = default);
 
     /// Silently removes the source's own settlements of one origin (no confirmation, no activity). A settlement is owned
     /// by the document whose id is its BatchId: Auto by the stock voucher, AtVoucher by the cash voucher that made the

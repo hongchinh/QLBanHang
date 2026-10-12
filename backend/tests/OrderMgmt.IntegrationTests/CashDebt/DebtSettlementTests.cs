@@ -213,6 +213,75 @@ public class DebtSettlementTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Remove_source_with_a_token_removes_only_listed_settlements()
+    {
+        var source = Guid.NewGuid();
+        var yCode = "Y" + _suffix;
+        var zCode = "Z" + _suffix;
+        var x = await EntryAsync(Draft(_partnerId, R, Inc, 1_000m, "2026-10-01 08:00", "X" + _suffix), sourceId: source);
+        var y = await EntryAsync(Draft(_partnerId, R, Dec, 400m, "2026-10-02 08:00", yCode));
+        var z = await EntryAsync(Draft(_partnerId, R, Dec, 300m, "2026-10-02 08:00", zCode));
+        var s1 = (await SettleAsync(SettlementOrigin.Manual, new SettlementDraft(x, y, 400m))).Single();
+
+        var first = (await FluentActions.Awaiting(() => RemoveSourceAsync(source, confirm: false))
+            .Should().ThrowAsync<ConfirmationRequiredException>()).Which;
+        first.Token.Should().Be(SettlementRemovalConfirmation.TokenOf(new[] { s1.Id }));
+
+        var s2 = (await SettleAsync(SettlementOrigin.Manual, new SettlementDraft(x, z, 300m))).Single();
+
+        var stale = (await FluentActions.Awaiting(() => RemoveSourceAsync(source, confirm: true, first.Token))
+            .Should().ThrowAsync<ConfirmationRequiredException>()).Which;
+        stale.Code.Should().Be("DEBT_SETTLEMENTS_WILL_BE_REMOVED");
+        stale.Details.Keys.Should().BeEquivalentTo(yCode, zCode);
+        SettlementRemovalConfirmation.Covers(stale.Token, new[] { s1.Id, s2.Id }).Should().BeTrue();
+        (await EntriesOfAsync(DebtSourceType.Opening, source)).Should().ContainSingle();
+        (await SettlementsOfAsync(x)).Should().HaveCount(2);
+
+        await RemoveSourceAsync(source, confirm: true, stale.Token);
+
+        (await EntriesOfAsync(DebtSourceType.Opening, source)).Should().BeEmpty();
+        (await SettlementsOfAsync(y)).Should().BeEmpty();
+        (await SettlementsOfAsync(z)).Should().BeEmpty();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Post_shrink_with_a_covering_token_proceeds()
+    {
+        var source = Guid.NewGuid();
+        var xCode = "X" + _suffix;
+        var x = await EntryAsync(Draft(_partnerId, R, Inc, 1_000m, "2026-10-01 08:00", xCode), sourceId: source);
+        var y = await EntryAsync(Draft(_partnerId, R, Dec, 400m, "2026-10-02 08:00", "Y" + _suffix));
+        var z = await EntryAsync(Draft(_partnerId, R, Dec, 300m, "2026-10-02 08:00", "Z" + _suffix));
+        var s1 = (await SettleAsync(SettlementOrigin.Manual, new SettlementDraft(x, y, 400m))).Single();
+        var shrunk = Draft(_partnerId, R, Inc, 100m, "2026-10-01 08:00", xCode);
+
+        var first = (await FluentActions.Awaiting(() => RepostAsync(source, shrunk, confirm: false))
+            .Should().ThrowAsync<ConfirmationRequiredException>()).Which;
+        first.Token.Should().Be(SettlementRemovalConfirmation.TokenOf(new[] { s1.Id }));
+
+        var s2 = (await SettleAsync(SettlementOrigin.Manual, new SettlementDraft(x, z, 300m))).Single();
+
+        var stale = (await FluentActions.Awaiting(() => RepostAsync(source, shrunk, confirm: true, first.Token))
+            .Should().ThrowAsync<ConfirmationRequiredException>()).Which;
+        SettlementRemovalConfirmation.Covers(stale.Token, new[] { s1.Id, s2.Id }).Should().BeTrue();
+        (await SettlementsOfAsync(x)).Should().HaveCount(2);
+
+        await RepostAsync(source, shrunk, confirm: true, stale.Token);
+
+        (await SettlementsOfAsync(x)).Should().BeEmpty();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    private Task RepostAsync(Guid source, DebtEntryDraft draft, bool confirm, string? confirmedSettlements = null) =>
+        InTransactionAsync(async (sp, ct) =>
+        {
+            await sp.GetRequiredService<IDebtLedgerService>()
+                .PostAsync(DebtSourceType.Opening, source, new[] { draft }, confirm, confirmedSettlements, ct);
+            return true;
+        });
+
+    [Fact]
     public async Task Settled_amounts_can_exclude_an_origin()
     {
         var x = await EntryAsync(Draft(_partnerId, R, Inc, 1_000m, "2026-10-01 08:00", "X" + _suffix));
@@ -238,7 +307,7 @@ public class DebtSettlementTests : CashDebtTestBase
         var source = sourceId ?? Guid.NewGuid();
         if (sourceType == DebtSourceType.Opening) LedgerOnlyOpeningSource(source);
         var entries = await InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .PostAsync(sourceType, source, new[] { draft }, false, ct));
+            .PostAsync(sourceType, source, new[] { draft }, false, ct: ct));
         return entries.Single().Id;
     }
 
@@ -257,10 +326,10 @@ public class DebtSettlementTests : CashDebtTestBase
         error.Errors.Keys.Should().BeEquivalentTo(keys);
     }
 
-    private Task RemoveSourceAsync(Guid sourceId, bool confirm) =>
+    private Task RemoveSourceAsync(Guid sourceId, bool confirm, string? confirmedSettlements = null) =>
         InTransactionAsync(async (sp, ct) =>
         {
-            await sp.GetRequiredService<IDebtLedgerService>().RemoveSourceAsync(DebtSourceType.Opening, sourceId, confirm, ct);
+            await sp.GetRequiredService<IDebtLedgerService>().RemoveSourceAsync(DebtSourceType.Opening, sourceId, confirm, confirmedSettlements, ct);
             return true;
         });
 

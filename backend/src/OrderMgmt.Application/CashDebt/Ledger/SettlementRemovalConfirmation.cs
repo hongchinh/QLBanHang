@@ -9,9 +9,6 @@ public static class SettlementRemovalConfirmation
 
     private const string Message = "Chứng từ đã được đối trừ. Lưu sẽ bỏ các đối trừ sau.";
 
-    public static ConfirmationRequiredException Create(IDictionary<string, string[]> details) =>
-        new(Code, Message, details, canConfirm: true);
-
     /// A confirmation that carries the token of the settlements it lists.
     public static ConfirmationRequiredException Create(IDictionary<string, string[]> details,
         IEnumerable<Guid> settlementIds) =>
@@ -22,7 +19,7 @@ public static class SettlementRemovalConfirmation
         string.Join(',', ids.Distinct().Order().Select(id => id.ToString("N")));
 
     /// True when the confirmed token lists every settlement the save would remove. An absent token means the caller
-    /// sent no token (unchanged behaviour), so it covers everything; an unparsable token covers nothing.
+    /// sent no token (unchanged behaviour), so it covers everything; an unparsable or empty token covers nothing.
     public static bool Covers(string? token, IEnumerable<Guid> ids)
     {
         if (token is null) return true;
@@ -32,14 +29,13 @@ public static class SettlementRemovalConfirmation
 
     /// One confirmation for two sources saved together (a stock voucher and its automatic voucher): the details of
     /// both, merged by the other document's code. The token is the union of the ids of both tokens (an absent or
-    /// unparsable token adds none); it is null only when neither source has a token.
+    /// unparsable token adds none), so it is never null.
     public static ConfirmationRequiredException Merge(ConfirmationRequiredException first,
         ConfirmationRequiredException second)
     {
         var details = first.Details.Concat(second.Details)
             .GroupBy(d => d.Key)
             .ToDictionary(g => g.Key, g => g.SelectMany(d => d.Value).ToArray());
-        if (first.Token is null && second.Token is null) return Create(details);
         var ids = (Parse(first.Token) ?? new HashSet<Guid>()).Union(Parse(second.Token) ?? new HashSet<Guid>());
         return Create(details, ids);
     }

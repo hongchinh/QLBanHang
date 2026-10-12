@@ -140,7 +140,7 @@ public class DebtQueryTests : CashDebtTestBase
         var source = sourceId ?? Guid.NewGuid();
         if (sourceType == DebtSourceType.Opening) LedgerOnlyOpeningSource(source);
         var entries = await InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .PostAsync(sourceType, source, new[] { draft }, false, ct));
+            .PostAsync(sourceType, source, new[] { draft }, false, ct: ct));
         return entries.Single().Id;
     }
 

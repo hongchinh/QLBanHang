@@ -57,8 +57,8 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
         await _ledger.RemoveOwnSettlementsAsync(sourceType, voucher.Id, SettlementOrigin.Auto, ct);
 
         Task PostOrRemoveAsync(bool confirm) => remove
-            ? _ledger.RemoveSourceAsync(sourceType, voucher.Id, confirm, ct)
-            : _ledger.PostAsync(sourceType, voucher.Id, DebtDraftsOf(voucher, reason), confirm, ct);
+            ? _ledger.RemoveSourceAsync(sourceType, voucher.Id, confirm, ct: ct)
+            : _ledger.PostAsync(sourceType, voucher.Id, DebtDraftsOf(voucher, reason), confirm, ct: ct);
 
         ConfirmationRequiredException? stockRemovals = null;
         try

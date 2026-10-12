@@ -1,5 +1,6 @@
 using FluentAssertions;
 using OrderMgmt.Application.CashDebt.Ledger;
+using OrderMgmt.Domain.Common;
 using Xunit;
 
 namespace OrderMgmt.IntegrationTests.CashDebt.Unit;
@@ -17,7 +18,7 @@ public class SettlementRemovalConfirmationTests
     {
         var details = new Dictionary<string, string[]> { ["PT-1"] = new[] { "Bỏ đối trừ 10 với PC-1" } };
 
-        var error = SettlementRemovalConfirmation.Create(details);
+        var error = SettlementRemovalConfirmation.Create(details, new[] { Guid.NewGuid() });
 
         error.Code.Should().Be(SettlementRemovalConfirmation.Code);
         error.CanConfirm.Should().BeTrue();
@@ -32,12 +33,12 @@ public class SettlementRemovalConfirmationTests
         {
             ["PT-1"] = new[] { "a" },
             ["PT-2"] = new[] { "b" },
-        });
+        }, new[] { Guid.NewGuid() });
         var second = SettlementRemovalConfirmation.Create(new Dictionary<string, string[]>
         {
             ["PT-1"] = new[] { "c" },
             ["PT-3"] = new[] { "d" },
-        });
+        }, new[] { Guid.NewGuid() });
 
         var merged = SettlementRemovalConfirmation.Merge(first, second);
 
@@ -86,6 +87,24 @@ public class SettlementRemovalConfirmationTests
 
         SettlementRemovalConfirmation.Covers(SettlementRemovalConfirmation.TokenOf(new[] { a }), new[] { a, b })
             .Should().BeFalse();
+    }
+
+    [Fact]
+    public void Covers_is_false_for_an_empty_token()
+    {
+        SettlementRemovalConfirmation.Covers("", new[] { Guid.NewGuid() }).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Merge_with_one_token_keeps_its_ids()
+    {
+        var a = Guid.NewGuid();
+        var details = new Dictionary<string, string[]> { ["PT-1"] = new[] { "x" } };
+        var first = SettlementRemovalConfirmation.Create(details, new[] { a });
+        var tokenless = new ConfirmationRequiredException(SettlementRemovalConfirmation.Code, "m", details, true);
+
+        SettlementRemovalConfirmation.Merge(first, tokenless).Token.Should().Be(SettlementRemovalConfirmation.TokenOf(new[] { a }));
+        SettlementRemovalConfirmation.Merge(tokenless, first).Token.Should().Be(SettlementRemovalConfirmation.TokenOf(new[] { a }));
     }
 
     [Fact]

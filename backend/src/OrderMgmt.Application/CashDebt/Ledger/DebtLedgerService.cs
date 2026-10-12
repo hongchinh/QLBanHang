@@ -30,7 +30,8 @@ public class DebtLedgerService : IDebtLedgerService
     }
 
     public async Task<IReadOnlyList<DebtEntry>> PostAsync(DebtSourceType sourceType, Guid sourceId,
-        IReadOnlyList<DebtEntryDraft> drafts, bool confirmRemoveSettlements, CancellationToken ct = default)
+        IReadOnlyList<DebtEntryDraft> drafts, bool confirmRemoveSettlements, string? confirmedSettlements = null,
+        CancellationToken ct = default)
     {
         if (drafts.GroupBy(d => d.Side).Any(g => g.Count() > 1))
             throw new ArgumentException("A source has at most one debt entry draft per side.", nameof(drafts));
@@ -59,7 +60,9 @@ public class DebtLedgerService : IDebtLedgerService
         }
 
         var entries = await WithCounterpartsAsync(existing, settlements, ct);
-        if (pending.Count > 0 && !confirmRemoveSettlements)
+        if (pending.Count > 0
+            && (!confirmRemoveSettlements
+                || !SettlementRemovalConfirmation.Covers(confirmedSettlements, pending.Select(s => s.Id))))
             throw SettlementsWillBeRemoved(pending, existingIds, entries);
 
         // 2. Apply: drop the confirmed settlements, then upsert or delete each side in place.
@@ -113,14 +116,16 @@ public class DebtLedgerService : IDebtLedgerService
     }
 
     public async Task RemoveSourceAsync(DebtSourceType sourceType, Guid sourceId, bool confirmRemoveSettlements,
-        CancellationToken ct = default)
+        string? confirmedSettlements = null, CancellationToken ct = default)
     {
         var (existing, settlements) = await LoadSourceAsync(sourceType, sourceId, ct);
         if (existing.Count == 0)
             return;
 
         var entries = await WithCounterpartsAsync(existing, settlements, ct);
-        if (settlements.Count > 0 && !confirmRemoveSettlements)
+        if (settlements.Count > 0
+            && (!confirmRemoveSettlements
+                || !SettlementRemovalConfirmation.Covers(confirmedSettlements, settlements.Select(s => s.Id))))
             throw SettlementsWillBeRemoved(settlements, existing.Select(e => e.Id).ToList(), entries);
 
         await RemoveCoreAsync(settlements, entries, ct);
@@ -326,7 +331,8 @@ public class DebtLedgerService : IDebtLedgerService
     private static ConfirmationRequiredException SettlementsWillBeRemoved(IEnumerable<DebtSettlement> settlements,
         IReadOnlyCollection<Guid> sourceEntryIds, IReadOnlyDictionary<Guid, DebtEntry> entries)
     {
-        var details = settlements
+        var settlementList = settlements.ToList();
+        var details = settlementList
             .Select(s =>
             {
                 var sourceIsIncrease = sourceEntryIds.Contains(s.IncreaseEntryId);
@@ -337,7 +343,7 @@ public class DebtLedgerService : IDebtLedgerService
             .GroupBy(x => x.Key)
             .ToDictionary(g => g.Key, g => g.Select(x => x.Text).ToArray());
 
-        return SettlementRemovalConfirmation.Create(details);
+        return SettlementRemovalConfirmation.Create(details, settlementList.Select(s => s.Id));
     }
 
     private static bool Touches(DebtSettlement s, Guid entryId) =>

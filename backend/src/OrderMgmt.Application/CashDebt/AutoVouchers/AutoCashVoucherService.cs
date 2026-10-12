@@ -49,7 +49,7 @@ public class AutoCashVoucherService : IAutoCashVoucherService
             return;
 
         // A Cancelled automatic voucher has no entry left, so this removes nothing for it.
-        await _ledger.RemoveSourceAsync(SourceTypeOf(auto.Type), auto.Id, confirmRemoveSettlements, ct);
+        await _ledger.RemoveSourceAsync(SourceTypeOf(auto.Type), auto.Id, confirmRemoveSettlements, ct: ct);
         if (!voucher.IsDeleted && voucher.Status == StockVoucherStatus.Cancelled)
         {
             auto.Status = DocumentStatus.Cancelled;
@@ -120,7 +120,7 @@ public class AutoCashVoucherService : IAutoCashVoucherService
         await _db.SaveChangesAsync(ct);
 
         var entries = await _ledger.PostAsync(SourceTypeOf(type), auto.Id, DraftsOf(auto, reason),
-            confirmRemoveSettlements, ct);
+            confirmRemoveSettlements, ct: ct);
         // The save checked the voucher's date against the period lock, and the Auto pair is dated at it.
         if (entries.Count > 0)
             await SettleAsync(voucher, entries.Single(), lockedUntil: null, ct);

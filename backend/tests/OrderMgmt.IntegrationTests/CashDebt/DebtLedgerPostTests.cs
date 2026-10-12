@@ -180,7 +180,7 @@ public class DebtLedgerPostTests : CashDebtTestBase
     {
         await InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
             .PostAsync(DebtSourceType.Opening, Guid.NewGuid(),
-                new[] { Draft(_partnerId, R, Inc, 100m, "2026-10-01 08:00", _xCode) }, false, ct));
+                new[] { Draft(_partnerId, R, Inc, 100m, "2026-10-01 08:00", _xCode) }, false, ct: ct));
 
         var assert = () => AssertCashDebtInvariantsAsync();
 
@@ -207,7 +207,7 @@ public class DebtLedgerPostTests : CashDebtTestBase
 
     private Task<IReadOnlyList<DebtEntry>> PostAsync(Guid sourceId, bool confirm, params DebtEntryDraft[] drafts) =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(sourceId), drafts, confirm, ct));
+            .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(sourceId), drafts, confirm, ct: ct));
 
     private Task<DebtSettlement> SettlementOf(Guid settlementId) =>
         InDbAsync(db => db.DebtSettlements.AsNoTracking().SingleAsync(s => s.Id == settlementId));

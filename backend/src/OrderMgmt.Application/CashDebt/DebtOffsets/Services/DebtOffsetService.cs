@@ -178,7 +178,7 @@ public class DebtOffsetService : IDebtOffsetService
 
             var entries = await _ledger.PostAsync(DebtSourceType.Offset, offset.Id,
                 new[] { DraftOf(offset, DebtSide.Receivable), DraftOf(offset, DebtSide.Payable) },
-                confirmRemoveSettlements: false, c);
+                confirmRemoveSettlements: false, ct: c);
             await SettleAsync(offset, entries.Single(e => e.Side == DebtSide.Receivable), request.Receivables,
                 "receivables", c);
             await SettleAsync(offset, entries.Single(e => e.Side == DebtSide.Payable), request.Payables, "payables", c);
@@ -241,7 +241,7 @@ public class DebtOffsetService : IDebtOffsetService
     private async Task RemoveDebtAsync(DebtOffsetVoucher offset, bool confirmRemoveSettlements, CancellationToken ct)
     {
         await _ledger.RemoveOwnSettlementsAsync(DebtSourceType.Offset, offset.Id, SettlementOrigin.Offset, ct);
-        await _ledger.RemoveSourceAsync(DebtSourceType.Offset, offset.Id, confirmRemoveSettlements, ct);
+        await _ledger.RemoveSourceAsync(DebtSourceType.Offset, offset.Id, confirmRemoveSettlements, ct: ct);
     }
 
     /// Cancel and delete (the controller checks their permission): working branch, status and version. There is no

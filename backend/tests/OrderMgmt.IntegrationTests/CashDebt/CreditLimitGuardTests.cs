@@ -144,14 +144,14 @@ public class CreditLimitGuardTests : CashDebtTestBase
             var guard = sp.GetRequiredService<ICreditLimitGuard>();
             var before = await guard.CaptureAsync(draft.BranchId, draft.PartnerId, ct);
             await sp.GetRequiredService<IDebtLedgerService>()
-                .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(Guid.NewGuid()), new[] { draft }, false, ct);
+                .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(Guid.NewGuid()), new[] { draft }, false, ct: ct);
             await guard.CheckAsync(draft.BranchId, draft.PartnerId, before, acknowledge, ct);
             return before;
         });
 
     private Task PostAsync(DebtEntryDraft draft) =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtLedgerService>()
-            .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(Guid.NewGuid()), new[] { draft }, false, ct));
+            .PostAsync(DebtSourceType.Opening, LedgerOnlyOpeningSource(Guid.NewGuid()), new[] { draft }, false, ct: ct));
 
     private Task<decimal> BalanceAsync() =>
         InTransactionAsync((sp, ct) => sp.GetRequiredService<IDebtQueryService>()

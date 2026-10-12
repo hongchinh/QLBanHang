@@ -95,7 +95,7 @@ public class OpeningDebtService : IOpeningDebtService
             await _db.SaveChangesAsync(c);
 
             await _ledger.PostAsync(DebtSourceType.Opening, row.Id, new[] { Draft(row, openingDate) },
-                request.ConfirmRemoveSettlements, c);
+                request.ConfirmRemoveSettlements, ct: c);
             return row.Id;
         }, ct);
 
@@ -117,7 +117,7 @@ public class OpeningDebtService : IOpeningDebtService
             // A confirmed shrink drops the row's settlements: a stock voucher among the entries they join gets its Auto
             // settlement recomputed before the commit (AutoRecomputeHook).
             await _ledger.PostAsync(DebtSourceType.Opening, row.Id, new[] { Draft(row, openingDate) },
-                request.ConfirmRemoveSettlements, c);
+                request.ConfirmRemoveSettlements, ct: c);
         }, ct);
 
         return await GetAsync(id, ct);
@@ -131,7 +131,7 @@ public class OpeningDebtService : IOpeningDebtService
             var row = await LockRowAsync(branchId, id, newPartnerId: null, version, c);
             await OpeningDateAsync(branchId, c);
 
-            await _ledger.RemoveSourceAsync(DebtSourceType.Opening, row.Id, confirmRemoveSettlements, c);
+            await _ledger.RemoveSourceAsync(DebtSourceType.Opening, row.Id, confirmRemoveSettlements, ct: c);
             row.IsDeleted = true;
             row.DeletedAt = _clock.UtcNow;
             row.DeletedBy = _currentUser.UserId;
@@ -157,7 +157,7 @@ public class OpeningDebtService : IOpeningDebtService
             // Amounts do not change, so no settlement is dropped; the ledger moves the settlements' EffectiveAt.
             foreach (var row in rows)
                 await _ledger.PostAsync(DebtSourceType.Opening, row.Id, new[] { Draft(row, openingDate) },
-                    confirmRemoveSettlements: false, c);
+                    confirmRemoveSettlements: false, ct: c);
         }, ct);
     }
 

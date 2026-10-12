@@ -1,6 +1,6 @@
 # Phase 04 — Per-user pins and chips
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

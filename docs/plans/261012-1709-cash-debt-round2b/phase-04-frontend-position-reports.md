@@ -85,7 +85,7 @@ export function bucketLabel(bucket: AgingBucket): string;
 ### Task 4.1 — Types, API, keys, hooks and the bucket helper
 
 1. **Write the failing test** `features/cash-reports/aging.test.ts`:
-   - `normalizeBuckets`: `''` → `'30,60,90'`; `' 15 , 45 '` → `'15,45'`; `'7'` → `'7'`; `'60,30'`, `'30,30'`, `'0,30'`, `'abc'`, `'30,,60'`, `'1,2,3,4,5,6,7'`, `'+5'`, `'1e2'`, `'30abc'`, `'99999999999'` → `null`.
+   - `normalizeBuckets`: `''` → `'30,60,90'`; `' 15 , 45 '` → `'15,45'`; `'7'` → `'7'`; `'60,30'`, `'30,30'`, `'0,30'`, `'abc'`, `'30,,60'`, `'1,2,3,4,5,6,7'`, `'+5'`, `'1e2'`, `'30abc'`, `'99999999999'`, `'36501'`, `'30,50000'` → `null` (each value is capped at 36500 days, mirroring `DebtAging.MaxBoundaryDays`; the cap was added in Phase 02 deviation to prevent int overflow in bucket ranges, so `normalizeBuckets` must reject values above 36500).
    - `bucketLabel`: `{from:0,to:30}` → `'0–30'`; `{from:31,to:60}` → `'31–60'`; `{from:91,to:null}` → `'> 90'`; `{from:1,to:30}` → `'1–30'`.
 2. **Run the test to verify it fails:** `npx vitest run src/features/cash-reports/aging.test.ts`. Expected: FAIL — module not found.
 3. **Write the minimal implementation:** `aging.ts`; add the types above to `types.ts`; `cashReportsApi.debtDocuments / debtAging / debtOverdue` (`apiGet` to `/reports/debt-documents` etc.); keys `debtDocuments(params)`, `debtAging(params)`, `debtOverdue(params)` under `cashReportKeys.all`; hooks `useDebtDocuments`, `useDebtAging`, `useDebtOverdue` with the same `{ enabled }` option as `useDebtBalance`.

@@ -130,3 +130,7 @@ dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~CashDe
 - Aging totals equal the documents report per partner and in total at two dates.
 - Invalid boundaries return 400 with key `buckets`; users without `reports.debt` get 403.
 - No new failures in the `CashDebt` suite.
+
+## Deviations
+
+- `DebtAging.ParseBoundaries` (frozen in Phase 01) now also rejects any bucket value above `MaxBoundaryDays = 36500` (commit 264db22). Without the cap, `buckets=2147483647` passed validation and `Ranges` overflowed to a last bucket `{From: -2147483648, To: null}`. The 400 message is unchanged (fixed by the plan). Phase 04 `normalizeBuckets` mirrors the cap (test case `'36501'` -> null).

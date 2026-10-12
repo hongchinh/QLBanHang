@@ -105,3 +105,28 @@ describe('SidebarRail', () => {
     expect(groupButton('Kho')).not.toHaveAttribute('data-active');
   });
 });
+
+describe('SidebarRail search and pins', () => {
+  it('🔍 expands the sidebar, persists it and focuses the search box', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.click(screen.getByRole('button', { name: 'Tìm chức năng' }));
+    expect(useUiStore.getState().sidebarCollapsed).toBe(false);
+    expect(screen.getByRole('searchbox', { name: 'Tìm chức năng' })).toHaveFocus();
+  });
+
+  it('★ is hidden without pins', () => {
+    renderSidebar('/');
+    expect(screen.queryByRole('button', { name: 'Mục đã ghim' })).not.toBeInTheDocument();
+  });
+
+  it('★ opens the pinned items flyout', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ pinnedNavPaths: { u1: ['/reports/debt-aging', '/receipts'] } });
+    renderSidebar('/');
+    await user.click(screen.getByRole('button', { name: 'Mục đã ghim' }));
+    const flyout = screen.getByRole('dialog');
+    expect(within(flyout).getAllByRole('link').map((a) => a.textContent)).toEqual(['Tuổi nợ', 'Phiếu thu']);
+    expect(within(flyout).queryByRole('heading', { level: 4 })).not.toBeInTheDocument();
+  });
+});

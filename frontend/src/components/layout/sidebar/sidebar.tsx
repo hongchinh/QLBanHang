@@ -60,11 +60,24 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
   const pinnedItems = useMemo(() => resolvePinnedItems(pinnedPaths, groups), [pinnedPaths, groups]);
 
   const navigate = useNavigate();
+  const setSidebarCollapsed = useUiStore((s) => s.setSidebarCollapsed);
   const navId = `${idPrefix}-nav`;
   const inputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
   const searching = query.trim() !== '';
   const filtered = useMemo(() => (searching ? filterNavGroups(groups, query) : null), [searching, groups, query]);
+
+  // jsx-a11y/no-autofocus forbids autoFocus: the rail's search button sets a flag, the effect focuses once expanded.
+  const focusSearchOnExpand = useRef(false);
+  const expandToSearch = () => {
+    focusSearchOnExpand.current = true;
+    setSidebarCollapsed(false);
+  };
+  useEffect(() => {
+    if (collapsed || !focusSearchOnExpand.current) return;
+    focusSearchOnExpand.current = false;
+    inputRef.current?.focus();
+  }, [collapsed]);
 
   // The box clears on navigation and when the sidebar collapses.
   useEffect(() => {
@@ -125,6 +138,8 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
           activePath={activePath}
           activeGroupId={activeGroupId}
           pins={pins}
+          pinnedItems={pinnedItems}
+          onSearch={expandToSearch}
         />
       ) : (
         <>

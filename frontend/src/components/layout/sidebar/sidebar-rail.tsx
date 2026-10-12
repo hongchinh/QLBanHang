@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { Search, Star } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { NavGroup, NavItem } from '../nav-config';
 import { SidebarFlyout } from './sidebar-flyout';
@@ -11,9 +13,11 @@ interface SidebarRailProps {
   activePath: string | null;
   activeGroupId: string | null;
   pins?: PinControls;
+  pinnedItems: NavItem[];
+  onSearch: () => void;
 }
 
-export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, pins }: SidebarRailProps) {
+export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, pins, pinnedItems, onSearch }: SidebarRailProps) {
   const { pathname } = useLocation();
   const [openId, setOpenId] = useState<string | null>(null); // one flyout at a time
   useEffect(() => setOpenId(null), [pathname]);
@@ -21,6 +25,46 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
 
   return (
     <nav aria-label="Chức năng" className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden py-3">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            aria-label="Tìm chức năng"
+            onClick={onSearch}
+            className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Search className="h-4 w-4" />
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">Tìm chức năng</TooltipContent>
+      </Tooltip>
+      {pins && pinnedItems.length > 0 && (
+        <SidebarFlyout
+          title="Mục đã ghim"
+          icon={Star}
+          iconClassName="bg-nav-pin-bg text-nav-pin-fg"
+          open={openId === 'pins'}
+          onOpenChange={(open) => setOpenId(open ? 'pins' : null)}
+          trigger={
+            <button
+              type="button"
+              aria-label="Mục đã ghim"
+              className="flex h-10 w-10 items-center justify-center rounded-md text-nav-pin-fg hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Star className="h-4 w-4 fill-current" />
+            </button>
+          }
+        >
+          <SidebarItemList
+            label="Mục đã ghim"
+            items={pinnedItems}
+            activePath={activePath}
+            pins={pins}
+            onNavigate={close}
+            showSections={false}
+          />
+        </SidebarFlyout>
+      )}
       <div className="my-1 h-px w-8 bg-border" />
       <SidebarItem item={dashboardItem} active={dashboardItem.to === activePath} collapsed />
       {groups.map((group) => (

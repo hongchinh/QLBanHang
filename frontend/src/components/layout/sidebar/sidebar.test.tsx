@@ -88,6 +88,18 @@ describe('Sidebar groups', () => {
     expect(useUiStore.getState().sidebarGroupOpen).toEqual({ catalogs: false });
   });
 
+  it('re-opens the active group when returning to a page whose group was closed by click', async () => {
+    const user = userEvent.setup();
+    const { navigate } = renderSidebar('/products');
+    await user.click(header('Danh mục'));
+    expect(header('Danh mục')).toHaveAttribute('aria-expanded', 'false');
+    navigate('/receipts');
+    navigate('/products');
+    expect(header('Danh mục')).toHaveAttribute('aria-expanded', 'true');
+    expect(link('Hàng hóa')).toBeInTheDocument();
+    expect(useUiStore.getState().sidebarGroupOpen).toEqual({ catalogs: false });
+  });
+
   it('keeps group state on a page without an item', () => {
     renderSidebar('/admin/user-settings/u1');
     expect(header('Danh mục')).toHaveAttribute('aria-expanded', 'false');

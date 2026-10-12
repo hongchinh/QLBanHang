@@ -30,6 +30,12 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
   // The group of the current page opens temporarily on every route change (never stored).
   // A header click on it records the choice and drops the temporary state until the next route change.
   const [tempOpen, setTempOpen] = useState<{ pathname: string; groupId: string | null } | null>(null);
+  const [seenPath, setSeenPath] = useState(pathname);
+  if (seenPath !== pathname) {
+    // Route change: forget the earlier click so the active group opens again (adjusted during render, no effect).
+    setSeenPath(pathname);
+    setTempOpen(null);
+  }
   const tempGroupId = tempOpen?.pathname === pathname ? tempOpen.groupId : activeGroupId;
   const isOpen = (g: NavGroup) => g.id === tempGroupId || (sidebarGroupOpen[g.id] ?? g.defaultOpen);
   const toggleGroup = (g: NavGroup) => {

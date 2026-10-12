@@ -1,6 +1,6 @@
 # Phase 01 — Branch, baseline, regroup, icons, longest-prefix highlight
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

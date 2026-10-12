@@ -44,4 +44,22 @@ public class DebtDatesTests
         var laterUtc = new DateTimeOffset(2026, 10, 5, 4, 0, 0, TimeSpan.Zero);
         DebtDates.EffectiveAt(vn, laterUtc).Should().BeExactly(laterUtc);
     }
+
+    [Fact]
+    public void Days_outstanding_is_never_negative()
+    {
+        DebtDates.DaysOutstanding(new DateOnly(2026, 10, 4), DocDate).Should().Be(0);
+        DebtDates.DaysOutstanding(DocDate, DocDate).Should().Be(0);
+        DebtDates.DaysOutstanding(new DateOnly(2026, 10, 15), DocDate).Should().Be(10);
+    }
+
+    [Fact]
+    public void Days_overdue_is_zero_unless_due_date_has_passed()
+    {
+        var at = new DateOnly(2026, 10, 15);
+
+        DebtDates.DaysOverdue(at, at).Should().Be(0);
+        DebtDates.DaysOverdue(at, new DateOnly(2026, 10, 20)).Should().Be(0);
+        DebtDates.DaysOverdue(at, new DateOnly(2026, 10, 5)).Should().Be(10);
+    }
 }

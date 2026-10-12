@@ -134,3 +134,4 @@ dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~CashDe
 ## Deviations
 
 - `DebtAging.ParseBoundaries` (frozen in Phase 01) now also rejects any bucket value above `MaxBoundaryDays = 36500` (commit 264db22). Without the cap, `buckets=2147483647` passed validation and `Ranges` overflowed to a last bucket `{From: -2147483648, To: null}`. The 400 message is unchanged (fixed by the plan). Phase 04 `normalizeBuckets` mirrors the cap (test case `'36501'` -> null).
+- Commit 264db22 also extracted `DebtDates.DaysOutstanding` / `DebtDates.DaysOverdue` (pure B5 helpers in `CashDebt/Common`) so the documents, aging and overdue reports share one rule; unit-tested in `DebtDatesTests`.

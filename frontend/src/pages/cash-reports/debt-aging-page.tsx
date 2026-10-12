@@ -31,6 +31,15 @@ export function DebtAgingPage() {
   const [picked, setPicked] = useState<{ id: string; label: string } | null>(null);
   const [bucketsText, setBucketsText] = useState(searchParams.get('buckets') ?? DEFAULT_BUCKETS);
   const [typedInvalid, setTypedInvalid] = useState(false);
+  // The page stays mounted when only the query string changes (e.g. the sidebar link), so re-derive the
+  // typed text from the URL whenever its raw value changes.
+  const rawBuckets = searchParams.get('buckets') ?? '';
+  const [syncedBuckets, setSyncedBuckets] = useState(rawBuckets);
+  if (syncedBuckets !== rawBuckets) {
+    setSyncedBuckets(rawBuckets);
+    setBucketsText(rawBuckets || DEFAULT_BUCKETS);
+    setTypedInvalid(false);
+  }
 
   const { data: report, isLoading, isError, error } = useDebtAging(
     { side, at, partnerId, buckets: urlBuckets ?? DEFAULT_BUCKETS },

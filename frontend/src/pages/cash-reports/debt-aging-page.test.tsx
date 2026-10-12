@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useLocation } from 'react-router-dom';
+import { Link, MemoryRouter, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { todayYmd } from '@/lib/vn-datetime';
 import { DebtAgingPage } from './debt-aging-page';
@@ -115,6 +115,27 @@ describe('DebtAgingPage', () => {
 
     expect(screen.getByText(ERROR_TEXT)).toBeInTheDocument();
     expect(screen.getByTestId('location')).toHaveTextContent('buckets=20,40');
+  });
+
+  it('re-syncs the input and clears the typed error when the url buckets change under a mounted page', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/reports/debt-aging?buckets=15,45']}>
+        <DebtAgingPage />
+        <Link to="/reports/debt-aging">Tuổi nợ</Link>
+      </MemoryRouter>,
+    );
+
+    const input = screen.getByLabelText('Mốc tuổi nợ');
+    await user.clear(input);
+    await user.type(input, '45,15');
+    await user.tab();
+    expect(screen.getByText(ERROR_TEXT)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('link', { name: 'Tuổi nợ' }));
+
+    expect(screen.getByLabelText('Mốc tuổi nợ')).toHaveValue('30,60,90');
+    expect(screen.queryByText(ERROR_TEXT)).not.toBeInTheDocument();
   });
 
   it('row click opens the documents report for that partner', async () => {

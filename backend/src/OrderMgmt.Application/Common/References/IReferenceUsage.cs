@@ -7,7 +7,7 @@ namespace OrderMgmt.Application.Common.References;
 public interface IReferenceUsage
 {
     /// Non-deleted cash vouchers, opening debts and offsets of any status (a cancelled one can be restored), and any
-    /// debt entry.
+    /// debt entry. Deleting the partner would leave them uneditable and its debt unreachable.
     Task<bool> PartnerHasCashOrDebtDataAsync(Guid partnerId, CancellationToken ct);
 
     Task<bool> PartnerHasDebtOnSideAsync(Guid partnerId, DebtSide side, CancellationToken ct);
@@ -19,7 +19,8 @@ public interface IReferenceUsage
     /// Only stock vouchers with a paid amount: they store a fund of the method's kind.
     Task<bool> PaymentMethodUsedByPaidStockVouchersAsync(Guid methodId, CancellationToken ct);
 
-    /// Non-deleted documents of any status: stock vouchers, cash vouchers, fund transfers and debt offsets.
+    /// Non-deleted documents of any status (the query filters skip deleted ones): stock vouchers, cash vouchers,
+    /// fund transfers and debt offsets.
     Task<bool> BranchHasDocumentsAsync(Guid branchId, CancellationToken ct);
 
     /// Opening stock, opening debts or a fund with an opening amount.

@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Superpowers Brainstorming</title>
+  <style>
+    /*
+     * BRAINSTORM COMPANION FRAME TEMPLATE
+     *
+     * This template provides a consistent frame with:
+     * - OS-aware light/dark theming
+     * - Fixed header and selection indicator bar
+     * - Scrollable main content area
+     * - CSS helpers for common UI patterns
+     *
+     * Content is injected via placeholder comment in #claude-content.
+     */
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ===== THEME VARIABLES ===== */
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    /* ===== FRAME STRUCTURE ===== */
+    .header {
+      background: var(--bg-secondary);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
+    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; }
+    .header .status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+    .main { flex: 1; overflow-y: auto; }
+    #claude-content { padding: 2rem; min-height: 100%; }
+
+    .indicator-bar {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1.5rem;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .indicator-bar span {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .indicator-bar .selected-text {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+    /* ===== OPTIONS (for A/B/C choices) ===== */
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .option:hover { border-color: var(--accent); }
+    .option.selected { background: var(--selected-bg); border-color: var(--selected-border); }
+    .option .letter {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      width: 1.75rem; height: 1.75rem;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .option.selected .letter { background: var(--accent); color: white; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+
+    /* ===== CARDS (for showing designs/mockups) ===== */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .card.selected { border-color: var(--selected-border); border-width: 2px; }
+    .card-image { background: var(--bg-tertiary); aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+
+    /* ===== MOCKUP CONTAINER ===== */
+    .mockup {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .mockup-header {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-body { padding: 1.5rem; }
+
+    /* ===== SPLIT VIEW (side-by-side comparison) ===== */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+    /* ===== PROS/CONS ===== */
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+
+    /* ===== PLACEHOLDER (for mockup areas) ===== */
+    .placeholder {
+      background: var(--bg-tertiary);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-tertiary);
+    }
+
+    /* ===== INLINE MOCKUP ELEMENTS ===== */
+    .mock-nav { background: var(--accent); color: white; padding: 0.75rem 1rem; display: flex; gap: 1.5rem; font-size: 0.9rem; }
+    .mock-sidebar { background: var(--bg-tertiary); padding: 1rem; min-width: 180px; }
+    .mock-content { padding: 1.5rem; flex: 1; }
+    .mock-button { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; }
+    .mock-input { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><a href="https://github.com/obra/superpowers" style="color: inherit; text-decoration: none;">Superpowers Brainstorming</a></h1>
+    <div class="status">Connected</div>
+  </div>
+
+  <div class="main">
+    <div id="claude-content">
+      <style>
+  .cx { font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .cx * { box-sizing: border-box; }
+  .cx .light { --hb: hsl(212 78% 36%); --pr: hsl(221.2 83.2% 53.3%); --prs: hsl(221 83% 95%); --mu: hsl(215.4 16.3% 46.9%); --bd: hsl(214.3 31.8% 91.4%); --ac: hsl(210 40% 96.1%); --fg: hsl(222.2 84% 4.9%); --card: #fff; --page: hsl(210 40% 98%); --ghbg: hsl(210 40% 97%); --chipbg: hsl(45 100% 95%); --chipfg: hsl(30 80% 30%); --chipbd: hsl(45 90% 80%); --mark: hsl(48 100% 85%); }
+  .cx .dark { --hb: hsl(212 78% 22%); --pr: hsl(217.2 91.2% 59.8%); --prs: hsl(217 60% 20%); --mu: hsl(215 20.2% 65.1%); --bd: hsl(217.2 32.6% 17.5%); --ac: hsl(217.2 32.6% 17.5%); --fg: hsl(210 40% 98%); --card: hsl(222.2 84% 4.9%); --page: hsl(222 70% 7%); --ghbg: hsl(217 33% 11%); --chipbg: rgb(245 158 11 / .12); --chipfg: #fbbf24; --chipbd: rgb(245 158 11 / .35); --mark: rgb(250 204 21 / .3); }
+
+  .cx-block { border: 1px solid var(--border, #d0d7de); border-radius: 12px; padding: 20px 22px; margin-bottom: 28px; }
+  .cx-block > h3 { font-size: 1.1rem; margin-bottom: 4px; }
+  .cx-block > .sub { color: var(--text-secondary); font-size: 14px; margin-bottom: 14px; }
+  .cx-row { display: flex; gap: 28px; align-items: flex-start; flex-wrap: wrap; }
+  .cx-notes { flex: 1; min-width: 260px; font-size: 14px; line-height: 1.6; }
+  .cx-notes ul { margin: 0 0 10px 18px; padding: 0; }
+  .cx-notes b { font-weight: 600; }
+
+  .app { color: var(--fg); background: var(--card); border: 1px solid var(--bd); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgb(0 0 0 / .12); flex-shrink: 0; max-width: 100%; }
+  .top { height: 44px; background: var(--hb); color: #fff; display: flex; align-items: center; gap: 8px; padding: 0 12px; font-weight: 700; font-size: 14px; }
+  .top svg { width: 18px; height: 18px; }
+  .body { display: grid; background: var(--page); position: relative; }
+  .side { background: var(--card); border-right: 1px solid var(--bd); display: flex; flex-direction: column; }
+  .search { padding: 10px; border-bottom: 1px solid var(--bd); }
+  .search .box { display: flex; align-items: center; gap: 6px; height: 34px; border: 1px solid var(--bd); border-radius: 6px; padding: 0 8px; font-size: 13px; color: var(--mu); background: var(--card); }
+  .search .box.focus { border-color: var(--pr); box-shadow: 0 0 0 3px color-mix(in srgb, var(--pr) 25%, transparent); color: var(--fg); }
+  .search .box svg { width: 15px; height: 15px; }
+  .search .box .x { margin-left: auto; color: var(--mu); display: flex; }
+  .nav { padding: 8px 10px 16px; font-size: 13.5px; }
+  .nav svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: var(--mu); font-weight: 500; white-space: nowrap; }
+  .item.hover { background: var(--ac); color: var(--fg); }
+  .item.active { background: var(--pr); color: #fff; }
+  .item .pin { margin-left: auto; display: flex; color: var(--mu); }
+  .item .pin.on { color: #f59e0b; }
+  .item .pin svg { width: 14px; height: 14px; }
+  .item mark { background: var(--mark); color: inherit; border-radius: 2px; padding: 0 1px; }
+  .gh { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 8px; font-weight: 600; color: var(--fg); background: var(--ghbg); margin-top: 6px; }
+  .gh .ic { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: #fff; flex-shrink: 0; }
+  .gh .ic svg { width: 15px; height: 15px; }
+  .gh .chev { margin-left: auto; color: var(--mu); display: flex; }
+  .gh .chev svg { width: 14px; height: 14px; }
+  .children { padding: 4px 0 2px 8px; }
+  .subh { padding: 8px 10px 2px; font-size: 11px; color: var(--mu); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 2px 10px; border-bottom: 1px dashed var(--bd); margin-bottom: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 9px; border-radius: 999px; background: var(--chipbg); color: var(--chipfg); border: 1px solid var(--chipbd); max-width: 100%; }
+  .chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+  .chip svg { width: 12px; height: 12px; flex-shrink: 0; }
+  .chip.active { background: var(--pr); color: #fff; border-color: var(--pr); }
+  .chip .del { display: flex; opacity: .8; }
+  .chip.more { background: transparent; color: var(--mu); border-style: dashed; border-color: var(--bd); }
+  .empty { padding: 16px 10px; text-align: center; color: var(--mu); font-size: 13px; }
+  .content { padding: 16px; }
+  .content .bar { height: 12px; border-radius: 4px; background: var(--bd); margin-bottom: 10px; }
+  .content .title { height: 18px; width: 45%; border-radius: 4px; background: color-mix(in srgb, var(--bd) 60%, var(--mu)); margin-bottom: 16px; }
+  .tip { position: absolute; background: hsl(222 47% 11%); color: #fff; font-size: 12px; padding: 4px 8px; border-radius: 6px; white-space: nowrap; }
+
+  /* collapsed rail */
+  .rail { width: 64px; background: var(--card); border-right: 1px solid var(--bd); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; }
+  .rail .btn { width: 40px; height: 40px; border-radius: 8px; display: grid; place-items: center; color: var(--mu); position: relative; }
+  .rail .btn svg { width: 18px; height: 18px; }
+  .rail .btn.plain:hover { background: var(--ac); }
+  .rail .gicon { width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; color: #fff; }
+  .rail .gicon svg { width: 17px; height: 17px; }
+  .rail .btn.current::after { content: ''; position: absolute; left: -12px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 3px 3px 0; background: var(--pr); }
+  .rail .btn.current .gicon { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--pr); }
+  .rail .btn.open { background: var(--ac); }
+  .rail .divider { width: 32px; height: 1px; background: var(--bd); margin: 2px 0; }
+  .flyout { position: absolute; left: 72px; width: 250px; background: var(--card); border: 1px solid var(--bd); border-radius: 10px; box-shadow: 0 8px 24px rgb(0 0 0 / .18); font-size: 13.5px; overflow: hidden; }
+  .flyout .fh { display: flex; align-items: center; gap: 10px; padding: 10px 12px; font-weight: 600; border-bottom: 1px solid var(--bd); background: var(--ghbg); }
+  .flyout .fh .ic { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: #fff; }
+  .flyout .fh .ic svg { width: 14px; height: 14px; }
+  .flyout .fb { padding: 6px; }
+  .flyout .item { padding: 6px 10px; }
+  .flyout svg { width: 15px; height: 15px; }
+</style>
+
+<div class="cx">
+<h2>Phương án C: các trạng thái để review</h2>
+<p class="subtitle">Màu nhóm cố định: <b style="color:#2563eb">Bán hàng</b> · <b style="color:#d97706">Kho</b> · <b style="color:#059669">Thu chi</b> · <b style="color:#dc2626">Công nợ</b> · <b style="color:#7c3aed">Báo cáo</b> · <b style="color:#0891b2">Danh mục</b> · <b style="color:#475569">Hệ thống</b>. Mỗi khối là một trạng thái; xem lần lượt từ trên xuống.</p>
+
+<!-- ============ 1. GHIM NHIỀU / TÊN DÀI ============ -->
+<div class="cx-block">
+  <h3>1. Ghim nhiều mục và tên dài</h3>
+  <div class="sub">Người dùng ghim 7 mục, đang đứng ở "Sổ chi tiết công nợ" (cũng là một mục đã ghim). Chuột đang trỏ vào "Phiếu chi".</div>
+  <div class="cx-row light">
+    <div class="app" style="width:520px">
+      <div class="top"><i data-lucide="file-text"></i> QLDonHang</div>
+      <div class="body" style="grid-template-columns:250px 1fr">
+        <div class="side">
+          <div class="search"><div class="box"><i data-lucide="search"></i> Tìm chức năng…</div></div>
+          <div class="nav">
+            <div class="chips">
+              <span class="chip"><i data-lucide="star"></i><span>Báo giá</span></span>
+              <span class="chip"><i data-lucide="star"></i><span>Phiếu thu</span></span>
+              <span class="chip"><i data-lucide="star"></i><span>Phiếu chi</span><span class="del"><i data-lucide="x"></i></span></span>
+              <span class="chip active" title="Sổ chi tiết công nợ"><i data-lucide="star"></i><span>Sổ chi tiết công…</span></span>
+              <span class="chip" title="Công nợ theo nhân viên"><i data-lucide="star"></i><span>Công nợ theo nh…</span></span>
+              <span class="chip"><i data-lucide="star"></i><span>Tồn kho</span></span>
+              <span class="chip more">+1</span>
+            </div>
+            <div class="item"><i data-lucide="layout-dashboard"></i> Tổng quan</div>
+            <div class="gh"><span class="ic" style="background:#2563eb"><i data-lucide="shopping-cart"></i></span> Bán hàng <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#d97706"><i data-lucide="warehouse"></i></span> Kho <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#059669"><i data-lucide="wallet"></i></span> Thu chi <span class="chev"><i data-lucide="chevron-down"></i></span></div>
+            <div class="children">
+              <div class="item"><i data-lucide="hand-coins"></i> Phiếu thu <span class="pin on"><i data-lucide="star"></i></span></div>
+              <div class="item hover"><i data-lucide="banknote"></i> Phiếu chi <span class="pin on"><i data-lucide="star"></i></span></div>
+              <div class="item"><i data-lucide="arrow-left-right"></i> Chuyển quỹ</div>
+            </div>
+            <div class="gh"><span class="ic" style="background:#dc2626"><i data-lucide="scale"></i></span> Công nợ <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#7c3aed"><i data-lucide="bar-chart-3"></i></span> Báo cáo <span class="chev"><i data-lucide="chevron-down"></i></span></div>
+            <div class="children">
+              <div class="subh">Công nợ</div>
+              <div class="item"><i data-lucide="book-open"></i> Số dư công nợ</div>
+              <div class="item active"><i data-lucide="book-text"></i> Sổ chi tiết công nợ</div>
+              <div class="item"><i data-lucide="files"></i> Công nợ theo chứng từ</div>
+              <div class="item" style="color:var(--mu);font-size:12px;font-style:italic">… (các mục báo cáo khác)</div>
+            </div>
+            <div class="gh"><span class="ic" style="background:#0891b2"><i data-lucide="library"></i></span> Danh mục <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#475569"><i data-lucide="settings"></i></span> Hệ thống <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+          </div>
+        </div>
+        <div class="content"><div class="title"></div><div class="bar"></div><div class="bar" style="width:85%"></div></div>
+      </div>
+    </div>
+    <div class="cx-notes">
+      <ul>
+        <li><b>Chip tối đa 120px</b>; tên dài bị cắt bằng "…", rê chuột hiện đầy đủ (tooltip).</li>
+        <li>Hiện <b>tối đa 6 chip</b> (khoảng 3 dòng). Phần dư gom vào chip <b>"+1"</b>; bấm vào để xổ hết.</li>
+        <li><b>Chip của trang đang mở</b> tô xanh như mục active.</li>
+        <li>Rê chuột vào chip sẽ hiện <b>×</b> để bỏ ghim nhanh.</li>
+        <li>Trong danh sách, mục đã ghim có <b>★ vàng luôn hiện</b>; mục chưa ghim chỉ hiện ☆ khi rê chuột.</li>
+        <li>Không giới hạn số ghim. Chỉ phần hiển thị bị giới hạn.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 2. ĐANG TÌM KIẾM ============ -->
+<div class="cx-block">
+  <h3>2. Đang tìm kiếm</h3>
+  <div class="sub">Người dùng gõ "cong no" (không dấu). Bên phải là trường hợp không có kết quả.</div>
+  <div class="cx-row light">
+    <div class="app" style="width:520px">
+      <div class="top"><i data-lucide="file-text"></i> QLDonHang</div>
+      <div class="body" style="grid-template-columns:250px 1fr">
+        <div class="side">
+          <div class="search"><div class="box focus"><i data-lucide="search"></i> cong no<span class="x"><i data-lucide="x"></i></span></div></div>
+          <div class="nav">
+            <div class="gh"><span class="ic" style="background:#dc2626"><i data-lucide="scale"></i></span> <span><mark style="background:var(--mark);color:inherit">Công nợ</mark></span> <span class="chev" style="font-size:12px;font-weight:500">4</span></div>
+            <div class="children">
+              <div class="item hover"><i data-lucide="link-2"></i> Đối trừ chứng từ</div>
+              <div class="item"><i data-lucide="scale"></i> Bù trừ <mark>công nợ</mark></div>
+              <div class="item"><i data-lucide="history"></i> Nợ đầu kỳ</div>
+              <div class="item"><i data-lucide="gauge"></i> Hạn mức nợ</div>
+            </div>
+            <div class="gh"><span class="ic" style="background:#7c3aed"><i data-lucide="bar-chart-3"></i></span> Báo cáo <span class="chev" style="font-size:12px;font-weight:500">7</span></div>
+            <div class="children">
+              <div class="subh"><mark style="background:var(--mark)">Công nợ</mark></div>
+              <div class="item"><i data-lucide="book-open"></i> Số dư <mark>công nợ</mark></div>
+              <div class="item"><i data-lucide="book-text"></i> Sổ chi tiết <mark>công nợ</mark></div>
+              <div class="item"><i data-lucide="files"></i> <mark>Công nợ</mark> theo chứng từ</div>
+              <div class="item"><i data-lucide="hourglass"></i> Tuổi nợ</div>
+              <div class="item"><i data-lucide="alarm-clock"></i> Nợ quá hạn</div>
+              <div class="item"><i data-lucide="user-round"></i> <mark>Công nợ</mark> theo nhân viên</div>
+              <div class="item"><i data-lucide="file-check"></i> Biên bản đối chiếu</div>
+            </div>
+          </div>
+        </div>
+        <div class="content"><div class="title"></div><div class="bar"></div><div class="bar" style="width:85%"></div></div>
+      </div>
+    </div>
+    <div class="app" style="width:250px">
+      <div class="top"><i data-lucide="file-text"></i> QLDonHang</div>
+      <div class="side" style="border-right:0">
+        <div class="search"><div class="box focus"><i data-lucide="search"></i> phieu nhap kho xyz<span class="x"><i data-lucide="x"></i></span></div></div>
+        <div class="nav"><div class="empty"><i data-lucide="search-x" style="width:22px;height:22px;margin-bottom:6px"></i><br>Không tìm thấy chức năng<br><span style="font-size:12px">Thử từ khóa ngắn hơn</span></div></div>
+      </div>
+    </div>
+    <div class="cx-notes">
+      <ul>
+        <li>Đang tìm thì <b>ẩn chip ghim và Tổng quan</b>; chỉ hiện các nhóm có kết quả và <b>tự mở</b> các nhóm đó. Số bên phải tiêu đề nhóm là số kết quả.</li>
+        <li>Phần khớp được <b>tô vàng</b> (bỏ qua dấu).</li>
+        <li>Khớp tên nhóm hoặc tiêu đề con thì <b>hiện toàn bộ mục</b> của nhóm/tiêu đề con đó (ví dụ "Tuổi nợ" hiện vì thuộc tiêu đề con "Công nợ").</li>
+        <li><b>↑/↓</b> di chuyển giữa kết quả (dòng xám là kết quả đang chọn), <b>Enter</b> mở, <b>Esc</b> hoặc <b>×</b> xóa ô tìm.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 3. THU GỌN + FLYOUT ============ -->
+<div class="cx-block">
+  <h3>3. Sidebar thu gọn (64px) và flyout</h3>
+  <div class="sub">Đang ở trang "Báo giá" (nhóm Bán hàng). Người dùng vừa bấm icon nhóm Báo cáo.</div>
+  <div class="cx-row light">
+    <div class="app" style="width:520px">
+      <div class="top"><i data-lucide="file-text"></i></div>
+      <div class="body" style="grid-template-columns:64px 1fr; min-height:560px">
+        <div class="rail">
+          <div class="btn plain" title="Tìm chức năng"><i data-lucide="search"></i></div>
+          <div class="btn plain" title="Đã ghim" style="color:#f59e0b"><i data-lucide="star"></i></div>
+          <div class="divider"></div>
+          <div class="btn plain"><i data-lucide="layout-dashboard"></i></div>
+          <div class="btn current"><span class="gicon" style="background:#2563eb"><i data-lucide="shopping-cart"></i></span></div>
+          <div class="btn"><span class="gicon" style="background:#d97706"><i data-lucide="warehouse"></i></span></div>
+          <div class="btn"><span class="gicon" style="background:#059669"><i data-lucide="wallet"></i></span></div>
+          <div class="btn"><span class="gicon" style="background:#dc2626"><i data-lucide="scale"></i></span></div>
+          <div class="btn open"><span class="gicon" style="background:#7c3aed"><i data-lucide="bar-chart-3"></i></span></div>
+          <div class="btn"><span class="gicon" style="background:#0891b2"><i data-lucide="library"></i></span></div>
+          <div class="btn"><span class="gicon" style="background:#475569"><i data-lucide="settings"></i></span></div>
+        </div>
+        <div class="content"><div class="title"></div><div class="bar"></div><div class="bar" style="width:85%"></div><div class="bar" style="width:70%"></div></div>
+        <div class="flyout" style="top:150px">
+          <div class="fh"><span class="ic" style="background:#7c3aed"><i data-lucide="bar-chart-3"></i></span> Báo cáo</div>
+          <div class="fb">
+            <div class="subh">Doanh thu</div>
+            <div class="item"><i data-lucide="trending-up"></i> Doanh thu</div>
+            <div class="item"><i data-lucide="user-check"></i> Doanh thu sale</div>
+            <div class="item"><i data-lucide="truck"></i> Doanh thu xe</div>
+            <div class="item"><i data-lucide="target"></i> Hiệu suất sale</div>
+            <div class="subh">Kho</div>
+            <div class="item"><i data-lucide="boxes"></i> Tồn kho</div>
+            <div class="item"><i data-lucide="scroll-text"></i> Thẻ kho</div>
+            <div class="subh">Quỹ</div>
+            <div class="item"><i data-lucide="book-open-check"></i> Sổ quỹ</div>
+            <div class="subh">Công nợ</div>
+            <div class="item hover"><i data-lucide="book-open"></i> Số dư công nợ <span class="pin"><i data-lucide="star"></i></span></div>
+            <div class="item" style="font-size:12px;font-style:italic">… 6 báo cáo công nợ khác</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="cx-notes">
+      <ul>
+        <li>Thanh 64px gồm: <b>🔍</b> (bấm thì mở rộng sidebar và focus ô tìm) · <b>★</b> (flyout danh sách ghim) · Tổng quan · <b>7 ô icon nhóm có màu</b>.</li>
+        <li><b>Nhóm chứa trang hiện tại</b> có viền xanh quanh ô icon và vạch xanh ở mép trái.</li>
+        <li><b>Bấm</b> (không mở bằng hover, tránh bật nhầm khi lướt chuột) hoặc Enter/Space để mở flyout bên phải. Tiêu đề flyout mang màu nhóm, bên trong có tiêu đề con và nút ☆ ghim như bản mở rộng.</li>
+        <li>Flyout <b>đóng</b> khi bấm ra ngoài, nhấn Esc (focus trả về icon) hoặc chọn một mục.</li>
+        <li>Flyout dài hơn màn hình thì tự cuộn bên trong.</li>
+        <li>Rê chuột vào icon chỉ hiện tooltip tên nhóm.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 4. DARK MODE ============ -->
+<div class="cx-block">
+  <h3>4. Chế độ tối</h3>
+  <div class="sub">Cùng trạng thái mặc định (đang ở "Báo giá", 2 mục ghim), dùng token dark có sẵn của app.</div>
+  <div class="cx-row dark">
+    <div class="app" style="width:520px">
+      <div class="top"><i data-lucide="file-text"></i> QLDonHang</div>
+      <div class="body" style="grid-template-columns:250px 1fr">
+        <div class="side">
+          <div class="search"><div class="box"><i data-lucide="search"></i> Tìm chức năng…</div></div>
+          <div class="nav">
+            <div class="chips">
+              <span class="chip active"><i data-lucide="star"></i><span>Báo giá</span></span>
+              <span class="chip"><i data-lucide="star"></i><span>Phiếu thu</span></span>
+            </div>
+            <div class="item"><i data-lucide="layout-dashboard"></i> Tổng quan</div>
+            <div class="gh"><span class="ic" style="background:#2563eb"><i data-lucide="shopping-cart"></i></span> Bán hàng <span class="chev"><i data-lucide="chevron-down"></i></span></div>
+            <div class="children">
+              <div class="item active"><i data-lucide="file-text"></i> Báo giá</div>
+              <div class="item"><i data-lucide="users"></i> Khách hàng</div>
+              <div class="item"><i data-lucide="qr-code"></i> Tạo mã QR thanh toán</div>
+            </div>
+            <div class="gh"><span class="ic" style="background:#d97706"><i data-lucide="warehouse"></i></span> Kho <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#059669"><i data-lucide="wallet"></i></span> Thu chi <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#dc2626"><i data-lucide="scale"></i></span> Công nợ <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#7c3aed"><i data-lucide="bar-chart-3"></i></span> Báo cáo <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#0891b2"><i data-lucide="library"></i></span> Danh mục <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+            <div class="gh"><span class="ic" style="background:#475569"><i data-lucide="settings"></i></span> Hệ thống <span class="chev"><i data-lucide="chevron-right"></i></span></div>
+          </div>
+        </div>
+        <div class="content"><div class="title"></div><div class="bar"></div><div class="bar" style="width:85%"></div></div>
+      </div>
+    </div>
+    <div class="cx-notes">
+      <ul>
+        <li>Ô icon nhóm <b>giữ nguyên màu</b> ở cả hai chế độ: icon trắng trên nền đậm vẫn đủ tương phản trên nền tối.</li>
+        <li>Nền tiêu đề nhóm, chip ghim và màu tô kết quả tìm kiếm có biến thể tối riêng (chip vàng dùng nền trong suốt và chữ vàng sáng).</li>
+        <li>Màu nhóm khai báo thành CSS variables (<code>--nav-sales</code>, <code>--nav-inventory</code>…) trong <code>index.css</code>, không hard-code trong component.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle"><b>Mobile drawer</b> giống hệt bản mở rộng ở khối 1, chỉ khác là nút ☆ luôn hiện mờ vì không có hover, và chip có × luôn hiện.</p>
+</div>
+
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>if (window.lucide) lucide.createIcons();</script>
+
+    </div>
+  </div>
+
+  <div class="indicator-bar">
+    <span id="indicator-text">Click an option above, then return to the terminal</span>
+  </div>
+
+</body>
+</html>

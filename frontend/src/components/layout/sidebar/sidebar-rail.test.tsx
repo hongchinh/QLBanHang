@@ -158,13 +158,28 @@ describe('SidebarRail search and pins', () => {
 
   it('unpinning the first row, with focus on its own link, moves focus to the next row (not the removed one)', async () => {
     const user = userEvent.setup();
-    useUiStore.setState({ pinnedNavPaths: { u1: ['/receipts', '/reports/debt-aging'] } });
+    useUiStore.setState({ pinnedNavPaths: { u1: ['/receipts', '/reports/debt-aging', '/products'] } });
     renderSidebar('/');
     await user.click(screen.getByRole('button', { name: 'Mục đã ghim' }));
     const flyout = screen.getByRole('dialog');
-    fireEvent.click(within(flyout).getByRole('button', { name: 'Ghim Tuổi nợ' }));
+    const firstLink = within(flyout).getByRole('link', { name: 'Phiếu thu' });
+    firstLink.focus();
+    expect(firstLink).toHaveFocus();
+    fireEvent.click(within(flyout).getByRole('button', { name: 'Ghim Phiếu thu' }));
     expect(screen.getByRole('dialog')).toBeInTheDocument();
-    expect(within(flyout).getByRole('link', { name: 'Phiếu thu' })).toHaveFocus();
+    expect(within(flyout).queryByRole('link', { name: 'Phiếu thu' })).not.toBeInTheDocument();
+    expect(within(flyout).getByRole('link', { name: 'Tuổi nợ' })).toHaveFocus();
+  });
+
+  it('unpinning the last row moves focus to the previous row', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ pinnedNavPaths: { u1: ['/receipts', '/reports/debt-aging', '/products'] } });
+    renderSidebar('/');
+    await user.click(screen.getByRole('button', { name: 'Mục đã ghim' }));
+    const flyout = screen.getByRole('dialog');
+    fireEvent.click(within(flyout).getByRole('button', { name: 'Ghim Hàng hóa' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(flyout).getByRole('link', { name: 'Tuổi nợ' })).toHaveFocus();
   });
 
   it('unpinning the last pin closes the ★ flyout and focuses the search button', async () => {

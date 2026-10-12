@@ -1,6 +1,6 @@
 # Phase 03 — Settlement confirmation token
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-12)
 **Complexity:** L
 
 ## Objective

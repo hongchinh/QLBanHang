@@ -186,9 +186,8 @@ public class StockVoucherSettlementTests : CashDebtTestBase
     }
 
     /// The sale's stock entry and its automatic receipt's entry each have a foreign settlement. A token that is stale on
-    /// the automatic side converges: the next 422 lists every settlement of both entries, and its token passes. (The
-    /// mirror, a new settlement on the stock side only, has no room: the Auto settlement fills the stock entry whenever
-    /// the automatic entry has room for a foreign one; the stock side is covered by the single-entry test.)
+    /// the automatic side converges: the next 422 lists every settlement of both entries, and its token passes. The stock side
+    /// has its own test below.
     [Fact]
     public async Task A_stale_token_on_a_two_entry_cancel_converges()
     {
@@ -226,6 +225,52 @@ public class StockVoucherSettlementTests : CashDebtTestBase
         staleStatus.Should().Be(HttpStatusCode.UnprocessableEntity);
         stale!.Code.Should().Be(Removed);
         stale.Details.Keys.Should().BeEquivalentTo(r1.Code, "HD1", "HD2");
+        SettlementRemovalConfirmation.Covers(stale.Token, await ForeignIdsAsync()).Should().BeTrue();
+        (await GetVoucherAsync(_branchClient, paidSale.Id)).Status.Should().Be(StockVoucherStatus.Active);
+
+        cancel.ConfirmedSettlements = stale.Token;
+        var (okStatus, cancelled, okError) = await ActionAsync(paidSale.Id, "cancel", cancel);
+        okStatus.Should().Be(HttpStatusCode.OK, okError?.Message);
+        cancelled!.Status.Should().Be(StockVoucherStatus.Cancelled);
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    /// The mirror: the new settlement lands on the stock entry only. The Auto settlement is limited by the paid amount
+    /// and the automatic entry's own foreign settlement, so the stock entry keeps room for it.
+    [Fact]
+    public async Task A_stale_token_on_the_stock_side_of_a_two_entry_cancel_converges()
+    {
+        var customer = await NewCustomerAsync();
+        var ph1 = await CreateOpeningDebtAsync(_branchClient, customer, DebtSide.Receivable, OpeningDebtKind.Debt, "PH1",
+            new DateOnly(2026, 9, 20), 500m);
+        var sale = await CreateSaleAsync(customer, 3, 1_000, paid: 0);
+        var stockEntry = (await EntriesOfAsync(DebtSourceType.StockOut, sale.Id)).Single();
+        var r1 = await CreateReceiptAsync(customer, 500m, (stockEntry.Id, 500m));
+        var paidSale = await PayAsync(sale, 5_000);
+        var autoEntry = (await EntriesOfAsync(DebtSourceType.Receipt, paidSale.AutoCashVoucherId!.Value)).Single();
+        await MatchManuallyAsync(ph1.EntryId, autoEntry.Id, 500m);
+        // Paid 2,000: the Auto settlement drops to 1,500, leaving 1,000 of room on the stock entry.
+        paidSale = await PayAsync(paidSale, 2_000);
+        await AssertAutoSettlementAsync(paidSale, 1_500m);
+
+        async Task<IEnumerable<Guid>> ForeignIdsAsync() =>
+            (await SettlementsOfAsync(stockEntry.Id)).Concat(await SettlementsOfAsync(autoEntry.Id))
+            .Where(x => x.Origin != SettlementOrigin.Auto).Select(x => x.Id).Distinct();
+
+        var cancel = new StockVoucherActionRequest { Version = paidSale.Version };
+        var (status, _, first) = await ActionAsync(paidSale.Id, "cancel", cancel);
+        status.Should().Be(HttpStatusCode.UnprocessableEntity);
+        first!.Details.Keys.Should().BeEquivalentTo(r1.Code, "PH1");
+        first.Token.Should().Be(SettlementRemovalConfirmation.TokenOf(await ForeignIdsAsync()));
+
+        var r2 = await CreateReceiptAsync(customer, 500m, (stockEntry.Id, 500m));
+
+        cancel.ConfirmRemoveSettlements = true;
+        cancel.ConfirmedSettlements = first.Token;
+        var (staleStatus, _, stale) = await ActionAsync(paidSale.Id, "cancel", cancel);
+        staleStatus.Should().Be(HttpStatusCode.UnprocessableEntity);
+        stale!.Code.Should().Be(Removed);
+        stale.Details.Keys.Should().BeEquivalentTo(r1.Code, r2.Code, "PH1");
         SettlementRemovalConfirmation.Covers(stale.Token, await ForeignIdsAsync()).Should().BeTrue();
         (await GetVoucherAsync(_branchClient, paidSale.Id)).Status.Should().Be(StockVoucherStatus.Active);
 

@@ -129,4 +129,28 @@ describe('SidebarRail search and pins', () => {
     expect(within(flyout).getAllByRole('link').map((a) => a.textContent)).toEqual(['Tuổi nợ', 'Phiếu thu']);
     expect(within(flyout).queryByRole('heading', { level: 4 })).not.toBeInTheDocument();
   });
+
+  it('unpinning inside the ★ flyout moves focus to the neighbouring pin', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ pinnedNavPaths: { u1: ['/receipts', '/reports/debt-aging'] } });
+    renderSidebar('/');
+    await user.click(screen.getByRole('button', { name: 'Mục đã ghim' }));
+    const flyout = screen.getByRole('dialog');
+    within(flyout).getByRole('button', { name: 'Ghim Phiếu thu' }).focus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(flyout).queryByRole('link', { name: 'Phiếu thu' })).not.toBeInTheDocument();
+    expect(within(flyout).getByRole('link', { name: 'Tuổi nợ' })).toHaveFocus();
+  });
+
+  it('unpinning the last pin closes the ★ flyout and focuses the search button', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ pinnedNavPaths: { u1: ['/receipts'] } });
+    renderSidebar('/');
+    await user.click(screen.getByRole('button', { name: 'Mục đã ghim' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Ghim Phiếu thu' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mục đã ghim' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tìm chức năng' })).toHaveFocus();
+  });
 });

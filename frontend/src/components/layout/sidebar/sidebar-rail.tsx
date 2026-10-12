@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { Search, Star } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -22,12 +22,36 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
   const [openId, setOpenId] = useState<string | null>(null); // one flyout at a time
   useEffect(() => setOpenId(null), [pathname]);
   const close = () => setOpenId(null);
+  const searchRef = useRef<HTMLButtonElement>(null);
+
+  // Unpinning inside the star flyout unmounts the focused button: hand focus to the neighbouring link,
+  // or, when it was the last pin (the whole flyout and its trigger go away), to the search button.
+  const flyoutPins = useMemo<PinControls | undefined>(() => {
+    if (!pins) return undefined;
+    return {
+      pinned: pins.pinned,
+      toggle: (path) => {
+        if (pins.pinned.has(path)) {
+          const row = document.activeElement?.closest('li');
+          const neighbour = row?.nextElementSibling ?? row?.previousElementSibling;
+          const link = neighbour?.querySelector<HTMLElement>('a[href]');
+          if (link) link.focus();
+          else {
+            setOpenId(null);
+            searchRef.current?.focus();
+          }
+        }
+        pins.toggle(path);
+      },
+    };
+  }, [pins]);
 
   return (
     <nav aria-label="Chức năng" className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden py-3">
       <Tooltip>
         <TooltipTrigger asChild>
           <button
+            ref={searchRef}
             type="button"
             aria-label="Tìm chức năng"
             onClick={onSearch}
@@ -59,7 +83,7 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
             label="Mục đã ghim"
             items={pinnedItems}
             activePath={activePath}
-            pins={pins}
+            pins={flyoutPins}
             onNavigate={close}
             showSections={false}
           />

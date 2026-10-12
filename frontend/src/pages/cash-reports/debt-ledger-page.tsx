@@ -1,11 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useDebtLedger } from '@/features/cash-reports/hooks';
-import { useDebtPartnerSearch } from '@/features/debt/hooks';
 import type { DebtPartnerSearchItem } from '@/features/debt/types';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide } from '@/features/cash-common/types';
-import { SearchCombobox } from '@/components/search-combobox/search-combobox';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,36 +21,9 @@ import {
   parseDebtSide,
 } from './document-link';
 import { DocumentCodeLink } from './document-code-link';
+import { ReportPartnerPicker } from './report-partner-picker';
 
 const SIDES: DebtSide[] = ['Receivable', 'Payable'];
-
-interface PartnerPickerProps {
-  side: DebtSide;
-  selectedLabel: string;
-  onSelect: (partner: DebtPartnerSearchItem) => void;
-}
-
-// Partners of the side (GET /debt/partners); an empty keyword lists the first ones on focus.
-function PartnerPicker({ side, selectedLabel, onSelect }: PartnerPickerProps) {
-  const useSearch = (keyword: string) => useDebtPartnerSearch(side, keyword, { includeInactive: true });
-  return (
-    <SearchCombobox<DebtPartnerSearchItem>
-      id="debt-ledger-partner"
-      ariaLabel="Đối tượng"
-      placeholder="Mã hoặc tên đối tượng"
-      selectedLabel={selectedLabel}
-      useSearch={useSearch}
-      getKey={(p) => p.id}
-      renderItem={(p) => (
-        <>
-          <span className="font-medium">{p.code}</span>
-          <span className="truncate text-muted-foreground">{p.name}</span>
-        </>
-      )}
-      onSelect={onSelect}
-    />
-  );
-}
 
 // Sổ chi tiết công nợ of one partner and side. Route permission: reports.debt. Filters live in the URL,
 // so the balance report can open it for a partner.
@@ -124,7 +95,7 @@ export function DebtLedgerPage() {
           </div>
           <div className="space-y-1">
             <Label htmlFor="debt-ledger-partner">Đối tượng</Label>
-            <PartnerPicker key={side} side={side} selectedLabel={selectedLabel} onSelect={selectPartner} />
+            <ReportPartnerPicker id="debt-ledger-partner" key={side} side={side} selectedLabel={selectedLabel} onSelect={selectPartner} />
           </div>
           <div className="space-y-1">
             <Label htmlFor="debt-ledger-from">Từ ngày</Label>

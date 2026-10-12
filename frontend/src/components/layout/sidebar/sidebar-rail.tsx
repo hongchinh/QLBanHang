@@ -24,27 +24,31 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
   const close = () => setOpenId(null);
   const searchRef = useRef<HTMLButtonElement>(null);
 
-  // Unpinning inside the star flyout unmounts the focused button: hand focus to the neighbouring link,
+  // Unpinning inside the star flyout unmounts the clicked button: hand focus to the neighbouring pin's link,
   // or, when it was the last pin (the whole flyout and its trigger go away), to the search button.
+  // The target comes from pinnedItems, not document.activeElement: Safari and macOS Firefox do not focus a
+  // button on mouse click.
+  const pinListRef = useRef<HTMLDivElement>(null);
   const flyoutPins = useMemo<PinControls | undefined>(() => {
     if (!pins) return undefined;
     return {
       pinned: pins.pinned,
       toggle: (path) => {
-        if (pins.pinned.has(path)) {
-          const row = document.activeElement?.closest('li');
-          const neighbour = row?.nextElementSibling ?? row?.previousElementSibling;
-          const link = neighbour?.querySelector<HTMLElement>('a[href]');
-          if (link) link.focus();
-          else {
+        const index = pinnedItems.findIndex((item) => item.to === path);
+        if (pins.pinned.has(path) && index >= 0) {
+          if (pinnedItems.length === 1) {
             setOpenId(null);
             searchRef.current?.focus();
+          } else {
+            const neighbour = index + 1 < pinnedItems.length ? index + 1 : index - 1;
+            // The list renders pinnedItems in order, one link per row, and still shows every row at this point.
+            pinListRef.current?.querySelectorAll<HTMLElement>('a[href]')[neighbour]?.focus();
           }
         }
         pins.toggle(path);
       },
     };
-  }, [pins]);
+  }, [pins, pinnedItems]);
 
   return (
     <nav aria-label="Chức năng" className="flex min-h-0 flex-1 flex-col items-center gap-1 overflow-y-auto overflow-x-hidden py-3">
@@ -79,14 +83,16 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
             </button>
           }
         >
-          <SidebarItemList
-            label="Mục đã ghim"
-            items={pinnedItems}
-            activePath={activePath}
-            pins={flyoutPins}
-            onNavigate={close}
-            showSections={false}
-          />
+          <div ref={pinListRef}>
+            <SidebarItemList
+              label="Mục đã ghim"
+              items={pinnedItems}
+              activePath={activePath}
+              pins={flyoutPins}
+              onNavigate={close}
+              showSections={false}
+            />
+          </div>
         </SidebarFlyout>
       )}
       <div className="my-1 h-px w-8 bg-border" />

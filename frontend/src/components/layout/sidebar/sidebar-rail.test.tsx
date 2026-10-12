@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useAuthStore } from '@/stores/auth-store';
@@ -141,6 +141,30 @@ describe('SidebarRail search and pins', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     expect(within(flyout).queryByRole('link', { name: 'Phiếu thu' })).not.toBeInTheDocument();
     expect(within(flyout).getByRole('link', { name: 'Tuổi nợ' })).toHaveFocus();
+  });
+
+  it('unpinning without focusing the star (Safari / macOS Firefox) keeps the flyout open and focuses a neighbour link', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ pinnedNavPaths: { u1: ['/receipts', '/reports/debt-aging', '/products'] } });
+    renderSidebar('/');
+    await user.click(screen.getByRole('button', { name: 'Mục đã ghim' }));
+    const flyout = screen.getByRole('dialog');
+    // fireEvent.click does not move focus to the button, like a mouse click in Safari.
+    fireEvent.click(within(flyout).getByRole('button', { name: 'Ghim Tuổi nợ' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(flyout).queryByRole('link', { name: 'Tuổi nợ' })).not.toBeInTheDocument();
+    expect(within(flyout).getByRole('link', { name: 'Hàng hóa' })).toHaveFocus();
+  });
+
+  it('unpinning the first row, with focus on its own link, moves focus to the next row (not the removed one)', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ pinnedNavPaths: { u1: ['/receipts', '/reports/debt-aging'] } });
+    renderSidebar('/');
+    await user.click(screen.getByRole('button', { name: 'Mục đã ghim' }));
+    const flyout = screen.getByRole('dialog');
+    fireEvent.click(within(flyout).getByRole('button', { name: 'Ghim Tuổi nợ' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(flyout).getByRole('link', { name: 'Phiếu thu' })).toHaveFocus();
   });
 
   it('unpinning the last pin closes the ★ flyout and focuses the search button', async () => {

@@ -296,7 +296,7 @@ describe('OpeningDebtPage', () => {
 
   it.each([
     ['Lê Văn Cũ', 'Lê Văn Cũ'],
-    [null, 'Nhân viên đã ngừng hoạt động'],
+    [null, 'Nhân viên đã bị xóa — vui lòng chọn lại'],
   ])('an owner missing from the options (name %s) stays selectable and is kept', async (ownerName, label) => {
     const user = userEvent.setup();
     extraRows = [goneOwnerRow(ownerName)];
@@ -322,6 +322,34 @@ describe('OpeningDebtPage', () => {
         data: expect.objectContaining({ ownerUserId: GONE_OWNER_ID }),
       }),
     );
+  });
+
+  it('lists a row whose owner user was deleted as inactive, not as having no owner', () => {
+    extraRows = [goneOwnerRow(null)];
+    cachedRows = null;
+    renderPage();
+
+    const row = screen.getByText('HD777').closest('tr')!;
+    expect(within(row).getByText('Nhân viên đã ngừng hoạt động')).toBeInTheDocument();
+  });
+
+  it('shows the server owner error under the select and clears it on change', async () => {
+    const user = userEvent.setup();
+    extraRows = [goneOwnerRow(null)];
+    cachedRows = null;
+    updateMock.mockRejectedValueOnce(
+      apiError(400, 'VALIDATION_ERROR', 'Dữ liệu không hợp lệ.', { ownerUserId: ['Nhân viên không tồn tại.'] }),
+    );
+    renderPage();
+
+    const row = screen.getByText('HD777').closest('tr')!;
+    await user.click(within(row).getByRole('button', { name: 'Sửa nợ đầu kỳ' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Lưu' }));
+
+    expect(await within(dialog).findByText('Nhân viên không tồn tại.')).toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText('Nhân viên'), '');
+    expect(within(dialog).queryByText('Nhân viên không tồn tại.')).not.toBeInTheDocument();
   });
 
   it('prepayment hides due date', async () => {

@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DEBT_SIDE_LABELS, OPENING_DEBT_KIND_LABELS } from '@/features/cash-common/labels';
+import { DEBT_SIDE_LABELS, GONE_OWNER_LABEL, OPENING_DEBT_KIND_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide } from '@/features/cash-common/types';
 import {
   useDeleteOpeningDebt,
@@ -114,7 +114,7 @@ export function OpeningDebtPage() {
       {
         id: 'owner',
         header: 'Nhân viên',
-        cell: ({ row }) => row.original.ownerName ?? '—',
+        cell: ({ row }) => row.original.ownerName ?? (row.original.ownerUserId ? GONE_OWNER_LABEL : '—'),
       },
       { id: 'note', header: 'Ghi chú', cell: ({ row }) => row.original.note ?? '' },
       {

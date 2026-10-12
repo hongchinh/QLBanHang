@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DEBT_SIDE_LABELS, OPENING_DEBT_KIND_LABELS } from '@/features/cash-common/labels';
+import { DEBT_SIDE_LABELS, GONE_OWNER_PICK_LABEL, OPENING_DEBT_KIND_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide, OpeningDebtKind } from '@/features/cash-common/types';
 import { useDebtPartnerSearch } from '@/features/debt/hooks';
 import {
@@ -40,8 +40,6 @@ const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 const KINDS: OpeningDebtKind[] = ['Debt', 'Prepayment'];
 const CONCURRENCY_MESSAGE =
   'Nợ đầu kỳ đã được người khác cập nhật. Đã tải lại danh sách — vui lòng mở lại để sửa.';
-
-const GONE_OWNER_LABEL = 'Nhân viên đã ngừng hoạt động';
 
 const SERVER_FIELDS = ['partnerId', 'docNo', 'docDate', 'dueDate', 'amount', 'note'] as const;
 
@@ -87,6 +85,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
 
   const [partner, setPartner] = useState<PickedPartner | null>(null);
   const [ownerUserId, setOwnerUserId] = useState<string | null>(null);
+  const [ownerError, setOwnerError] = useState<string | null>(null);
   const { data: owners } = useOpeningDebtOwners();
   const [pending, setPending] = useState<PendingConfirmation | null>(null);
 
@@ -104,6 +103,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
     form.reset(toDefaults(initial, openingDate));
     setPartner(initial ? { id: initial.partnerId, code: initial.partnerCode, name: initial.partnerName } : null);
     setOwnerUserId(initial?.ownerUserId ?? null);
+    setOwnerError(null);
     setPending(null);
   }, [open, initial, openingDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -114,7 +114,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
   const ownerOptions = owners ?? [];
   const missingOwner =
     initial?.ownerUserId && !ownerOptions.some((o) => o.id === initial.ownerUserId)
-      ? { id: initial.ownerUserId, fullName: initial.ownerName ?? GONE_OWNER_LABEL }
+      ? { id: initial.ownerUserId, fullName: initial.ownerName ?? GONE_OWNER_PICK_LABEL }
       : null;
 
   const submit = async (values: OpeningDebtFormParsed, flags: ConfirmFlags = {}) => {
@@ -143,6 +143,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
         return;
       }
       applyApiFieldErrors(err, form.setError, SERVER_FIELDS);
+      setOwnerError(getApiError(err)?.details?.ownerUserId?.[0] ?? null);
       toast({ variant: 'destructive', title: 'Không thể lưu', description: formatApiErrorDetails(err) });
     }
   };
@@ -229,7 +230,10 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
               id="opening-debt-owner"
               className={SELECT_CLASS}
               value={ownerUserId ?? ''}
-              onChange={(e) => setOwnerUserId(e.target.value || null)}
+              onChange={(e) => {
+                setOwnerUserId(e.target.value || null);
+                setOwnerError(null);
+              }}
             >
               <option value="">Không chọn</option>
               {ownerOptions.map((o) => (
@@ -239,6 +243,7 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
               ))}
               {missingOwner && <option value={missingOwner.id}>{missingOwner.fullName}</option>}
             </select>
+            {ownerError && <p className="text-sm text-destructive">{ownerError}</p>}
           </div>
 
           <div className="space-y-2">

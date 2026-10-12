@@ -182,6 +182,38 @@ public class DebtDocumentsReportTests : CashDebtTestBase
         early.Balance.Should().Be(4_000m);
     }
 
+    [Fact]
+    public async Task Opening_to_opening_settlement_counts_before_the_opening_date()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+
+        // HD-OLD against TT-OLD: both are Opening entries, so the match counts even before the opening date (B3).
+        var match = await client.PostAsJsonAsync("/api/debt/settlements", new CreateSettlementBatchRequest
+        {
+            PartnerId = ids.Kh1Id,
+            Side = DebtSide.Receivable,
+            Items = new List<SettlementItemRequest>
+            {
+                new() { IncreaseEntryId = ids.OpeningHdOldEntryId, DecreaseEntryId = ids.OpeningTtOldEntryId, Amount = 1_000m },
+            },
+        }, TestJson.Options);
+        match.IsSuccessStatusCode.Should().BeTrue(await match.Content.ReadAsStringAsync());
+
+        var early = await GetDocumentsAsync(client, "side=Receivable&at=2026-09-25");
+        var group = early.Groups.Should().ContainSingle().Which;
+        group.Items.Select(i => (i.DocCode, i.Amount, i.Settled, i.Remaining, i.DaysOutstanding, i.DaysOverdue))
+            .Should().Equal(("HD-OLD", 5_000m, 1_000m, 4_000m, 20, 5));
+        group.Unallocated.Should().BeEmpty();
+        group.Balance.Should().Be(4_000m);
+
+        var late = await GetDocumentsAsync(client, "side=Receivable&at=2026-10-31");
+        var lateGroup = late.Groups.Should().ContainSingle().Which;
+        lateGroup.Items.Select(i => (i.DocCode, i.Remaining)).Should().Equal(("PX00001", 2_000m));
+        lateGroup.Unallocated.Select(u => (u.DocCode, u.Remaining)).Should().Equal(("PN00001", 500m));
+        lateGroup.Balance.Should().Be(1_500m);
+    }
+
     private HttpClient MainBranchClient(ReportIds ids)
     {
         var client = CloneAdminClient();

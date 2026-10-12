@@ -8,13 +8,12 @@ using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
 using OrderMgmt.Domain.Common;
-using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Inventory.StockVouchers.Services;
 
-/// The cash and debt steps of a stock voucher save, called by StockVoucherService at the section-03 §5 steps.
+/// The cash and debt steps of a stock voucher save (section-03 §5).
 public class StockVoucherCashDebt : IStockVoucherCashDebt
 {
     private readonly IAppDbContext _db;
@@ -127,9 +126,8 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
         };
     }
 
-    private static DebtSourceType DebtSourceOf(StockDirection type) =>
-        type == StockDirection.In ? DebtSourceType.StockIn : DebtSourceType.StockOut;
-
+    /// The customer's receivable balance before the save (save step 7), read after the partner keys. Captured only when
+    /// the reason raises the receivable and a partner is set; null otherwise, and the credit check is skipped.
     public async Task<StockVoucherCreditCapture?> CaptureCreditAsync(Guid branchId, StockReason reason, Guid? partnerId,
         CancellationToken ct)
     {
@@ -150,6 +148,10 @@ public class StockVoucherCashDebt : IStockVoucherCashDebt
         CancellationToken ct) =>
         _fundGuard.CaptureAsync(funds.Where(f => f.FundId is not null).Select(f => (f.FundId!.Value, f.From)), ct);
 
+    /// The fund-balance check after the automatic voucher is posted, against the balances captured at step 8.
     public Task CheckFundsAsync(FundCapture capture, bool acknowledge, CancellationToken ct) =>
         _fundGuard.CheckAsync(capture, acknowledge, ct);
+
+    private static DebtSourceType DebtSourceOf(StockDirection type) =>
+        type == StockDirection.In ? DebtSourceType.StockIn : DebtSourceType.StockOut;
 }

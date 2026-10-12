@@ -1,12 +1,16 @@
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import { renderSidebar } from './sidebar-test-utils';
 
+const TEST_USER = { id: 'u1', username: 'u1', email: 'u1@x.vn', fullName: 'User 1', roles: [], permissions: [] };
+
 beforeEach(() => {
   localStorage.clear();
-  useUiStore.setState({ sidebarCollapsed: false, sidebarGroupOpen: {} });
+  useUiStore.setState({ sidebarCollapsed: false, sidebarGroupOpen: {}, pinnedNavPaths: {} });
+  useAuthStore.setState({ user: TEST_USER });
 });
 
 const link = (name: string) => screen.getByRole('link', { name });
@@ -202,5 +206,30 @@ describe('Sidebar search keyboard', () => {
     await user.click(screen.getByRole('button', { name: 'Xóa tìm kiếm' }));
     expect(searchBox()).toHaveValue('');
     expect(searchBox()).toHaveFocus();
+  });
+});
+
+describe('Sidebar pin toggle', () => {
+  it('pins and unpins an item for the signed-in user', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    const star = screen.getByRole('button', { name: 'Ghim Phiếu thu' });
+    expect(star).toHaveAttribute('aria-pressed', 'false');
+    await user.click(star);
+    expect(star).toHaveAttribute('aria-pressed', 'true');
+    expect(useUiStore.getState().pinnedNavPaths).toEqual({ u1: ['/receipts'] });
+    await user.click(star);
+    expect(useUiStore.getState().pinnedNavPaths).toEqual({ u1: [] });
+  });
+
+  it('Tổng quan has no pin button', () => {
+    renderSidebar('/');
+    expect(screen.queryByRole('button', { name: 'Ghim Tổng quan' })).not.toBeInTheDocument();
+  });
+
+  it('shows no pin buttons without a user', () => {
+    useAuthStore.setState({ user: null });
+    renderSidebar('/');
+    expect(screen.queryByRole('button', { name: /^Ghim / })).not.toBeInTheDocument();
   });
 });

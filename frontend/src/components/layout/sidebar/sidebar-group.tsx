@@ -2,7 +2,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NavGroup } from '../nav-config';
 import type { MatchRange } from './nav-search';
-import { SidebarItemList } from './sidebar-item';
+import { SidebarItemList, type PinControls } from './sidebar-item';
 
 interface SidebarGroupProps {
   group: NavGroup;
@@ -13,9 +13,10 @@ interface SidebarGroupProps {
   // Set while searching: the header becomes a static label with the result count.
   resultCount?: number;
   matches?: ReadonlyMap<string, MatchRange>;
+  pins?: PinControls;
 }
 
-export function SidebarGroup({ group, open, onToggle, activePath, listId, resultCount, matches }: SidebarGroupProps) {
+export function SidebarGroup({ group, open, onToggle, activePath, listId, resultCount, matches, pins }: SidebarGroupProps) {
   const { icon: Icon, label, color, items } = group;
   const Chevron = open ? ChevronDown : ChevronRight;
   const iconBlock = (
@@ -55,6 +56,7 @@ export function SidebarGroup({ group, open, onToggle, activePath, listId, result
         items={items}
         activePath={activePath}
         matches={matches}
+        pins={pins}
       />
     </section>
   );

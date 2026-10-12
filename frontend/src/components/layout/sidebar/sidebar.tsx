@@ -2,12 +2,15 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
 import { SearchX, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import type { NavGroup, NavItem } from '../nav-config';
 import { filterNavGroups, findActiveItem } from './nav-search';
 import { SidebarGroup } from './sidebar-group';
-import { SidebarItem } from './sidebar-item';
+import { SidebarItem, type PinControls } from './sidebar-item';
 import { SidebarSearch } from './sidebar-search';
+
+const EMPTY_PINS: string[] = []; // module scope: a stable fallback for the selector
 
 interface SidebarProps {
   dashboardItem: NavItem;
@@ -43,6 +46,14 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
     setSidebarGroupOpen(g.id, !isOpen(g));
     if (g.id === tempGroupId) setTempOpen({ pathname, groupId: null });
   };
+
+  const userId = useAuthStore((s) => s.user?.id ?? null);
+  const pinnedPaths = useUiStore((s) => (userId ? s.pinnedNavPaths[userId] : undefined)) ?? EMPTY_PINS;
+  const togglePin = useUiStore((s) => s.togglePin);
+  const pins = useMemo<PinControls | undefined>(
+    () => (userId ? { pinned: new Set(pinnedPaths), toggle: (path) => togglePin(userId, path) } : undefined),
+    [userId, pinnedPaths, togglePin],
+  );
 
   const navigate = useNavigate();
   const navId = `${idPrefix}-nav`;
@@ -145,6 +156,7 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
                     onToggle={() => {}}
                     resultCount={g.items.length}
                     matches={filtered.matches}
+                    pins={pins}
                     activePath={activePath}
                     listId={`${idPrefix}-group-${g.id}`}
                   />
@@ -161,6 +173,7 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
                     group={g}
                     open={isOpen(g)}
                     onToggle={() => toggleGroup(g)}
+                    pins={pins}
                     activePath={activePath}
                     listId={`${idPrefix}-group-${g.id}`}
                   />

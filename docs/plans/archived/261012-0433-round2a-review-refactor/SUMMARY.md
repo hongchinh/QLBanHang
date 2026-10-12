@@ -1,6 +1,6 @@
 # Round 2A Review — Confirmation Token & Refactors (Đợt B sau review)
 
-> Created: 2026-10-12 04:33:54 · Branch: `feat/cash-debt-round2a` (base `192bb1d` + docs) · Source: team-lead review of Round 2A, recorded in [EXECUTION-REPORT](../archived/261007-2314-cash-debt-round2a/EXECUTION-REPORT.md) §"Team-lead review and fixes" (follow-ups F-13 "confirmation not tied to the listed settlements" and F-15 refactors). The user chose to fix every review finding, including the refactors (2026-10-12).
+> Created: 2026-10-12 04:33:54 · Branch: `feat/cash-debt-round2a` (base `192bb1d` + docs) · Source: team-lead review of Round 2A, recorded in [EXECUTION-REPORT](../261007-2314-cash-debt-round2a/EXECUTION-REPORT.md) §"Team-lead review and fixes" (follow-ups F-13 "confirmation not tied to the listed settlements" and F-15 refactors). The user chose to fix every review finding, including the refactors (2026-10-12).
 
 ## Goal
 
@@ -47,7 +47,7 @@ Finish the last review findings of Round 2A:
 - [x] Phase 02 — Stock voucher coordinator & automatic Auto recompute (L) — `phase-02-coordinator-and-auto-recompute.md`
 - [x] Phase 03 — Settlement confirmation token (L) — `phase-03-confirmation-token.md`
 - [x] Phase 04 — Frontend refactors (L) — `phase-04-frontend-refactors.md`
-- [ ] Phase 05 — Docs & final verification (S) — `phase-05-docs-and-verification.md`
+- [x] Phase 05 — Docs & final verification (S) — `phase-05-docs-and-verification.md`
 
 Phases 01 → 02 → 03 run in order (03 uses the helper of 01 and the coordinator of 02). Phase 04 is independent of 01–02 and may run in parallel with them, but its Task 4.6 depends on Phase 03's frontend task.
 

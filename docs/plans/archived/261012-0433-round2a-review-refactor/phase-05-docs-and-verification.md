@@ -1,6 +1,6 @@
 # Phase 05 — Docs & final verification
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-12)
 **Complexity:** S
 
 ## Objective

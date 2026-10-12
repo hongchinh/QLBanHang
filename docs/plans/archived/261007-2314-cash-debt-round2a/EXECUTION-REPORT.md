@@ -133,7 +133,7 @@ Verification after the fixes (on `2c7e314`): `dotnet test` 19 failed / 735 total
 
 ### Second pass: the remaining findings (2026-10-12)
 
-The user then asked for every remaining finding to be fixed, the refactors included. The fixes below are on the branch; the confirmation token (F-13) and the refactors (F-15) are planned in [261012-0433-round2a-review-refactor](../../261012-0433-round2a-review-refactor/SUMMARY.md).
+The user then asked for every remaining finding to be fixed, the refactors included. The fixes below are on the branch; the confirmation token (F-13) and the refactors (F-15) are planned in [261012-0433-round2a-review-refactor](../261012-0433-round2a-review-refactor/SUMMARY.md).
 
 | Commit | Finding | Fix |
 |---|---|---|
@@ -159,6 +159,36 @@ The user then asked for every remaining finding to be fixed, the refactors inclu
 
 Verification after the second pass (on `192bb1d`): `dotnet test` 19 failed / 756 total (737 passed), the same 19 baseline tests; `npm run test` 3 failed / 658 total (655 passed), the same 3 baseline tests; typecheck clean; lint 3 errors and 14 warnings (baseline); `npm run build` passes.
 
+### Third pass: the confirmation token and the refactors (2026-10-12)
+
+Plan [261012-0433-round2a-review-refactor](../261012-0433-round2a-review-refactor/SUMMARY.md), five phases on the same branch, executed with an implementer, a spec reviewer and a quality reviewer per task.
+
+| Phase | Commits | Result |
+|---|---|---|
+| 01 Shared backend helpers | `9c0f2cb` `a2a0d93` `102bfd4` `0eefc16` `7632342` `01516d2` | `LikePattern`, `CashDocuments`, `SettlementRemovalConfirmation`, `IReferenceUsage` (F-15). |
+| 02 Coordinator and Auto recompute | `50635fd` `27b256f` `1f985aa` `6889311` `4e13e62` | `StockVoucherCashDebt` (`StockVoucherService` 13 → 9 dependencies); `IBeforeCommitHook` in `EfTransactionRunner`; `SettlementChangeCollector` + `AutoRecomputeHook` replace the six manual recompute pairs (F-15). |
+| 03 Confirmation token | `2b034c5` `ad96b76` `68b364f` `0427753` `d3fb81a` `df21270` `0ccb629` `d814516` | The 422 `DEBT_SETTLEMENTS_WILL_BE_REMOVED` carries `token`; the ledger accepts a confirmed removal only when the token covers every settlement it would remove; requests and the frontend carry `confirmedSettlements` (F-13). |
+| 04 Frontend refactors | `a3568f6` `918a2f5` `d7b7446` `c3aaa8a` `4c1552f` `1340d0b` `620dd4a` `25842a2` `379b4b8` `c9e5225` `6d2c76a` `4b01a14` | Date/number/money helpers, `MoneyCell`, `ActivityHistory`, `keys.ts` factories, fund transfer invalidates `['inventory']`, `SearchCombobox` (Debt pair only), `useDocumentActions` for the four document forms (F-15). |
+| 05 Docs and verification | `6c0be04` | `conventions.md`, `system-architecture.md`, `directory-structure.md`. |
+
+| # | Area | Deviation | Reason |
+|---|---|---|---|
+| D-23 | Token, `StockVoucherCashDebt.SyncDebtAsync` (`0427753`) | The stock step always runs unconfirmed first and is retried confirmed without a token; the automatic voucher step runs confirmed with the client token only when the stock side is covered; an automatic-voucher 422 is merged with a held stock 422 even when the stock side is covered. The plan only said "rethrown or merged as today". | With a stale token the two 422s alternated forever (each listed only one entry's settlements). Three API tests cover a stale token on either entry. |
+| D-24 | Token, signatures (`0427753`) | `confirmedSettlements` is a required parameter of `IAutoCashVoucherService.SyncAsync` and `IStockVoucherCashDebt.SyncDebtAsync`; the ledger keeps the optional default. The token-less `SettlementRemovalConfirmation.Create(details)` was removed. | The compiler lists every call site, and no 422 can be built without a token. |
+| D-25 | Coordinator (`50635fd`) | `IStockVoucherCashDebt` has a sixth member, `CheckFundsAsync` (pass-through to the fund guard), and `DebtSourceOf` moved with it. | `StockVoucherService` called the guard directly at three sites; without the member it could not drop `IFundBalanceGuard`. |
+| D-26 | Frontend, Task 4.5 (`379b4b8`) **(user)** | `SearchCombobox` backs only `DebtPartnerPicker` and the ledger `PartnerPicker`. `CashPartnerFilter` and `CustomerPicker` keep their own code. | The four pickers differ in Escape and click-outside, when the list shows, focus handling and the error branch; one component would need about twelve flags or visible behaviour changes. |
+| D-27 | Frontend, `withConfirmed` (`0ccb629`) | A removal 422 without a token drops an earlier `confirmedSettlements` from the flags. | A stale token would otherwise be resent and fail `Covers` in a loop. The new server always sends a token. |
+
+Verification at the end of Phase 05 (on `6c0be04`): `dotnet build` 0 errors; `dotnet test` 19 failed / 790 total (771 passed), the same 19 baseline tests by name; `npm run test` 3 failed / 714 total (711 passed), the same 3 baseline tests; typecheck clean; lint 3 errors and 14 warnings (baseline); `npm run build` passes.
+
+Deferred from this pass (review notes, none blocks):
+- A confirmed DELETE carries the token in the query string (33 characters per settlement): beyond about 240 settlements the request line exceeds common 8 KB limits (opening debts have no cancel step to fall back on). Fix by a body on DELETE or a POST for the confirmed resend.
+- The `confirm` + token pair travels through about eight signatures; a small `SettlementConfirmation` value type would replace it, and the ledger's token parameter could become required.
+- `useDocumentActions`: `reload` could return a boolean and own the form reset (drops `onReloaded` and three casts), `concurrencyReloadFailedMessage` could be optional, and `perform` could take only the action.
+- `SearchCombobox` keeps three behaviours of the old picker: Enter can select a stale result inside the debounce window, IME composition is not guarded, Tab leaves the list open.
+- `useInvalidate*` helpers are copied in five feature `hooks.ts`; `line-items-grid.css` is the shared accounting-grid stylesheet but lives in `pages/quotations`; `sales-revenue-detail-page` has a local `formatDate` equal to `formatDateOnly`.
+- Test gaps: `openingDebtsApi.remove` and the cash voucher / opening debt endpoints have no API test for the token through the query string or body.
+
 ## Follow-ups (for Round 2B or a separate fix)
 
 | # | Item |
@@ -180,10 +210,10 @@ Verification after the second pass (on `192bb1d`): `dotnet test` 19 failed / 756
 | F-10 | Round 2B (separate plan): Công nợ theo chứng từ, Tuổi nợ, Nợ quá hạn, Công nợ theo nhân viên, Biên bản đối chiếu, and the overdue warning list. |
 | F-11 | **Fixed in the second pass (`acaab35`).** **Before go-live (review, Medium).** Nothing requires `Branch.OpeningDate` before the first document or `VoucherAt ≥ OpeningDate`. A branch created without a date that gets a voucher can never take opening stock, opening debt or a fund opening balance (`BRANCH_HAS_DOCUMENTS`). Reject stock, cash, transfer and offset saves without a date or dated before it, or require the date when a branch is created. |
 | F-12 | **Fixed in the second pass (`4f012eb`).** **Before go-live (review, Medium; extends F-8).** The negative-fund guard loads a fund's whole history two to four times per write while holding the `cash-fund` key, on every receipt, payment, transfer and paid stock voucher. Sum the balance before `from` in SQL and load only the later movements. |
-| F-13 | Backend items from the review (Low). **Fixed in the second pass, except the confirmation token, which is planned:**
+| F-13 | Backend items from the review (Low). **Fixed in the second pass; the confirmation token was fixed in the third pass:**
   - stock voucher `Total → 0` with settlements returns 409 instead of the confirmable 422;
   - `DueDate` may be earlier than the document date;
-  - a confirmed resend removes whatever settlements exist then, not only the ones the 422 listed;
+  - a confirmed resend removes whatever settlements exist then, not only the ones the 422 listed (**fixed in the third pass**, `2b034c5` … `d814516`);
   - restore does not re-check the stored fund or the method's `FundKind`;
   - soft-deleted numbers can be issued again after a numbering reset-policy change;
   - an unmatch is undone by saving a cash voucher form opened before it;
@@ -200,7 +230,7 @@ Verification after the second pass (on `192bb1d`): `dotnet test` 19 failed / 756
   - links to automatic vouchers and opening debts ignore permissions;
   - the Sổ chi tiết running balance does not split Nợ/Có;
   - the list state may carry over between /receipts and /payments (no `key`). |
-| F-15 | Refactoring from the review. **Planned in `docs/plans/261012-0433-round2a-review-refactor`:**
+| F-15 | Refactoring from the review. **Done in the third pass (`docs/plans/261012-0433-round2a-review-refactor`; the picker merge covers the Debt pair only, D-26):**
   - `CashVoucherService`, `FundTransferService` and `DebtOffsetService` duplicate their lifecycle, activity, lock and helper code;
   - `RecomputeAutoAsync` is a manual hook at six call sites;
   - the "in use" guards list their tables by hand (the cause of `f276516`);

@@ -1,6 +1,6 @@
 # Phase 05 — Frontend: by-salesperson & reconciliation pages
 
-**Status:** [x] done
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

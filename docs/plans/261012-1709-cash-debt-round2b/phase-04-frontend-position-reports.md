@@ -1,6 +1,6 @@
 # Phase 04 — Frontend: documents, aging, overdue pages & panel link
 
-**Status:** [x] done
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

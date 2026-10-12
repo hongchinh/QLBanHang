@@ -1,6 +1,6 @@
 # Phase 00 — Baseline commit and failure baseline
 
-**Status:** [x] done
+**Status:** [x] complete
 **Complexity:** S
 
 ## Objective

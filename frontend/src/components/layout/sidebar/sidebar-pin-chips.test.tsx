@@ -50,5 +50,13 @@ describe('SidebarPinChips', () => {
     const chip = screen.getByRole('link', { name: ITEMS[2].label });
     expect(chip).toHaveAttribute('aria-current', 'page');
     expect(chip).toHaveAttribute('title', ITEMS[2].label);
+    // Only the current page's chip is marked current, and only it is primary.
+    expect(screen.getAllByRole('link', { current: 'page' })).toEqual([chip]);
+    expect(chip.closest('li')).toHaveClass('bg-primary');
+    expect(chip.closest('li')).not.toHaveClass('bg-nav-pin-bg');
+    const other = screen.getByRole('link', { name: ITEMS[0].label });
+    expect(other).not.toHaveAttribute('aria-current');
+    expect(other.closest('li')).toHaveClass('bg-nav-pin-bg');
+    expect(other.closest('li')).not.toHaveClass('bg-primary');
   });
 });

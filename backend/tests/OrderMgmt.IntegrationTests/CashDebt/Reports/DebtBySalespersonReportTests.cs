@@ -221,6 +221,22 @@ public class DebtBySalespersonReportTests : CashDebtTestBase
         }
     }
 
+    [Fact]
+    public async Task Validation_and_permission()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = CloneAdminClient();
+        UseBranch(client, ids.MainBranchId);
+
+        var inverted = await client.GetAsync("/api/reports/debt-by-salesperson?from=2026-10-31&to=2026-10-01");
+        inverted.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await inverted.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey("to");
+
+        var cashOnly = await CreateClientWithPermissionsAsync("sp_cash_" + ids.Kh1Code[3..], ids.MainBranchId, Permissions.Reports.Cash);
+        (await cashOnly.GetAsync("/api/reports/debt-by-salesperson?from=2026-10-01&to=2026-10-31"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     private static async Task<DebtBySalespersonReportDto> GetAsync(HttpClient client, string query) =>
         await ReadDataAsync<DebtBySalespersonReportDto>(await client.GetAsync($"/api/reports/debt-by-salesperson?{query}"));
 }

@@ -1,9 +1,12 @@
+using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.DebtOffsets.Models;
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -110,6 +113,29 @@ public class DebtReconciliationReportTests : CashDebtTestBase
         side.Side.Should().Be(DebtSide.Receivable);
         side.ClosingBalance.Should().Be(1_500m);
         report.NetBalance.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Validation_and_permission()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+
+        await AssertBadRequestKeyAsync(client, "from=2026-10-01&to=2026-10-31", "partnerId");
+        await AssertBadRequestKeyAsync(client, $"partnerId={ids.Kh1Id}&from=2026-10-31&to=2026-10-01", "to");
+        (await client.GetAsync($"/api/reports/debt-reconciliation?partnerId={Guid.NewGuid()}&from=2026-10-01&to=2026-10-31"))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+
+        var cashOnly = await CreateClientWithPermissionsAsync("rc_cash_" + ids.Kh1Code[3..], ids.MainBranchId, Permissions.Reports.Cash);
+        (await cashOnly.GetAsync($"/api/reports/debt-reconciliation?partnerId={ids.Kh1Id}&from=2026-10-01&to=2026-10-31"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    private static async Task AssertBadRequestKeyAsync(HttpClient client, string query, string key)
+    {
+        var response = await client.GetAsync($"/api/reports/debt-reconciliation?{query}");
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, query);
+        (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey(key, query);
     }
 
     /// A customer-and-supplier partner with a sale of 1,000 (10-20) and a purchase of 400 (10-21), both paid 0.

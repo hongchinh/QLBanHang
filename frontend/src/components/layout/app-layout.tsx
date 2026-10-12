@@ -43,7 +43,7 @@ export function AppLayout() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="grid h-screen grid-cols-1 grid-rows-[4rem_1fr] overflow-hidden bg-muted/30 md:grid-cols-[auto_1fr]">
+      <div className="grid h-screen grid-cols-1 grid-rows-[4rem_minmax(0,1fr)] overflow-hidden bg-muted/30 md:grid-cols-[auto_1fr]">
         <SkipToContent />
         <AppHeader />
 

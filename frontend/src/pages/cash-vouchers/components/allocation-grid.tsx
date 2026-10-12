@@ -1,10 +1,10 @@
+import { CellError, MoneyCell } from '@/components/money-cell/money-cell';
 import { checkAllocations, suggestAllocations } from '@/features/cash-vouchers/allocation';
 import type { CashAllocationFormValues } from '@/features/cash-vouchers/schema';
 import type { OpenItem } from '@/features/debt/types';
 import { formatDateOnly } from '@/lib/date-only';
 import { toNumberOrZero } from '@/lib/to-number';
 import { cn } from '@/lib/utils';
-import { CellError, MoneyCell } from './cash-line-grid';
 import '@/pages/quotations/components/line-items-grid.css';
 
 const fmt = new Intl.NumberFormat('vi-VN');

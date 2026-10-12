@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { parseMoneyInput } from '@/lib/money-input';
 import { optionalString } from '@/lib/zod-helpers';
-import { parseMoneyInput } from '@/pages/quotations/utils/money-input';
 
 // The amount input holds display text ("1.500.000"); a number is accepted too.
 const amountSchema = z.union([z.string(), z.number()]).transform((value, ctx) => {

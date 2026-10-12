@@ -20,8 +20,8 @@ import {
   type ConfirmationRequest,
   type ConfirmFlags,
 } from '@/lib/confirm-required';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toast } from '@/lib/use-toast';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 
 interface Props {
   open: boolean;

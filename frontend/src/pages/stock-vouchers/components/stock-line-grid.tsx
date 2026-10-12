@@ -1,6 +1,7 @@
 import { useState, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
+import { CellError } from '@/components/money-cell/money-cell';
 import { createEmptyStockLine } from '@/features/stock-vouchers/payload';
 import type {
   StockLineFormValues,
@@ -10,10 +11,10 @@ import type {
 import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
 import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
 import '@/pages/quotations/components/line-items-grid.css';
 
@@ -139,15 +140,6 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
       }}
       onBlur={() => setEditing(null)}
     />
-  );
-}
-
-function CellError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
-  return (
-    <div id={id} className="px-1 text-[11px] leading-tight text-destructive">
-      {message}
-    </div>
   );
 }
 

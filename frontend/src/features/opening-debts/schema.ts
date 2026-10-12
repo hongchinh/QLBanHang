@@ -1,6 +1,6 @@
 import { z } from 'zod';
+import { parseMoneyInput } from '@/lib/money-input';
 import { optionalString } from '@/lib/zod-helpers';
-import { parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import type { UpsertOpeningDebtRequest } from './types';
 
 // Same rules and messages as OpeningDebtService.ValidateAsync; the server also checks the partner role

@@ -1,6 +1,6 @@
 import type { ConfirmFlags } from '@/lib/confirm-required';
+import { formatMoneyForDisplay } from '@/lib/money-input';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
-import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import type { FundTransferFormParsed, FundTransferFormValues } from './schema';
 import type { FundTransfer, FundTransferDefaults, UpsertFundTransferRequest } from './types';
 

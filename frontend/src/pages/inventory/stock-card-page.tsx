@@ -7,13 +7,13 @@ import type { ProductSuggestion } from '@/features/products/types';
 import { useWarehouses } from '@/features/warehouses/hooks';
 import { selectableWarehouses } from '@/features/warehouses/utils';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
-import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getErrorMessage } from '@/lib/api-client';
+import { formatMoneyForDisplay } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
 

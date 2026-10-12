@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { QrCode } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { computeTotals, type HeaderLike, type LineLike } from '@/pages/quotations/utils/compute-line';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import { buildPaymentQrHref } from '@/pages/quotations/utils/payment-qr-link';
 import { useAuthStore } from '@/stores/auth-store';
 

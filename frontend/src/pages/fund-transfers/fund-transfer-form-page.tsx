@@ -40,9 +40,9 @@ import {
   type ConfirmationRequest,
   type ConfirmFlags,
 } from '@/lib/confirm-required';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import { StockVoucherActivityHistory } from '@/pages/stock-vouchers/components/stock-voucher-activity-history';
 
 const BASE_PATH = '/fund-transfers';

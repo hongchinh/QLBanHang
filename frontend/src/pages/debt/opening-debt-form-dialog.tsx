@@ -28,9 +28,9 @@ import type { OpeningDebt } from '@/features/opening-debts/types';
 import { formatApiErrorDetails, getApiError } from '@/lib/api-client';
 import { applyApiFieldErrors } from '@/lib/apply-api-field-errors';
 import { toConfirmationRequest, withConfirmed, type ConfirmationRequest, type ConfirmFlags } from '@/lib/confirm-required';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toast } from '@/lib/use-toast';
 import { todayYmd } from '@/lib/vn-datetime';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 
 const SELECT_CLASS =
   'h-9 w-full rounded-md border border-input bg-background px-3 text-sm disabled:cursor-not-allowed disabled:opacity-50';

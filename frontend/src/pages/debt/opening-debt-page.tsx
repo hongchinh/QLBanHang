@@ -22,9 +22,9 @@ import type { OpeningDebt } from '@/features/opening-debts/types';
 import { getErrorMessage } from '@/lib/api-client';
 import { toConfirmationRequest, withConfirmed, type ConfirmationRequest, type ConfirmFlags } from '@/lib/confirm-required';
 import { formatDateOnly } from '@/lib/date-only';
+import { formatMoneyForDisplay } from '@/lib/money-input';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { toast } from '@/lib/use-toast';
-import { formatMoneyForDisplay } from '@/pages/quotations/utils/money-input';
 import { OpeningDebtFormDialog } from './opening-debt-form-dialog';
 
 const PAGE_SIZE = 20;

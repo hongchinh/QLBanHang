@@ -14,9 +14,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-client';
 import { applyApiFieldErrors } from '@/lib/apply-api-field-errors';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { cn } from '@/lib/utils';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useSearchParamNumber, useSearchParamString } from '@/lib/use-search-param-state';

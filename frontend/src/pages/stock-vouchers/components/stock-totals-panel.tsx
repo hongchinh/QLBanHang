@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useCanAccessRoute } from '@/hooks/useCanAccessRoute';
 import type { CashVoucherType } from '@/features/cash-common/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import type { StockTotals } from '@/pages/stock-vouchers/utils/compute-stock-line';
 
 const fmt = new Intl.NumberFormat('vi-VN');

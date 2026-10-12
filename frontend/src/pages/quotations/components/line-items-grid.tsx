@@ -7,10 +7,10 @@ import type {
   QuotationFormValues,
   QuotationLineFormValues,
 } from '@/features/quotations/schema';
+import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
 import { computeLineCost, computeLineQuantity, computeLineTotal } from '@/pages/quotations/utils/compute-line';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import { useAuthStore } from '@/stores/auth-store';
 import './line-items-grid.css';
 

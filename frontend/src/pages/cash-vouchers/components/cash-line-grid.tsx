@@ -1,6 +1,7 @@
-import { useState, type KeyboardEvent } from 'react';
+import { type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
+import { CellError, MoneyCell } from '@/components/money-cell/money-cell';
 import { createEmptyCashLine } from '@/features/cash-vouchers/payload';
 import type {
   CashLineFormValues,
@@ -9,58 +10,9 @@ import type {
 } from '@/features/cash-vouchers/schema';
 import { roundAwayFromZero } from '@/lib/round';
 import { toNumberOrZero } from '@/lib/to-number';
-import { formatMoneyForDisplay, parseMoneyInput } from '@/pages/quotations/utils/money-input';
 import '@/pages/quotations/components/line-items-grid.css';
 
 const fmt = new Intl.NumberFormat('vi-VN');
-
-export interface MoneyCellProps {
-  id: string;
-  label: string;
-  value: number | undefined;
-  onCommit: (value: number | undefined) => void;
-  disabled?: boolean;
-  error?: string;
-  errorId?: string;
-}
-
-// Formatted when idle; raw text while focused. Every keystroke commits the parsed value.
-export function MoneyCell({ id, label, value, onCommit, disabled, error, errorId }: MoneyCellProps) {
-  const [editing, setEditing] = useState<string | null>(null);
-  return (
-    <input
-      id={id}
-      className="cell-input cell-number tabular-nums"
-      type="text"
-      inputMode="decimal"
-      aria-label={label}
-      aria-invalid={error ? true : undefined}
-      aria-describedby={error ? errorId : undefined}
-      title={error}
-      disabled={disabled}
-      value={editing ?? formatMoneyForDisplay(value)}
-      onFocus={(e) => {
-        const el = e.currentTarget;
-        setEditing(value === undefined ? '' : String(value));
-        requestAnimationFrame(() => el.select());
-      }}
-      onChange={(e) => {
-        setEditing(e.target.value);
-        onCommit(parseMoneyInput(e.target.value));
-      }}
-      onBlur={() => setEditing(null)}
-    />
-  );
-}
-
-export function CellError({ id, message }: { id: string; message?: string }) {
-  if (!message) return null;
-  return (
-    <div id={id} className="px-1 text-[11px] leading-tight text-destructive">
-      {message}
-    </div>
-  );
-}
 
 function cellId(field: 'description' | 'amount' | 'note', idx: number): string {
   return `cash-line-${field}-${idx}`;

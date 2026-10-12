@@ -46,7 +46,7 @@ Finish the last review findings of Round 2A:
 - [x] Phase 01 — Backend shared helpers (M) — `phase-01-backend-shared-helpers.md`
 - [x] Phase 02 — Stock voucher coordinator & automatic Auto recompute (L) — `phase-02-coordinator-and-auto-recompute.md`
 - [x] Phase 03 — Settlement confirmation token (L) — `phase-03-confirmation-token.md`
-- [ ] Phase 04 — Frontend refactors (L) — `phase-04-frontend-refactors.md`
+- [x] Phase 04 — Frontend refactors (L) — `phase-04-frontend-refactors.md`
 - [ ] Phase 05 — Docs & final verification (S) — `phase-05-docs-and-verification.md`
 
 Phases 01 → 02 → 03 run in order (03 uses the helper of 01 and the coordinator of 02). Phase 04 is independent of 01–02 and may run in parallel with them, but its Task 4.6 depends on Phase 03's frontend task.

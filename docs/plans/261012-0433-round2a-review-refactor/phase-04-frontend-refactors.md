@@ -1,6 +1,6 @@
 # Phase 04 — Frontend refactors
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-12) — Task 4.5 reduced by user decision: SearchCombobox backs only DebtPartnerPicker and the ledger PartnerPicker; CashPartnerFilter and CustomerPicker keep their own behaviour (they differ in Escape/click-outside, list visibility, error branch)
 **Complexity:** L
 
 ## Objective

@@ -1,6 +1,6 @@
 # Phase 01 — Aging calculator, position query & debt documents report
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 
 ## Objective

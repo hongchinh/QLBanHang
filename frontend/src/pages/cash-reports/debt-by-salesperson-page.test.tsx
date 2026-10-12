@@ -171,12 +171,39 @@ describe('DebtBySalespersonPage', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('from=2026-09-01');
   });
 
-  it('shows the empty message and no summary rows when there are no rows', () => {
-    reportState.data = report({ rows: [] });
+  const zeroTotals = { openingOpen: 0, increase: 0, settled: 0, closingOpen: 0, closingOverdue: 0 };
+
+  it('shows the empty message and no summary rows when everything is zero', () => {
+    reportState.data = report({
+      rows: [], totals: zeroTotals, unallocated: { opening: 0, closing: 0 }, openingBalance: 0, closingBalance: 0,
+    });
     renderAt('/reports/debt-by-salesperson');
 
     expect(screen.getByText('Không có công nợ trong kỳ này')).toBeInTheDocument();
     expect(screen.queryByText('Cộng')).toBeNull();
     expect(screen.queryByText('Số dư công nợ')).toBeNull();
+  });
+
+  it('still shows the summary rows when there are no rows but an unallocated amount exists', () => {
+    reportState.data = report({
+      rows: [], totals: zeroTotals, unallocated: { opening: 5_000_000, closing: 5_000_000 },
+      openingBalance: -5_000_000, closingBalance: -5_000_000,
+    });
+    renderAt('/reports/debt-by-salesperson');
+
+    expect(screen.queryByText('Không có công nợ trong kỳ này')).toBeNull();
+    expect(screen.getByText('Cộng')).toBeInTheDocument();
+    expect(screen.getByText('Chưa đối trừ (khách trả trước)').closest('tr')).toHaveTextContent('-5.000.000');
+    expect(screen.getByText('Số dư công nợ')).toBeInTheDocument();
+  });
+
+  it('shows 0 and not -0 in the unallocated row when it is zero', () => {
+    reportState.data = report({ unallocated: { opening: 0, closing: 0 } });
+    renderAt('/reports/debt-by-salesperson');
+
+    const cells = screen.getByText('Chưa đối trừ (khách trả trước)').closest('tr')!.querySelectorAll('td');
+    expect(cells[1]).toHaveTextContent(/^0$/);
+    expect(cells[cells.length - 2]).toHaveTextContent(/^0$/);
+    expect(screen.getByText('Chưa đối trừ (khách trả trước)').closest('tr')!.textContent).not.toContain('-0');
   });
 });

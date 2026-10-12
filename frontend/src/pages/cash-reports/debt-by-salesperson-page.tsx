@@ -119,7 +119,11 @@ export function DebtBySalespersonPage() {
       ) : isError ? (
         <p className="text-sm text-destructive">{getErrorMessage(error)}</p>
       ) : report ? (
-        report.rows.length === 0 ? (
+        report.rows.length === 0 &&
+        report.unallocated.opening === 0 &&
+        report.unallocated.closing === 0 &&
+        report.openingBalance === 0 &&
+        report.closingBalance === 0 ? (
           <p className="text-sm text-muted-foreground">Không có công nợ trong kỳ này</p>
         ) : (
           <Card>
@@ -160,9 +164,9 @@ export function DebtBySalespersonPage() {
                   </tr>
                   <tr className="border-b text-muted-foreground">
                     <td className="px-2 py-2">{unallocatedLabel}</td>
-                    <td className={NUMERIC_CELL}>{formatCurrencyVnd(-report.unallocated.opening)}</td>
+                    <td className={NUMERIC_CELL}>{formatCurrencyVnd(0 - report.unallocated.opening)}</td>
                     <td colSpan={2} />
-                    <td className={NUMERIC_CELL}>{formatCurrencyVnd(-report.unallocated.closing)}</td>
+                    <td className={NUMERIC_CELL}>{formatCurrencyVnd(0 - report.unallocated.closing)}</td>
                     <td />
                   </tr>
                   <tr className="font-semibold">

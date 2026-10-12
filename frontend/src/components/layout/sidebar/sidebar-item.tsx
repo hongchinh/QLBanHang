@@ -50,11 +50,12 @@ interface SidebarItemListProps {
   items: readonly NavItem[];
   activePath: string | null;
   id?: string;
+  hidden?: boolean;
 }
 
-export function SidebarItemList({ label, items, activePath, id }: SidebarItemListProps) {
+export function SidebarItemList({ label, items, activePath, id, hidden }: SidebarItemListProps) {
   return (
-    <ul aria-label={label} id={id} className="space-y-0.5 pl-2">
+    <ul aria-label={label} id={id} hidden={hidden} className="space-y-0.5 pl-2">
       {items.map((item, index) => (
         <SectionedItem
           key={item.to}

@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import type { NavGroup, NavItem } from '../nav-config';
-import { filterNavGroups, findActiveItem } from './nav-search';
+import { filterNavGroups, findActiveItem, resolvePinnedItems } from './nav-search';
 import { SidebarGroup } from './sidebar-group';
 import { SidebarItem, type PinControls } from './sidebar-item';
+import { SidebarPinChips } from './sidebar-pin-chips';
 import { SidebarSearch } from './sidebar-search';
 
 const EMPTY_PINS: string[] = []; // module scope: a stable fallback for the selector
@@ -54,6 +55,8 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
     () => (userId ? { pinned: new Set(pinnedPaths), toggle: (path) => togglePin(userId, path) } : undefined),
     [userId, pinnedPaths, togglePin],
   );
+
+  const pinnedItems = useMemo(() => resolvePinnedItems(pinnedPaths, groups), [pinnedPaths, groups]);
 
   const navigate = useNavigate();
   const navId = `${idPrefix}-nav`;
@@ -164,6 +167,9 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
               )
             ) : (
               <>
+                {pins && pinnedItems.length > 0 && (
+                  <SidebarPinChips items={pinnedItems} activePath={activePath} onUnpin={pins.toggle} />
+                )}
                 <ul>
                   <SidebarItem item={dashboardItem} active={dashboardItem.to === activePath} />
                 </ul>

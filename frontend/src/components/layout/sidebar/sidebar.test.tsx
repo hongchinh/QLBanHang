@@ -233,3 +233,36 @@ describe('Sidebar pin toggle', () => {
     expect(screen.queryByRole('button', { name: /^Ghim / })).not.toBeInTheDocument();
   });
 });
+
+describe('Sidebar pin chips', () => {
+  const chips = () => screen.queryByRole('list', { name: 'Mục đã ghim' });
+
+  it('shows no chip area without pins', () => {
+    renderSidebar('/');
+    expect(chips()).not.toBeInTheDocument();
+  });
+
+  it('shows the user pins as chips above Tổng quan', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.click(screen.getByRole('button', { name: 'Ghim Phiếu thu' }));
+    expect(within(chips()!).getByRole('link', { name: 'Phiếu thu' })).toBeInTheDocument();
+    await user.click(within(chips()!).getByRole('button', { name: 'Bỏ ghim Phiếu thu' }));
+    expect(chips()).not.toBeInTheDocument();
+  });
+
+  it('hides pins of another user and of invisible items', () => {
+    useUiStore.setState({ pinnedNavPaths: { u2: ['/receipts'], u1: ['/gone', '/quotations'] } });
+    renderSidebar('/');
+    expect(within(chips()!).getAllByRole('link').map((a) => a.textContent)).toEqual(['Báo giá']);
+    expect(useUiStore.getState().pinnedNavPaths.u1).toEqual(['/gone', '/quotations']);
+  });
+
+  it('hides the chips while searching', async () => {
+    const user = userEvent.setup();
+    useUiStore.setState({ pinnedNavPaths: { u1: ['/quotations'] } });
+    renderSidebar('/');
+    await user.type(searchBox(), 'thu');
+    expect(chips()).not.toBeInTheDocument();
+  });
+});

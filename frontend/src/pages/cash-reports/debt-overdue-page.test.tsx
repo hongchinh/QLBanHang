@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { todayYmd } from '@/lib/vn-datetime';
@@ -59,8 +59,8 @@ const report = (over: Partial<DebtOverdueReport> = {}): DebtOverdueReport => ({
       unallocated: 77_000,
     },
   ],
-  totalAmounts: [250_000, 600_000, 0],
-  totalOverdue: 850_000,
+  totalAmounts: [300_000, 650_000, 0],
+  totalOverdue: 950_000,
   totalUnallocated: 77_000,
   ...over,
 });
@@ -103,8 +103,19 @@ describe('DebtOverduePage', () => {
     expect(first).toHaveTextContent('31–60');
     const second = screen.getByText('PX-002').closest('tr')!;
     expect(second).toHaveTextContent('1–30');
-    expect(screen.getAllByText('Tổng quá hạn').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('850.000').length).toBeGreaterThan(0);
+
+    // group tfoot: per-bucket subtotals from group.amounts and the group total
+    expect(screen.getByText('Cộng nhóm 1–30').closest('tr')).toHaveTextContent('250.000');
+    expect(screen.getByText('Cộng nhóm 31–60').closest('tr')).toHaveTextContent('600.000');
+    const groupTotal = screen.getAllByText('Tổng quá hạn').find((el) => el.closest('tr'))!.closest('tr')!;
+    expect(groupTotal).toHaveTextContent('850.000');
+
+    // footer card: report.totalAmounts and report.totalOverdue (distinct from the group's values)
+    const footer = screen.getByText('Tổng nhóm 1–30').closest('div')!.parentElement!;
+    expect(within(footer).getByText('Tổng nhóm 1–30').closest('div')).toHaveTextContent('300.000');
+    expect(within(footer).getByText('Tổng nhóm 31–60').closest('div')).toHaveTextContent('650.000');
+    const grand = within(footer).getByText('Tổng quá hạn').closest('div')!;
+    expect(grand).toHaveTextContent('950.000');
     expect(screen.getByText('Chưa đối trừ (tham khảo): 77.000')).toBeInTheDocument();
   });
 

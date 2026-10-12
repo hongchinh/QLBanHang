@@ -17,7 +17,8 @@ public interface IAutoCashVoucherService
     /// - Cancelled: removes its entry (confirmation per P10) and cancels it.
     /// Logs a CashDocumentActivity on the automatic voucher and, when it is created or deleted, AutoVoucherChanged on
     /// the stock voucher.
-    Task SyncAsync(StockVoucher voucher, StockReason reason, bool confirmRemoveSettlements, CancellationToken ct = default);
+    Task SyncAsync(StockVoucher voucher, StockReason reason, bool confirmRemoveSettlements,
+        string? confirmedSettlements, CancellationToken ct = default);
 
     /// Sets the Auto settlement of every non-deleted, Active stock voucher with PaidAmount > 0 whose own entry or
     /// automatic voucher's entry is among `entryIds` (both entries existing) to DebtSettlementMath.AutoAmount of the

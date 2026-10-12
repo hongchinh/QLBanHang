@@ -27,6 +27,10 @@ public static class SettlementRemovalConfirmation
         return listed is not null && ids.All(listed.Contains);
     }
 
+    /// True when the confirmed token lists every settlement the held confirmation lists (see Covers).
+    public static bool Covers(string? token, ConfirmationRequiredException removal) =>
+        token is null || Covers(token, Parse(removal.Token) ?? new HashSet<Guid>());
+
     /// One confirmation for two sources saved together (a stock voucher and its automatic voucher): the details of
     /// both, merged by the other document's code. The token is the union of the ids of both tokens (an absent or
     /// unparsable token adds none), so it is never null.

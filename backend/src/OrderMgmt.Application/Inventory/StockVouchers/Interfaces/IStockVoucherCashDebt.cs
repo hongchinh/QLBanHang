@@ -19,7 +19,7 @@ public interface IStockVoucherCashDebt
     /// Save steps 11–13 (cancel / delete step 7): the voucher's debt entry and its automatic voucher follow the
     /// voucher, or are removed (`remove`).
     Task SyncDebtAsync(StockVoucher voucher, StockReason reason, bool remove, bool confirmRemoveSettlements,
-        CancellationToken ct);
+        string? confirmedSettlements, CancellationToken ct);
 
     /// The customer's receivable balance before the save (save step 7); null when the credit check does not apply.
     Task<StockVoucherCreditCapture?> CaptureCreditAsync(Guid branchId, StockReason reason, Guid? partnerId,

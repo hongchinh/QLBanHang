@@ -9,7 +9,8 @@ public interface IOpeningDebtService
     Task<OpeningDebtListResult> ListAsync(OpeningDebtListRequest request, CancellationToken ct = default);
     Task<OpeningDebtDto> CreateAsync(UpsertOpeningDebtRequest request, CancellationToken ct = default);
     Task<OpeningDebtDto> UpdateAsync(Guid id, UpsertOpeningDebtRequest request, CancellationToken ct = default);
-    Task DeleteAsync(Guid id, uint? version, bool confirmRemoveSettlements, CancellationToken ct = default);
+    Task DeleteAsync(Guid id, uint? version, bool confirmRemoveSettlements, string? confirmedSettlements,
+        CancellationToken ct = default);
 
     /// Re-posts every opening debt of the branch at its current opening date (the ledger moves the settlements'
     /// EffectiveAt). Caller holds the exclusive branch gate inside a transaction and has saved the new date.

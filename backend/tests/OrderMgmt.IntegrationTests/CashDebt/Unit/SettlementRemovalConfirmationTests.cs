@@ -96,6 +96,17 @@ public class SettlementRemovalConfirmationTests
     }
 
     [Fact]
+    public void Covers_a_held_confirmation_by_its_token()
+    {
+        var (a, b) = TwoIds();
+        var held = SettlementRemovalConfirmation.Create(new Dictionary<string, string[]>(), new[] { a, b });
+
+        SettlementRemovalConfirmation.Covers(null, held).Should().BeTrue();
+        SettlementRemovalConfirmation.Covers(SettlementRemovalConfirmation.TokenOf(new[] { a, b }), held).Should().BeTrue();
+        SettlementRemovalConfirmation.Covers(SettlementRemovalConfirmation.TokenOf(new[] { a }), held).Should().BeFalse();
+    }
+
+    [Fact]
     public void Merge_with_one_token_keeps_its_ids()
     {
         var a = Guid.NewGuid();

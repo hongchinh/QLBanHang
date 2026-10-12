@@ -239,7 +239,7 @@ public class CashVoucherService : ICashVoucherService
             await _db.SaveChangesAsync(c);
 
             var entries = await _ledger.PostAsync(SourceTypeOf(voucher.Type), voucher.Id, DraftsOf(voucher, reason),
-                request.ConfirmRemoveSettlements, ct: c);
+                request.ConfirmRemoveSettlements, request.ConfirmedSettlements, ct: c);
             await AllocateAsync(entries, request.Allocations, c);
             await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, CashDocumentActivityAction.Created, "Tạo phiếu");
@@ -280,7 +280,7 @@ public class CashVoucherService : ICashVoucherService
             await _db.SaveChangesAsync(c);
 
             var entries = await _ledger.PostAsync(sourceType, voucher.Id, DraftsOf(voucher, reason),
-                request.ConfirmRemoveSettlements, ct: c);
+                request.ConfirmRemoveSettlements, request.ConfirmedSettlements, ct: c);
             await AllocateAsync(entries, request.Allocations, c);
             await _fundGuard.CheckAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, CashDocumentActivityAction.Updated, "Cập nhật phiếu");
@@ -295,7 +295,7 @@ public class CashVoucherService : ICashVoucherService
         await ChangeLifecycleAsync(id, request, CashVoucherPermissions.Cancel, DocumentStatus.Active,
             CashDocumentActivityAction.Cancelled, "Hủy phiếu", async (v, c) =>
             {
-                await RemoveDebtAsync(v, request.ConfirmRemoveSettlements, c);
+                await RemoveDebtAsync(v, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
                 v.Status = DocumentStatus.Cancelled;
                 v.CancelledAt = _clock.UtcNow;
                 v.CancelledBy = _currentUser.UserId;
@@ -314,7 +314,7 @@ public class CashVoucherService : ICashVoucherService
                 v.CancelledAt = null;
                 v.CancelledBy = null;
                 await _db.SaveChangesAsync(c);
-                await _ledger.PostAsync(SourceTypeOf(v.Type), v.Id, DraftsOf(v, reason), request.ConfirmRemoveSettlements, ct: c);
+                await _ledger.PostAsync(SourceTypeOf(v.Type), v.Id, DraftsOf(v, reason), request.ConfirmRemoveSettlements, request.ConfirmedSettlements, ct: c);
             }, ct);
         return await LoadDtoAsync(id, ct);
     }
@@ -326,14 +326,16 @@ public class CashVoucherService : ICashVoucherService
             {
                 // Only an Active voucher has a debt entry; removing its settlements needs confirmation.
                 if (v.Status == DocumentStatus.Active)
-                    await RemoveDebtAsync(v, request.ConfirmRemoveSettlements, c);
+                    await RemoveDebtAsync(v, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
                 v.IsDeleted = true;
             }, ct);
 
     /// Cancel / delete: removes the voucher's entry (its settlements need confirmation, P10). The Auto settlement of
     /// the stock vouchers whose entries it was settled against is recomputed before the commit (AutoRecomputeHook).
-    private Task RemoveDebtAsync(CashVoucher voucher, bool confirmRemoveSettlements, CancellationToken ct) =>
-        _ledger.RemoveSourceAsync(SourceTypeOf(voucher.Type), voucher.Id, confirmRemoveSettlements, ct: ct);
+    private Task RemoveDebtAsync(CashVoucher voucher, bool confirmRemoveSettlements, string? confirmedSettlements,
+        CancellationToken ct) =>
+        _ledger.RemoveSourceAsync(SourceTypeOf(voucher.Type), voucher.Id, confirmRemoveSettlements, confirmedSettlements,
+            ct);
 
     /// Cancel / restore / delete per the steps table: locks, period lock on the stored date, fund capture, the
     /// operation's own steps (`apply`), save, the negative-fund check on the voucher's fund, then the activity.

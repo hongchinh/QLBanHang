@@ -385,7 +385,7 @@ public class StockVoucherService : IStockVoucherService
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
-            await _cashDebt.SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, c);
+            await _cashDebt.SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             await _cashDebt.CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);
@@ -425,7 +425,7 @@ public class StockVoucherService : IStockVoucherService
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
-            await _cashDebt.SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, c);
+            await _cashDebt.SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             await _cashDebt.CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);
@@ -497,7 +497,7 @@ public class StockVoucherService : IStockVoucherService
             await _db.SaveChangesAsync(c);
 
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c, removeAll: !restore);
-            await _cashDebt.SyncDebtAsync(voucher, reason, remove: !restore, request.ConfirmRemoveSettlements, c);
+            await _cashDebt.SyncDebtAsync(voucher, reason, remove: !restore, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
             if (voucher.Type == StockDirection.In)
                 await RecomputeCostPricesAsync(productIds, c);
             await _cashDebt.CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);

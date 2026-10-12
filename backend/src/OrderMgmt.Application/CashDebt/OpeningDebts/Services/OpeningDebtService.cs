@@ -95,7 +95,7 @@ public class OpeningDebtService : IOpeningDebtService
             await _db.SaveChangesAsync(c);
 
             await _ledger.PostAsync(DebtSourceType.Opening, row.Id, new[] { Draft(row, openingDate) },
-                request.ConfirmRemoveSettlements, ct: c);
+                request.ConfirmRemoveSettlements, request.ConfirmedSettlements, ct: c);
             return row.Id;
         }, ct);
 
@@ -117,13 +117,14 @@ public class OpeningDebtService : IOpeningDebtService
             // A confirmed shrink drops the row's settlements: a stock voucher among the entries they join gets its Auto
             // settlement recomputed before the commit (AutoRecomputeHook).
             await _ledger.PostAsync(DebtSourceType.Opening, row.Id, new[] { Draft(row, openingDate) },
-                request.ConfirmRemoveSettlements, ct: c);
+                request.ConfirmRemoveSettlements, request.ConfirmedSettlements, ct: c);
         }, ct);
 
         return await GetAsync(id, ct);
     }
 
-    public async Task DeleteAsync(Guid id, uint? version, bool confirmRemoveSettlements, CancellationToken ct = default)
+    public async Task DeleteAsync(Guid id, uint? version, bool confirmRemoveSettlements,
+        string? confirmedSettlements, CancellationToken ct = default)
     {
         var branchId = await _currentBranch.GetIdAsync(ct);
         await _transaction.RunAsync(async c =>
@@ -131,7 +132,8 @@ public class OpeningDebtService : IOpeningDebtService
             var row = await LockRowAsync(branchId, id, newPartnerId: null, version, c);
             await OpeningDateAsync(branchId, c);
 
-            await _ledger.RemoveSourceAsync(DebtSourceType.Opening, row.Id, confirmRemoveSettlements, ct: c);
+            await _ledger.RemoveSourceAsync(DebtSourceType.Opening, row.Id, confirmRemoveSettlements, confirmedSettlements,
+                c);
             row.IsDeleted = true;
             row.DeletedAt = _clock.UtcNow;
             row.DeletedBy = _currentUser.UserId;

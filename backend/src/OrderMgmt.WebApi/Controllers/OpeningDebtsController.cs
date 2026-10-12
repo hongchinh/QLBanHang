@@ -55,9 +55,10 @@ public class OpeningDebtsController : ApiControllerBase
     [HttpDelete("{id:guid}")]
     [HasPermission(Permissions.Debt.OpeningBalance)]
     public async Task<ActionResult<ApiResponse>> Delete(
-        Guid id, [FromQuery] uint? version, [FromQuery] bool confirmRemoveSettlements, CancellationToken ct)
+        Guid id, [FromQuery] uint? version, [FromQuery] bool confirmRemoveSettlements,
+        [FromQuery] string? confirmedSettlements, CancellationToken ct)
     {
-        await _service.DeleteAsync(id, version, confirmRemoveSettlements, ct);
+        await _service.DeleteAsync(id, version, confirmRemoveSettlements, confirmedSettlements, ct);
         return Success();
     }
 }

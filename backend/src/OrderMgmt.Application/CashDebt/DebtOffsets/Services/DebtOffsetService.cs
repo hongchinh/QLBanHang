@@ -196,7 +196,7 @@ public class DebtOffsetService : IDebtOffsetService
         await ChangeLifecycleAsync(id, request, DocumentStatus.Active, CashDocumentActivityAction.Cancelled,
             "Hủy chứng từ", async (o, c) =>
             {
-                await RemoveDebtAsync(o, request.ConfirmRemoveSettlements, c);
+                await RemoveDebtAsync(o, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
                 o.Status = DocumentStatus.Cancelled;
                 o.CancelledAt = _clock.UtcNow;
                 o.CancelledBy = _currentUser.UserId;
@@ -210,7 +210,7 @@ public class DebtOffsetService : IDebtOffsetService
             {
                 // Only an Active offset still has its entries and settlements.
                 if (o.Status == DocumentStatus.Active)
-                    await RemoveDebtAsync(o, request.ConfirmRemoveSettlements, c);
+                    await RemoveDebtAsync(o, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
                 o.IsDeleted = true;
             }, ct);
 
@@ -238,10 +238,11 @@ public class DebtOffsetService : IDebtOffsetService
     /// matched manually or allocated by a voucher) belongs to another document, so it asks first (P10, P21). A stock
     /// voucher among the entries those settlements joined gets its Auto settlement recomputed before the commit
     /// (AutoRecomputeHook), since the freed room goes back to its paid amount (Phase 07 rule, 2026-10-09).
-    private async Task RemoveDebtAsync(DebtOffsetVoucher offset, bool confirmRemoveSettlements, CancellationToken ct)
+    private async Task RemoveDebtAsync(DebtOffsetVoucher offset, bool confirmRemoveSettlements,
+        string? confirmedSettlements, CancellationToken ct)
     {
         await _ledger.RemoveOwnSettlementsAsync(DebtSourceType.Offset, offset.Id, SettlementOrigin.Offset, ct);
-        await _ledger.RemoveSourceAsync(DebtSourceType.Offset, offset.Id, confirmRemoveSettlements, ct: ct);
+        await _ledger.RemoveSourceAsync(DebtSourceType.Offset, offset.Id, confirmRemoveSettlements, confirmedSettlements, ct);
     }
 
     /// Cancel and delete (the controller checks their permission): working branch, status and version. There is no

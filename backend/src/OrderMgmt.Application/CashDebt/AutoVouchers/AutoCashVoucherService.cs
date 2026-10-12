@@ -34,7 +34,7 @@ public class AutoCashVoucherService : IAutoCashVoucherService
     }
 
     public async Task SyncAsync(StockVoucher voucher, StockReason reason, bool confirmRemoveSettlements,
-        CancellationToken ct = default)
+        string? confirmedSettlements, CancellationToken ct = default)
     {
         // The live automatic voucher; one soft-deleted earlier (P3) is hidden by the query filter.
         var auto = await _db.CashVouchers.Include(v => v.Lines)
@@ -42,14 +42,15 @@ public class AutoCashVoucherService : IAutoCashVoucherService
 
         if (!voucher.IsDeleted && voucher.Status == StockVoucherStatus.Active && voucher.PaidAmount > 0)
         {
-            await UpsertAsync(voucher, reason, auto, confirmRemoveSettlements, ct);
+            await UpsertAsync(voucher, reason, auto, confirmRemoveSettlements, confirmedSettlements, ct);
             return;
         }
         if (auto is null)
             return;
 
         // A Cancelled automatic voucher has no entry left, so this removes nothing for it.
-        await _ledger.RemoveSourceAsync(SourceTypeOf(auto.Type), auto.Id, confirmRemoveSettlements, ct: ct);
+        await _ledger.RemoveSourceAsync(SourceTypeOf(auto.Type), auto.Id, confirmRemoveSettlements,
+            confirmedSettlements, ct);
         if (!voucher.IsDeleted && voucher.Status == StockVoucherStatus.Cancelled)
         {
             auto.Status = DocumentStatus.Cancelled;
@@ -69,7 +70,7 @@ public class AutoCashVoucherService : IAutoCashVoucherService
 
     /// Creates or updates the automatic voucher of a paid, Active stock voucher, then its entry and Auto settlement.
     private async Task UpsertAsync(StockVoucher voucher, StockReason reason, CashVoucher? auto, bool confirmRemoveSettlements,
-        CancellationToken ct)
+        string? confirmedSettlements, CancellationToken ct)
     {
         var type = DebtEffectRules.AutoVoucherType(voucher.Type);
         var action = auto is null ? CashDocumentActivityAction.Created
@@ -120,7 +121,7 @@ public class AutoCashVoucherService : IAutoCashVoucherService
         await _db.SaveChangesAsync(ct);
 
         var entries = await _ledger.PostAsync(SourceTypeOf(type), auto.Id, DraftsOf(auto, reason),
-            confirmRemoveSettlements, ct: ct);
+            confirmRemoveSettlements, confirmedSettlements, ct);
         // The save checked the voucher's date against the period lock, and the Auto pair is dated at it.
         if (entries.Count > 0)
             await SettleAsync(voucher, entries.Single(), lockedUntil: null, ct);

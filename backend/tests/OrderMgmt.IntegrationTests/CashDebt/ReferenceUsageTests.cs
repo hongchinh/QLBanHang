@@ -1,10 +1,10 @@
+using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Common.References;
 using OrderMgmt.Application.Inventory.PaymentMethods.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
-using System.Net.Http.Json;
 using Xunit;
 
 namespace OrderMgmt.IntegrationTests.CashDebt;
@@ -59,18 +59,26 @@ public class ReferenceUsageTests : CashDebtTestBase
         async Task<PaymentMethodDto> MethodAsync(string suffix) => await ReadDataAsync<PaymentMethodDto>(
             await _client.PostAsJsonAsync("/api/payment-methods", new { code = code + suffix, name = "Ví", fundKind = "Cash" }));
         var used = await MethodAsync("U");
+        var unpaid = await MethodAsync("N");
         var fresh = await MethodAsync("F");
-        var product = await CreateInventoryProductAsync("SP-" + Guid.NewGuid().ToString("N")[..8], track: false);
-        await CreateVoucherAsync(client, StockDirection.Out, "XBH", "2026-10-05 09:00", r =>
+        async Task SaleAsync(Guid methodId, decimal paid)
         {
-            r.WarehouseId = warehouseId;
-            r.PartnerId = customer;
-            r.PaymentMethodId = used.Id;
-            r.PaidAmount = 500m;
-        }, LineRequest(product, 1, 1_000));
+            var product = await CreateInventoryProductAsync("SP-" + Guid.NewGuid().ToString("N")[..8], track: false);
+            await CreateVoucherAsync(client, StockDirection.Out, "XBH", "2026-10-05 09:00", r =>
+            {
+                r.WarehouseId = warehouseId;
+                r.PartnerId = customer;
+                r.PaymentMethodId = methodId;
+                r.PaidAmount = paid;
+            }, LineRequest(product, 1, 1_000));
+        }
+        await SaleAsync(used.Id, 500m);
+        await SaleAsync(unpaid.Id, 0m);
 
         (await UsageAsync((u, ct) => u.PaymentMethodUsedByPaidStockVouchersAsync(used.Id, ct))).Should().BeTrue();
         (await UsageAsync((u, ct) => u.PaymentMethodUsedByStockVouchersAsync(used.Id, ct))).Should().BeTrue();
+        (await UsageAsync((u, ct) => u.PaymentMethodUsedByStockVouchersAsync(unpaid.Id, ct))).Should().BeTrue();
+        (await UsageAsync((u, ct) => u.PaymentMethodUsedByPaidStockVouchersAsync(unpaid.Id, ct))).Should().BeFalse();
         (await UsageAsync((u, ct) => u.PaymentMethodUsedByPaidStockVouchersAsync(fresh.Id, ct))).Should().BeFalse();
         (await UsageAsync((u, ct) => u.PartnerHasStockVouchersAsync(customer, ct))).Should().BeTrue();
     }

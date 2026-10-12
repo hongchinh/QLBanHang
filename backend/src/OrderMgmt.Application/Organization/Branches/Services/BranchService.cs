@@ -4,7 +4,6 @@ using OrderMgmt.Application.CashDebt.AutoVouchers;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.References;
-using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;

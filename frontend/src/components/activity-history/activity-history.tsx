@@ -1,9 +1,20 @@
 import { Ban, CirclePlus, Link2Off, Loader2, ReceiptText, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import type { StockVoucherActivity, StockVoucherActivityAction } from '@/features/stock-vouchers/types';
+import type { StockVoucherActivityAction } from '@/features/stock-vouchers/types';
+
+// The stock action union is a superset of the cash one, so cash, fund transfer and debt offset activities fit too.
+export type DocumentActivityAction = StockVoucherActivityAction;
+
+export interface DocumentActivity {
+  id: string;
+  action: DocumentActivityAction;
+  occurredAt: string;
+  description: string;
+  actorName?: string | null;
+}
 
 interface Props {
-  activities: StockVoucherActivity[];
+  activities: DocumentActivity[];
   isLoading: boolean;
   isError: boolean;
   errorMessage: string;
@@ -11,7 +22,7 @@ interface Props {
 }
 
 // Same layout as QuotationActivityHistory.
-export function StockVoucherActivityHistory({ activities, isLoading, isError, errorMessage, onRetry }: Props) {
+export function ActivityHistory({ activities, isLoading, isError, errorMessage, onRetry }: Props) {
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
@@ -59,7 +70,7 @@ export function StockVoucherActivityHistory({ activities, isLoading, isError, er
   );
 }
 
-const ACTIVITY_LABELS: Record<StockVoucherActivityAction, string> = {
+const ACTIVITY_LABELS: Record<DocumentActivityAction, string> = {
   Created: 'Tạo phiếu',
   Updated: 'Cập nhật',
   Cancelled: 'Hủy phiếu',
@@ -69,7 +80,7 @@ const ACTIVITY_LABELS: Record<StockVoucherActivityAction, string> = {
   AutoVoucherChanged: 'Phiếu thu/chi tự động',
 };
 
-function activityIcon(action: StockVoucherActivityAction) {
+function activityIcon(action: DocumentActivityAction) {
   switch (action) {
     case 'Created':
       return <CirclePlus className="h-4 w-4 text-cyan-600" />;

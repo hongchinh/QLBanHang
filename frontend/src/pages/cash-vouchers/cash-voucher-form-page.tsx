@@ -35,7 +35,8 @@ import { useFunds } from '@/features/funds/hooks';
 import { selectableFunds } from '@/features/funds/utils';
 import { useOpenItems } from '@/features/debt/hooks';
 import type { PartnerType } from '@/features/stock-reasons/types';
-import type { PartnerSearchItem, StockVoucherActivity } from '@/features/stock-vouchers/types';
+import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
+import { ActivityHistory } from '@/components/activity-history/activity-history';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,7 +49,6 @@ import { formatDateOnly } from '@/lib/date-only';
 import { roundAwayFromZero } from '@/lib/round';
 import { toNumberOrZero } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
-import { StockVoucherActivityHistory } from '@/pages/stock-vouchers/components/stock-voucher-activity-history';
 import { AllocationGrid } from './components/allocation-grid';
 import { CashLineGrid } from './components/cash-line-grid';
 import {
@@ -611,9 +611,8 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
             <CardTitle>Lịch sử</CardTitle>
           </CardHeader>
           <CardContent className="pt-3">
-            {/* Same row shape; an action without a stock voucher label shows its raw name. */}
-            <StockVoucherActivityHistory
-              activities={(activitiesQuery.data ?? []) as StockVoucherActivity[]}
+            <ActivityHistory
+              activities={activitiesQuery.data ?? []}
               isLoading={activitiesQuery.isLoading}
               isError={activitiesQuery.isError}
               errorMessage={getErrorMessage(activitiesQuery.error)}

@@ -25,6 +25,7 @@ import type { Fund } from '@/features/funds/types';
 import { selectableFunds } from '@/features/funds/utils';
 import { FUND_KIND_LABELS } from '@/features/cash-common/labels';
 import type { FundKind } from '@/features/cash-common/types';
+import { ActivityHistory } from '@/components/activity-history/activity-history';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,7 +44,6 @@ import {
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
-import { StockVoucherActivityHistory } from '@/pages/stock-vouchers/components/stock-voucher-activity-history';
 
 const BASE_PATH = '/fund-transfers';
 const TITLE = 'Phiếu chuyển quỹ';
@@ -469,7 +469,7 @@ function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps
             <CardTitle>Lịch sử</CardTitle>
           </CardHeader>
           <CardContent className="pt-3">
-            <StockVoucherActivityHistory
+            <ActivityHistory
               activities={activitiesQuery.data ?? []}
               isLoading={activitiesQuery.isLoading}
               isError={activitiesQuery.isError}

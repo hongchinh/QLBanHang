@@ -16,6 +16,7 @@ import {
 } from '@/features/debt-offsets/hooks';
 import { toCreatePayload } from '@/features/debt-offsets/payload';
 import type { DebtOffset, DebtOffsetDefaults } from '@/features/debt-offsets/types';
+import { ActivityHistory } from '@/components/activity-history/activity-history';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,6 @@ import { roundAwayFromZero } from '@/lib/round';
 import { toast } from '@/lib/use-toast';
 import { toDateTimeLocalValue } from '@/lib/vn-datetime';
 import { useAuthStore } from '@/stores/auth-store';
-import { StockVoucherActivityHistory } from '@/pages/stock-vouchers/components/stock-voucher-activity-history';
 import { DebtPartnerPicker } from './components/debt-partner-picker';
 import { OpenItemGrid } from './components/open-item-grid';
 
@@ -340,7 +340,7 @@ function DebtOffsetView({ id }: { id: string }) {
       offset={offsetQuery.data}
       refetch={() => void offsetQuery.refetch()}
       activities={
-        <StockVoucherActivityHistory
+        <ActivityHistory
           activities={activitiesQuery.data ?? []}
           isLoading={activitiesQuery.isLoading}
           isError={activitiesQuery.isError}

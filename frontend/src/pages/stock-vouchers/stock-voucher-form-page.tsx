@@ -44,6 +44,7 @@ import { usePaymentMethods } from '@/features/payment-methods/hooks';
 import { useFunds } from '@/features/funds/hooks';
 import { defaultFund, selectableFunds } from '@/features/funds/utils';
 import { useInventorySettings } from '@/features/inventory-settings/hooks';
+import { ActivityHistory } from '@/components/activity-history/activity-history';
 import { PartnerAutocomplete } from '@/components/partner-autocomplete/partner-autocomplete';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -69,7 +70,6 @@ import { useBranchStore } from '@/stores/branch-store';
 import { CustomerDebtPanel } from './components/customer-debt-panel';
 import { StockLineGrid } from './components/stock-line-grid';
 import { StockTotalsPanel } from './components/stock-totals-panel';
-import { StockVoucherActivityHistory } from './components/stock-voucher-activity-history';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
 
@@ -798,7 +798,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
             <CardTitle>Lịch sử</CardTitle>
           </CardHeader>
           <CardContent className="pt-3">
-            <StockVoucherActivityHistory
+            <ActivityHistory
               activities={activitiesQuery.data ?? []}
               isLoading={activitiesQuery.isLoading}
               isError={activitiesQuery.isError}

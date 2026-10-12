@@ -31,7 +31,7 @@ export function SidebarItem({ item, active, collapsed = false, match }: SidebarI
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed ? label : undefined}
       className={cn(
-        'flex items-center rounded-md text-sm font-medium transition-colors',
+        'flex items-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
         collapsed ? 'mx-auto h-10 w-10 justify-center' : 'min-w-0 flex-1 gap-3 px-3 py-2',
         active
           ? 'bg-primary text-primary-foreground'

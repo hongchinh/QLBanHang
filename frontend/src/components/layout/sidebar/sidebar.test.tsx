@@ -170,3 +170,37 @@ describe('Sidebar search', () => {
     expect(searchBox()).toHaveValue('');
   });
 });
+
+describe('Sidebar search keyboard', () => {
+  it('↓ moves focus into the results, ↑ on the first returns to the box', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.type(searchBox(), 'phieu');
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('link', { name: 'Phiếu nhập kho' })).toHaveFocus();
+    await user.keyboard('{ArrowDown}');
+    expect(screen.getByRole('link', { name: 'Phiếu xuất kho' })).toHaveFocus();
+    await user.keyboard('{ArrowUp}{ArrowUp}');
+    expect(searchBox()).toHaveFocus();
+  });
+
+  it('Esc in the results clears the box and focuses it', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.type(searchBox(), 'phieu');
+    await user.keyboard('{ArrowDown}{Escape}');
+    expect(searchBox()).toHaveValue('');
+    expect(searchBox()).toHaveFocus();
+  });
+
+  it('Esc in the box and the × button clear it', async () => {
+    const user = userEvent.setup();
+    renderSidebar('/');
+    await user.type(searchBox(), 'thu{Escape}');
+    expect(searchBox()).toHaveValue('');
+    await user.type(searchBox(), 'thu');
+    await user.click(screen.getByRole('button', { name: 'Xóa tìm kiếm' }));
+    expect(searchBox()).toHaveValue('');
+    expect(searchBox()).toHaveFocus();
+  });
+});

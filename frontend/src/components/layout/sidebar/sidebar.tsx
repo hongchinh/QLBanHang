@@ -64,9 +64,35 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
     const first = filtered?.groups[0]?.items[0];
     if (first) navigate(first.to);
   };
+  const navRef = useRef<HTMLElement>(null);
   const focusFirstResult = () => {
-    document.getElementById(navId)?.querySelector<HTMLAnchorElement>('a[href]')?.focus();
+    navRef.current?.querySelector<HTMLAnchorElement>('a[href]')?.focus();
   };
+
+  // A native listener (a React onKeyDown on <nav> trips jsx-a11y/no-noninteractive-element-interactions).
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || !searching) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        clearSearch();
+        return;
+      }
+      const links = Array.from(nav.querySelectorAll<HTMLAnchorElement>('a[href]'));
+      const index = links.indexOf(document.activeElement as HTMLAnchorElement);
+      if (index < 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        links[index + 1]?.focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        (index === 0 ? inputRef.current : links[index - 1])?.focus();
+      }
+    };
+    nav.addEventListener('keydown', onKeyDown);
+    return () => nav.removeEventListener('keydown', onKeyDown);
+  }, [searching, clearSearch]);
 
   return (
     <>
@@ -102,7 +128,7 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
             inputRef={inputRef}
             controlsId={navId}
           />
-          <nav id={navId} aria-label="Chức năng" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3">
+          <nav ref={navRef} id={navId} aria-label="Chức năng" className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden p-3">
             {filtered ? (
               filtered.count === 0 ? (
                 <div className="flex flex-col items-center gap-1 py-8 text-center text-sm text-muted-foreground">

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Keyboard, Plus, Trash2 } from 'lucide-react';
@@ -232,9 +233,12 @@ export interface StockLineGridProps {
   // Keyed `${productId}:${warehouseId}`.
   stockAt: Record<string, number>;
   readOnly: boolean;
+  // Element on the tab row to host the toolbar (null while it is not mounted yet). Omitted: the toolbar renders
+  // above the grid.
+  toolbarSlot?: HTMLElement | null;
 }
 
-export function StockLineGrid({ form, type, warehouses, computed, stockAt, readOnly }: StockLineGridProps) {
+export function StockLineGrid({ form, type, warehouses, computed, stockAt, readOnly, toolbarSlot }: StockLineGridProps) {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
   const watched = useWatch({ control: form.control, name: 'lines' }) as StockLineFormValues[] | undefined;
   const rows = watched ?? [];
@@ -616,9 +620,14 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     }
   };
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="stock-grid-toolbar flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-2 py-1.5">
+  // On the tab row (slot) the toolbar has no border or padding of its own; above the grid it is a row of its own.
+  const toolbar = (inSlot: boolean) => (
+    <div
+      className={cn(
+        'stock-grid-toolbar flex items-center gap-2',
+        inSlot ? 'justify-end' : 'shrink-0 flex-wrap justify-between border-b px-2 py-1.5',
+      )}
+    >
         <div className="flex items-center gap-2">
           {!readOnly && (
             <button type="button" id="stock-line-add" className="lib-btn" onClick={addLine}>
@@ -643,7 +652,13 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
             <KeyboardGuideItems />
           </PopoverContent>
         </Popover>
-      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {toolbarSlot === undefined && toolbar(false)}
+      {toolbarSlot && createPortal(toolbar(true), toolbarSlot)}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
       <div
         className="accounting-grid-wrap stock-grid-wrap min-h-0 flex-1"

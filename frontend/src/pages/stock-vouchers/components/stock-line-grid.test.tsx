@@ -608,6 +608,26 @@ describe('StockLineGrid', () => {
     expect(values().lines.map((l) => l.productCode)).toEqual(['A', 'B']);
   });
 
+  it('renders its toolbar into the given slot (on the tab row) instead of above the grid', () => {
+    const slot = document.createElement('div');
+    document.body.appendChild(slot);
+    const formRef: { current: UseFormReturn<StockVoucherFormValues, unknown, StockVoucherFormParsed> | null } = { current: null };
+    function Harness() {
+      const form = useForm<StockVoucherFormValues, unknown, StockVoucherFormParsed>({
+        defaultValues: { ...toFormDefaults(), warehouseId: WH1, lines: [line()] },
+      });
+      formRef.current = form;
+      return <StockLineGrid form={form} type="In" warehouses={warehouses} computed={[]} stockAt={{}} readOnly={false} toolbarSlot={slot} />;
+    }
+    render(<Harness />);
+    expect(within(slot).getByRole('button', { name: /Thêm dòng/ })).toBeInTheDocument();
+    expect(within(slot).getByRole('button', { name: /Phím tắt/ })).toBeInTheDocument();
+    expect(within(slot).getByRole('button', { name: /Cột|Cài đặt|tùy chọn/i })).toBeInTheDocument();
+    expect(document.querySelectorAll('.stock-grid-toolbar')).toHaveLength(1);
+    expect(slot.querySelector('.stock-grid-toolbar')).not.toBeNull();
+    slot.remove();
+  });
+
   it('the keyboard guide lists the new keys', () => {
     renderGrid({ lines: [line()] });
     const guide = document.querySelector('.keyboard-guide')!;

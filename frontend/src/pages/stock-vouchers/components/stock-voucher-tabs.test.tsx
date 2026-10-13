@@ -39,4 +39,22 @@ describe('StockVoucherTabs', () => {
     expect(screen.queryByTestId('tab-error-other')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Lịch sử/ })).toBeInTheDocument();
   });
+
+  it('offers a slot on the tab row for the grid toolbar, only while Hàng hóa is active', () => {
+    const toolbarRef = vi.fn();
+    const { rerender } = render(
+      <StockVoucherTabs value="lines" onValueChange={vi.fn()} lineCount={1} errorTabs={new Set()} toolbarRef={toolbarRef}
+        lines={<i />} other={<i />} payment={<i />} />,
+    );
+    const slot = screen.getByTestId('stock-lines-toolbar-slot');
+    expect(toolbarRef).toHaveBeenCalledWith(slot);
+    expect(slot).not.toHaveClass('hidden');
+    // The slot shares the row with the tab list: it is not inside the tablist.
+    expect(screen.getByRole('tablist')).not.toContainElement(slot);
+    rerender(
+      <StockVoucherTabs value="payment" onValueChange={vi.fn()} lineCount={1} errorTabs={new Set()} toolbarRef={toolbarRef}
+        lines={<i />} other={<i />} payment={<i />} />,
+    );
+    expect(screen.getByTestId('stock-lines-toolbar-slot')).toHaveClass('hidden');
+  });
 });

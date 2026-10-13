@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Inventory.Reports.Models;
@@ -86,4 +87,52 @@ public class StockCardRowDto
     public decimal? CostAmount { get; set; }
     public decimal RunningQty { get; set; }
     public decimal? RunningValue { get; set; }
+}
+
+public class StockSummaryRequest
+{
+    /// VN dates, both required, From <= To.
+    public DateOnly? From { get; set; }
+    public DateOnly? To { get; set; }
+    public ReportScope Scope { get; set; } = ReportScope.Branch;
+    /// Branch scope only.
+    public Guid? WarehouseId { get; set; }
+    public Guid? ProductGroupId { get; set; }
+    public string? Search { get; set; }
+}
+
+public class StockSummaryReportDto
+{
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+    public ReportScope Scope { get; set; }
+    public Guid? WarehouseId { get; set; }
+    /// The costing period containing To has not ended yet.
+    public bool IsProvisional { get; set; }
+    public bool CanViewCost { get; set; }
+    /// A warehouse filter under CostingScope.Branch: quantities only (D32).
+    public bool ValuesAtScopeOnly { get; set; }
+    /// Ordered by ProductCode (ordinal).
+    public List<StockSummaryRowDto> Rows { get; set; } = new();
+    public decimal? TotalOpeningValue { get; set; }
+    public decimal? TotalInValue { get; set; }
+    public decimal? TotalOutValue { get; set; }
+    public decimal? TotalClosingValue { get; set; }
+}
+
+public class StockSummaryRowDto
+{
+    public Guid ProductId { get; set; }
+    public string ProductCode { get; set; } = "";
+    public string ProductName { get; set; } = "";
+    public string UnitName { get; set; } = "";
+    public string? ProductGroupName { get; set; }
+    public decimal OpeningQty { get; set; }
+    public decimal? OpeningValue { get; set; }
+    public decimal InQty { get; set; }
+    public decimal? InValue { get; set; }
+    public decimal OutQty { get; set; }
+    public decimal? OutValue { get; set; }
+    public decimal ClosingQty { get; set; }
+    public decimal? ClosingValue { get; set; }
 }

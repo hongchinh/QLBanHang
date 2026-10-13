@@ -32,3 +32,8 @@ public class StockCardRequestValidator : AbstractValidator<StockCardRequest>
             .WithMessage("Đến ngày phải sau hoặc bằng từ ngày.");
     }
 }
+
+// Rules come with the scope and validation task.
+public class StockSummaryRequestValidator : AbstractValidator<StockSummaryRequest>
+{
+}

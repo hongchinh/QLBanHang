@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Ledger;
@@ -244,6 +245,103 @@ public class InventoryReportService : IInventoryReportService
             ClosingQty = openingQty + inQty - outQty,
             ClosingValue = showRunning ? openingValue + inValue - outValue : null,
             Rows = rows,
+        };
+    }
+
+    /// One REPEATABLE READ snapshot for all the report's queries.
+    public Task<StockSummaryReportDto> GetStockSummaryAsync(StockSummaryRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildStockSummaryAsync(request, c), ct);
+
+    private async Task<StockSummaryReportDto> BuildStockSummaryAsync(StockSummaryRequest request, CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var from = request.From!.Value;
+        var to = request.To!.Value;
+        var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, ct);
+        // T19: a ledger row is "opening" when PostedAt < start and "in the period" when start <= PostedAt < end.
+        var start = VnTime.StartOfDay(from);
+        var end = VnTime.StartOfNextDay(to);
+
+        var products = _db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => p.TrackInventory);
+        if (request.ProductGroupId is { } groupId)
+            products = products.Where(p => p.ProductGroupId == groupId);
+        if (!string.IsNullOrWhiteSpace(request.Search))
+        {
+            var pattern = $"%{LikePattern.Escape(request.Search.Trim())}%";
+            products = products.Where(p => EF.Functions.ILike(p.Code, pattern, LikePattern.EscapeCharacter)
+                || EF.Functions.ILike(p.Name, pattern, LikePattern.EscapeCharacter));
+        }
+        var productInfo = await products
+            .Select(p => new
+            {
+                p.Id,
+                p.Code,
+                p.Name,
+                GroupName = p.ProductGroup != null ? p.ProductGroup.Name : null,
+                p.PricingMode,
+                UnitName = p.Unit != null ? p.Unit.Name : null,
+            })
+            .ToDictionaryAsync(p => p.Id, ct);
+        var productIds = productInfo.Keys.ToList();
+
+        var ledger = _db.InventoryLedger.AsNoTracking()
+            .Where(e => e.BranchId == branchId && e.PostedAt < end && productIds.Contains(e.ProductId));
+        if (request.WarehouseId is { } warehouseId)
+            ledger = ledger.Where(e => e.WarehouseId == warehouseId);
+        var sums = await ledger
+            .GroupBy(e => e.ProductId)
+            .Select(g => new
+            {
+                ProductId = g.Key,
+                OpeningQty = g.Sum(e => e.PostedAt < start ? e.QtyIn - e.QtyOut : 0m),
+                OpeningValue = g.Sum(e => e.PostedAt < start ? e.InValue - (e.CostAmount ?? 0m) : 0m),
+                InQty = g.Sum(e => e.PostedAt >= start ? e.QtyIn : 0m),
+                InValue = g.Sum(e => e.PostedAt >= start ? e.InValue : 0m),
+                OutQty = g.Sum(e => e.PostedAt >= start ? e.QtyOut : 0m),
+                OutValue = g.Sum(e => e.PostedAt >= start ? e.CostAmount ?? 0m : 0m),
+            })
+            .ToListAsync(ct);
+
+        var rows = sums
+            .Select(x =>
+            {
+                var info = productInfo[x.ProductId];
+                return new StockSummaryRowDto
+                {
+                    ProductId = info.Id,
+                    ProductCode = info.Code,
+                    ProductName = info.Name,
+                    UnitName = StockUnit.NameFor(info.PricingMode, info.UnitName),
+                    ProductGroupName = info.GroupName,
+                    OpeningQty = x.OpeningQty,
+                    OpeningValue = x.OpeningValue,
+                    InQty = x.InQty,
+                    InValue = x.InValue,
+                    OutQty = x.OutQty,
+                    OutValue = x.OutValue,
+                    ClosingQty = x.OpeningQty + x.InQty - x.OutQty,
+                    ClosingValue = x.OpeningValue + x.InValue - x.OutValue,
+                };
+            })
+            // A row with nothing to show (all quantities and values zero) is dropped.
+            .Where(r => r.OpeningQty != 0m || r.InQty != 0m || r.OutQty != 0m || r.ClosingQty != 0m
+                || r.OpeningValue != 0m || r.InValue != 0m || r.OutValue != 0m || r.ClosingValue != 0m)
+            .OrderBy(r => r.ProductCode, StringComparer.Ordinal)
+            .ToList();
+
+        return new StockSummaryReportDto
+        {
+            From = from,
+            To = to,
+            Scope = request.Scope,
+            WarehouseId = request.WarehouseId,
+            IsProvisional = IsProvisional(to, settings.CostingPeriod),
+            CanViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost),
+            Rows = rows,
+            TotalOpeningValue = rows.Sum(r => r.OpeningValue),
+            TotalInValue = rows.Sum(r => r.InValue),
+            TotalOutValue = rows.Sum(r => r.OutValue),
+            TotalClosingValue = rows.Sum(r => r.ClosingValue),
         };
     }
 

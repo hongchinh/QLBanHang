@@ -9,4 +9,7 @@ public interface IInventoryReportService
 
     // Movements of one product (optionally one warehouse) between two VN dates, with opening, running and closing.
     Task<StockCardDto> GetStockCardAsync(StockCardRequest request, CancellationToken ct = default);
+
+    // Opening / in / out / closing per product between two VN dates (S07), quantities and values.
+    Task<StockSummaryReportDto> GetStockSummaryAsync(StockSummaryRequest request, CancellationToken ct = default);
 }

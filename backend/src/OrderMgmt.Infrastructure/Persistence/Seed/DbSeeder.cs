@@ -163,7 +163,7 @@ public static class DbSeeder
             (Permissions.DebtOffsets.Delete, Permissions.CashModule, "Bù trừ công nợ - Xóa"),
             (Permissions.Debt.Matching, Permissions.CashModule, "Đối trừ chứng từ"),
             (Permissions.Debt.OpeningBalance, Permissions.CashModule, "Nợ đầu kỳ"),
-            (Permissions.Debt.PartnerSummary, Permissions.CashModule, "Xem công nợ khách trên phiếu xuất"),
+            (Permissions.Debt.PartnerSummary, Permissions.CashModule, "Xem công nợ đối tượng trên phiếu nhập/xuất"),
             (Permissions.Cash.OpeningBalance, Permissions.CashModule, "Số dư quỹ đầu kỳ"),
             (Permissions.Cash.ManageCatalogs, Permissions.CashModule, "Danh mục lý do thu/chi và quỹ"),
             (Permissions.Cash.Settings, Permissions.CashModule, "Cấu hình tiền & công nợ"),

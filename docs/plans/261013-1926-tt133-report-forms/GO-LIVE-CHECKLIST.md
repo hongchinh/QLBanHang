@@ -107,7 +107,7 @@ S06, S08 và S12 xuất được một, nhiều hoặc "Tất cả có phát sin
 - Trình duyệt chờ tối đa 120 giây cho một lần xuất. Phần mềm cho phép chuyển PDF tối đa 130 giây.
 - Các con số trên đo bằng dữ liệu thử trên máy của nhóm phát triển, chưa đo trên máy chủ thật. Sổ dài hơn 20 dòng hoặc máy chủ yếu hơn thì chậm hơn. Xuất hàng loạt bản PDF của S06 là chậm nhất; nếu chờ lâu thì xuất Excel, hoặc chia theo từng kho.
 - Khi PDF lỗi, phần mềm báo "Xuất PDF thất bại, hãy dùng Excel." File Excel có cùng nội dung và in được từ Excel.
-- **Lưu ý khi nhiều người xuất PDF cùng lúc:** trong lần thử chạy ba lần chuyển PDF cùng một lúc, 7 trên 27 lần bị lỗi (không lần nào bị treo). Lần thử này chạy thẳng bộ chuyển PDF, chưa chạy qua phần mềm. Cách xử lý đang chờ quyết định của PO. Cho đến khi sửa xong: gặp thông báo lỗi PDF thì bấm xuất lại, hoặc dùng Excel.
+- **Nhiều người xuất PDF cùng lúc:** lần thử đầu, khi chạy ba lần chuyển PDF cùng một lúc thì 7 trên 27 lần bị lỗi. Lỗi này đã được sửa ngày 14/10/2026 (mỗi lần chuyển PDF dùng một vùng làm việc riêng); thử lại chín lần chuyển cùng lúc thì cả chín lần đều thành công. Nếu vẫn gặp thông báo lỗi PDF thì bấm xuất lại hoặc dùng Excel, và báo cho đội phát triển.
 
 ## 4. Xác nhận
 

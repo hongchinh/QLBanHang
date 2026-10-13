@@ -194,7 +194,7 @@ Không làm: S13-DNN / S14-DNN (ngoại tệ, là non-goal) và Sổ nhật ký 
   | S06 | 3,13 giây | 61,49 giây | 64,6 giây |
 
   Giới hạn đặt ra: Excel dưới 20 giây, Excel + PDF dưới 90 giây (client chờ 120 giây). S06 chậm nhất; timeout 130 giây lớn hơn hai lần thời gian chuyển PDF của nó (123 giây).
-- R2 còn mở: chạy 3 lần chuyển PDF cùng lúc bằng `soffice` trực tiếp trong image (chưa đo qua API) thì 7/27 lần lỗi, không lần nào treo; khi mỗi lần chuyển dùng một thư mục profile riêng thì 9/9 thành công. Chưa chọn cách sửa.
+- R2 đã xử lý (quyết định của người dùng ngày 14/10/2026): chạy 3 lần chuyển PDF cùng lúc bằng `soffice` trực tiếp trong image thì 7/27 lần lỗi, không lần nào treo. Converter nay cấp một thư mục profile riêng cho mỗi lần chuyển (`-env:UserInstallation`); chạy 9 lần chuyển song song qua converter với LibreOffice thật thì 9/9 thành công. Không dùng semaphore.
 
 ## Rủi ro
 

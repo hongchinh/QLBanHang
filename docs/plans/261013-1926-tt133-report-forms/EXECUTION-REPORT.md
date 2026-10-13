@@ -4,7 +4,7 @@
 
 ## Outcome
 
-Phases 00–04 are complete. Phase 05 is **left in progress**: its measurements, docs and final suites are done, but three of its steps wait for a user decision (see "Open decisions"), and the browser smoke test was not run.
+Phases 00–04 are complete. Phase 05 is **left in progress**: its measurements, docs and final suites are done, but some of its steps wait for a user decision (see "Open decisions"), and the browser smoke test was not run.
 
 The branch delivers the eight forms (S04a, S05, S06, S07, S08, S12, debt summary, reconciliation record) as Excel and PDF, the company profile with its settings page, the stock in–out–balance report and page, the branch/company scope of the debt reports and S07, the reason, due-date and branch-code fields, and `VndAmountInWords`.
 
@@ -28,7 +28,7 @@ The suites grew by 131 backend tests and 87 frontend tests. The change is 142 fi
 | 02 Form builder, export pipeline, S04a, S05 | `d4ec7cb` → `a61c3c8` (marker `8651c1a`) | 9 tasks; builder and export service frozen here |
 | 03 Debt scope, S12, debt summary, reconciliation | `c83c4ec` → `9625104` (marker `09493a3`) | 9 tasks |
 | 04 Stock summary, S07, S08, S06 | `5644581` → `3b818d2`, fix `80cdde5` (marker `3a83a4f`) | 7 tasks; one review finding fixed |
-| 05 Measurements, docs, verification | `c6cfd7b`, `bfc425e`, `d94cf24`, `1499df0`, `e49eacb`, this report | two layout fixes from the PDF check |
+| 05 Measurements, docs, verification | `c6cfd7b`, `bfc425e`, `d94cf24`, `1499df0`, `e49eacb`, `a70b099`, `c5439c1`, then the docs update | two layout fixes from the PDF check; R2 fix after the user's decision |
 
 ## How it was run
 
@@ -65,7 +65,7 @@ Conditions: 20 rows per sheet, October 2026, `all: true`, in-process test server
 ## Open decisions (for the user)
 
 1. **Container checks over HTTP were not run.** The project settings deny `curl`, `wget` and `Invoke-WebRequest`, so Task 5.2 steps 2, 3, 4 and 6 and the API parts of the smoke test were not carried out against the running container. Options: allow `curl` to localhost and re-run the task; accept the in-process exports plus the direct `soffice` runs as the evidence; or run the nine-request loop of step 6 by hand.
-2. **R2: concurrent PDF conversions fail about one time in three.** In the application that is a 503 `PDF_EXPORT_FAILED` for that user. The plan's options: a profile directory per conversion (`-env:UserInstallation`), a semaphore, or both. A semaphore alone queues requests behind a 61 s S06 conversion, which can pass the 120 s client timeout. Nothing was implemented, because review S3 rejected both and the plan asks for a decision.
+2. **R2: concurrent PDF conversions — DECIDED and fixed.** On the shared default profile about one conversion in three failed (503 `PDF_EXPORT_FAILED` for that user). The user chose a profile directory per conversion on 2026-10-14 (no semaphore). `c5439c1` adds `-env:UserInstallation` under the conversion's temp folder, with the unit test `Each_conversion_gets_its_own_profile_directory` (RED first). Check: nine parallel conversions (3 × 3 rounds) of `S12-DNN_Receivable.xlsx` through `LibreOfficeSpreadsheetPdfConverter` with the local LibreOffice on Windows all returned a PDF (3.6–6.7 s each). That check ran after the final full-suite run, in a temporary test that was not committed; only the three converter tests were re-run after the fix, not the full suite, and the fix was not re-measured inside the Docker image.
 3. **Number separators in PDFs.** Table cells print `1,250,750,000` (the image's LibreOffice runs with an English locale) while the reconciliation sentence prints `368.775.000 đồng`. Excel on a Vietnamese Windows shows dots from the same file. Options: a Vietnamese locale in the image, a locale tag in the number formats, or accept commas in PDFs.
 4. **Conversion timeout of 130 s** is longer than the 120 s client timeout and the 60–120 s a reverse proxy usually allows. A 300-sheet S06 PDF takes about 65 s. Lowering `MaxSheets` to 100 would bring it to about 22 s. `appsettings.Development.json` and the test factory still use 60.
 5. **Archiving.** The plan folder was not moved to `docs/plans/archived/`: Phase 05 is not closed, and `docs/SUMMARY.md` and `product-goals.md` link to the current path. Archive it in a docs commit after the PR merges, as was done for the stock voucher form plan.
@@ -81,7 +81,8 @@ Conditions: 20 rows per sheet, October 2026, `all: true`, in-process test server
 | D-5 | `ProductTypeaheadCell` (shared with quotations and stock vouchers) got `pointerEvents: 'auto'` on its suggestion list. | Fix of the Task 4.7 review finding. |
 | D-6 | Task 5.2 used an in-process test and direct `soffice` runs. | HTTP clients are denied (open decision 1). |
 | D-7 | LibreOffice is installed on the dev machine, unlike the plan's assumption. | Found while preparing Phase 05; the measurements still use the Docker image. |
-| D-8 | Phase 05 is not marked complete and the folder is not archived. | Open decisions 1, 2 and 5. |
+| D-8 | Phase 05 is not marked complete and the folder is not archived. | Open decisions 1 and 5. |
+| D-9 | A LibreOffice profile per conversion, which review S3 had rejected. | User decision 2026-10-14 after the R2 measurement. |
 
 ## Choices made where the plan was silent
 

@@ -7,6 +7,9 @@ import type { ProductSuggestion } from '@/features/products/types';
 import { useWarehouses } from '@/features/warehouses/hooks';
 import { selectableWarehouses } from '@/features/warehouses/utils';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
+import { PeriodPresetSelect } from '@/components/period-preset-select/period-preset-select';
+import { ExportTargetsDialog, type ExportTargetChoice } from '@/components/tt133-export/export-targets-dialog';
+import { Tt133ExportButton } from '@/components/tt133-export/tt133-export-button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,8 +19,28 @@ import { getErrorMessage } from '@/lib/api-client';
 import { formatMoneyForDisplay } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
+import { tt133FileBase, type ExportFormat, type Tt133ExportForm } from '@/features/tt133-export/types';
+import { useTt133Download } from '@/features/tt133-export/use-tt133-download';
+import { useAuthStore } from '@/stores/auth-store';
 
 const ALL = 'all';
+
+// The product picker of the export dialog: each pick is added as a chip and the box is cleared.
+function ExportProductPicker({ onAdd }: { onAdd: (item: { id: string; label: string }) => void }) {
+  const [text, setText] = useState('');
+  return (
+    <ProductTypeaheadCell
+      inputId="stock-card-export-product"
+      value={text}
+      onChange={setText}
+      onSelect={(s) => {
+        onAdd({ id: s.id, label: s.code });
+        setText('');
+      }}
+      placeholder="Mã hoặc tên hàng"
+    />
+  );
+}
 
 function voucherLink(row: StockCardRow): string | null {
   if (row.sourceType === 'StockIn') return `/stock-in/${row.sourceId}`;
@@ -35,6 +58,9 @@ export function StockCardPage() {
   const [productText, setProductText] = useState('');
   const [from, setFrom] = useState(() => firstDayOfMonthYmd());
   const [to, setTo] = useState(() => todayYmd());
+  const [exportRequest, setExportRequest] = useState<{ form: Tt133ExportForm; format: ExportFormat } | null>(null);
+  const { download } = useTt133Download();
+  const canViewCostPermission = useAuthStore((s) => s.hasPermission('inventory.view_cost'));
 
   // yyyy-MM-dd strings compare chronologically.
   const rangeError = !from || !to ? 'Chọn đủ Từ ngày và Đến ngày' : from > to ? 'Từ ngày không được sau Đến ngày' : null;
@@ -89,11 +115,35 @@ export function StockCardPage() {
   const canViewCost = card?.canViewCost ?? false;
   const showRunningValue = canViewCost && !card?.valuesAtScopeOnly;
 
+  // S08 (quantities) and S06 (with values, needs inventory.view_cost) export one, several or all
+  // product x warehouse pairs, so the button asks for the products first.
+  const exportParams = { from, to, warehouseId: warehouseId === ALL ? undefined : warehouseId };
+  const exportForms: Tt133ExportForm[] = [
+    { code: 'S08-DNN', report: 'stock-card', params: exportParams, fileBase: tt133FileBase('S08-DNN', from, to) },
+    ...(canViewCostPermission
+      ? [{ code: 'S06-DNN', report: 'stock-detail' as const, params: exportParams, fileBase: tt133FileBase('S06-DNN', from, to) }]
+      : []),
+  ];
+  const currentLabel = card && card.productId === productId ? card.productCode : productText;
+
+  const confirmExport = (choice: ExportTargetChoice) => {
+    if (!exportRequest) return;
+    void download(exportRequest.form, exportRequest.format, 'all' in choice ? { all: true } : { productIds: choice.ids });
+    setExportRequest(null);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl font-semibold">Thẻ kho</h1>
-        {canViewCost && card?.isProvisional && <Badge variant="warning">Giá vốn tạm tính</Badge>}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-semibold">Thẻ kho</h1>
+          {canViewCost && card?.isProvisional && <Badge variant="warning">Giá vốn tạm tính</Badge>}
+        </div>
+        <Tt133ExportButton
+          forms={exportForms}
+          disabled={!!rangeError}
+          onSelect={(form, format) => setExportRequest({ form, format })}
+        />
       </div>
 
       <Card>
@@ -124,6 +174,13 @@ export function StockCardPage() {
               </SelectContent>
             </Select>
           </div>
+          <PeriodPresetSelect
+            id="stock-card-period"
+            onChange={(range) => {
+              setFrom(range.from);
+              setTo(range.to);
+            }}
+          />
           <div className="space-y-1">
             <Label htmlFor="stock-card-from">Từ ngày</Label>
             <Input id="stock-card-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -233,6 +290,15 @@ export function StockCardPage() {
       ) : (
         isLoading && <p className="text-sm text-muted-foreground">Đang tải…</p>
       )}
+
+      <ExportTargetsDialog
+        open={exportRequest !== null}
+        onOpenChange={(open) => !open && setExportRequest(null)}
+        title="Chọn mặt hàng xuất sổ"
+        current={productId && currentLabel ? { id: productId, label: currentLabel } : null}
+        renderPicker={(add) => <ExportProductPicker onAdd={add} />}
+        onConfirm={confirmExport}
+      />
     </div>
   );
 }

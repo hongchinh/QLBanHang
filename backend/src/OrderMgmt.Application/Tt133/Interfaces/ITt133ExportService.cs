@@ -11,4 +11,7 @@ public interface ITt133ExportService
 
     /// S12-DNN: one sheet per partner of the request.
     Task<ExportFile> ExportDebtLedgerAsync(DebtLedgerExportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// Bảng tổng hợp chi tiết thanh toán với người mua / người bán, for every partner (a partnerId is refused).
+    Task<ExportFile> ExportDebtSummaryAsync(DebtBalanceReportRequest request, ExportFormat format, CancellationToken ct = default);
 }

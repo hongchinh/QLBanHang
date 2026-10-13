@@ -15,6 +15,9 @@ public class Tt133FormRenderer : ITt133FormRenderer
     public byte[] RenderDebtLedgers(Tt133FormContext context, IReadOnlyList<DebtLedgerReportDto> ledgers) =>
         Render(workbook => DebtLedgerForm.Write(workbook, context, ledgers));
 
+    public byte[] RenderDebtSummary(Tt133FormContext context, DebtBalanceReportDto report, string? search) =>
+        Render(workbook => DebtSummaryForm.Write(workbook, context, report, search));
+
     private static byte[] Render(Action<XLWorkbook> write)
     {
         using var workbook = new XLWorkbook();

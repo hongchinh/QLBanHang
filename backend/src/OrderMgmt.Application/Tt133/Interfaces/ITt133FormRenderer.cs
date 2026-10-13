@@ -12,4 +12,7 @@ public interface ITt133FormRenderer
 
     /// S12-DNN: one sheet per ledger (partner × side), in the order given.
     byte[] RenderDebtLedgers(Tt133FormContext context, IReadOnlyList<DebtLedgerReportDto> ledgers);
+
+    /// Bảng tổng hợp chi tiết thanh toán: one sheet. search (trimmed, null when blank) prints the filter line (T22).
+    byte[] RenderDebtSummary(Tt133FormContext context, DebtBalanceReportDto report, string? search);
 }

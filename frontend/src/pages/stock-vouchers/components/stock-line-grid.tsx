@@ -155,7 +155,9 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
       onFocus={(e) => {
         const el = e.currentTarget;
         setEditing(value === undefined ? '' : String(value));
-        requestAnimationFrame(() => el.select());
+        requestAnimationFrame(() => {
+          if (document.activeElement === el) el.select();
+        });
       }}
       onChange={(e) => {
         setEditing(e.target.value);

@@ -488,6 +488,21 @@ describe('StockLineGrid', () => {
     expect(fireEvent.keyDown(last, { key: 'ArrowDown' })).toBe(false);
   });
 
+  // Chrome's select() also focuses the element, so a late select() would pull the focus back.
+  it('a number cell selects its text on focus only while it is still the active element', async () => {
+    renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b' })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      act(() => byId('stock-line-quantity-0').focus());
+      act(() => byId('stock-line-quantity-1').focus());
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(select.mock.contexts).toEqual([byId('stock-line-quantity-1')]);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
   it('arrows leave the warehouse select alone', () => {
     showAllColumns();
     renderGrid({ lines: [line(), line({ _uiKey: 'b' })] });

@@ -62,6 +62,7 @@ const RULES: RouteRule[] = [
   { pattern: /^\/funds$/, anyPermission: ['cash.catalogs.manage', 'cash.opening_balance'] },
   { pattern: /^\/credit-limits$/, permission: 'credit_limit.manage' },
   { pattern: /^\/settings\/cash$/, permission: 'cash.settings' },
+  { pattern: /^\/settings\/company$/, permission: 'settings.company' },
 ];
 
 export function canAccessRouteWith(

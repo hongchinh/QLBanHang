@@ -47,6 +47,7 @@ import { NumberingSettingsPage } from '@/pages/settings/numbering-settings-page'
 import { RecalcCostPage } from '@/pages/settings/recalc-cost-page';
 // Round 2A: 10.8 cash settings
 import { CashSettingsPage } from '@/pages/settings/cash-settings-page';
+import { CompanyProfilePage } from '@/pages/settings/company-profile-page';
 import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
 import { StockOnHandPage } from '@/pages/inventory/stock-on-hand-page';
 import { StockCardPage } from '@/pages/inventory/stock-card-page';
@@ -562,6 +563,14 @@ export function App() {
                   element={
                     <ProtectedRoute permission="cash.settings">
                       <CashSettingsPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="settings/company"
+                  element={
+                    <ProtectedRoute permission="settings.company">
+                      <CompanyProfilePage />
                     </ProtectedRoute>
                   }
                 />

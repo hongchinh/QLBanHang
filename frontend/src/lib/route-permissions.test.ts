@@ -214,4 +214,9 @@ describe('cash and debt routes', () => {
     expectRule('/settings/cash', 'cash.settings');
     expect(canAccessRoute('/settings/cash', ['inventory.settings'], [])).toBe(false);
   });
+
+  it('/settings/company cần settings.company', () => {
+    expectRule('/settings/company', 'settings.company');
+    expect(canAccessRoute('/settings/company', ['cash.settings'], [])).toBe(false);
+  });
 });

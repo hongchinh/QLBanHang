@@ -581,8 +581,12 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const linesError = errors.lines as { message?: string; root?: { message?: string } } | undefined;
   const linesRootMessage = linesError?.root?.message ?? linesError?.message;
 
+  // Height chain: main#main-content (scrolls) > this root (h-full) > form (flex-1, no min-h-0) > Tabs (no min-h-0)
+  // > lines panel (min-h-[280px]; the grid wrapper has contain:size so its rows never size the page).
+  // The panel minimum therefore propagates up: with room the page fills the window and the grid scrolls
+  // inside; in a short window main scrolls and the totals bar sits below the grid.
   return (
-    <div className="flex h-full min-h-[560px] flex-col gap-2">
+    <div className="flex h-full flex-col gap-2">
       <div className="sticky top-0 z-30 shrink-0 -mx-4 border-b bg-background/95 px-4 py-3 shadow-sm backdrop-blur md:-mx-3 md:px-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -671,7 +675,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           submitWithIntent(isEdit ? 'update' : 'save-stay');
         }}
         onKeyDown={handleFormKeyDown}
-        className="flex min-h-0 flex-1 flex-col gap-2"
+        className="flex flex-1 flex-col gap-2"
       >
         <StockVoucherMainFields
           form={form}
@@ -807,7 +811,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           }
         />
 
-        <div className="sticky bottom-0 z-20 shrink-0 rounded-md border bg-card shadow-[0_-2px_6px_rgba(0,0,0,0.06)]">
+        <div className="shrink-0 rounded-md border bg-card shadow-[0_-2px_6px_rgba(0,0,0,0.06)]">
           <StockTotalsBar
             totals={computed.totals}
             freight={freight}

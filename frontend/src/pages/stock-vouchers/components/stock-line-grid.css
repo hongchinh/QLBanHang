@@ -2,6 +2,8 @@
  * the grid scrolls inside its tab, the header row and the #/Mã/Tên and Số còn lại/delete columns stick. */
 .stock-grid-wrap {
   overflow: auto;
+  /* The rows must not size the page: the lines panel (min-h-[280px]) is the minimum that propagates upward. */
+  contain: size;
 }
 
 .stock-grid thead th {

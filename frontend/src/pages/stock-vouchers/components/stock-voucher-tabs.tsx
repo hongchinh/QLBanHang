@@ -22,7 +22,7 @@ const PANEL = 'mt-0 data-[state=inactive]:hidden';
 export function StockVoucherTabs(props: StockVoucherTabsProps) {
   const { value, onValueChange, lineCount, errorTabs, lines, other, payment, history } = props;
   return (
-    <Tabs value={value} onValueChange={(v) => onValueChange(v as StockVoucherTab)} className="flex min-h-0 flex-1 flex-col">
+    <Tabs value={value} onValueChange={(v) => onValueChange(v as StockVoucherTab)} className="flex flex-1 flex-col">
       <TabsList className="h-auto shrink-0 justify-start gap-0.5 rounded-none border-b bg-transparent p-0">
         <Trigger value="lines" label="Hàng hóa" hotkey="Alt+1" error={errorTabs.has('lines')}>
           <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 text-xs text-primary">{lineCount}</span>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type * as ReactRouterDom from 'react-router-dom';
 import type * as DebtHooks from '@/features/debt/hooks';
 import { StockVoucherFormPage } from './stock-voucher-form-page';
@@ -418,6 +418,46 @@ describe('StockVoucherFormPage', () => {
     const [first, second] = createMock.mock.calls.map((c) => c[0]);
     expect(first.acknowledgeNegativeStock).toBe(false);
     expect(second).toEqual({ ...first, acknowledgeNegativeStock: true });
+  });
+
+  describe('focus after a 422 confirmation dialog', () => {
+    async function saveFromQuantityCell() {
+      createMock.mockRejectedValueOnce(apiError(422, 'NEGATIVE_STOCK_WARNING', NEGATIVE_DETAILS));
+      renderPage('In');
+      await fillPerUnitLine(3);
+      const cell = byId('stock-line-quantity-0');
+      act(() => cell.focus());
+      fireEvent.keyDown(cell, { key: 's', ctrlKey: true });
+      await screen.findByText('Xuất quá tồn kho');
+      return cell;
+    }
+
+    it('"Quay lại" returns the focus to the cell that was focused, so Ctrl+S works again', async () => {
+      const cell = await saveFromQuantityCell();
+      fireEvent.click(dialog().getByRole('button', { name: 'Quay lại' }));
+      await waitFor(() => expect(screen.queryByText('Xuất quá tồn kho')).not.toBeInTheDocument());
+      expect(document.activeElement).toBe(cell);
+
+      createMock.mockResolvedValueOnce(voucher());
+      fireEvent.keyDown(document.activeElement!, { key: 's', ctrlKey: true });
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
+    });
+
+    it('Escape returns the focus to the cell that was focused', async () => {
+      const cell = await saveFromQuantityCell();
+      fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByText('Xuất quá tồn kho')).not.toBeInTheDocument());
+      expect(document.activeElement).toBe(cell);
+    });
+
+    it('confirming keeps the focus on the cell while the page stays', async () => {
+      const cell = await saveFromQuantityCell();
+      updateMock.mockResolvedValue(voucher());
+      createMock.mockResolvedValueOnce(voucher());
+      fireEvent.click(dialog().getByRole('button', { name: 'Vẫn lưu' }));
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(document.activeElement).toBe(cell));
+    });
   });
 
   it('blocked negative stock shows the blocked dialog without resend', async () => {

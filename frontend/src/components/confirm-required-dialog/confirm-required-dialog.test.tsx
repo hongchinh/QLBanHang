@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ConfirmationRequest } from '@/lib/confirm-required';
 import { ConfirmRequiredDialog } from './confirm-required-dialog';
 
@@ -67,5 +67,22 @@ describe('ConfirmRequiredDialog', () => {
   it('renders nothing without a request', () => {
     render(<ConfirmRequiredDialog request={null} onConfirm={vi.fn()} onClose={vi.fn()} />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closing gives the focus to the element restoreFocusTo returns', async () => {
+    const target = document.createElement('input');
+    document.body.appendChild(target);
+    try {
+      const { rerender } = render(
+        <ConfirmRequiredDialog request={warning} onConfirm={vi.fn()} onClose={vi.fn()} restoreFocusTo={() => target} />,
+      );
+      expect(document.activeElement).not.toBe(target);
+
+      rerender(<ConfirmRequiredDialog request={null} onConfirm={vi.fn()} onClose={vi.fn()} restoreFocusTo={() => target} />);
+
+      await waitFor(() => expect(document.activeElement).toBe(target));
+    } finally {
+      target.remove();
+    }
   });
 });

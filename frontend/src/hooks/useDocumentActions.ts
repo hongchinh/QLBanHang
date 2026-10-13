@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatApiErrorDetails, getApiError } from '@/lib/api-client';
 import {
   toConfirmationRequest,
@@ -6,6 +6,7 @@ import {
   type ConfirmationRequest,
   type ConfirmFlags,
 } from '@/lib/confirm-required';
+import { canTakeFocus, currentFocus, isFocusLost } from '@/lib/focus';
 import { toast } from '@/lib/use-toast';
 
 /** `flags` are the confirmations (P10) already given for the action; a resend keeps them all. */
@@ -30,6 +31,9 @@ interface Options<A extends DocumentAction> {
   concurrencyReloadFailedMessage: string;
 }
 
+const FOCUSABLE =
+  'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
  * The action flow shared by the document forms: busy state, the 422 confirmation chain
  * (a confirmed resend keeps every earlier flag; a newer 422 replaces the pending request),
@@ -43,7 +47,26 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
   const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState<{ action: A; request: ConfirmationRequest } | null>(null);
 
-  async function run(action: A): Promise<void> {
+  // What had the focus when the user triggered the action (the 422 dialog is opened from state, so Radix has no
+  // trigger to give the focus back to); the action disables its own buttons, which makes the browser drop the focus.
+  const originRef = useRef<HTMLElement | null>(null);
+  // Set when a confirmed resend is running: the dialog is gone then and the origin may still be disabled.
+  const restoreAfterRunRef = useRef(false);
+
+  useEffect(() => {
+    if (busy || !restoreAfterRunRef.current) return;
+    restoreAfterRunRef.current = false;
+    // Never take the focus from something the user (or the page) already moved it to.
+    if (isFocusLost() && canTakeFocus(originRef.current)) originRef.current.focus();
+  }, [busy]);
+
+  function run(action: A): Promise<void> {
+    originRef.current = currentFocus();
+    restoreAfterRunRef.current = false;
+    return execute(action);
+  }
+
+  async function execute(action: A): Promise<void> {
     setBusy(true);
     try {
       await options.perform(action, action.flags);
@@ -90,6 +113,11 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
 
   const confirmDialogProps = {
     request: confirmation?.request ?? null,
+    // Dismissed: back to the origin, else the first control of the page. Confirmed: the effect above restores it later.
+    restoreFocusTo: (): HTMLElement | null => {
+      if (canTakeFocus(originRef.current)) return originRef.current;
+      return restoreAfterRunRef.current ? null : document.querySelector<HTMLElement>(`#main-content :is(${FOCUSABLE})`);
+    },
     confirmLabel: confirmation ? options.confirmLabels[confirmation.action.kind as A['kind']] : undefined,
     onConfirm: () => {
       if (!confirmation) return;
@@ -97,7 +125,8 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
       setConfirmation(null);
       // A blocked 422 has nothing to confirm.
       if (request.blocked) return;
-      void run({ ...action, flags: withConfirmed(action.flags, request) });
+      restoreAfterRunRef.current = true;
+      void execute({ ...action, flags: withConfirmed(action.flags, request) });
     },
     onClose: () => setConfirmation(null),
   };

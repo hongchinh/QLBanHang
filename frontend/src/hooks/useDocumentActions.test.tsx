@@ -1,8 +1,9 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '@/lib/use-toast';
 import type { ConfirmFlags } from '@/lib/confirm-required';
+import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { useDocumentActions } from './useDocumentActions';
 
 vi.mock('@/lib/use-toast', () => ({ toast: vi.fn() }));
@@ -226,5 +227,91 @@ describe('useDocumentActions', () => {
       description: 'Server says FORBIDDEN',
     });
     expect(hook.result.current.busy).toBe(false);
+  });
+});
+
+describe('useDocumentActions focus return', () => {
+  // The save button is disabled while busy, so a real browser blurs it: simulated with blur() inside perform.
+  function Harness({ perform }: { perform: (a: Action) => Promise<void> }) {
+    const { busy, run, confirmDialogProps } = useDocumentActions<Action>({
+      perform,
+      reload: async () => undefined,
+      onReloaded: () => {},
+      errorTitles,
+      confirmLabels,
+      concurrencyMessage: 'Đã tải lại',
+      concurrencyReloadFailedMessage: 'Không tải lại được',
+    });
+    return (
+      <>
+        <button type="button" data-testid="save" disabled={busy} onClick={() => void run({ kind: 'save', flags: {} })}>
+          Lưu
+        </button>
+        <ConfirmRequiredDialog {...confirmDialogProps} />
+      </>
+    );
+  }
+
+  const blurAndReject = (code: string) => async () => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    throw apiError(422, code);
+  };
+
+  it('dismissing the dialog gives the focus back to what had it when the action started', async () => {
+    const perform = vi.fn<(a: Action) => Promise<void>>().mockImplementation(blurAndReject('NEGATIVE_FUND_WARNING'));
+    render(<Harness perform={perform} />);
+    const save = screen.getByTestId('save');
+    act(() => save.focus());
+
+    fireEvent.click(save);
+    await screen.findByRole('dialog');
+    expect(document.activeElement).not.toBe(save);
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(document.activeElement).toBe(save);
+  });
+
+  it('after confirming, the focus is back on that element once the action settled', async () => {
+    const perform = vi
+      .fn<(a: Action) => Promise<void>>()
+      .mockImplementationOnce(blurAndReject('NEGATIVE_FUND_WARNING'))
+      .mockImplementationOnce(async () => {
+        (document.activeElement as HTMLElement | null)?.blur();
+      });
+    render(<Harness perform={perform} />);
+    const save = screen.getByTestId('save');
+    act(() => save.focus());
+
+    fireEvent.click(save);
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Vẫn lưu' }));
+
+    await waitFor(() => expect(perform).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(document.activeElement).toBe(save));
+  });
+
+  it('does not take the focus from an element the user moved to meanwhile', async () => {
+    const perform = vi
+      .fn<(a: Action) => Promise<void>>()
+      .mockImplementationOnce(blurAndReject('NEGATIVE_FUND_WARNING'))
+      .mockImplementationOnce(async () => {});
+    render(
+      <>
+        <input data-testid="other" />
+        <Harness perform={perform} />
+      </>,
+    );
+    const save = screen.getByTestId('save');
+    act(() => save.focus());
+    fireEvent.click(save);
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Vẫn lưu' }));
+    const other = screen.getByTestId('other');
+    act(() => other.focus());
+
+    await waitFor(() => expect(perform).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(document.activeElement).toBe(other);
   });
 });

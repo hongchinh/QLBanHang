@@ -19,15 +19,17 @@ public class SalesMetricsService : ISalesMetricsService
     private readonly IAppDbContext _db;
     private readonly ICurrentUser _currentUser;
     private readonly IExecutiveScopeResolver _scopes;
+    private readonly ExecutiveLookups _lookups;
     private readonly IDateTime _clock;
     private readonly ITransactionRunner _transaction;
 
     public SalesMetricsService(IAppDbContext db, ICurrentUser currentUser, IExecutiveScopeResolver scopes,
-        IDateTime clock, ITransactionRunner transaction)
+        ExecutiveLookups lookups, IDateTime clock, ITransactionRunner transaction)
     {
         _db = db;
         _currentUser = currentUser;
         _scopes = scopes;
+        _lookups = lookups;
         _clock = clock;
         _transaction = transaction;
     }
@@ -121,13 +123,17 @@ public class SalesMetricsService : ISalesMetricsService
         var totals = await TotalsAsync(query.By, counted, canViewCost, ct);
         var names = await LoadNamesAsync(query.By, totals.Keys.ToList(), ct);
 
-        var rows = totals.Select(t => new SalesTopRowDto
+        var rows = totals.Select(t =>
         {
-            Id = t.Key,
-            Code = names[t.Key].Code,
-            Name = names[t.Key].Name,
-            Revenue = t.Value.Revenue,
-            GrossProfit = canViewCost ? t.Value.Revenue - t.Value.Cost : null,
+            var name = names.TryGetValue(t.Key, out var known) ? known : (Code: (string?)null, Name: string.Empty);
+            return new SalesTopRowDto
+            {
+                Id = t.Key,
+                Code = name.Code,
+                Name = name.Name,
+                Revenue = t.Value.Revenue,
+                GrossProfit = canViewCost ? t.Value.Revenue - t.Value.Cost : null,
+            };
         });
         var byGrossProfit = query.Sort == SalesTopSort.GrossProfit && canViewCost;
         // A total order: equal figures and equal names still come back in the same order, so Take(Limit) is stable.
@@ -259,30 +265,21 @@ public class SalesMetricsService : ISalesMetricsService
         return revenues.ToDictionary(r => r.ProductId, r => new Totals(r.Revenue, costs.GetValueOrDefault(r.ProductId)));
     }
 
-    /// Code and name of each id; soft-deleted partners, products and users keep their history, so filters are off.
+    /// Code and name of each customer, product or employee, from the lookups every metrics service shares.
     private async Task<Dictionary<Guid, (string? Code, string Name)>> LoadNamesAsync(
         SalesTopBy by, List<Guid> ids, CancellationToken ct)
     {
         switch (by)
         {
             case SalesTopBy.Customer:
-                return (await _db.Customers.IgnoreQueryFilters().AsNoTracking()
-                        .Where(c => ids.Contains(c.Id))
-                        .Select(c => new { c.Id, c.Code, c.Name })
-                        .ToListAsync(ct))
-                    .ToDictionary(c => c.Id, c => ((string?)c.Code, c.Name));
+                return (await _lookups.PartnersAsync(ids, ct))
+                    .ToDictionary(c => c.Key, c => ((string?)c.Value.Code, c.Value.Name));
             case SalesTopBy.Product:
-                return (await _db.Products.IgnoreQueryFilters().AsNoTracking()
-                        .Where(p => ids.Contains(p.Id))
-                        .Select(p => new { p.Id, p.Code, p.Name })
-                        .ToListAsync(ct))
-                    .ToDictionary(p => p.Id, p => ((string?)p.Code, p.Name));
+                return (await _lookups.ProductsAsync(ids, ct))
+                    .ToDictionary(p => p.Key, p => ((string?)p.Value.Code, p.Value.Name));
             case SalesTopBy.Employee:
-                return (await _db.Users.IgnoreQueryFilters().AsNoTracking()
-                        .Where(u => ids.Contains(u.Id))
-                        .Select(u => new { u.Id, u.FullName })
-                        .ToListAsync(ct))
-                    .ToDictionary(u => u.Id, u => ((string?)null, u.FullName));
+                return (await _lookups.UserNamesAsync(ids, ct))
+                    .ToDictionary(u => u.Key, u => ((string?)null, u.Value));
             default:
                 throw new ArgumentOutOfRangeException(nameof(by), by, "Unknown top list.");
         }

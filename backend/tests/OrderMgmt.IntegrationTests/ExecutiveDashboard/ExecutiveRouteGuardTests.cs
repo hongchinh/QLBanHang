@@ -2,6 +2,7 @@ using System.Net;
 using FluentAssertions;
 using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -34,6 +35,9 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
         new("sales/top", "&by=Customer", Permissions.Reports.Profit,
             async response => (await ReadDataAsync<List<SalesTopRowDto>>(response)).Sum(row => row.Revenue),
             OwnBranch: 2_500m, Company: 12_499m),
+        new("cash/summary", "&at=2026-10-31", Permissions.Reports.Cash,
+            async response => (await ReadDataAsync<CashSummaryDto>(response)).Payments,
+            OwnBranch: 5_700m, Company: 5_823m),
     };
 
     public ExecutiveRouteGuardTests(PostgresFixture pg) : base(pg) { }
@@ -89,8 +93,21 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
         total.Should().Be(route.Company);
     }
 
-    /// The documents the cases read. Today the report dataset; a phase that adds routes adds its documents here.
-    private Task<ReportIds> ArrangeAsync() => ReportDataset.SeedAsync(this);
+    /// The documents the cases read: the report dataset plus one payment of 123 from branch B's cash fund, because the
+    /// dataset has no cash document in branch B. Its reason CK has no debt effect, so the sales and debt figures of
+    /// the dataset stay as they are.
+    private async Task<ReportIds> ArrangeAsync()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var branchB = CloneAdminClient();
+        UseBranch(branchB, ids.BranchBId);
+        var payment = CashRequest(CashVoucherType.Payment, await CashReasonIdAsync("CK"),
+            await CashFundIdAsync(ids.BranchBId), "2026-10-06 09:00", partnerId: null, 123m);
+        payment.PersonName = "Nguyễn B";
+        payment.AcknowledgeNegativeFund = true;
+        await CreateCashAsync(branchB, payment);
+        return ids;
+    }
 
     private static GuardedRoute RouteOf(string routeName) => Routes.Single(route => route.Route == routeName);
 

@@ -14,3 +14,7 @@ public class Tt133FormContext
     public DateOnly? OpeningDate { get; set; }
     public DateOnly PrintDate { get; set; }            // VN date of the export
 }
+
+public enum ExportFormat { Xlsx = 0, Pdf = 1 }
+
+public record ExportFile(byte[] Bytes, string ContentType, string FileName);

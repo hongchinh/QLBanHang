@@ -78,6 +78,8 @@ using OrderMgmt.Application.Sales.Quotations.Interfaces;
 using OrderMgmt.Application.Sales.Quotations.Services;
 using OrderMgmt.Application.Search.Interfaces;
 using OrderMgmt.Application.Search.Services;
+using OrderMgmt.Application.Tt133.Interfaces;
+using OrderMgmt.Application.Tt133.Services;
 
 namespace OrderMgmt.Application;
 
@@ -154,6 +156,7 @@ public static class DependencyInjection
         services.AddScoped<IStockVoucherCashDebt, StockVoucherCashDebt>();
         services.AddScoped<IOpeningStockService, OpeningStockService>();
         services.AddScoped<IInventoryReportService, InventoryReportService>();
+        services.AddScoped<ITt133ExportService, Tt133ExportService>();
 
         return services;
     }

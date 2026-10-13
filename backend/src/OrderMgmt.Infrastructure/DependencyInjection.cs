@@ -9,9 +9,11 @@ using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Reports.SalesRevenue.Interfaces;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
+using OrderMgmt.Application.Tt133.Interfaces;
 using OrderMgmt.Infrastructure.Branding;
 using OrderMgmt.Infrastructure.CashDebt;
 using OrderMgmt.Infrastructure.Excel;
+using OrderMgmt.Infrastructure.Excel.Tt133;
 using OrderMgmt.Infrastructure.Identity;
 using OrderMgmt.Infrastructure.Inventory;
 using OrderMgmt.Infrastructure.Notifications;
@@ -69,6 +71,7 @@ public static class DependencyInjection
         services.AddScoped<IHandoverExcelRenderer, HandoverExcelRenderer>();
         services.AddScoped<IRevenueReportExcelRenderer, RevenueReportExcelRenderer>();
         services.AddScoped<ISpreadsheetPdfConverter, LibreOfficeSpreadsheetPdfConverter>();
+        services.AddScoped<ITt133FormRenderer, Tt133FormRenderer>();
         services.AddScoped<IQuotationExportPathResolver, QuotationExportPathResolver>();
 
         return services;

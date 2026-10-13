@@ -90,6 +90,16 @@ public class GlobalExceptionMiddleware
                 Details = cre.Details,
                 Token = cre.Token,
             }),
+            UnprocessableException ue => (StatusCodes.Status422UnprocessableEntity, new ApiError
+            {
+                Code = ue.Code,
+                Message = ue.Message,
+            }),
+            ServiceUnavailableException sue => (StatusCodes.Status503ServiceUnavailable, new ApiError
+            {
+                Code = sue.Code,
+                Message = sue.Message,
+            }),
             DbUpdateConcurrencyException => (StatusCodes.Status409Conflict, new ApiError
             {
                 Code = "CONCURRENCY",

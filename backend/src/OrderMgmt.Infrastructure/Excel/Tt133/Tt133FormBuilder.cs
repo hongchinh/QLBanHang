@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Tt133.Models;
 
 namespace OrderMgmt.Infrastructure.Excel.Tt133;
@@ -7,6 +8,9 @@ namespace OrderMgmt.Infrastructure.Excel.Tt133;
 public sealed class Tt133FormBuilder
 {
     private const string FontName = "Times New Roman";
+    private const string MoneyFormat = "#,##0;(#,##0)";
+    private const string QuantityFormat = "#,##0.###;(#,##0.###)";
+    private const string DateFormat = "dd/MM/yyyy";
 
     private readonly Tt133FormContext _context;
     private readonly IReadOnlyList<Tt133Column> _columns;
@@ -29,6 +33,12 @@ public sealed class Tt133FormBuilder
     }
 
     public IXLWorksheet Sheet { get; }
+
+    /// The first row of the table header, set by the latest WriteTableHeader.
+    public int TableHeaderFirstRow { get; private set; }
+
+    /// The symbol row of the table header, set by the latest WriteTableHeader.
+    public int TableHeaderLastRow { get; private set; }
 
     /// The next free row (1-based).
     public int Row { get; private set; }
@@ -129,6 +139,90 @@ public sealed class Tt133FormBuilder
         WriteText(note, italic: true, centered: true);
     }
 
+    /// Two header tiers (a group and its sub-columns) plus the symbol row. May be called more than once.
+    public void WriteTableHeader()
+    {
+        var first = Row;
+        var count = _columns.Count;
+
+        var i = 0;
+        while (i < count)
+        {
+            var column = _columns[i];
+            var col = i + 1;
+            if (column.Group == null)
+            {
+                Sheet.Range(first, col, first + 1, col).Merge();
+                Sheet.Cell(first, col).Value = column.Header;
+                i++;
+                continue;
+            }
+
+            var end = i;
+            while (end + 1 < count && _columns[end + 1].Group == column.Group) end++;
+            if (end > i) Sheet.Range(first, col, first, end + 1).Merge();
+            Sheet.Cell(first, col).Value = column.Group;
+            for (var j = i; j <= end; j++)
+                Sheet.Cell(first + 1, j + 1).Value = _columns[j].Header;
+            i = end + 1;
+        }
+
+        for (var j = 0; j < count; j++)
+            Sheet.Cell(first + 2, j + 1).Value = _columns[j].Symbol;
+
+        var header = Sheet.Range(first, 1, first + 2, count);
+        header.Style.Font.Bold = true;
+        header.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        header.Style.Alignment.Vertical = XLAlignmentVerticalValues.Center;
+        header.Style.Alignment.WrapText = true;
+        Bordered(header);
+
+        var symbols = Sheet.Range(first + 2, 1, first + 2, count);
+        symbols.Style.Font.Bold = false;
+        symbols.Style.Font.Italic = true;
+
+        TableHeaderFirstRow = first;
+        TableHeaderLastRow = first + 2;
+        Row = first + 3;
+        _gapAfterTitle = false;
+    }
+
+    /// One value per column; null = empty.
+    public void WriteRow(params object?[] cells)
+    {
+        for (var i = 0; i < _columns.Count; i++)
+        {
+            var cell = Sheet.Cell(Row, i + 1);
+            var value = i < cells.Length ? cells[i] : null;
+            if (value != null) SetValue(cell, value);
+            FormatCell(cell, _columns[i].Kind);
+        }
+        Bordered(Sheet.Range(Row, 1, Row, _columns.Count));
+        Row++;
+        _gapAfterTitle = false;
+    }
+
+    /// Column is 1-based. The label goes in the label column; label and values are bold.
+    public void WriteSummaryRow(string label, params (int Column, object? Value)[] values)
+    {
+        for (var i = 0; i < _columns.Count; i++)
+            FormatCell(Sheet.Cell(Row, i + 1), _columns[i].Kind);
+
+        var labelCell = Sheet.Cell(Row, _labelColumn);
+        labelCell.Value = label;
+        labelCell.Style.Font.Bold = true;
+
+        foreach (var (column, value) in values)
+        {
+            var cell = Sheet.Cell(Row, column);
+            if (value != null) SetValue(cell, value);
+            cell.Style.Font.Bold = true;
+        }
+        Bordered(Sheet.Range(Row, 1, Row, _columns.Count));
+        Row++;
+        _gapAfterTitle = false;
+    }
+
     public static string PeriodLine(DateOnly from, DateOnly to)
     {
         if (from.Year == to.Year && from.Month == to.Month && from.Day == 1
@@ -148,6 +242,50 @@ public sealed class Tt133FormBuilder
             if (columns[i].Kind == Tt133CellKind.Text && columns[i].Group == null)
                 return i + 1;
         return 1;
+    }
+
+    private static void Bordered(IXLRange range)
+    {
+        range.Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        range.Style.Border.InsideBorder = XLBorderStyleValues.Thin;
+    }
+
+    private static void SetValue(IXLCell cell, object value)
+    {
+        switch (value)
+        {
+            case DateOnly d: cell.Value = d.ToDateTime(TimeOnly.MinValue); break;
+            case DateTimeOffset at: cell.Value = VnTime.ToVnDate(at).ToDateTime(TimeOnly.MinValue); break;
+            case DateTime dt: cell.Value = dt; break;
+            case decimal m: cell.Value = m; break;
+            case int n: cell.Value = n; break;
+            case long l: cell.Value = l; break;
+            case double x: cell.Value = x; break;
+            case string text: cell.Value = text; break;
+            default: cell.Value = value.ToString(); break;
+        }
+    }
+
+    private static void FormatCell(IXLCell cell, Tt133CellKind kind)
+    {
+        switch (kind)
+        {
+            case Tt133CellKind.Money:
+                cell.Style.NumberFormat.Format = MoneyFormat;
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                break;
+            case Tt133CellKind.Quantity:
+                cell.Style.NumberFormat.Format = QuantityFormat;
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+                break;
+            case Tt133CellKind.Date:
+                cell.Style.DateFormat.Format = DateFormat;
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+                break;
+            default:
+                cell.Style.Alignment.WrapText = true;
+                break;
+        }
     }
 
     private IXLCell Merged(int row, int firstColumn, int lastColumn)

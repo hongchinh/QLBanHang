@@ -1003,9 +1003,13 @@ describe('StockVoucherFormPage', () => {
       partnerId: customer.id,
       partnerCode: customer.code,
       partnerName: customer.name,
+      // Unpaid, so the saved voucher already lowered the server balance by its total.
+      paidAmount: 0,
     });
     const second = renderPage('In');
     expect(stripShown()).toBe(true);
+    // Unchanged edit: the saved impact is taken back before the current one applies, so nothing counts twice.
+    expect(screen.getByTestId('partner-debt-receivable-after')).toHaveTextContent('7.000.000');
     second.unmount();
 
     // Without debt.partner_summary and reports.debt: hidden, and never requested.

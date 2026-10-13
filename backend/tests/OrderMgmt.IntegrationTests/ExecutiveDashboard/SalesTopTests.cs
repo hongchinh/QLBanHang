@@ -1,3 +1,4 @@
+using System.Net;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Dashboards.Executive.Models;
@@ -108,6 +109,19 @@ public class SalesTopTests : ExecutiveDashboardTestBase
         rows.Should().HaveCount(1);
         await AssertBadRequestKeyAsync(client, $"sales/top?{October}&by=Product&limit=0", "limit", "Số dòng từ 1 đến 50.");
         await AssertBadRequestKeyAsync(client, $"sales/top?{October}&by=Product&limit=51", "limit", "Số dòng từ 1 đến 50.");
+    }
+
+    /// Pins the framework: model binding refuses a number outside the enum by itself, before any validator runs.
+    /// The body is a ValidationProblemDetails, not the app envelope, so only the status is asserted.
+    [Fact]
+    public async Task Undefined_by_or_sort_number_is_rejected()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainClient(ids);
+
+        (await GetExecRawAsync(client, $"sales/top?{October}&by=7")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await GetExecRawAsync(client, $"sales/top?{October}&by=Customer&sort=7"))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     /// A fresh branch with two tracked products (VAT 0), each bought 10 × 100. A is sold 2 × 150 (revenue 300, cost 200,

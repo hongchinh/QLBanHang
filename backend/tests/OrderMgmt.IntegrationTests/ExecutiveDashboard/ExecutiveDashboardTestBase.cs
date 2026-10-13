@@ -1,11 +1,12 @@
 using System.Net;
-using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
+using Xunit;
 
 namespace OrderMgmt.IntegrationTests.ExecutiveDashboard;
 
@@ -60,16 +61,33 @@ public abstract class ExecutiveDashboardTestBase : CashDebtTestBase
         return voucher!;
     }
 
-    /// Asserts a 400 whose validation details name `key` and, when given, carry `message` for it.
+    /// Asserts a 400 whose validation details name `key` and, when given, carry `message` for it. A 400 without the
+    /// app's error envelope (the framework's own model-binding answer, for instance) fails with the response body.
     protected static async Task AssertBadRequestKeyAsync(
         HttpClient client, string pathAndQuery, string key, string? message = null)
     {
         var response = await GetExecRawAsync(client, pathAndQuery);
+        var body = await response.Content.ReadAsStringAsync();
 
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest, pathAndQuery);
-        var details = (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details;
+        var details = ErrorDetailsOf(body);
+        if (details is null)
+            Assert.Fail($"{pathAndQuery} answered 400 without error details in the app's envelope. Body: {body}");
         details.Should().ContainKey(key, pathAndQuery);
         if (message is not null)
-            details![key].Should().Contain(message, pathAndQuery);
+            details[key].Should().Contain(message, pathAndQuery);
+    }
+
+    /// The `error.details` of an app response body; null when the body is not an app envelope or has no details.
+    private static IDictionary<string, string[]>? ErrorDetailsOf(string body)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<ApiResponse>(body, TestJson.Options)?.Error?.Details;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 }

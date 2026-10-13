@@ -85,6 +85,17 @@ public class SalesSeriesTests : ExecutiveDashboardTestBase
             .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    /// Pins the framework: model binding refuses a number outside the enum by itself, before any validator runs.
+    /// The body is a ValidationProblemDetails, not the app envelope, so only the status is asserted.
+    [Fact]
+    public async Task Undefined_granularity_number_is_rejected()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+
+        (await GetExecRawAsync(MainClient(ids), $"sales/series?{October}&granularity=7"))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     [Fact]
     public async Task Cost_is_hidden_without_view_cost()
     {

@@ -21,7 +21,7 @@ import {
   type StockVoucherFormParsed,
   type StockVoucherFormValues,
 } from '@/features/stock-vouchers/schema';
-import { toFormDefaults, toUpsertPayload } from '@/features/stock-vouchers/payload';
+import { createEmptyStockLine, toFormDefaults, toUpsertPayload } from '@/features/stock-vouchers/payload';
 import {
   readStockVoucherDraft,
   useStockVoucherDraft,
@@ -45,7 +45,6 @@ import { useFunds } from '@/features/funds/hooks';
 import { defaultFund, selectableFunds } from '@/features/funds/utils';
 import { useInventorySettings } from '@/features/inventory-settings/hooks';
 import { ActivityHistory } from '@/components/activity-history/activity-history';
-import { PartnerAutocomplete } from '@/components/partner-autocomplete/partner-autocomplete';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -66,6 +65,7 @@ import { useBranchStore } from '@/stores/branch-store';
 import { CustomerDebtPanel } from './components/customer-debt-panel';
 import { StockLineGrid } from './components/stock-line-grid';
 import { StockTotalsPanel } from './components/stock-totals-panel';
+import { StockVoucherMainFields, FieldError, SELECT_CLASS } from './components/stock-voucher-main-fields';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
 
@@ -112,9 +112,6 @@ const LINE_ERROR_FIELDS = new Set<string>([
   'vatRate',
   'note',
 ]);
-
-const SELECT_CLASS =
-  'h-7 w-full rounded-md border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-50';
 
 export function StockVoucherFormPage({ type }: { type: StockDirection }) {
   const { id } = useParams<{ id: string }>();
@@ -420,7 +417,22 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     if (e.key === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       submitWithIntent(isEdit ? 'update' : 'save-stay');
+      return;
     }
+    // D7: Enter never submits the form.
+    const tag = (e.target as HTMLElement).tagName;
+    if (e.key === 'Enter' && (tag === 'INPUT' || tag === 'SELECT')) e.preventDefault();
+  }
+
+  // Enter from the main area: the first line without a product, or a new one.
+  function enterGrid() {
+    const lines = form.getValues('lines');
+    let idx = lines.findIndex((l) => !l.productId);
+    if (idx === -1) {
+      idx = lines.length;
+      form.setValue('lines', [...lines, createEmptyStockLine(idx, form.getValues('warehouseId'))], { shouldDirty: true });
+    }
+    setTimeout(() => document.getElementById(`stock-line-product-code-${idx}`)?.focus(), 0);
   }
 
   function handleSelectPartner(p: PartnerSearchItem | null) {
@@ -566,6 +578,25 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
         onKeyDown={handleFormKeyDown}
         className="space-y-4"
       >
+        <StockVoucherMainFields
+          form={form}
+          type={type}
+          labels={labels}
+          readOnly={readOnly}
+          warehouses={headerWarehouses}
+          reasons={reasons}
+          paymentMethods={paymentMethods}
+          warehouseId={warehouseId}
+          reasonId={reasonId}
+          paymentMethodId={paymentMethodId}
+          selectedReason={selectedReason}
+          selectedPartner={selectedPartner}
+          onWarehouseChange={handleWarehouseChange}
+          onReasonChange={handleReasonChange}
+          onSelectPartner={handleSelectPartner}
+          onEnterGrid={enterGrid}
+        />
+
         <div className="grid items-stretch gap-4 lg:grid-cols-[1fr_320px]">
           <Card>
             <CardHeader className="flex h-9 flex-row items-center border-b bg-blue-50 p-1 px-3">
@@ -573,93 +604,11 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
             </CardHeader>
             <CardContent className="px-4 pb-3 pt-2">
               <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-[6px] border-0 p-0">
-                <div className="form-inline-grid form-cols-3">
-                  <Label htmlFor="stock-voucher-code" className="field-label">Số phiếu</Label>
-                  <Input
-                    id="stock-voucher-code"
-                    className="h-7 bg-muted"
-                    readOnly
-                    tabIndex={-1}
-                    value={voucher?.code ?? ''}
-                    placeholder="Tự động"
-                  />
-                  <Label htmlFor="stock-voucher-at" className="field-label required">{labels.dateLabel}</Label>
-                  <Input id="stock-voucher-at" type="datetime-local" className="h-7" {...form.register('voucherAt')} />
-                  <Label htmlFor="stock-warehouse" className="field-label required">Kho</Label>
-                  <select
-                    id="stock-warehouse"
-                    className={SELECT_CLASS}
-                    value={warehouseId}
-                    onChange={(e) => handleWarehouseChange(e.target.value)}
-                  >
-                    <option value="">-- Chọn kho --</option>
-                    {headerWarehouses.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError message={errors.voucherAt?.message ?? errors.warehouseId?.message} />
-                </div>
-
-                <div className="form-inline-grid form-cols-customer">
-                  <Label htmlFor="stock-reason" className="field-label required">{labels.reasonLabel}</Label>
-                  <select
-                    id="stock-reason"
-                    className={SELECT_CLASS}
-                    value={reasonId}
-                    onChange={(e) => handleReasonChange(e.target.value)}
-                  >
-                    <option value="">-- Chọn lý do --</option>
-                    {reasons.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {r.name}
-                      </option>
-                    ))}
-                  </select>
-                  <Label htmlFor="stock-partner" className="field-label">Đối tượng</Label>
-                  <PartnerAutocomplete
-                    inputId="stock-partner"
-                    type={type}
-                    reasonId={reasonId || undefined}
-                    partnerType={selectedReason?.partnerType}
-                    value={selectedPartner}
-                    onSelect={handleSelectPartner}
-                    disabled={readOnly}
-                  />
-                  <FieldError message={errors.reasonId?.message} />
-                </div>
-
                 <div className="form-inline-grid form-cols-2">
-                  <Label htmlFor="stock-partner-name" className="field-label">Tên đối tượng</Label>
-                  <Input id="stock-partner-name" className="h-7" {...form.register('partnerName')} />
                   <Label htmlFor="stock-partner-tax-code" className="field-label">MST</Label>
                   <Input id="stock-partner-tax-code" className="h-7" {...form.register('partnerTaxCode')} />
-                </div>
-
-                <div className="form-inline-grid">
-                  <Label htmlFor="stock-partner-address" className="field-label">Địa chỉ</Label>
-                  <Input id="stock-partner-address" className="h-7" {...form.register('partnerAddress')} />
-                </div>
-
-                <div className="form-inline-grid form-cols-2">
                   <Label htmlFor="stock-handler-name" className="field-label">{labels.handlerLabel}</Label>
                   <Input id="stock-handler-name" className="h-7" {...form.register('handlerName')} />
-                  <Label htmlFor="stock-payment-method" className="field-label">HTTT</Label>
-                  <select
-                    id="stock-payment-method"
-                    className={SELECT_CLASS}
-                    value={paymentMethodId ?? ''}
-                    onChange={(e) => form.setValue('paymentMethodId', e.target.value, { shouldDirty: true })}
-                  >
-                    <option value="">-- Hình thức thanh toán --</option>
-                    {paymentMethods.map((m) => (
-                      <option key={m.id} value={m.id}>
-                        {m.name}
-                      </option>
-                    ))}
-                  </select>
-                  <FieldError message={errors.paymentMethodId?.message} />
                 </div>
 
                 {(fundShown || dueDateShown) && (
@@ -812,11 +761,6 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     setConfirmKind(null);
     void runAction({ kind, version: form.getValues('version'), flags: {} });
   }
-}
-
-function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return <p className="field-message field-message-code text-destructive">{message}</p>;
 }
 
 function autoVoucherOf(voucher?: StockVoucher) {

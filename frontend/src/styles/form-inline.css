@@ -18,6 +18,18 @@
 .form-inline-grid.form-cols-3 {
   --qldh-form-grid-columns: 90px minmax(220px, 2fr) 90px minmax(120px, 1fr) 90px minmax(120px, 1fr);
 }
+.form-inline-grid.form-cols-stock-main-1 {
+  --qldh-form-grid-columns: 90px minmax(150px, 1fr) 90px minmax(150px, 1.2fr) 50px minmax(140px, 1fr) 50px minmax(150px, 1fr);
+}
+.form-inline-grid.form-cols-stock-main-2 {
+  --qldh-form-grid-columns: 90px minmax(170px, 1fr) 90px minmax(220px, 1.6fr) 50px minmax(260px, 2.6fr);
+}
+@media (max-width: 1279px) {
+  .form-inline-grid.form-cols-stock-main-1,
+  .form-inline-grid.form-cols-stock-main-2 {
+    --qldh-form-grid-columns: 90px minmax(160px, 1fr) 90px minmax(160px, 1fr);
+  }
+}
 
 .form-inline-grid .field-label {
   text-align: right;
@@ -54,6 +66,8 @@
   .form-inline-grid.info-row-3,
   .form-inline-grid.form-cols-2,
   .form-inline-grid.form-cols-3,
+  .form-inline-grid.form-cols-stock-main-1,
+  .form-inline-grid.form-cols-stock-main-2,
   .form-inline-grid.form-cols-customer {
     grid-template-columns: 90px 1fr;
   }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type * as ReactRouterDom from 'react-router-dom';
 import type * as DebtHooks from '@/features/debt/hooks';
 import { StockVoucherFormPage } from './stock-voucher-form-page';
@@ -959,6 +959,46 @@ describe('StockVoucherFormPage', () => {
     });
     renderPage('In');
     expect(panelShown()).toBe(false);
+  });
+
+  it('Enter moves through the main fields, never saves, and lands on the first empty line', async () => {
+    renderPage('In');
+    byId('stock-voucher-at').focus();
+    fireEvent.keyDown(byId('stock-voucher-at'), { key: 'Enter' });
+    expect(document.activeElement).toBe(byId('stock-reason'));
+    fireEvent.keyDown(byId('stock-reason'), { key: 'Enter' });
+    expect(document.activeElement).toBe(byId('stock-warehouse'));
+    fireEvent.keyDown(byId('stock-warehouse'), { key: 'Enter' });
+    expect(document.activeElement).toBe(byId('stock-payment-method'));
+    fireEvent.keyDown(byId('stock-payment-method'), { key: 'Enter' });
+    expect(document.activeElement).toBe(byId('stock-partner'));
+    fireEvent.keyDown(byId('stock-partner'), { key: 'Enter' });
+    expect(document.activeElement).toBe(byId('stock-partner-name'));
+    fireEvent.keyDown(byId('stock-partner-name'), { key: 'Enter' });
+    expect(document.activeElement).toBe(byId('stock-partner-address'));
+    fireEvent.keyDown(byId('stock-partner-address'), { key: 'Enter' });
+    await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-0')));
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  // Implicit submission is blocked by preventing the Enter keydown (D7).
+  it('Enter in a tab field is prevented so it cannot submit the form', () => {
+    renderPage('In');
+    const event = createEvent.keyDown(byId('stock-voucher-note'), { key: 'Enter' });
+    fireEvent(byId('stock-voucher-note'), event);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('Enter picks a partner from the open list and then moves on to the partner name', async () => {
+    partnerResults.data = [customer];
+    renderPage('In');
+    fireEvent.change(byId('stock-partner'), { target: { value: 'KH' } });
+    await screen.findByRole('listbox');
+    fireEvent.keyDown(byId('stock-partner'), { key: 'Enter' });
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+    await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
+    fireEvent.keyDown(byId('stock-partner'), { key: 'Enter' });
+    expect(document.activeElement).toBe(byId('stock-partner-name'));
   });
 
   it('stock-out uses Ngày xuất, Lý do xuất and Người nhận hàng labels', () => {

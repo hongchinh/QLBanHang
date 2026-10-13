@@ -254,9 +254,20 @@ public class InventoryReportService : IInventoryReportService
 
     private async Task<StockSummaryReportDto> BuildStockSummaryAsync(StockSummaryRequest request, CancellationToken ct)
     {
+        ReportScopeGuard.EnsureAllowed(_currentUser, request.Scope);
         var branchId = await _currentBranch.GetIdAsync(ct);
         var from = request.From!.Value;
         var to = request.To!.Value;
+        if (request.WarehouseId is { } requestedWarehouseId)
+        {
+            var warehouseBranchId = await _db.Warehouses.AsNoTracking()
+                .Where(w => w.Id == requestedWarehouseId)
+                .Select(w => (Guid?)w.BranchId)
+                .FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundException("Warehouse", requestedWarehouseId);
+            if (warehouseBranchId != branchId)
+                throw new ForbiddenException("Kho không thuộc chi nhánh đang làm việc.");
+        }
         var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, ct);
         // T19: a ledger row is "opening" when PostedAt < start and "in the period" when start <= PostedAt < end.
         var start = VnTime.StartOfDay(from);
@@ -285,7 +296,9 @@ public class InventoryReportService : IInventoryReportService
         var productIds = productInfo.Keys.ToList();
 
         var ledger = _db.InventoryLedger.AsNoTracking()
-            .Where(e => e.BranchId == branchId && e.PostedAt < end && productIds.Contains(e.ProductId));
+            .Where(e => e.PostedAt < end && productIds.Contains(e.ProductId));
+        if (request.Scope == ReportScope.Branch)
+            ledger = ledger.Where(e => e.BranchId == branchId);
         if (request.WarehouseId is { } warehouseId)
             ledger = ledger.Where(e => e.WarehouseId == warehouseId);
         var sums = await ledger
@@ -302,10 +315,16 @@ public class InventoryReportService : IInventoryReportService
             })
             .ToListAsync(ct);
 
+        var canViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost);
+        // D32: under Branch costing a single warehouse has no value of its own.
+        var valuesAtScopeOnly = request.WarehouseId is not null && settings.CostingScope == CostingScope.Branch;
+        var showValues = canViewCost && !valuesAtScopeOnly;
+
         var rows = sums
             .Select(x =>
             {
                 var info = productInfo[x.ProductId];
+                // Mask first, then drop: without values a zero-quantity row never reveals a residual value.
                 return new StockSummaryRowDto
                 {
                     ProductId = info.Id,
@@ -314,18 +333,19 @@ public class InventoryReportService : IInventoryReportService
                     UnitName = StockUnit.NameFor(info.PricingMode, info.UnitName),
                     ProductGroupName = info.GroupName,
                     OpeningQty = x.OpeningQty,
-                    OpeningValue = x.OpeningValue,
+                    OpeningValue = showValues ? x.OpeningValue : null,
                     InQty = x.InQty,
-                    InValue = x.InValue,
+                    InValue = showValues ? x.InValue : null,
                     OutQty = x.OutQty,
-                    OutValue = x.OutValue,
+                    OutValue = showValues ? x.OutValue : null,
                     ClosingQty = x.OpeningQty + x.InQty - x.OutQty,
-                    ClosingValue = x.OpeningValue + x.InValue - x.OutValue,
+                    ClosingValue = showValues ? x.OpeningValue + x.InValue - x.OutValue : null,
                 };
             })
             // A row with nothing to show (all quantities and values zero) is dropped.
             .Where(r => r.OpeningQty != 0m || r.InQty != 0m || r.OutQty != 0m || r.ClosingQty != 0m
-                || r.OpeningValue != 0m || r.InValue != 0m || r.OutValue != 0m || r.ClosingValue != 0m)
+                || (r.OpeningValue ?? 0m) != 0m || (r.InValue ?? 0m) != 0m || (r.OutValue ?? 0m) != 0m
+                || (r.ClosingValue ?? 0m) != 0m)
             .OrderBy(r => r.ProductCode, StringComparer.Ordinal)
             .ToList();
 
@@ -336,12 +356,13 @@ public class InventoryReportService : IInventoryReportService
             Scope = request.Scope,
             WarehouseId = request.WarehouseId,
             IsProvisional = IsProvisional(to, settings.CostingPeriod),
-            CanViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost),
+            CanViewCost = canViewCost,
+            ValuesAtScopeOnly = valuesAtScopeOnly,
             Rows = rows,
-            TotalOpeningValue = rows.Sum(r => r.OpeningValue),
-            TotalInValue = rows.Sum(r => r.InValue),
-            TotalOutValue = rows.Sum(r => r.OutValue),
-            TotalClosingValue = rows.Sum(r => r.ClosingValue),
+            TotalOpeningValue = showValues ? rows.Sum(r => r.OpeningValue) : null,
+            TotalInValue = showValues ? rows.Sum(r => r.InValue) : null,
+            TotalOutValue = showValues ? rows.Sum(r => r.OutValue) : null,
+            TotalClosingValue = showValues ? rows.Sum(r => r.ClosingValue) : null,
         };
     }
 

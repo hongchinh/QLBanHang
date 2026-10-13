@@ -1,4 +1,5 @@
 using FluentValidation;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Inventory.Reports.Models;
 
 namespace OrderMgmt.Application.Inventory.Reports.Validators;
@@ -33,7 +34,22 @@ public class StockCardRequestValidator : AbstractValidator<StockCardRequest>
     }
 }
 
-// Rules come with the scope and validation task.
 public class StockSummaryRequestValidator : AbstractValidator<StockSummaryRequest>
 {
+    private static readonly DateOnly MinDate = new(2000, 1, 1);
+    private static readonly DateOnly MaxDate = new(2100, 12, 31);
+
+    public StockSummaryRequestValidator()
+    {
+        RuleFor(x => x.From).NotNull().WithMessage("Vui lòng chọn từ ngày.")
+            .InclusiveBetween(MinDate, MaxDate).WithMessage("Từ ngày không hợp lệ.");
+        RuleFor(x => x.To).NotNull().WithMessage("Vui lòng chọn đến ngày.")
+            .InclusiveBetween(MinDate, MaxDate).WithMessage("Đến ngày không hợp lệ.");
+        RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From).When(x => x.From.HasValue && x.To.HasValue)
+            .WithMessage("Đến ngày phải sau hoặc bằng từ ngày.");
+        RuleFor(x => x.Scope).IsInEnum().WithMessage("Phạm vi không hợp lệ.");
+        RuleFor(x => x.Search).MaximumLength(200).WithMessage("Từ khóa tìm kiếm tối đa 200 ký tự.");
+        RuleFor(x => x.WarehouseId).Null().When(x => x.Scope == ReportScope.Company)
+            .WithMessage("Chỉ lọc kho trong phạm vi chi nhánh.");
+    }
 }

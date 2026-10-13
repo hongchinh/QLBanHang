@@ -86,7 +86,7 @@ public class Tt133ExportService : ITt133ExportService
         var (context, ledgers) = await _transaction.RunSnapshotAsync(async token =>
         {
             var formContext = await BuildContextAsync(request.Scope, token);
-            var targets = request.PartnerIds;
+            var targets = await DebtLedgerTargetsAsync(request, token);
             EnsureSheetCount(targets.Count);
 
             var data = new List<DebtLedgerReportDto>(targets.Count);
@@ -101,11 +101,28 @@ public class Tt133ExportService : ITt133ExportService
                     Scope = request.Scope,
                 }, token));
             }
+            // One sheet per partner in code order, whatever the order of the request.
+            data.Sort((a, b) => string.CompareOrdinal(a.PartnerCode, b.PartnerCode));
             return (formContext, data);
         }, ct);
 
         var xlsx = _renderer.RenderDebtLedgers(context, ledgers);
         return await ToFileAsync(xlsx, BaseName("S12-DNN", request.From, request.To), format, ct);
+    }
+
+    /// All: every partner the balance report lists (a non-zero opening balance or movement); otherwise the distinct ids.
+    private async Task<List<Guid>> DebtLedgerTargetsAsync(DebtLedgerExportRequest request, CancellationToken ct)
+    {
+        if (!request.All) return request.PartnerIds.Distinct().ToList();
+
+        var balance = await _cashDebtReports.GetDebtBalanceAsync(new DebtBalanceReportRequest
+        {
+            Side = request.Side,
+            From = request.From,
+            To = request.To,
+            Scope = request.Scope,
+        }, ct);
+        return balance.Rows.Where(r => r.PartnerId.HasValue).Select(r => r.PartnerId!.Value).ToList();
     }
 
     /// Company profile, working branch and signer of the form. Scope Company prints no branch.

@@ -3,6 +3,9 @@ using System.Net.Http.Json;
 using ClosedXML.Excel;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -177,6 +180,114 @@ public class DebtLedgerExportTests : CashDebtTestBase
         sales.Should().Contain(text => text.StartsWith($"[{codes[ids.MainBranchId]}] "));
         sales.Should().Contain(text => text.StartsWith($"[{codes[ids.BranchBId]}] "));
         Enumerable.Range(opening + 1, 5).Should().OnlyContain(row => ws.Cell(row, 4).GetString().StartsWith("["));
+    }
+
+    [Fact]
+    public async Task S12_all_partners_with_activity()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+        var kh2 = await CreatePartnerAsync("KH2" + ids.Kh1Code[3..], isCustomer: true, isSupplier: false);
+        await CreatePartnerAsync("KH9" + ids.Kh1Code[3..], isCustomer: true, isSupplier: false);
+        await ReportDataset.PostStockAsync(this, client, StockDirection.Out, "XBH", "2026-10-20 09:00", ids.MainWarehouseId,
+            kh2, 700m, paymentMethodId: null, paid: 0m);
+
+        var response = await PostAsync(client, Raw("Receivable", all: true));
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        var names = wb.Worksheets.Select(w => w.Name).ToList();
+        names.Should().Equal("KH1" + ids.Kh1Code[3..], "KH2" + ids.Kh1Code[3..]);
+
+        var balance = await GetBalanceAsync(client, "Receivable");
+        foreach (var ws in wb.Worksheets)
+        {
+            var row = balance.Rows.Single(r => r.PartnerCode == ws.Name);
+            Tt133Sheet.Number(ws, Tt133Sheet.RowOf(ws, "Số dư cuối kỳ"), 9).Should().Be(row.ClosingDebit, ws.Name);
+        }
+        balance.Rows.Select(r => r.PartnerCode).Should().Equal(names);
+    }
+
+    [Fact]
+    public async Task S12_several_partners()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+        var kh2 = await CreatePartnerAsync("KH2" + ids.Kh1Code[3..], isCustomer: true, isSupplier: false);
+        await ReportDataset.PostStockAsync(this, client, StockDirection.Out, "XBH", "2026-10-20 09:00", ids.MainWarehouseId,
+            kh2, 700m, paymentMethodId: null, paid: 0m);
+
+        var response = await PostAsync(client, Raw("Receivable", partnerIds: [kh2, ids.Kh1Id]));
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        using (var wb = await Tt133Sheet.OpenAsync(response))
+            wb.Worksheets.Select(w => w.Name).Should().Equal("KH1" + ids.Kh1Code[3..], "KH2" + ids.Kh1Code[3..]);
+
+        var repeated = await PostAsync(client, Raw("Receivable", partnerIds: [ids.Kh1Id, ids.Kh1Id]));
+        repeated.StatusCode.Should().Be(HttpStatusCode.OK, await repeated.Content.ReadAsStringAsync());
+        using var wb2 = await Tt133Sheet.OpenAsync(repeated);
+        wb2.Worksheets.Should().ContainSingle();
+    }
+
+    [Fact]
+    public async Task Validation_permission_and_limits()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+
+        var neither = await PostAsync(client, Raw("Receivable"));
+        neither.StatusCode.Should().Be(HttpStatusCode.BadRequest, await neither.Content.ReadAsStringAsync());
+        (await neither.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey("partnerIds");
+
+        // 150 unknown ids pass the validator: the answer is the 404 of the first unknown partner.
+        var many = await PostAsync(client, Raw("Receivable", partnerIds: Enumerable.Range(0, 150).Select(_ => Guid.NewGuid()).ToArray()));
+        many.StatusCode.Should().Be(HttpStatusCode.NotFound, await many.Content.ReadAsStringAsync());
+
+        (await client.GetAsync("/api/reports/debt-ledger/export?side=Receivable&from=2026-10-01&to=2026-10-31"))
+            .StatusCode.Should().Be(HttpStatusCode.MethodNotAllowed);
+
+        var reversed = Raw("Receivable", partnerIds: [ids.Kh1Id]);
+        reversed["from"] = "2026-10-31";
+        reversed["to"] = "2026-10-01";
+        var badRange = await PostAsync(client, reversed);
+        badRange.StatusCode.Should().Be(HttpStatusCode.BadRequest, await badRange.Content.ReadAsStringAsync());
+        (await badRange.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey("to");
+
+        var unknown = await PostAsync(client, Raw("Receivable", partnerIds: [Guid.NewGuid()]));
+        unknown.StatusCode.Should().Be(HttpStatusCode.NotFound, await unknown.Content.ReadAsStringAsync());
+
+        var none = Raw("Payable", all: true);
+        none["to"] = "2026-10-04";
+        var noTargets = await PostAsync(client, none);
+        noTargets.StatusCode.Should().Be((HttpStatusCode)422, await noTargets.Content.ReadAsStringAsync());
+        (await noTargets.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Code.Should().Be("EXPORT_NO_TARGETS");
+
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var cashOnly = await CreateClientWithPermissionsAsync("tt133_s12c_" + suffix, ids.MainBranchId, Permissions.Reports.Cash);
+        (await PostAsync(cashOnly, Raw("Receivable", partnerIds: [ids.Kh1Id]))).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        var debtOnly = await CreateClientWithPermissionsAsync("tt133_s12d_" + suffix, ids.MainBranchId, Permissions.Reports.Debt);
+        (await PostAsync(debtOnly, Raw("Receivable", partnerIds: [ids.Kh1Id], scope: "Company")))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    private static Dictionary<string, object?> Raw(string side, Guid[]? partnerIds = null, bool all = false, string? scope = null)
+    {
+        var body = new Dictionary<string, object?>
+        {
+            ["side"] = side,
+            ["from"] = "2026-10-01",
+            ["to"] = "2026-10-31",
+            ["scope"] = scope ?? "Branch",
+        };
+        if (partnerIds is not null) body["partnerIds"] = partnerIds;
+        if (all) body["all"] = true;
+        return body;
+    }
+
+    private async Task<DebtBalanceReportDto> GetBalanceAsync(HttpClient client, string side)
+    {
+        return await ReadDataAsync<DebtBalanceReportDto>(
+            await client.GetAsync($"/api/reports/debt-balance?side={side}&from=2026-10-01&to=2026-10-31"));
     }
 
     private static Dictionary<string, object?> Body(string side, Guid partnerId, string? scope = null) => new()

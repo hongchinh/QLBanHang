@@ -1,14 +1,17 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useDebtBalance } from '@/features/cash-reports/hooks';
 import type { DebtBalanceRow } from '@/features/cash-reports/types';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide } from '@/features/cash-common/types';
+import { PeriodPresetSelect } from '@/components/period-preset-select/period-preset-select';
 import { ReportScopeSelect } from '@/components/report-scope-select/report-scope-select';
 import { useReportScope } from '@/components/report-scope-select/use-report-scope';
+import { Tt133ExportButton } from '@/components/tt133-export/tt133-export-button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { tt133FileBase, type Tt133ExportForm } from '@/features/tt133-export/types';
 import { getErrorMessage } from '@/lib/api-client';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useSearchParamString } from '@/lib/use-search-param-state';
@@ -33,6 +36,7 @@ function AmountCells({ row }: { row: DebtBalanceRow }) {
 // Số dư công nợ. Route permission: reports.debt. Filters live in the URL; a row opens the partner's ledger.
 export function DebtBalancePage() {
   const navigate = useNavigate();
+  const [, setSearchParams] = useSearchParams();
   const [sideParam, setSide] = useSearchParamString('side');
   const [from, setFrom] = useSearchParamString('from', firstDayOfMonthYmd());
   const [to, setTo] = useSearchParamString('to', todayYmd());
@@ -50,6 +54,14 @@ export function DebtBalancePage() {
   );
   const rows = report?.rows ?? [];
 
+  // The summary is exported with the screen's filters, so the file equals the screen.
+  const exportForm: Tt133ExportForm = {
+    code: 'TongHopCongNo',
+    report: 'debt-balance',
+    params: { side, from, to, search: debouncedSearch.trim() || undefined, scope },
+    fileBase: tt133FileBase('TongHopCongNo', from, to),
+  };
+
   const openLedger = (row: DebtBalanceRow) => {
     if (!row.partnerId) return;
     const params = new URLSearchParams({ side, partnerId: row.partnerId, from, to });
@@ -59,7 +71,10 @@ export function DebtBalancePage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Số dư công nợ</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold">Số dư công nợ</h1>
+        <Tt133ExportButton forms={[exportForm]} disabled={!!rangeError} />
+      </div>
 
       <Card>
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -78,6 +93,21 @@ export function DebtBalancePage() {
               </SelectContent>
             </Select>
           </div>
+          <PeriodPresetSelect
+            id="debt-balance-period"
+            onChange={(range) =>
+              // One update for both keys: two setSearchParams calls in a row would keep only the last.
+              setSearchParams(
+                (prev) => {
+                  const next = new URLSearchParams(prev);
+                  next.set('from', range.from);
+                  next.set('to', range.to);
+                  return next;
+                },
+                { replace: true },
+              )
+            }
+          />
           <div className="space-y-1">
             <Label htmlFor="debt-balance-from">Từ ngày</Label>
             <Input id="debt-balance-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />

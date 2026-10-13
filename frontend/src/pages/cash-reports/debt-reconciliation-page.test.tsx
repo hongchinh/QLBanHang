@@ -9,6 +9,18 @@ import type {
   DebtReconciliationParams,
   DebtReconciliationReport,
 } from '@/features/cash-reports/types';
+import type { Tt133ExportForm } from '@/features/tt133-export/types';
+import { periodPreset } from '@/lib/period-presets';
+
+const exportButtonProps: { forms: Tt133ExportForm[]; disabled?: boolean; onSelect?: unknown } = { forms: [] };
+vi.mock('@/components/tt133-export/tt133-export-button', () => ({
+  Tt133ExportButton: (props: typeof exportButtonProps) => {
+    exportButtonProps.forms = props.forms;
+    exportButtonProps.disabled = props.disabled;
+    exportButtonProps.onSelect = props.onSelect;
+    return <div data-testid="tt133-export" data-disabled={String(!!props.disabled)} />;
+  },
+}));
 
 const reportState: { data: DebtReconciliationReport | undefined } = { data: undefined };
 const useDebtReconciliationMock = vi.fn((params: DebtReconciliationParams, options?: { enabled?: boolean }) => {
@@ -186,5 +198,47 @@ describe('DebtReconciliationPage', () => {
     renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
 
     expect(screen.getByText('Toàn công ty', { selector: 'p' })).toBeInTheDocument();
+  });
+
+  describe('TT133 export', () => {
+    it('is disabled until a partner is chosen', () => {
+      reportState.data = undefined;
+      renderAt('/reports/debt-reconciliation?from=2026-10-01&to=2026-10-31');
+
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'true');
+    });
+
+    it('offers the record of the chosen partner and downloads directly', () => {
+      renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
+
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'false');
+      expect(exportButtonProps.forms).toEqual([
+        {
+          code: 'DoiChieuCongNo_KH01',
+          report: 'debt-reconciliation',
+          params: { partnerId: 'p1', from: '2026-10-01', to: '2026-10-31', scope: 'Branch' },
+          fileBase: 'DoiChieuCongNo_KH01_20261001_20261031',
+        },
+      ]);
+      expect(exportButtonProps.onSelect).toBeUndefined();
+    });
+
+    it('an invalid range disables the button', () => {
+      renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-31&to=2026-10-01');
+
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'true');
+    });
+
+    it('the preset Tháng trước sets the previous month', async () => {
+      const user = userEvent.setup();
+      renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
+
+      await user.click(screen.getByRole('combobox', { name: 'Kỳ' }));
+      await user.click(screen.getByRole('option', { name: 'Tháng trước' }));
+
+      const last = periodPreset('lastMonth');
+      expect(screen.getByLabelText('Từ ngày')).toHaveValue(last.from);
+      expect(screen.getByLabelText('Đến ngày')).toHaveValue(last.to);
+    });
   });
 });

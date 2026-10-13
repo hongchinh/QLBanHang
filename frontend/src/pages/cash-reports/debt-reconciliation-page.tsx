@@ -3,11 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { useDebtReconciliation } from '@/features/cash-reports/hooks';
 import type { DebtPartnerSearchItem } from '@/features/debt/types';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
+import { PeriodPresetSelect } from '@/components/period-preset-select/period-preset-select';
 import { ReportScopeSelect } from '@/components/report-scope-select/report-scope-select';
 import { useReportScope } from '@/components/report-scope-select/use-report-scope';
+import { Tt133ExportButton } from '@/components/tt133-export/tt133-export-button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { tt133FileBase, type Tt133ExportForm } from '@/features/tt133-export/types';
 import { getErrorMessage } from '@/lib/api-client';
 import { formatDateOnly } from '@/lib/date-only';
 import { REPORT_SCOPE_LABELS } from '@/lib/report-scope';
@@ -30,7 +33,7 @@ export function DebtReconciliationPage() {
   const from = searchParams.get('from') || firstDayOfMonthYmd();
   const to = searchParams.get('to') || todayYmd();
   const [scope, setScope] = useReportScope();
-  const [picked, setPicked] = useState<{ id: string; label: string } | null>(null);
+  const [picked, setPicked] = useState<{ id: string; code: string; label: string } | null>(null);
 
   const rangeError = from > to ? 'Từ ngày không được sau Đến ngày' : null;
 
@@ -63,14 +66,31 @@ export function DebtReconciliationPage() {
         ? `${report.partnerCode} - ${report.partnerName}`
         : '';
 
-  const selectPartner = (p: DebtPartnerSearchItem) => {
-    setPicked({ id: p.id, label: `${p.code} - ${p.name}` });
+  // The file name carries the partner code, known once the partner is picked or its report is loaded.
+  const partnerCode = picked?.id === partnerId ? picked.code : report?.partnerId === partnerId ? report.partnerCode : '';
+  const exportForms: Tt133ExportForm[] =
+    partnerId && partnerCode
+      ? [
+          {
+            code: `DoiChieuCongNo_${partnerCode}`,
+            report: 'debt-reconciliation',
+            params: { partnerId, from, to, scope },
+            fileBase: tt133FileBase(`DoiChieuCongNo_${partnerCode}`, from, to),
+          },
+        ]
+      : [];
+
+  const selectPartner =(p: DebtPartnerSearchItem) => {
+    setPicked({ id: p.id, code: p.code, label: `${p.code} - ${p.name}` });
     updateParams({ partnerId: p.id });
   };
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Biên bản đối chiếu công nợ</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold">Biên bản đối chiếu công nợ</h1>
+        <Tt133ExportButton forms={exportForms} disabled={!partnerId || !!rangeError} />
+      </div>
 
       <Card>
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -82,6 +102,7 @@ export function DebtReconciliationPage() {
               onSelect={selectPartner}
             />
           </div>
+          <PeriodPresetSelect id="debt-reconciliation-period" onChange={(range) => updateParams(range)} />
           <div className="space-y-1">
             <Label htmlFor="debt-reconciliation-from">Từ ngày</Label>
             <Input

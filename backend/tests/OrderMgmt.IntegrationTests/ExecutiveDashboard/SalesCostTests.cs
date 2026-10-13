@@ -1,6 +1,4 @@
 using FluentAssertions;
-using OrderMgmt.Application.Dashboards.Executive.Models;
-using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -59,6 +57,27 @@ public class SalesCostTests : ExecutiveDashboardTestBase
     }
 
     [Fact]
+    public async Task Previous_period_has_its_own_cost_and_margin()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var product = await CreateInventoryProductAsync("COST-02");
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-01 09:00", branch.SupplierId, product, 20, 100);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-04 09:00", branch.CustomerId, product, 4, 150);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-07 09:00", branch.CustomerId, product, 2, 200);
+
+        // The period 10-06 .. 10-08 holds the second sale; the 3 days before it (10-03 .. 10-05) hold the first.
+        var summary = await GetSummaryAsync(branch.Client, $"from=2026-10-06&to=2026-10-08&branchId={branch.BranchId}");
+
+        summary.Revenue.Should().Be(400m);
+        summary.PrevRevenue.Should().Be(600m);
+        summary.RevenueDeltaPct.Should().Be(-33.33m);
+        summary.Cost.Should().Be(200m);
+        summary.GrossProfit.Should().Be(200m);
+        summary.MarginPct.Should().Be(50m);
+        summary.PrevMarginPct.Should().Be(33.33m);
+    }
+
+    [Fact]
     public async Task Cost_is_hidden_without_view_cost()
     {
         var (branch, _, _) = await SeedTrackedSaleAsync();
@@ -78,24 +97,9 @@ public class SalesCostTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Provisional_follows_the_costing_period()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-        var client = MainClient(ids);
+        var client = CloneAdminClient();
 
         (await GetSummaryAsync(client, "from=2020-01-01&to=2020-01-31")).IsProvisional.Should().BeFalse();
         (await GetSummaryAsync(client, "from=2099-12-01&to=2099-12-31")).IsProvisional.Should().BeTrue();
     }
-
-    /// A fresh branch where a tracked product (VAT 0) is bought 10 × 100 on 10-02 and sold 4 × 150 on 10-04.
-    private async Task<(FreshBranch Branch, Guid ProductId, StockVoucherDto Sale)> SeedTrackedSaleAsync()
-    {
-        var branch = await CreateFreshBranchAsync();
-        var product = await CreateInventoryProductAsync("COST-01");
-        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, product, 10, 100);
-        var sale = await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-04 09:00", branch.CustomerId,
-            product, 4, 150);
-        return (branch, product, sale);
-    }
-
-    private static Task<SalesSummaryDto> GetSummaryAsync(HttpClient client, string query) =>
-        GetExecAsync<SalesSummaryDto>(client, $"sales/summary?{query}");
 }

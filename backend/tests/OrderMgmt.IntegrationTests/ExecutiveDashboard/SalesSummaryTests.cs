@@ -127,10 +127,28 @@ public class SalesSummaryTests : ExecutiveDashboardTestBase
     }
 
     [Fact]
-    public async Task Requires_dashboard_executive()
+    public async Task Line_and_order_discounts_reduce_revenue()
     {
         var ids = await ReportDataset.SeedAsync(this);
-        var client = await CreateClientWithPermissionsAsync("profit_only", ids.MainBranchId, Permissions.Reports.Profit);
+        var product = await CreateInventoryProductAsync("DISC-01", track: false);
+        var line = LineRequest(product, 10, 100m);
+        line.DiscountRate = 10m;
+        // Amount 1,000 less the line discount 100 less the order discount 90 allocated to the only line.
+        await PostSaleAsync(ids, "2026-10-20 09:00", request => request.OrderDiscount = 90m, line);
+        var client = MainClient(ids);
+
+        var summary = await GetSummaryAsync(client, $"{October}&branchId={ids.MainBranchId}");
+        var products = await GetExecAsync<List<SalesTopRowDto>>(client,
+            $"sales/top?{October}&by=Product&branchId={ids.MainBranchId}");
+
+        summary.Revenue.Should().Be(3_310m);
+        products.Single(row => row.Id == product).Revenue.Should().Be(810m);
+    }
+
+    [Fact]
+    public async Task Requires_dashboard_executive()
+    {
+        var client = await CreateClientWithPermissionsAsync("profit_only", MainBranchId, Permissions.Reports.Profit);
 
         (await GetExecRawAsync(client, $"sales/summary?{October}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
@@ -138,24 +156,26 @@ public class SalesSummaryTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Requires_reports_profit()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-        var client = await CreateClientWithPermissionsAsync("executive_only", ids.MainBranchId,
+        var client = await CreateClientWithPermissionsAsync("executive_only", MainBranchId,
             Permissions.Dashboard.Executive);
 
         (await GetExecRawAsync(client, $"sales/summary?{October}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
     /// An unpaid stock-out voucher (XBH) to KH1 in the main branch; asserts 200.
-    private async Task<StockVoucherDto> PostSaleAsync(ReportIds ids, string at, params UpsertStockVoucherLineRequest[] lines)
+    private Task<StockVoucherDto> PostSaleAsync(ReportIds ids, string at, params UpsertStockVoucherLineRequest[] lines) =>
+        PostSaleAsync(ids, at, _ => { }, lines);
+
+    /// The same, after `configure` has changed the request (an order discount, for instance).
+    private async Task<StockVoucherDto> PostSaleAsync(ReportIds ids, string at,
+        Action<UpsertStockVoucherRequest> configure, params UpsertStockVoucherLineRequest[] lines)
     {
         var request = VoucherRequest(StockDirection.Out, await ReasonIdAsync("XBH"), at, lines);
         request.WarehouseId = ids.MainWarehouseId;
         request.PartnerId = ids.Kh1Id;
+        configure(request);
         var (status, voucher, error) = await PostVoucherAsync(MainClient(ids), request);
         status.Should().Be(HttpStatusCode.OK, error?.Message);
         return voucher!;
     }
-
-    private static Task<SalesSummaryDto> GetSummaryAsync(HttpClient client, string query) =>
-        GetExecAsync<SalesSummaryDto>(client, $"sales/summary?{query}");
 }

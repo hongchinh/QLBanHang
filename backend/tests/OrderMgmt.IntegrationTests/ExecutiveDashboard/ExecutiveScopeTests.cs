@@ -2,7 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using OrderMgmt.Application.Common.Models;
-using OrderMgmt.Application.Dashboards.Executive.Models;
+using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -66,9 +66,7 @@ public class ExecutiveScopeTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Unknown_branch_returns_404()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-
-        var response = await GetExecRawAsync(MainClient(ids), $"sales/summary?{OctoberRange}&branchId={Guid.NewGuid()}");
+        var response = await GetExecRawAsync(CloneAdminClient(), $"sales/summary?{OctoberRange}&branchId={Guid.NewGuid()}");
 
         response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
@@ -76,35 +74,28 @@ public class ExecutiveScopeTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task To_before_from_is_rejected()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-
-        await AssertBadRequestKeyAsync(MainClient(ids), "sales/summary?from=2026-10-10&to=2026-10-01", "to",
+        await AssertBadRequestKeyAsync(CloneAdminClient(), "sales/summary?from=2026-10-10&to=2026-10-01", "to",
             "Đến ngày phải sau hoặc bằng từ ngày.");
     }
 
     [Fact]
     public async Task Range_over_three_years_is_rejected()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-
-        await AssertBadRequestKeyAsync(MainClient(ids), "sales/summary?from=2020-01-01&to=2026-10-01", "to",
+        await AssertBadRequestKeyAsync(CloneAdminClient(), "sales/summary?from=2020-01-01&to=2026-10-01", "to",
             "Khoảng thời gian tối đa là 3 năm.");
     }
 
     [Fact]
     public async Task Only_from_far_in_the_past_is_rejected()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-
-        await AssertBadRequestKeyAsync(MainClient(ids), "sales/summary?from=2000-01-01", "to",
+        await AssertBadRequestKeyAsync(CloneAdminClient(), "sales/summary?from=2000-01-01", "to",
             "Khoảng thời gian tối đa là 3 năm.");
     }
 
     [Fact]
     public async Task Dates_outside_the_accepted_range_are_rejected()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-        var client = MainClient(ids);
+        var client = CloneAdminClient();
 
         await AssertBadRequestKeyAsync(client, "sales/summary?from=1999-12-31", "from", "Từ ngày không hợp lệ.");
         await AssertBadRequestKeyAsync(client, "sales/summary?to=2101-01-01", "to", "Đến ngày không hợp lệ.");
@@ -118,9 +109,7 @@ public class ExecutiveScopeTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Only_to_is_accepted()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-
-        var summary = await GetSummaryAsync(MainClient(ids), "to=2026-09-20");
+        var summary = await GetSummaryAsync(CloneAdminClient(), "to=2026-09-20");
 
         summary.From.Should().Be(new DateOnly(2026, 9, 1));
         summary.To.Should().Be(new DateOnly(2026, 9, 20));
@@ -130,28 +119,29 @@ public class ExecutiveScopeTests : ExecutiveDashboardTestBase
     public async Task Only_from_is_accepted()
     {
         var ids = await ReportDataset.SeedAsync(this);
+        // Day 1 of the current VN month stays inside the 1,100-day limit whatever day the test runs on.
+        var today = VnTime.ToVnDate(DateTimeOffset.UtcNow);
+        var from = new DateOnly(today.Year, today.Month, 1);
 
-        var summary = await GetSummaryAsync(MainClient(ids), $"from=2026-10-01&branchId={ids.MainBranchId}");
+        var summary = await GetSummaryAsync(MainClient(ids), $"from={from:yyyy-MM-dd}&branchId={ids.MainBranchId}");
 
-        summary.From.Should().Be(new DateOnly(2026, 10, 1));
+        summary.From.Should().Be(from);
     }
 
     [Fact]
     public async Task Defaults_to_the_current_month()
     {
-        var ids = await ReportDataset.SeedAsync(this);
+        var today = VnTime.ToVnDate(DateTimeOffset.UtcNow);
 
-        var summary = await GetSummaryAsync(MainClient(ids), string.Empty);
+        var summary = await GetSummaryAsync(CloneAdminClient(), string.Empty);
 
-        summary.From.Should().Be(new DateOnly(summary.To.Year, summary.To.Month, 1));
-        summary.To.Should().BeOnOrAfter(summary.From);
+        // A UTC "today" would be a day behind between 00:00 and 07:00 in Vietnam.
+        summary.To.Should().Be(today);
+        summary.From.Should().Be(new DateOnly(today.Year, today.Month, 1));
     }
 
     /// A user without branches.access_all whose default branch is the dataset's main branch.
     private Task<HttpClient> BranchUserAsync(ReportIds ids) =>
         CreateClientWithPermissionsAsync("branch_user", ids.MainBranchId,
             Permissions.Dashboard.Executive, Permissions.Reports.Profit);
-
-    private static Task<SalesSummaryDto> GetSummaryAsync(HttpClient client, string query) =>
-        GetExecAsync<SalesSummaryDto>(client, $"sales/summary?{query}");
 }

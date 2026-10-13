@@ -75,8 +75,7 @@ public class SalesSeriesTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Daily_series_over_a_year_is_rejected()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-        var client = MainClient(ids);
+        var client = CloneAdminClient();
 
         await AssertBadRequestKeyAsync(client, "sales/series?from=2025-01-01&to=2026-10-01&granularity=Day",
             "granularity", "Biểu đồ theo ngày tối đa 366 ngày. Hãy chọn theo tuần hoặc tháng.");
@@ -90,10 +89,24 @@ public class SalesSeriesTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Undefined_granularity_number_is_rejected()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-
-        (await GetExecRawAsync(MainClient(ids), $"sales/series?{October}&granularity=7"))
+        (await GetExecRawAsync(CloneAdminClient(), $"sales/series?{October}&granularity=7"))
             .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Tracked_sale_has_cost_and_gross_profit_points()
+    {
+        var (branch, _, _) = await SeedTrackedSaleAsync();
+
+        var series = await GetSeriesAsync(branch.Client, $"{October}&granularity=Day&branchId={branch.BranchId}");
+
+        var sale = series.Points.Single(p => p.Date == D(10, 4));
+        sale.Revenue.Should().Be(600m);
+        sale.Cost.Should().Be(400m);
+        sale.GrossProfit.Should().Be(200m);
+        var others = series.Points.Where(p => p.Date != D(10, 4)).ToList();
+        others.Should().HaveCount(30);
+        others.Should().OnlyContain(p => p.Revenue == 0m && p.Cost == 0m && p.GrossProfit == 0m);
     }
 
     [Fact]
@@ -112,8 +125,7 @@ public class SalesSeriesTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Requires_reports_profit()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-        var client = await CreateClientWithPermissionsAsync("executive_only", ids.MainBranchId,
+        var client = await CreateClientWithPermissionsAsync("executive_only", MainBranchId,
             Permissions.Dashboard.Executive);
 
         (await GetExecRawAsync(client, $"sales/series?{October}&granularity=Day"))

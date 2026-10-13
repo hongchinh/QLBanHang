@@ -99,6 +99,63 @@ public class SalesTopTests : ExecutiveDashboardTestBase
     }
 
     [Fact]
+    public async Task Vat_inclusive_price_is_reduced_on_the_product_list()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var product = await CreateInventoryProductAsync("TOP-VAT", track: false, priceIncludesVat: true);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-20 09:00", branch.CustomerId, product, 1, 1_100,
+            request => request.Lines[0].VatRate = 10m);
+
+        var rows = await GetTopAsync(branch.Client, $"{October}&by=Product&branchId={branch.BranchId}");
+
+        var row = rows.Should().ContainSingle().Which;
+        row.Id.Should().Be(product);
+        row.Revenue.Should().Be(1_000m);
+    }
+
+    [Fact]
+    public async Task Tracked_return_reduces_product_cost()
+    {
+        var (branch, product, sale) = await SeedTrackedSaleAsync();
+        var returned = await PostLineAsync(branch, StockDirection.In, "NTL", "2026-10-06 09:00", branch.CustomerId,
+            product, 1, 150);
+        var soldCost = (await LedgerOfAsync(sale.Id))
+            .Where(e => e.SourceType == LedgerSourceType.StockOut).Sum(e => e.CostAmount ?? 0m);
+        var returnedValue = (await LedgerOfAsync(returned.Id))
+            .Where(e => e.SourceType == LedgerSourceType.StockIn).Sum(e => e.InValue);
+
+        var rows = await GetTopAsync(branch.Client, $"{October}&by=Product&branchId={branch.BranchId}");
+
+        returnedValue.Should().BePositive();
+        var row = rows.Should().ContainSingle().Which;
+        row.Id.Should().Be(product);
+        row.Revenue.Should().Be(450m);
+        row.GrossProfit.Should().Be(450m - (soldCost - returnedValue));
+    }
+
+    [Fact]
+    public async Task Customers_sorted_by_gross_profit()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var product = await CreateInventoryProductAsync("TOP-C");
+        var customer1 = branch.CustomerId;
+        var customer2 = await CreatePartnerAsync("FKH2" + Guid.NewGuid().ToString("N")[..8], isCustomer: true,
+            isSupplier: false);
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, product, 10, 100);
+        // Customer 1: revenue 300, cost 200, profit 100. Customer 2: revenue 440, cost 400, profit 40.
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-04 09:00", customer1, product, 2, 150);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-05 09:00", customer2, product, 4, 110);
+        var query = $"{October}&by=Customer&branchId={branch.BranchId}";
+
+        var byRevenue = await GetTopAsync(branch.Client, $"{query}&sort=Revenue");
+        var byProfit = await GetTopAsync(branch.Client, $"{query}&sort=GrossProfit");
+
+        byRevenue.Select(r => r.Id).Should().Equal(customer2, customer1);
+        byProfit.Select(r => r.Id).Should().Equal(customer1, customer2);
+        byProfit.Select(r => r.GrossProfit).Should().Equal(100m, 40m);
+    }
+
+    [Fact]
     public async Task Limit_is_applied_and_validated()
     {
         var ids = await ReportDataset.SeedAsync(this);
@@ -116,8 +173,7 @@ public class SalesTopTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Undefined_by_or_sort_number_is_rejected()
     {
-        var ids = await ReportDataset.SeedAsync(this);
-        var client = MainClient(ids);
+        var client = CloneAdminClient();
 
         (await GetExecRawAsync(client, $"sales/top?{October}&by=7")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await GetExecRawAsync(client, $"sales/top?{October}&by=Customer&sort=7"))

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using FluentAssertions;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
@@ -50,16 +51,34 @@ public abstract class ExecutiveDashboardTestBase : CashDebtTestBase
     }
 
     /// An unpaid one-line stock voucher of the branch (reason NMH takes a supplier, XBH and NTL a customer); asserts 200.
+    /// `configure` may change the request before it is posted (discounts, VAT rate of the line).
     protected async Task<StockVoucherDto> PostLineAsync(FreshBranch branch, StockDirection type, string reasonCode,
-        string at, Guid partnerId, Guid productId, decimal quantity, decimal unitPrice)
+        string at, Guid partnerId, Guid productId, decimal quantity, decimal unitPrice,
+        Action<UpsertStockVoucherRequest>? configure = null)
     {
         var request = VoucherRequest(type, await ReasonIdAsync(reasonCode), at, LineRequest(productId, quantity, unitPrice));
         request.WarehouseId = branch.WarehouseId;
         request.PartnerId = partnerId;
+        configure?.Invoke(request);
         var (status, voucher, error) = await PostVoucherAsync(branch.Client, request);
         status.Should().Be(HttpStatusCode.OK, error?.Message);
         return voucher!;
     }
+
+    /// A fresh branch where a tracked product (VAT 0) is bought 10 × 100 on 10-02 and sold 4 × 150 on 10-04:
+    /// revenue 600, cost 400, gross profit 200.
+    protected async Task<(FreshBranch Branch, Guid ProductId, StockVoucherDto Sale)> SeedTrackedSaleAsync()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var product = await CreateInventoryProductAsync("COST-01");
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, product, 10, 100);
+        var sale = await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-04 09:00", branch.CustomerId,
+            product, 4, 150);
+        return (branch, product, sale);
+    }
+
+    protected static Task<SalesSummaryDto> GetSummaryAsync(HttpClient client, string query) =>
+        GetExecAsync<SalesSummaryDto>(client, $"sales/summary?{query}");
 
     /// Asserts a 400 whose validation details name `key` and, when given, carry `message` for it. A 400 without the
     /// app's error envelope (the framework's own model-binding answer, for instance) fails with the response body.

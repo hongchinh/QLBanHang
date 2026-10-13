@@ -551,6 +551,27 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(document.activeElement).toBe(rowB));
   });
 
+  it('deleting the only line, by Ctrl+Delete or by its button, moves focus to Thêm dòng', async () => {
+    const { values } = renderGrid({ lines: [line({ productCode: 'A' })] });
+    fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 'Delete', ctrlKey: true });
+    await waitFor(() => expect(values().lines).toHaveLength(0));
+    await waitFor(() => expect(focused()).toBe('stock-line-add'));
+    // Insert from the button adds a line again, so the keyboard never dead-ends.
+    fireEvent.click(byId('stock-line-add'));
+    await waitFor(() => expect(values().lines).toHaveLength(1));
+    byId('stock-line-add').blur();
+    fireEvent.click(screen.getByRole('button', { name: /Xóa/ }));
+    await waitFor(() => expect(values().lines).toHaveLength(0));
+    await waitFor(() => expect(focused()).toBe('stock-line-add'));
+  });
+
+  it('the delete button keeps focus in the grid, on the Mã of the line that takes its place', async () => {
+    const { values } = renderGrid({ lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' })] });
+    fireEvent.click(screen.getAllByRole('button', { name: /Xóa/ })[0]);
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B']));
+    await waitFor(() => expect(focused()).toBe('stock-line-product-code-0'));
+  });
+
   it('Ctrl+Delete does nothing on a read-only grid', async () => {
     const { values } = renderGrid({
       lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' })],

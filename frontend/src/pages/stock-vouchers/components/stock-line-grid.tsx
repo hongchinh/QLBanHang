@@ -247,6 +247,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     pendingFocus.current = null;
     const to = Math.min(pending.rowIndex, rows.length - 1);
     if (to >= 0) focusCell(verticalTarget(rows[to].pricingMode ?? 'PerUnit', pending.field, isShown), to);
+    // No line left: keep the focus inside the form so Insert, Ctrl+S and Alt+n still work.
+    else document.getElementById('stock-line-add')?.focus();
   });
   const lineErrors = form.formState.errors.lines;
 
@@ -596,7 +598,11 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         return <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.netAmount ?? 0)}</div>;
       case 'action':
         return (
-          <button type="button" aria-label={rowLabel('Xóa', idx)} onClick={() => remove(idx)}>
+          <button type="button" aria-label={rowLabel('Xóa', idx)} onClick={() => {
+              // The button disappears with its row: move the focus to the line that takes its place.
+              pendingFocus.current = { field: 'product-code', rowIndex: idx };
+              remove(idx);
+            }}>
             <Trash2 className="h-4 w-4 text-red-600" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
           </button>
         );

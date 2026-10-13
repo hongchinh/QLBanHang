@@ -526,6 +526,18 @@ describe('StockVoucherFormPage', () => {
     await waitFor(() => expect(byId('stock-line-width-0').getAttribute('aria-invalid')).toBe('true'));
   });
 
+  it('Ctrl+S also saves with Caps Lock on (key "S"), but Ctrl+Shift+S does not', async () => {
+    createMock.mockResolvedValue(voucher());
+    renderPage('In');
+    await fillPerUnitLine(2);
+
+    fireEvent.keyDown(byId('stock-voucher-note'), { key: 'S', ctrlKey: true, shiftKey: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(createMock).not.toHaveBeenCalled();
+    fireEvent.keyDown(byId('stock-voucher-note'), { key: 'S', ctrlKey: true });
+    await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+  });
+
   it('Ctrl+S saves', async () => {
     createMock.mockResolvedValue(voucher());
     renderPage('In');

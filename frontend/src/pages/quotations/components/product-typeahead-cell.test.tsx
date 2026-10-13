@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -70,5 +70,75 @@ describe('ProductTypeaheadCell', () => {
     expect(onSelect).toHaveBeenCalledWith(sheet);
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(screen.getByRole('dialog', { name: 'Chọn mặt hàng' })).toBeInTheDocument();
+  });
+
+  it('keeps the highlighted option clear of the sticky header and of the list bottom', () => {
+    // List box 100..420 with a 28px sticky header; the highlighted row is measured at 100..128 (under the header).
+    const rect = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const rowRect = rect(100, 128);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.tagName === 'THEAD') return rect(100, 128);
+      if (this.getAttribute('role') === 'option') return rowRect;
+      return rect(100, 420);
+    });
+    const scrolls: number[] = [];
+    let top = 300;
+    Object.defineProperty(HTMLElement.prototype, 'scrollTop', { configurable: true, get: () => top, set: (v: number) => { top = v; scrolls.push(v); } });
+    try {
+      renderCell();
+      expect(scrolls).toEqual([272]); // 28px up, out from under the header
+    } finally {
+      delete (HTMLElement.prototype as { scrollTop?: number }).scrollTop;
+      vi.restoreAllMocks();
+    }
+  });
+
+  describe('placement against the window', () => {
+    function placeCell(inputRect: { top: number; bottom: number }, listHeight: number, innerHeight = 768) {
+      vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(innerHeight);
+      vi.spyOn(HTMLInputElement.prototype, 'getBoundingClientRect').mockReturnValue({
+        ...inputRect, left: 40, right: 240, width: 200, height: inputRect.bottom - inputRect.top, x: 40, y: inputRect.top, toJSON: () => ({}),
+      } as DOMRect);
+      vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(listHeight);
+      renderCell();
+      return screen.getByRole('listbox').parentElement as HTMLElement;
+    }
+    afterEach(() => vi.restoreAllMocks());
+
+    it('opens below the input when there is room (unchanged)', () => {
+      const box = placeCell({ top: 100, bottom: 130 }, 300);
+      expect(box.style.top).toBe('134px');
+      expect(box.style.bottom).toBe('');
+      expect(box.style.maxHeight).toBe('');
+    });
+
+    it('opens above the input when the list does not fit below but fits above', () => {
+      const box = placeCell({ top: 600, bottom: 630 }, 300);
+      expect(box.style.top).toBe('');
+      expect(box.style.bottom).toBe('172px'); // 768 - 600 + 4
+      expect(box.style.maxHeight).toBe('');
+    });
+
+    it('a long result list counts as its capped 320px, not its full content height', () => {
+      // 20 results: 679px of content, shown in a 320px scrolling box. 768-380-8 = 380 below is enough.
+      const box = placeCell({ top: 350, bottom: 380 }, 679);
+      expect(box.style.top).toBe('384px');
+      expect(box.style.bottom).toBe('');
+      expect(box.style.maxHeight).toBe('');
+    });
+
+    it('caps the height to the larger side when neither side fits', () => {
+      const box = placeCell({ top: 150, bottom: 180 }, 320, 400);
+      // below: 400-180-8 = 212, above: 150-8 = 142 -> stays below, capped
+      expect(box.style.top).toBe('184px');
+      expect(box.style.maxHeight).toBe('208px');
+    });
+
+    it('caps the height above when the space above is larger but still too small', () => {
+      const box = placeCell({ top: 250, bottom: 280 }, 320, 400);
+      // below: 112, above: 242 -> above, capped to 242 - 4
+      expect(box.style.bottom).toBe('154px');
+      expect(box.style.maxHeight).toBe('238px');
+    });
   });
 });

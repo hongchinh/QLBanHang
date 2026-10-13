@@ -1,6 +1,6 @@
 # Phase 03 — Form layout T2: main fields, tabs, totals bar, debt strip, full height
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

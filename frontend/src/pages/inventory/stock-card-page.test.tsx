@@ -1,8 +1,53 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { StockCardPage } from './stock-card-page';
 import type { StockCard, StockCardParams } from '@/features/inventory-reports/types';
+import type { ExportFormat, Tt133ExportForm } from '@/features/tt133-export/types';
+import { periodPreset } from '@/lib/period-presets';
+import { useAuthStore } from '@/stores/auth-store';
+
+const exportButtonProps: {
+  forms: Tt133ExportForm[];
+  disabled?: boolean;
+  onSelect?: (form: Tt133ExportForm, format: ExportFormat) => void;
+} = { forms: [] };
+vi.mock('@/components/tt133-export/tt133-export-button', () => ({
+  Tt133ExportButton: (props: typeof exportButtonProps) => {
+    exportButtonProps.forms = props.forms;
+    exportButtonProps.disabled = props.disabled;
+    exportButtonProps.onSelect = props.onSelect;
+    return <div data-testid="tt133-export" data-disabled={String(!!props.disabled)} />;
+  },
+}));
+
+const downloadMock = vi.fn();
+vi.mock('@/features/tt133-export/use-tt133-download', () => ({
+  useTt133Download: () => ({ download: downloadMock, isPending: false }),
+}));
+
+// The real typeahead needs a product search; the stub picks fixed products by button.
+vi.mock('@/pages/quotations/components/product-typeahead-cell', () => ({
+  ProductTypeaheadCell: (props: {
+    inputId?: string;
+    value: string;
+    onChange: (v: string) => void;
+    onSelect: (s: { id: string; code: string; name: string }) => void;
+  }) => (
+    <div>
+      <input id={props.inputId} value={props.value} onChange={(e) => props.onChange(e.target.value)} />
+      {[
+        { id: 'p2', code: 'THEP02', name: 'Thép' },
+        { id: 'p3', code: 'SON03', name: 'Sơn' },
+      ].map((p) => (
+        <button key={p.id} type="button" onClick={() => props.onSelect(p)}>
+          {`pick ${props.inputId} ${p.code}`}
+        </button>
+      ))}
+    </div>
+  ),
+}));
 
 vi.mock('@/features/warehouses/hooks', () => ({
   useWarehouses: () => ({ data: [{ id: 'w1', code: 'KHO01', name: 'Kho chính', isActive: true }], isSuccess: true }),
@@ -78,6 +123,8 @@ describe('StockCardPage', () => {
   beforeEach(() => {
     useStockCardMock.mockClear();
     cardState.error = undefined;
+    downloadMock.mockClear();
+    useAuthStore.setState({ user: null });
   });
 
   it('reads product from the URL and renders opening, rows (voucher codes linked by type, opening rows unlinked) and closing', () => {
@@ -157,5 +204,115 @@ describe('StockCardPage', () => {
     renderAt('/inventory/stock-card?productId=p1');
 
     expect(screen.getByText('Không tải được thẻ kho')).toBeInTheDocument();
+  });
+
+  describe('TT133 export', () => {
+    const URL = '/inventory/stock-card?productId=p1&warehouseId=w1';
+
+    function setPermissions(permissions: string[]) {
+      useAuthStore.setState({
+        user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions },
+      });
+    }
+
+    function fileBase(code: string) {
+      const from = (screen.getByLabelText('Từ ngày') as HTMLInputElement).value;
+      const to = (screen.getByLabelText('Đến ngày') as HTMLInputElement).value;
+      return `${code}_${from.replace(/-/g, '')}_${to.replace(/-/g, '')}`;
+    }
+
+    it('offers S08-DNN and, with inventory.view_cost, S06-DNN with the screen parameters', () => {
+      cardState.data = card();
+      setPermissions(['reports.inventory', 'inventory.view_cost']);
+      renderAt(URL);
+
+      const from = (screen.getByLabelText('Từ ngày') as HTMLInputElement).value;
+      const to = (screen.getByLabelText('Đến ngày') as HTMLInputElement).value;
+      expect(exportButtonProps.forms).toEqual([
+        { code: 'S08-DNN', report: 'stock-card', params: { from, to, warehouseId: 'w1' }, fileBase: fileBase('S08-DNN') },
+        { code: 'S06-DNN', report: 'stock-detail', params: { from, to, warehouseId: 'w1' }, fileBase: fileBase('S06-DNN') },
+      ]);
+    });
+
+    it('offers only S08-DNN without inventory.view_cost, warehouseId omitted for all warehouses', () => {
+      cardState.data = card();
+      setPermissions(['reports.inventory']);
+      renderAt('/inventory/stock-card?productId=p1');
+
+      expect(exportButtonProps.forms.map((f) => f.code)).toEqual(['S08-DNN']);
+      expect(exportButtonProps.forms[0].params.warehouseId).toBeUndefined();
+    });
+
+    it('opens the dialog with the current product; confirming downloads it by id', async () => {
+      const user = userEvent.setup();
+      cardState.data = card();
+      renderAt(URL);
+
+      act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'pdf'));
+      expect(await screen.findByRole('dialog', { name: 'Chọn mặt hàng xuất sổ' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Đang xem: TON01' })).toBeChecked();
+
+      await user.click(screen.getByRole('button', { name: 'Xuất' }));
+      expect(downloadMock).toHaveBeenCalledWith(exportButtonProps.forms[0], 'pdf', { productIds: ['p1'] });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('Tất cả có phát sinh trong kỳ downloads all', async () => {
+      const user = userEvent.setup();
+      cardState.data = card();
+      renderAt(URL);
+
+      act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'xlsx'));
+      await user.click(await screen.findByRole('radio', { name: 'Tất cả có phát sinh trong kỳ' }));
+      await user.click(screen.getByRole('button', { name: 'Xuất' }));
+
+      expect(downloadMock).toHaveBeenCalledWith(exportButtonProps.forms[0], 'xlsx', { all: true });
+    });
+
+    it('several picked products send their ids', async () => {
+      const user = userEvent.setup();
+      cardState.data = card();
+      renderAt(URL);
+
+      act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'xlsx'));
+      await user.click(await screen.findByRole('radio', { name: 'Chọn nhiều' }));
+      await user.click(screen.getByRole('button', { name: 'pick stock-card-export-product THEP02' }));
+      await user.click(screen.getByRole('button', { name: 'pick stock-card-export-product SON03' }));
+      await user.click(screen.getByRole('button', { name: 'Xuất' }));
+
+      expect(downloadMock).toHaveBeenCalledWith(exportButtonProps.forms[0], 'xlsx', { productIds: ['p2', 'p3'] });
+    });
+
+    it('without a product the dialog starts at Chọn nhiều', async () => {
+      cardState.data = undefined;
+      renderAt('/inventory/stock-card');
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'false');
+
+      act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'pdf'));
+      expect(await screen.findByRole('radio', { name: 'Chọn nhiều' })).toBeChecked();
+      expect(screen.queryByRole('radio', { name: /^Đang xem/ })).not.toBeInTheDocument();
+    });
+
+    it('an invalid range disables the button', () => {
+      cardState.data = card();
+      renderAt(URL);
+      fireEvent.change(screen.getByLabelText('Từ ngày'), { target: { value: '2026-10-10' } });
+      fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: '2026-10-01' } });
+
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'true');
+    });
+
+    it('the preset Tháng trước sets the previous month', async () => {
+      const user = userEvent.setup();
+      cardState.data = card();
+      renderAt(URL);
+
+      await user.click(screen.getByRole('combobox', { name: 'Kỳ' }));
+      await user.click(screen.getByRole('option', { name: 'Tháng trước' }));
+
+      const last = periodPreset('lastMonth');
+      expect(screen.getByLabelText('Từ ngày')).toHaveValue(last.from);
+      expect(screen.getByLabelText('Đến ngày')).toHaveValue(last.to);
+    });
   });
 });

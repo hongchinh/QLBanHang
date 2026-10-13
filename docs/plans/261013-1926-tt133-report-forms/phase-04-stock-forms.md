@@ -1,6 +1,6 @@
 # Phase 04 — Stock summary (S07) report and page, S06, S08
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

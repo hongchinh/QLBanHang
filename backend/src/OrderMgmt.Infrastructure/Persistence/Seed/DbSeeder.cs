@@ -105,6 +105,7 @@ public static class DbSeeder
             (Permissions.Quotations.CancelAccountingConfirmed, Permissions.SalesModule, "Huỷ báo giá đã kế toán xác nhận"),
             (Permissions.UserSettings.Manage, Permissions.SystemModule, "Cấu hình thiết lập của user khác"),
             (Permissions.System.ManageSettings, Permissions.SystemModule, "Quản trị cấu hình hệ thống"),
+            (Permissions.CompanySettings.Manage, Permissions.SystemModule, "Thông tin đơn vị"),
 
             (Permissions.Reports.Revenue, Permissions.ReportModule, "Báo cáo doanh thu"),
             (Permissions.Reports.Profit, Permissions.ReportModule, "Báo cáo lợi nhuận"),
@@ -219,6 +220,7 @@ public static class DbSeeder
                 Permissions.Debt.Matching, Permissions.Debt.OpeningBalance, Permissions.Debt.PartnerSummary,
                 Permissions.Cash.OpeningBalance, Permissions.Cash.ManageCatalogs, Permissions.Cash.Settings,
                 Permissions.CreditLimits.Manage, Permissions.Reports.Cash,
+                Permissions.CompanySettings.Manage,
             }),
             (RoleCodes.Warehouse, "Kho / giao hàng", new[]
             {

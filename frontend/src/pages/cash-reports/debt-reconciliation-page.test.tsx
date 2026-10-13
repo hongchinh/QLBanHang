@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { DebtReconciliationPage } from './debt-reconciliation-page';
 import type {
@@ -8,6 +9,18 @@ import type {
   DebtReconciliationParams,
   DebtReconciliationReport,
 } from '@/features/cash-reports/types';
+import type { Tt133ExportForm } from '@/features/tt133-export/types';
+import { periodPreset } from '@/lib/period-presets';
+
+const exportButtonProps: { forms: Tt133ExportForm[]; disabled?: boolean; onSelect?: unknown } = { forms: [] };
+vi.mock('@/components/tt133-export/tt133-export-button', () => ({
+  Tt133ExportButton: (props: typeof exportButtonProps) => {
+    exportButtonProps.forms = props.forms;
+    exportButtonProps.disabled = props.disabled;
+    exportButtonProps.onSelect = props.onSelect;
+    return <div data-testid="tt133-export" data-disabled={String(!!props.disabled)} />;
+  },
+}));
 
 const reportState: { data: DebtReconciliationReport | undefined } = { data: undefined };
 const useDebtReconciliationMock = vi.fn((params: DebtReconciliationParams, options?: { enabled?: boolean }) => {
@@ -35,6 +48,7 @@ vi.mock('@/features/debt/hooks', () => ({
 
 const ledger = (side: 'Receivable' | 'Payable', code: string): DebtLedgerReport => ({
   side,
+  scope: 'Branch',
   partnerId: 'p1',
   partnerCode: 'KH01',
   partnerName: 'Công ty ABC',
@@ -58,6 +72,7 @@ const ledger = (side: 'Receivable' | 'Payable', code: string): DebtLedgerReport 
 });
 
 const report = (over: Partial<DebtReconciliationReport> = {}): DebtReconciliationReport => ({
+  scope: 'Branch',
   partnerId: 'p1',
   partnerCode: 'KH01',
   partnerName: 'Công ty ABC',
@@ -77,10 +92,16 @@ function setPermissions(permissions: string[]) {
   });
 }
 
+function LocationDisplay() {
+  const loc = useLocation();
+  return <div data-testid="location">{loc.pathname + loc.search}</div>;
+}
+
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <DebtReconciliationPage />
+      <LocationDisplay />
     </MemoryRouter>,
   );
 }
@@ -110,7 +131,7 @@ describe('DebtReconciliationPage', () => {
     renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
 
     expect(useDebtReconciliationMock).toHaveBeenLastCalledWith(
-      { partnerId: 'p1', from: '2026-10-01', to: '2026-10-31' },
+      { partnerId: 'p1', from: '2026-10-01', to: '2026-10-31', scope: 'Branch' },
       { enabled: true },
     );
     expect(screen.getByText('BIÊN BẢN ĐỐI CHIẾU CÔNG NỢ')).toBeInTheDocument();
@@ -155,5 +176,69 @@ describe('DebtReconciliationPage', () => {
     renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
 
     expect(screen.getByText('Bù trừ hai bên: Hai bên không còn nợ')).toBeInTheDocument();
+  });
+
+  it('choosing Toàn công ty puts scope=Company in the url and the hook params', async () => {
+    setPermissions(['stock_out.view', 'stock_in.view', 'branches.access_all']);
+    const user = userEvent.setup();
+    renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
+
+    await user.click(screen.getByRole('combobox', { name: 'Phạm vi' }));
+    await user.click(screen.getByRole('option', { name: 'Toàn công ty' }));
+
+    expect(useDebtReconciliationMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scope: 'Company' }),
+      { enabled: true },
+    );
+    expect(screen.getByTestId('location')).toHaveTextContent('scope=Company');
+  });
+
+  it('shows Toàn công ty in place of the branch name when it is null', () => {
+    reportState.data = report({ scope: 'Company', branchName: null });
+    renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
+
+    expect(screen.getByText('Toàn công ty', { selector: 'p' })).toBeInTheDocument();
+  });
+
+  describe('TT133 export', () => {
+    it('is disabled until a partner is chosen', () => {
+      reportState.data = undefined;
+      renderAt('/reports/debt-reconciliation?from=2026-10-01&to=2026-10-31');
+
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'true');
+    });
+
+    it('offers the record of the chosen partner and downloads directly', () => {
+      renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
+
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'false');
+      expect(exportButtonProps.forms).toEqual([
+        {
+          code: 'DoiChieuCongNo_KH01',
+          report: 'debt-reconciliation',
+          params: { partnerId: 'p1', from: '2026-10-01', to: '2026-10-31', scope: 'Branch' },
+          fileBase: 'DoiChieuCongNo_KH01_20261001_20261031',
+        },
+      ]);
+      expect(exportButtonProps.onSelect).toBeUndefined();
+    });
+
+    it('an invalid range disables the button', () => {
+      renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-31&to=2026-10-01');
+
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'true');
+    });
+
+    it('the preset Tháng trước sets the previous month', async () => {
+      const user = userEvent.setup();
+      renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
+
+      await user.click(screen.getByRole('combobox', { name: 'Kỳ' }));
+      await user.click(screen.getByRole('option', { name: 'Tháng trước' }));
+
+      const last = periodPreset('lastMonth');
+      expect(screen.getByLabelText('Từ ngày')).toHaveValue(last.from);
+      expect(screen.getByLabelText('Đến ngày')).toHaveValue(last.to);
+    });
   });
 });

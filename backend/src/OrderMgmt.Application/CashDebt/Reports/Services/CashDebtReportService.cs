@@ -3,6 +3,7 @@ using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.CashDebt.Reports.Interfaces;
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Common;
@@ -18,15 +19,20 @@ public class CashDebtReportService : ICashDebtReportService
     // The escape character EscapeLike uses; every ILike must pass it (see CashVoucherService).
     private const string LikeEscape = "\\";
 
+    private const string OffsetReasonName = "Bù trừ công nợ";
+
     private readonly IAppDbContext _db;
     private readonly ICurrentBranch _currentBranch;
     private readonly ITransactionRunner _transaction;
+    private readonly ICurrentUser _currentUser;
 
-    public CashDebtReportService(IAppDbContext db, ICurrentBranch currentBranch, ITransactionRunner transaction)
+    public CashDebtReportService(
+        IAppDbContext db, ICurrentBranch currentBranch, ITransactionRunner transaction, ICurrentUser currentUser)
     {
         _db = db;
         _currentBranch = currentBranch;
         _transaction = transaction;
+        _currentUser = currentUser;
     }
 
     /// One REPEATABLE READ snapshot, so the opening and period queries see the same ledger.
@@ -35,14 +41,16 @@ public class CashDebtReportService : ICashDebtReportService
 
     private async Task<DebtBalanceReportDto> BuildDebtBalanceAsync(DebtBalanceReportRequest request, CancellationToken ct)
     {
+        ReportScopeGuard.EnsureAllowed(_currentUser, request.Scope);
         var branchId = await _currentBranch.GetIdAsync(ct);
         var start = VnTime.ToUtc(VnTime.StartOfDay(request.From));
         var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.To));
 
         // Soft-deleted partners keep their ledger rows, so they stay in the report.
         var partners = _db.Customers.IgnoreQueryFilters().AsNoTracking();
-        var entries = _db.DebtEntries.AsNoTracking()
-            .Where(e => e.BranchId == branchId && e.Side == request.Side);
+        var entries = _db.DebtEntries.AsNoTracking().Where(e => e.Side == request.Side);
+        if (request.Scope == ReportScope.Branch)
+            entries = entries.Where(e => e.BranchId == branchId);
         if (request.PartnerId is { } partnerId)
             entries = entries.Where(e => e.PartnerId == partnerId);
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -110,6 +118,7 @@ public class CashDebtReportService : ICashDebtReportService
         return new DebtBalanceReportDto
         {
             Side = request.Side,
+            Scope = request.Scope,
             From = request.From,
             To = request.To,
             Rows = rows,
@@ -131,6 +140,7 @@ public class CashDebtReportService : ICashDebtReportService
 
     private async Task<DebtLedgerReportDto> BuildDebtLedgerAsync(DebtLedgerReportRequest request, CancellationToken ct)
     {
+        ReportScopeGuard.EnsureAllowed(_currentUser, request.Scope);
         var branchId = await _currentBranch.GetIdAsync(ct);
         var start = VnTime.ToUtc(VnTime.StartOfDay(request.From));
         var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.To));
@@ -143,7 +153,9 @@ public class CashDebtReportService : ICashDebtReportService
             ?? throw new NotFoundException(nameof(Customer), request.PartnerId);
 
         var entries = _db.DebtEntries.AsNoTracking()
-            .Where(e => e.BranchId == branchId && e.PartnerId == request.PartnerId && e.Side == request.Side);
+            .Where(e => e.PartnerId == request.PartnerId && e.Side == request.Side);
+        if (request.Scope == ReportScope.Branch)
+            entries = entries.Where(e => e.BranchId == branchId);
 
         // Same window rule as the balance report (P29): Opening entries are opening balance in every window.
         var openingBalance = await entries
@@ -152,6 +164,11 @@ public class CashDebtReportService : ICashDebtReportService
         var periodEntries = await entries
             .Where(e => e.SourceType != DebtSourceType.Opening && e.PostedAt >= start && e.PostedAt < end)
             .ToListAsync(ct);
+
+        var reasonNames = await LoadReasonNamesAsync(periodEntries, ct);
+        var branchCodes = request.Scope == ReportScope.Company
+            ? await LoadBranchCodesAsync(periodEntries, ct)
+            : new Dictionary<Guid, string>();
 
         var running = openingBalance;
         var rows = new List<DebtLedgerRowDto>();
@@ -173,6 +190,9 @@ public class CashDebtReportService : ICashDebtReportService
                 SourceType = e.SourceType,
                 SourceId = e.SourceId,
                 Description = e.Description,
+                ReasonName = reasonNames.GetValueOrDefault((e.SourceType, e.SourceId)),
+                DueDate = e.DueDate,
+                BranchCode = request.Scope == ReportScope.Company ? branchCodes.GetValueOrDefault(e.BranchId) : null,
                 Increase = increase,
                 Decrease = decrease,
                 RunningBalance = running,
@@ -184,6 +204,7 @@ public class CashDebtReportService : ICashDebtReportService
         return new DebtLedgerReportDto
         {
             Side = request.Side,
+            Scope = request.Scope,
             PartnerId = request.PartnerId,
             PartnerCode = partner.Code,
             PartnerName = partner.Name,
@@ -201,24 +222,94 @@ public class CashDebtReportService : ICashDebtReportService
         };
     }
 
+    // Branch code of each period row for the Company scope (T21), one query; a deleted branch keeps its history.
+    private async Task<Dictionary<Guid, string>> LoadBranchCodesAsync(
+        IReadOnlyCollection<DebtEntry> entries, CancellationToken ct)
+    {
+        var branchIds = entries.Select(e => e.BranchId).Distinct().ToList();
+        if (branchIds.Count == 0)
+            return new Dictionary<Guid, string>();
+        return await _db.Branches.IgnoreQueryFilters().AsNoTracking()
+            .Where(b => branchIds.Contains(b.Id))
+            .ToDictionaryAsync(b => b.Id, b => b.Code, ct);
+    }
+
+    // Reason of each period row (T8), read in two queries. Soft-deleted vouchers and reasons keep their history.
+    private async Task<Dictionary<(DebtSourceType, Guid), string>> LoadReasonNamesAsync(
+        IReadOnlyCollection<DebtEntry> entries, CancellationToken ct)
+    {
+        var names = new Dictionary<(DebtSourceType, Guid), string>();
+        foreach (var e in entries.Where(e => e.SourceType == DebtSourceType.Offset))
+            names[(e.SourceType, e.SourceId)] = OffsetReasonName;
+
+        var stockIds = entries
+            .Where(e => e.SourceType is DebtSourceType.StockIn or DebtSourceType.StockOut)
+            .Select(e => e.SourceId).Distinct().ToList();
+        if (stockIds.Count > 0)
+        {
+            var stock = await _db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+                .Where(v => stockIds.Contains(v.Id))
+                .Select(v => new
+                {
+                    v.Id,
+                    Name = _db.StockReasons.IgnoreQueryFilters()
+                        .Where(r => r.Id == v.ReasonId).Select(r => r.Name).FirstOrDefault(),
+                })
+                .ToListAsync(ct);
+            foreach (var v in stock.Where(v => v.Name is not null))
+            {
+                names[(DebtSourceType.StockIn, v.Id)] = v.Name!;
+                names[(DebtSourceType.StockOut, v.Id)] = v.Name!;
+            }
+        }
+
+        var cashIds = entries
+            .Where(e => e.SourceType is DebtSourceType.Receipt or DebtSourceType.Payment)
+            .Select(e => e.SourceId).Distinct().ToList();
+        if (cashIds.Count > 0)
+        {
+            var cash = await _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+                .Where(v => cashIds.Contains(v.Id))
+                .Select(v => new
+                {
+                    v.Id,
+                    Name = _db.CashReasons.IgnoreQueryFilters()
+                        .Where(r => r.Id == v.ReasonId).Select(r => r.Name).FirstOrDefault(),
+                })
+                .ToListAsync(ct);
+            foreach (var v in cash.Where(v => v.Name is not null))
+            {
+                names[(DebtSourceType.Receipt, v.Id)] = v.Name!;
+                names[(DebtSourceType.Payment, v.Id)] = v.Name!;
+            }
+        }
+
+        return names;
+    }
+
     /// One REPEATABLE READ snapshot, so both ledgers see the same state.
     public Task<DebtReconciliationReportDto> GetDebtReconciliationAsync(DebtReconciliationReportRequest request, CancellationToken ct = default) =>
         _transaction.RunSnapshotAsync(c => BuildDebtReconciliationAsync(request, c), ct);
 
     private async Task<DebtReconciliationReportDto> BuildDebtReconciliationAsync(DebtReconciliationReportRequest request, CancellationToken ct)
     {
+        ReportScopeGuard.EnsureAllowed(_currentUser, request.Scope);
         var branchId = await _currentBranch.GetIdAsync(ct);
         var partner = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
             .Where(c => c.Id == request.PartnerId)
             .Select(c => new { c.Code, c.Name, c.TaxCode, c.CompanyAddress, c.IsCustomer, c.IsSupplier })
             .SingleOrDefaultAsync(ct)
             ?? throw new NotFoundException(nameof(Customer), request.PartnerId);
-        var branchName = await _db.Branches.AsNoTracking()
-            .Where(b => b.Id == branchId)
-            .Select(b => b.Name)
-            .SingleAsync(ct);
-        var sidesWithEntries = await _db.DebtEntries.AsNoTracking()
-            .Where(e => e.BranchId == branchId && e.PartnerId == request.PartnerId)
+        var branchName = request.Scope == ReportScope.Branch
+            ? await _db.Branches.AsNoTracking()
+                .Where(b => b.Id == branchId)
+                .Select(b => b.Name)
+                .SingleAsync(ct)
+            : null;
+        var partnerEntries = _db.DebtEntries.AsNoTracking().Where(e => e.PartnerId == request.PartnerId);
+        if (request.Scope == ReportScope.Branch)
+            partnerEntries = partnerEntries.Where(e => e.BranchId == branchId);
+        var sidesWithEntries = await partnerEntries
             .Select(e => e.Side)
             .Distinct()
             .ToListAsync(ct);
@@ -232,7 +323,7 @@ public class CashDebtReportService : ICashDebtReportService
                 continue;
             sides.Add(await BuildDebtLedgerAsync(new DebtLedgerReportRequest
             {
-                Side = side, PartnerId = request.PartnerId, From = request.From, To = request.To,
+                Side = side, PartnerId = request.PartnerId, From = request.From, To = request.To, Scope = request.Scope,
             }, ct));
         }
 
@@ -240,6 +331,7 @@ public class CashDebtReportService : ICashDebtReportService
         var payable = sides.SingleOrDefault(s => s.Side == DebtSide.Payable);
         return new DebtReconciliationReportDto
         {
+            Scope = request.Scope,
             PartnerId = request.PartnerId,
             PartnerCode = partner.Code,
             PartnerName = partner.Name,
@@ -321,6 +413,7 @@ public class CashDebtReportService : ICashDebtReportService
                     TransferCode = m.Kind is FundMovementKind.TransferIn or FundMovementKind.TransferOut ? m.Code : null,
                     PartnerOrPerson = m.PartnerOrPerson,
                     Description = m.Description,
+                    ReasonName = m.ReasonName,
                     In = @in,
                     Out = @out,
                     Running = running,

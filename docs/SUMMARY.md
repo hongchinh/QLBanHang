@@ -8,7 +8,7 @@ System design, component interactions, data flows, deployment, and external inte
 
 | File | Description |
 | ---- | ----------- |
-| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow, API response, soft-delete/audit, migration/seed, logging and frontend layering |
+| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile), API response, soft-delete/audit, migration/seed, logging and frontend layering |
 
 ## Codebase
 
@@ -16,7 +16,7 @@ Directory structure, entry points, API patterns, and key modules.
 
 | File | Description |
 | ---- | ----------- |
-| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory and cash & debt), API controllers, entry points, runtime artifacts and production configuration keys |
+| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile and the TT133 report forms), API controllers, entry points, runtime artifacts and production configuration keys |
 
 ## Code Standard
 
@@ -24,7 +24,7 @@ Conventions, naming rules, tech stack versions, and development workflows.
 
 | File | Description |
 | ---- | ----------- |
-| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1) and cash & debt (Round 2A) patterns |
+| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A) and TT133 report form patterns |
 
 ## Project PDR
 
@@ -32,7 +32,7 @@ Product goals, use cases, business rules, and constraints.
 
 | File | Description |
 | ---- | ----------- |
-| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules, planned inventory/cash/debt scope and non-goals |
+| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports and the TT133 report forms), planned Round 3 scope and non-goals |
 
 ## Other
 
@@ -74,4 +74,5 @@ Repository-specific docs outside the standard topic folders.
 | [plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md](plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md) | Implementation plan for Round 2B — debt documents, aging, overdue, by-salesperson and reconciliation reports |
 | [plans/archived/261012-0433-round2a-review-refactor/SUMMARY.md](plans/archived/261012-0433-round2a-review-refactor/SUMMARY.md) | Archived plan for the last Round 2A review findings — settlement confirmation token, shared backend helpers, Auto recompute before commit, frontend refactors |
 | [plans/archived/261012-2311-sidebar-navigation-redesign/SUMMARY.md](plans/archived/261012-2311-sidebar-navigation-redesign/SUMMARY.md) | Implementation plan for the sidebar redesign — scroll hotfix, task-based groups with colored blocks, longest-prefix highlight, collapsible groups, accent-insensitive search, per-user pin chips, collapsed rail with flyouts |
+| [plans/261013-1926-tt133-report-forms/SUMMARY.md](plans/261013-1926-tt133-report-forms/SUMMARY.md) | Implementation plan for the TT133 report forms — company profile, shared ClosedXML form builder, Excel/PDF exports of S04a/S05/S06/S07/S08/S12, debt summary and reconciliation record, branch/company scope, stock summary report |
 | [plans/archived/](plans/archived/) | Archived implementation plans and execution reports |

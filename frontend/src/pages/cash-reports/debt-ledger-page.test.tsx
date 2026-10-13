@@ -1,9 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { act, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { DebtLedgerPage } from './debt-ledger-page';
 import type { DebtLedgerParams, DebtLedgerReport } from '@/features/cash-reports/types';
+import type { ExportFormat, Tt133ExportForm } from '@/features/tt133-export/types';
+import { periodPreset } from '@/lib/period-presets';
+
+const exportButtonProps: {
+  forms: Tt133ExportForm[];
+  disabled?: boolean;
+  onSelect?: (form: Tt133ExportForm, format: ExportFormat) => void;
+} = { forms: [] };
+vi.mock('@/components/tt133-export/tt133-export-button', () => ({
+  Tt133ExportButton: (props: typeof exportButtonProps) => {
+    exportButtonProps.forms = props.forms;
+    exportButtonProps.disabled = props.disabled;
+    exportButtonProps.onSelect = props.onSelect;
+    return <div data-testid="tt133-export" data-disabled={String(!!props.disabled)} />;
+  },
+}));
+
+const downloadMock = vi.fn();
+vi.mock('@/features/tt133-export/use-tt133-download', () => ({
+  useTt133Download: () => ({ download: downloadMock, isPending: false }),
+}));
 
 const ledgerState: { data: DebtLedgerReport | undefined } = { data: undefined };
 const useDebtLedgerMock = vi.fn((params: DebtLedgerParams, options?: { enabled?: boolean }) => {
@@ -28,6 +50,7 @@ vi.mock('@/features/debt/hooks', () => ({
 
 const ledger = (over: Partial<DebtLedgerReport> = {}): DebtLedgerReport => ({
   side: 'Payable',
+  scope: 'Branch',
   partnerId: 's1',
   partnerCode: 'NCC01',
   partnerName: 'Thép Hòa Phát',
@@ -71,10 +94,16 @@ function setPermissions(permissions: string[]) {
   });
 }
 
+function LocationDisplay() {
+  const loc = useLocation();
+  return <div data-testid="location">{loc.pathname + loc.search}</div>;
+}
+
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <DebtLedgerPage />
+      <LocationDisplay />
     </MemoryRouter>,
   );
 }
@@ -83,6 +112,7 @@ describe('DebtLedgerPage', () => {
   beforeEach(() => {
     useDebtLedgerMock.mockClear();
     useDebtPartnerSearchMock.mockClear();
+    downloadMock.mockClear();
     ledgerState.data = ledger();
     setPermissions(ALL_LINK_PERMISSIONS);
   });
@@ -91,7 +121,7 @@ describe('DebtLedgerPage', () => {
     renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31');
 
     expect(useDebtLedgerMock).toHaveBeenLastCalledWith(
-      { side: 'Payable', partnerId: 's1', from: '2026-10-01', to: '2026-10-31' },
+      { side: 'Payable', partnerId: 's1', from: '2026-10-01', to: '2026-10-31', scope: 'Branch' },
       { enabled: true },
     );
     // The ledger of a partner made inactive since must stay reachable.
@@ -101,7 +131,7 @@ describe('DebtLedgerPage', () => {
     expect(screen.getByLabelText('Từ ngày')).toHaveValue('2026-10-01');
     expect(screen.getByLabelText('Đến ngày')).toHaveValue('2026-10-31');
 
-    for (const name of ['Ngày', 'Số CT', 'Loại CT', 'Diễn giải', 'Tăng', 'Giảm', 'Số dư']) {
+    for (const name of ['Ngày', 'Số CT', 'Loại CT', 'Diễn giải', 'Lý do', 'Hạn TT', 'Tăng', 'Giảm', 'Số dư']) {
       expect(screen.getByRole('columnheader', { name })).toBeInTheDocument();
     }
 
@@ -110,14 +140,14 @@ describe('DebtLedgerPage', () => {
 
     const stockIn = screen.getByRole('link', { name: 'PN00001' }).closest('tr')!;
     expect(within(stockIn).getAllByRole('cell').map((c) => c.textContent)).toEqual([
-      '02/10/2026', 'PN00001', 'Phiếu nhập', 'Nhập mua tôn', '2.500.000', '', 'Có 3.500.000',
+      '02/10/2026', 'PN00001', 'Phiếu nhập', 'Nhập mua tôn', '', '', '2.500.000', '', 'Có 3.500.000',
     ]);
     const payment = screen.getByRole('link', { name: 'PC00001' }).closest('tr')!;
     const paymentCells = within(payment).getAllByRole('cell');
-    expect(paymentCells[5]).toHaveTextContent('4.000.000');
+    expect(paymentCells[7]).toHaveTextContent('4.000.000');
     // Payable: positive is Dư Có, negative is Dư Nợ (P24), like the opening and closing balances.
-    expect(paymentCells[6]).toHaveTextContent('Nợ 500.000');
-    expect(paymentCells[6]).toHaveClass('text-right', 'tabular-nums');
+    expect(paymentCells[8]).toHaveTextContent('Nợ 500.000');
+    expect(paymentCells[8]).toHaveClass('text-right', 'tabular-nums');
 
     const totals = screen.getByText('Cộng phát sinh').closest('tr')!;
     expect(within(totals).getByText('2.500.000')).toBeInTheDocument();
@@ -145,8 +175,8 @@ describe('DebtLedgerPage', () => {
     renderAt('/reports/debt-ledger?side=Receivable&partnerId=s1&from=2026-10-01&to=2026-10-31');
 
     const cells = (code: string) => within(screen.getByText(code).closest('tr')!).getAllByRole('cell');
-    expect(cells('PX00001')[6]).toHaveTextContent('Nợ 700.000');
-    expect(cells('PT00001')[6]).toHaveTextContent('Có 200.000');
+    expect(cells('PX00001')[8]).toHaveTextContent('Nợ 700.000');
+    expect(cells('PT00001')[8]).toHaveTextContent('Có 200.000');
   });
 
   it('asks for a partner when none is in the url', () => {
@@ -206,5 +236,130 @@ describe('DebtLedgerPage', () => {
       expect(screen.getByText(code)).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: code })).not.toBeInTheDocument();
     }
+  });
+
+  it('shows the reason, the due date and the branch code of a row', () => {
+    ledgerState.data = ledger({
+      scope: 'Company',
+      rows: [
+        {
+          entryId: 'e1', postedAt: '2026-10-02T02:00:00Z', docDate: '2026-10-02', docCode: 'PN00001',
+          sourceType: 'StockIn', sourceId: 'v1', description: 'Bán hàng tháng 10', reasonName: 'Bán hàng',
+          dueDate: '2026-10-20', branchCode: 'HN', increase: 2_500_000, decrease: 0, runningBalance: 3_500_000,
+        },
+        {
+          entryId: 'e2', postedAt: '2026-10-05T02:00:00Z', docDate: '2026-10-05', docCode: 'PC00001',
+          sourceType: 'Payment', sourceId: 'c1', description: 'Trả tiền NCC',
+          increase: 0, decrease: 4_000_000, runningBalance: -500_000,
+        },
+      ],
+    });
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31');
+
+    const withBranch = within(screen.getByText('PN00001').closest('tr')!).getAllByRole('cell');
+    expect(withBranch[3]).toHaveTextContent('[HN] Bán hàng tháng 10');
+    expect(withBranch[4]).toHaveTextContent('Bán hàng');
+    expect(withBranch[5]).toHaveTextContent('20/10/2026');
+    const without = within(screen.getByText('PC00001').closest('tr')!).getAllByRole('cell');
+    expect(without[3].textContent).toBe('Trả tiền NCC');
+    expect(without[5].textContent).toBe('');
+  });
+
+  it('passes scope=Company to the hook only for holders of branches.access_all', () => {
+    setPermissions([...ALL_LINK_PERMISSIONS, 'branches.access_all']);
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31&scope=Company');
+
+    expect(useDebtLedgerMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Company' }), { enabled: true });
+    expect(screen.getByRole('combobox', { name: 'Phạm vi' })).toHaveTextContent('Toàn công ty');
+  });
+
+  it('ignores scope=Company in the url without the permission', () => {
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31&scope=Company');
+
+    expect(useDebtLedgerMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Branch' }), { enabled: true });
+    expect(screen.queryByRole('combobox', { name: 'Phạm vi' })).not.toBeInTheDocument();
+  });
+
+  it('choosing Toàn công ty puts scope=Company in the url and the hook params', async () => {
+    setPermissions([...ALL_LINK_PERMISSIONS, 'branches.access_all']);
+    const user = userEvent.setup();
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31');
+
+    await user.click(screen.getByRole('combobox', { name: 'Phạm vi' }));
+    await user.click(screen.getByRole('option', { name: 'Toàn công ty' }));
+
+    expect(useDebtLedgerMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Company' }), { enabled: true });
+    expect(screen.getByTestId('location')).toHaveTextContent('scope=Company');
+  });
+
+  describe('TT133 export', () => {
+    const URL = '/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31';
+
+    it('offers S12-DNN with the screen parameters', () => {
+      renderAt(URL);
+
+      expect(exportButtonProps.forms).toEqual([
+        {
+          code: 'S12-DNN',
+          report: 'debt-ledger',
+          params: { side: 'Payable', from: '2026-10-01', to: '2026-10-31', scope: 'Branch' },
+          fileBase: 'S12-DNN_20261001_20261031',
+        },
+      ]);
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'false');
+    });
+
+    it('PDF opens the dialog with the current partner; Tất cả downloads all', async () => {
+      const user = userEvent.setup();
+      renderAt(URL);
+
+      act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'pdf'));
+      expect(await screen.findByRole('dialog', { name: 'Chọn đối tượng xuất sổ S12' })).toBeInTheDocument();
+      expect(screen.getByRole('radio', { name: 'Đang xem: NCC01 - Thép Hòa Phát' })).toBeChecked();
+
+      await user.click(screen.getByRole('radio', { name: 'Tất cả có phát sinh trong kỳ' }));
+      await user.click(screen.getByRole('button', { name: 'Xuất' }));
+
+      expect(downloadMock).toHaveBeenCalledWith(exportButtonProps.forms[0], 'pdf', { all: true });
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('confirming the current partner downloads it by id', async () => {
+      const user = userEvent.setup();
+      renderAt(URL);
+
+      act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'xlsx'));
+      await user.click(await screen.findByRole('button', { name: 'Xuất' }));
+
+      expect(downloadMock).toHaveBeenCalledWith(exportButtonProps.forms[0], 'xlsx', { partnerIds: ['s1'] });
+    });
+
+    it('stays enabled without a partner and the dialog starts at Chọn nhiều', async () => {
+      ledgerState.data = undefined;
+      renderAt('/reports/debt-ledger?side=Payable&from=2026-10-01&to=2026-10-31');
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'false');
+
+      act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'pdf'));
+      expect(await screen.findByRole('radio', { name: 'Chọn nhiều' })).toBeChecked();
+      expect(screen.queryByRole('radio', { name: /^Đang xem/ })).not.toBeInTheDocument();
+    });
+
+    it('an invalid range disables the button', () => {
+      renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-31&to=2026-10-01');
+
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'true');
+    });
+
+    it('the preset Tháng trước sets the previous month', async () => {
+      const user = userEvent.setup();
+      renderAt(URL);
+
+      await user.click(screen.getByRole('combobox', { name: 'Kỳ' }));
+      await user.click(screen.getByRole('option', { name: 'Tháng trước' }));
+
+      const last = periodPreset('lastMonth');
+      expect(screen.getByLabelText('Từ ngày')).toHaveValue(last.from);
+      expect(screen.getByLabelText('Đến ngày')).toHaveValue(last.to);
+    });
   });
 });

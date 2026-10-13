@@ -70,6 +70,18 @@ public sealed class ConfirmationRequiredException : DomainException
     public bool CanConfirm { get; }
 }
 
+/// The request is understood but cannot be carried out in the current state (mapped to 422).
+public sealed class UnprocessableException : DomainException
+{
+    public UnprocessableException(string code, string message) : base(code, message) { }
+}
+
+/// A dependency the request needs is not available (mapped to 503).
+public sealed class ServiceUnavailableException : DomainException
+{
+    public ServiceUnavailableException(string code, string message) : base(code, message) { }
+}
+
 public sealed class ValidationDomainException : DomainException
 {
     public IDictionary<string, string[]> Errors { get; }

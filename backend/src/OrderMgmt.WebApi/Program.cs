@@ -41,6 +41,8 @@ builder.Services.AddInfrastructure(builder.Configuration);
 
 // Feature flags
 builder.Services.Configure<FeatureOptions>(builder.Configuration.GetSection(FeatureOptions.SectionName));
+builder.Services.Configure<OrderMgmt.Application.Tt133.Tt133ExportOptions>(
+    builder.Configuration.GetSection(OrderMgmt.Application.Tt133.Tt133ExportOptions.SectionName));
 
 // Template upload options (bound from QuotationExport section so it shares config with Excel renderer).
 builder.Services.Configure<OrderMgmt.Application.Identity.UserSettings.Models.TemplateUploadOptions>(

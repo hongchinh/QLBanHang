@@ -183,8 +183,18 @@ Không làm: S13-DNN / S14-DNN (ngoại tệ, là non-goal) và Sổ nhật ký 
 - Xác nhận chi nhánh **không** có MST riêng, theo giả định của review B1. Nếu có thì `CompanyProfile` phải theo chi nhánh và bỏ scope Company.
 - Xác nhận đổi `CostingScope` sang **Warehouse** (review B2): giá vốn bình quân theo từng kho.
 
-**Kỹ thuật (chốt khi viết plan):**
-- Ngưỡng 300 sheet/PDF và timeout LibreOffice khi xuất "tất cả": đo trên dữ liệu thật rồi chỉnh.
+**Kỹ thuật (đã đo ở Phase 05 của [plan](../../plans/261013-1926-tt133-report-forms/SUMMARY.md), 2026-10-14):**
+- Ngưỡng sheet giữ **300** (`Tt133Export:MaxSheets`); timeout chuyển PDF tăng từ 60 lên **130 giây** (`QuotationExport:ConversionTimeoutSeconds`).
+- Số đo với 300 sheet, mỗi sheet 20 dòng. Đây là dữ liệu sinh ra để đo, không phải dữ liệu thật; chứng từ nguồn không tồn tại nên bước tra "Lý do" có chạy nhưng không tìm thấy gì.
+
+  | Mẫu | Xuất Excel | Chuyển PDF (image Docker, LibreOffice 7.4) | Tổng |
+  |---|---|---|---|
+  | S12 | 2,57 giây | 28,47 giây | 31,0 giây |
+  | S08 | 3,37 giây | 19,48 giây | 22,9 giây |
+  | S06 | 3,13 giây | 61,49 giây | 64,6 giây |
+
+  Giới hạn đặt ra: Excel dưới 20 giây, Excel + PDF dưới 90 giây (client chờ 120 giây). S06 chậm nhất; timeout 130 giây lớn hơn hai lần thời gian chuyển PDF của nó (123 giây).
+- R2 đã xử lý (quyết định của người dùng ngày 14/10/2026): chạy 3 lần chuyển PDF cùng lúc bằng `soffice` trực tiếp trong image thì 7/27 lần lỗi, không lần nào treo. Converter nay cấp một thư mục profile riêng cho mỗi lần chuyển (`-env:UserInstallation`); chạy 9 lần chuyển song song qua converter với LibreOffice thật thì 9/9 thành công. Không dùng semaphore.
 
 ## Rủi ro
 
@@ -200,10 +210,10 @@ Ghi nhận từ review; không đổi thiết kế. Chi tiết ở [section-02](
 
 ## Next steps
 
-1. Hoàn tất Round 2B (phase 04–06).
+1. ~~Hoàn tất Round 2B (phase 04–06).~~ Xong.
 2. Gửi kế toán các câu hỏi Kế toán/PO ở trên và bản mô tả cột trong [section-01](section-01-form-specs.md). Đối chiếu bố cục với bản gốc Phụ lục 4 TT133.
-3. `write-plan` cho 5 phase ở trên.
-4. Cập nhật `docs/project-pdr/product-goals.md` khi plan được duyệt.
+3. ~~`write-plan` cho 5 phase ở trên.~~ Xong: [plan TT133 report forms](../../plans/261013-1926-tt133-report-forms/SUMMARY.md) (Phase 00–05).
+4. ~~Cập nhật `docs/project-pdr/product-goals.md` khi plan được duyệt.~~ Xong trong Phase 05 của [plan](../../plans/261013-1926-tt133-report-forms/SUMMARY.md).
 
 ## Nguồn tham khảo
 

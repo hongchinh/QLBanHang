@@ -12,4 +12,8 @@ public static class DebtBalanceSign
         var negative = Math.Max(-balance, 0m);
         return side == DebtSide.Receivable ? (positive, negative) : (negative, positive);
     }
+
+    /// Movement columns of S12 and the debt summary (P24): Receivable (increase, decrease); Payable (decrease, increase).
+    public static (decimal Debit, decimal Credit) SplitMovement(DebtSide side, decimal increase, decimal decrease)
+        => side == DebtSide.Receivable ? (increase, decrease) : (decrease, increase);
 }

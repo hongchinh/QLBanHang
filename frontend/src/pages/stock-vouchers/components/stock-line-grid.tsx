@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Keyboard, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -145,8 +145,19 @@ interface NumberCellProps {
 // Formatted when idle; raw text while focused. Every keystroke commits the parsed value.
 function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, disabled, error }: NumberCellProps) {
   const [editing, setEditing] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  const fromPointer = useRef(false);
+  const selectAfterRender = useRef(false);
+  // Keyboard focus: the raw text replaces the formatted one on this render, so select it as soon as
+  // that render commits (still inside the event that moved the focus, not a frame later).
+  useLayoutEffect(() => {
+    if (!selectAfterRender.current) return;
+    selectAfterRender.current = false;
+    if (document.activeElement === ref.current) ref.current?.select();
+  });
   return (
     <input
+      ref={ref}
       id={cellId(field, rowIndex)}
       className="cell-input cell-number tabular-nums"
       type="text"
@@ -155,18 +166,30 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
       {...errorProps(field, rowIndex, error)}
       disabled={disabled}
       value={editing ?? format(value)}
+      onMouseDown={() => {
+        fromPointer.current = true;
+      }}
       onFocus={(e) => {
         const el = e.currentTarget;
         setEditing(value === undefined ? '' : String(value));
-        requestAnimationFrame(() => {
-          if (document.activeElement === el) el.select();
-        });
+        if (fromPointer.current) {
+          // A click places the caret after the focus event; select one frame later, as before.
+          fromPointer.current = false;
+          requestAnimationFrame(() => {
+            if (document.activeElement === el) el.select();
+          });
+        } else {
+          selectAfterRender.current = true;
+        }
       }}
       onChange={(e) => {
         setEditing(e.target.value);
         onCommit(parse(e.target.value));
       }}
-      onBlur={() => setEditing(null)}
+      onBlur={() => {
+        fromPointer.current = false;
+        setEditing(null);
+      }}
     />
   );
 }

@@ -493,11 +493,40 @@ describe('StockLineGrid', () => {
     renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b' })] });
     const select = vi.spyOn(HTMLInputElement.prototype, 'select');
     try {
-      act(() => byId('stock-line-quantity-0').focus());
-      act(() => byId('stock-line-quantity-1').focus());
+      // Focus moves on within the same batch (fast keys): only the cell that still has it may select.
+      act(() => {
+        byId('stock-line-quantity-0').focus();
+        byId('stock-line-quantity-1').focus();
+      });
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(select.mock.contexts).toEqual([byId('stock-line-quantity-1')]);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  // A digit can arrive before the next frame; the whole raw text must already be selected then.
+  it('keyboard navigation selects the raw text of the number cell before the handler returns', () => {
+    renderGrid({ lines: [line({ quantity: 5, unitPrice: 30000 })] });
+    byId('stock-line-quantity-0').focus();
+    enter('stock-line-quantity-0'); // quantity -> unit price, no frame awaited
+    const price = byId('stock-line-unit-price-0') as HTMLInputElement;
+    expect(focused()).toBe('stock-line-unit-price-0');
+    expect(price.value).toBe('30000');
+    expect([price.selectionStart, price.selectionEnd]).toEqual([0, 5]);
+  });
+
+  it('a number cell focused with the mouse is not selected synchronously, so the caret goes where clicked', async () => {
+    renderGrid({ lines: [line({ quantity: 5 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      const cell = byId('stock-line-quantity-0');
+      fireEvent.mouseDown(cell);
+      act(() => cell.focus());
+      expect(select).not.toHaveBeenCalled();
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      expect(select.mock.contexts).toEqual([cell]);
     } finally {
       select.mockRestore();
     }

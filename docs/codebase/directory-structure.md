@@ -252,7 +252,7 @@ Template paths configured as relative values are resolved from `AppContext.BaseD
 | `Database__AutoMigrateAndSeed` | Enables automatic migration/seed; usually `false` outside controlled deployments |
 | `Cors__Origins__0`, `Cors__Origins__1` | Allowed frontend origins |
 | `AuthCookie__SameSite`, `AuthCookie__Secure` | Refresh cookie behavior |
-| `QuotationExport__LibreOfficePath` | Optional explicit LibreOffice executable path for PDF conversion; the TT133 PDF exports use the same converter |
+| `QuotationExport__LibreOfficePath` | Optional explicit LibreOffice executable path for PDF conversion; the TT133 PDF exports use the same converter. The backend image sets it to `/usr/local/bin/soffice-vi`, a wrapper that runs `soffice` in the `vi_VN` locale so PDFs print `1.250.000` |
 | `QuotationExport__ConversionTimeoutSeconds` | Optional; seconds one PDF conversion may take before its LibreOffice process is killed (130 in `appsettings.json`, set from the 300-sheet S06 measurement). Serves the quotation and the TT133 PDF exports |
 | `Tt133Export__MaxSheets` | Optional; the most sheets one TT133 export may hold (default 300) |
 | `VITE_API_BASE_URL` | Frontend build-time backend API URL |

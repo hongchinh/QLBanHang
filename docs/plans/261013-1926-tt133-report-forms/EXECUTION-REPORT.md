@@ -55,7 +55,7 @@ Conditions: 20 rows per sheet, October 2026, `all: true`, in-process test server
 
 ## Real PDF output (Task 5.2, R2)
 
-- The 13 sample workbooks and their PDFs are in `%TEMP%\tt133-samples\` (page images in `png\`). The workbooks came from a temporary in-process test and the PDFs from `soffice` run directly in the image, **not** from the container's API (see open decision 1).
+- The 13 sample workbooks and their PDFs are in `%TEMP%\tt133-samples\` (page images in `png\`; the images predate the locale change of decision 3 and still show commas). The workbooks came from a temporary in-process test and the PDFs from `soffice` run directly in the image, **not** from the container's API (see open decision 1).
 - Every PDF was looked at. Fonts are Times New Roman only, with diacritics intact; every form fits the page width; negatives print in parentheses; dates are `dd/MM/yyyy`; each sheet starts a new page; the signature block stays together.
 - Two layout defects were fixed, each with a failing unit test first:
   - `bfc425e` — wrapped text printed over the neighbouring rows, and the reconciliation conclusion was cut at the page edge. The builder now sets row heights from an estimate of the line count; some rows get one spare line.
@@ -64,9 +64,9 @@ Conditions: 20 rows per sheet, October 2026, `all: true`, in-process test server
 
 ## Open decisions (for the user)
 
-1. **Container checks over HTTP were not run.** The project settings deny `curl`, `wget` and `Invoke-WebRequest`, so Task 5.2 steps 2, 3, 4 and 6 and the API parts of the smoke test were not carried out against the running container. Options: allow `curl` to localhost and re-run the task; accept the in-process exports plus the direct `soffice` runs as the evidence; or run the nine-request loop of step 6 by hand.
+1. **Container checks over HTTP were not run — DECIDED: accepted.** The project settings deny `curl`, `wget` and `Invoke-WebRequest`, so Task 5.2 steps 2, 3, 4 and 6 and the API parts of the smoke test were not carried out against the running container. On 2026-10-14 the user accepted the in-process exports, the direct `soffice` runs in the image and the nine parallel conversions through the converter as the evidence. The HTTP path of the container (login, routes, the converter called by the running application) remains unexercised.
 2. **R2: concurrent PDF conversions — DECIDED and fixed.** On the shared default profile about one conversion in three failed (503 `PDF_EXPORT_FAILED` for that user). The user chose a profile directory per conversion on 2026-10-14 (no semaphore). `c5439c1` adds `-env:UserInstallation` under the conversion's temp folder, with the unit test `Each_conversion_gets_its_own_profile_directory` (RED first). Check: nine parallel conversions (3 × 3 rounds) of `S12-DNN_Receivable.xlsx` through `LibreOfficeSpreadsheetPdfConverter` with the local LibreOffice on Windows all returned a PDF (3.6–6.7 s each). That check ran after the final full-suite run, in a temporary test that was not committed; only the three converter tests were re-run after the fix, not the full suite, and the fix was not re-measured inside the Docker image.
-3. **Number separators in PDFs.** Table cells print `1,250,750,000` (the image's LibreOffice runs with an English locale) while the reconciliation sentence prints `368.775.000 đồng`. Excel on a Vietnamese Windows shows dots from the same file. Options: a Vietnamese locale in the image, a locale tag in the number formats, or accept commas in PDFs.
+3. **Number separators in PDFs — DECIDED and fixed.** Table cells printed `1,250,750,000` (the image's LibreOffice ran with an English locale) while the reconciliation sentence prints `368.775.000 đồng`. The user chose a Vietnamese locale in the image on 2026-10-14. `3dbfd0f` generates `vi_VN.UTF-8` in `backend/Dockerfile` and points `QuotationExport__LibreOfficePath` at a wrapper (`/usr/local/bin/soffice-vi`) that sets the locale for `soffice` only, so the .NET process keeps its culture. Check in the rebuilt image: eight sample forms print `48.600.000`, `(5.000)`, `200,125`, with the same fonts, page counts and `dd/MM/yyyy` dates, and three parallel conversions succeeded. The 13 sample PDFs in `%TEMP%	t133-samples\` were regenerated. Quotation and handover PDFs go through the same converter, so their separators change too; they were not looked at. A dev machine or a deployment that does not use this image keeps its own LibreOffice locale.
 4. **Conversion timeout of 130 s** is longer than the 120 s client timeout and the 60–120 s a reverse proxy usually allows. A 300-sheet S06 PDF takes about 65 s. Lowering `MaxSheets` to 100 would bring it to about 22 s. `appsettings.Development.json` and the test factory still use 60.
 5. **Archiving.** The plan folder was not moved to `docs/plans/archived/`: Phase 05 is not closed, and `docs/SUMMARY.md` and `product-goals.md` link to the current path. Archive it in a docs commit after the PR merges, as was done for the stock voucher form plan.
 
@@ -83,6 +83,7 @@ Conditions: 20 rows per sheet, October 2026, `all: true`, in-process test server
 | D-7 | LibreOffice is installed on the dev machine, unlike the plan's assumption. | Found while preparing Phase 05; the measurements still use the Docker image. |
 | D-8 | Phase 05 is not marked complete and the folder is not archived. | Open decisions 1 and 5. |
 | D-9 | A LibreOffice profile per conversion, which review S3 had rejected. | User decision 2026-10-14 after the R2 measurement. |
+| D-10 | `backend/Dockerfile` changed (locale and `soffice` wrapper); it is not in the plan's files. | User decision 2026-10-14 on PDF number separators. |
 
 ## Choices made where the plan was silent
 

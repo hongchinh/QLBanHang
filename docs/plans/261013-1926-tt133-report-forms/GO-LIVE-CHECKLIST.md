@@ -42,7 +42,7 @@ Phần mềm đang làm theo cột "Đang làm theo". Nếu câu trả lời kh�
 - "Người ghi sổ" là họ tên người đang đăng nhập và bấm xuất. "Kế toán trưởng" và "Người đại diện theo pháp luật" lấy từ Thông tin đơn vị.
 - Dòng kỳ báo cáo in "Tháng MM năm yyyy" khi chọn trọn một tháng, "Năm yyyy" khi chọn trọn một năm, còn lại in "Từ ngày … đến ngày …".
 - Tồn kho đầu kỳ được ghi sổ vào ngày mở sổ của chi nhánh. Vì vậy ở **kỳ đầu tiên**, S06 và S08 có một dòng "Tồn đầu kỳ" nằm trong phần phát sinh, và S07 cộng số này vào cột "Nhập trong kỳ" chứ không vào "Tồn đầu kỳ". Từ kỳ thứ hai trở đi thì bình thường.
-- Trong file PDF, số ở các ô của bảng đang in dấu phẩy ngăn hàng nghìn và dấu chấm thập phân (`1,250,750,000`, `350.5`). Mở file Excel trên máy Windows tiếng Việt thì ra dấu chấm ngăn hàng nghìn. Kế toán cho biết có chấp nhận dấu phẩy trên PDF không.
+- Trong file PDF, số in dấu chấm ngăn hàng nghìn và dấu phẩy thập phân (`1.250.750.000`, `350,5`), giống file Excel mở trên máy Windows tiếng Việt. Các file PDF mẫu đã được xuất lại ngày 14/10/2026 theo cách này.
 
 ### Từng biểu
 

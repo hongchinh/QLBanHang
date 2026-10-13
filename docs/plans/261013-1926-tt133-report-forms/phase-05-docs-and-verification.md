@@ -1,6 +1,6 @@
 # Phase 05 — Measurements, docs, final verification
 
-**Status:** [ ] pending
+**Status:** [-] in progress (open decisions, see EXECUTION-REPORT.md)
 **Complexity:** M
 
 ## Objective

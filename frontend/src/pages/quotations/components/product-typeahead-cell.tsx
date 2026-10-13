@@ -33,6 +33,8 @@ const currency = new Intl.NumberFormat('vi-VN');
 // Gap between the input and the list, and between the list and the window edge.
 const DROPDOWN_GAP = 4;
 const WINDOW_MARGIN = 8;
+// The list never grows past this (the max-h-80 class), however many results there are.
+const MAX_LIST_HEIGHT = 320;
 
 interface Placement {
   above: boolean;
@@ -98,7 +100,7 @@ export function ProductTypeaheadCell({
   // the height to the side it opens to. Unchanged (below, CSS max-h) when it fits.
   useLayoutEffect(() => {
     if (!showDropdown || !dropdownRect || !dropdownRef.current) return;
-    const natural = dropdownRef.current.scrollHeight;
+    const natural = Math.min(dropdownRef.current.scrollHeight, MAX_LIST_HEIGHT);
     const room = DROPDOWN_GAP + WINDOW_MARGIN;
     const below = window.innerHeight - dropdownRect.bottom - room;
     const above = dropdownRect.top - room;
@@ -111,6 +113,13 @@ export function ProductTypeaheadCell({
   useEffect(() => {
     if (highlightedIndex >= items.length) setHighlightedIndex(0);
   }, [items.length, highlightedIndex]);
+
+  // Keep the highlighted option inside the scrolling list.
+  const highlightedId = items[highlightedIndex]?.id;
+  useEffect(() => {
+    if (!open || !highlightedId) return;
+    document.getElementById(`product-option-${highlightedId}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [open, highlightedId]);
 
   const commit = useCallback(
     (s: ProductSuggestion) => {

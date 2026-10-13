@@ -73,6 +73,14 @@ describe('ProductTypeaheadCell', () => {
       expect(box.style.maxHeight).toBe('');
     });
 
+    it('a long result list counts as its capped 320px, not its full content height', () => {
+      // 20 results: 679px of content, shown in a 320px scrolling box. 768-380-8 = 380 below is enough.
+      const box = placeCell({ top: 350, bottom: 380 }, 679);
+      expect(box.style.top).toBe('384px');
+      expect(box.style.bottom).toBe('');
+      expect(box.style.maxHeight).toBe('');
+    });
+
     it('caps the height to the larger side when neither side fits', () => {
       const box = placeCell({ top: 150, bottom: 180 }, 320, 400);
       // below: 400-180-8 = 212, above: 150-8 = 142 -> stays below, capped

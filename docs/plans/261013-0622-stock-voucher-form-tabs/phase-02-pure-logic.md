@@ -1,6 +1,6 @@
 # Phase 02 — Pure logic: line navigation, grid prefs, debt after voucher, error tabs
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

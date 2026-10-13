@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Keyboard, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -243,17 +243,6 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const watched = useWatch({ control: form.control, name: 'lines' }) as StockLineFormValues[] | undefined;
   const rows = watched ?? [];
 
-  // Focus to apply after a row removal, once the watched rows have caught up with the field array.
-  const pendingFocus = useRef<{ field: LineFocusField; rowIndex: number } | null>(null);
-  useEffect(() => {
-    const pending = pendingFocus.current;
-    if (!pending || rows.length !== fields.length) return;
-    pendingFocus.current = null;
-    const to = Math.min(pending.rowIndex, rows.length - 1);
-    if (to >= 0) focusCell(verticalTarget(rows[to].pricingMode ?? 'PerUnit', pending.field, isShown), to);
-    // No line left: keep the focus inside the form so Insert, Ctrl+S and Alt+n still work.
-    else document.getElementById('stock-line-add')?.focus();
-  });
   const lineErrors = form.formState.errors.lines;
 
   const userId = useAuthStore((s) => s.user?.id ?? '');
@@ -263,9 +252,10 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const isShown = (key: ColumnKey) =>
     !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key);
   // Remove a row without a focus gap: the focused cell lives in the row being removed, so move the focus to a
-  // surviving row (kept mounted by its key) BEFORE removing; the effect above then only re-asserts it.
+  // surviving row BEFORE removing. Its key keeps that row mounted, so the focus stays there and nothing has to
+  // re-focus later (a later re-focus would undo a key the user pressed in between). With no line left the focus
+  // goes to "Thêm dòng", so Insert, Ctrl+S and Alt+n still work.
   const removeLine = (rowIndex: number, field: LineFocusField) => {
-    pendingFocus.current = { field, rowIndex };
     const survivor = rowIndex + 1 < fields.length ? rowIndex + 1 : rowIndex - 1;
     if (survivor >= 0) focusCell(verticalTarget(rows[survivor]?.pricingMode ?? 'PerUnit', field, isShown), survivor);
     else document.getElementById('stock-line-add')?.focus();

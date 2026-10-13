@@ -598,6 +598,20 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(focused()).toBe('stock-line-product-code-0'));
   });
 
+  it('a key pressed right after Ctrl+Delete is kept: nothing re-focuses the old row later', async () => {
+    const { values } = renderGrid({
+      lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' }), line({ _uiKey: 'c', productCode: 'C' })],
+    });
+    fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 'Delete', ctrlKey: true });
+    // No wait: the user goes one row down at once (from B to C).
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    const onC = document.activeElement;
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B', 'C']));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(document.activeElement).toBe(onC);
+    expect(focused()).toBe('stock-line-quantity-1');
+  });
+
   it('Ctrl+Delete does nothing on a read-only grid', async () => {
     const { values } = renderGrid({
       lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' })],

@@ -514,7 +514,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
     if (e.defaultPrevented) return;
-    if (e.key === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
+    if (e.key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       submitWithIntent(isEdit ? 'update' : 'save-stay');
       return;
@@ -808,7 +808,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                           },
                         })}
                       />
-                      {creditDays != null && <span className="text-xs text-muted-foreground">({creditDays} ngày)</span>}
+                      {creditDays != null && <span className="whitespace-nowrap text-xs text-muted-foreground">({creditDays} ngày)</span>}
                     </div>
                     <FieldError message={errors.dueDate?.message} />
                   </div>

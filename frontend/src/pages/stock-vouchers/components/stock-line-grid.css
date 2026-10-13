@@ -124,7 +124,7 @@
   display: none;
 }
 
-@media (min-width: 1536px) {
+@media (min-width: 1800px) {
   .stock-grid-toolbar .keyboard-guide-inline {
     display: flex;
   }

@@ -26,4 +26,7 @@ public interface ITt133FormRenderer
 
     /// S08-DNN: one portrait sheet per stock card, in the order given; "Tờ số" is the 1-based index.
     byte[] RenderStockCards(Tt133FormContext context, IReadOnlyList<StockCardSheet> sheets);
+
+    /// S06-DNN: one landscape sheet per stock card, in the order given; the values follow each card's own masking.
+    byte[] RenderStockDetail(Tt133FormContext context, IReadOnlyList<StockCardSheet> sheets);
 }

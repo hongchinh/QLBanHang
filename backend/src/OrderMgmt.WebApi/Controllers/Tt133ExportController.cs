@@ -105,4 +105,15 @@ public class Tt133ExportController : ApiControllerBase
         var file = await _exports.ExportStockCardsAsync(request, format, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
+
+    /// S06-DNN: as S08, with values (needs inventory.view_cost, checked by the export service).
+    [HttpPost("stock-detail/export")]
+    [HasPermission(Permissions.Reports.Inventory)]
+    public async Task<IActionResult> StockDetail(
+        [FromBody] StockCardExportRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
+    {
+        await _stockCardValidator.ValidateAndThrowAsync(request, ct);
+        var file = await _exports.ExportStockDetailAsync(request, format, ct);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
 }

@@ -24,4 +24,7 @@ public interface ITt133ExportService
 
     /// S08-DNN: one sheet per product x warehouse (T20), quantities only.
     Task<ExportFile> ExportStockCardsAsync(StockCardExportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// S06-DNN: one sheet per product x warehouse (T20), with values; needs inventory.view_cost.
+    Task<ExportFile> ExportStockDetailAsync(StockCardExportRequest request, ExportFormat format, CancellationToken ct = default);
 }

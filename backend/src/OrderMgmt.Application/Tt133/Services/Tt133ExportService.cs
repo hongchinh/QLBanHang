@@ -12,6 +12,7 @@ using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Tt133.Interfaces;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Domain.Common;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Tt133.Services;
@@ -195,6 +196,22 @@ public class Tt133ExportService : ITt133ExportService
 
         var xlsx = _renderer.RenderStockCards(context, sheets);
         return await ToFileAsync(xlsx, BaseName("S08-DNN", request.From!.Value, request.To!.Value), format, ct);
+    }
+
+    public async Task<ExportFile> ExportStockDetailAsync(StockCardExportRequest request, ExportFormat format, CancellationToken ct = default)
+    {
+        if (!_currentUser.HasPermission(Permissions.Inventory.ViewCost))
+            throw new ForbiddenException("Cần quyền xem giá vốn để xuất sổ chi tiết vật liệu, hàng hóa.");
+
+        var (context, sheets) = await _transaction.RunSnapshotAsync(async token =>
+        {
+            var formContext = await BuildContextAsync(ReportScope.Branch, token);
+            var data = await ResolveStockSheetsAsync(request, token);
+            return (formContext, data);
+        }, ct);
+
+        var xlsx = _renderer.RenderStockDetail(context, sheets);
+        return await ToFileAsync(xlsx, BaseName("S06-DNN", request.From!.Value, request.To!.Value), format, ct);
     }
 
     /// All: every partner the balance report lists (a non-zero opening balance or movement); otherwise the distinct ids.

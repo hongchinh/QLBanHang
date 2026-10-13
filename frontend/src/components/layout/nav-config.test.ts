@@ -78,6 +78,7 @@ describe('visibleNavGroups', () => {
     expect(groups.find((g) => g.id === 'reports')?.items.map((i) => [i.section, i.to])).toEqual([
       ['Kho', '/inventory/stock-on-hand'],
       ['Kho', '/inventory/stock-card'],
+      ['Kho', '/inventory/stock-summary'],
     ]);
     expect(paths(WAREHOUSE_PERMS, 'catalogs')).toEqual(['/suppliers']);
   });
@@ -96,7 +97,8 @@ describe('visibleNavGroups', () => {
     const reports = all().find((g) => g.id === 'reports')!;
     expect(reports.items.map((i) => [i.section, i.label])).toEqual([
       ['Doanh thu', 'Doanh thu'], ['Doanh thu', 'Doanh thu sale'], ['Doanh thu', 'Doanh thu xe'],
-      ['Doanh thu', 'Hiệu suất sale'], ['Kho', 'Tồn kho'], ['Kho', 'Thẻ kho'], ['Quỹ', 'Sổ quỹ'],
+      ['Doanh thu', 'Hiệu suất sale'], ['Kho', 'Tồn kho'], ['Kho', 'Thẻ kho'], ['Kho', 'Tổng hợp nhập xuất tồn'],
+      ['Quỹ', 'Sổ quỹ'],
       ['Công nợ', 'Số dư công nợ'], ['Công nợ', 'Sổ chi tiết công nợ'], ['Công nợ', 'Công nợ theo chứng từ'],
       ['Công nợ', 'Tuổi nợ'], ['Công nợ', 'Nợ quá hạn'], ['Công nợ', 'Công nợ theo nhân viên'],
       ['Công nợ', 'Biên bản đối chiếu'],

@@ -50,6 +50,7 @@ import { CashSettingsPage } from '@/pages/settings/cash-settings-page';
 import { CompanyProfilePage } from '@/pages/settings/company-profile-page';
 import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
 import { StockOnHandPage } from '@/pages/inventory/stock-on-hand-page';
+import { StockSummaryPage } from '@/pages/inventory/stock-summary-page';
 import { StockCardPage } from '@/pages/inventory/stock-card-page';
 // Round 2A: 11.5 fund transfers
 import { FundTransferListPage } from '@/pages/fund-transfers/fund-transfer-list-page';
@@ -436,6 +437,14 @@ export function App() {
                   element={
                     <ProtectedRoute permission="reports.inventory">
                       <StockCardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="inventory/stock-summary"
+                  element={
+                    <ProtectedRoute permission="reports.inventory">
+                      <StockSummaryPage />
                     </ProtectedRoute>
                   }
                 />

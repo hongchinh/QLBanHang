@@ -97,9 +97,10 @@ describe('inventory routes', () => {
     expectRule('/inventory/opening-stock', 'inventory.opening_stock');
   });
 
-  it('/inventory/stock-on-hand và /inventory/stock-card cần reports.inventory', () => {
+  it('/inventory/stock-on-hand, /inventory/stock-card và /inventory/stock-summary cần reports.inventory', () => {
     expectRule('/inventory/stock-on-hand', 'reports.inventory');
     expectRule('/inventory/stock-card', 'reports.inventory');
+    expectRule('/inventory/stock-summary', 'reports.inventory');
   });
 
   it('/suppliers cần suppliers.view; /suppliers/new cần create, /suppliers/:id cần update', () => {

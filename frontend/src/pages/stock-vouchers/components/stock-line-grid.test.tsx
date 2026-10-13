@@ -363,4 +363,28 @@ describe('StockLineGrid', () => {
     act(() => form().setError('lines', { type: 'server', message: 'Phiếu phải có ít nhất 1 dòng' }));
     await waitFor(() => expect(headers()).toContain('STT'));
   });
+
+  it('pins #, Mã and Tên left and Số còn lại + delete right with cumulative offsets', () => {
+    renderGrid({ lines: [line()] });
+    const ths = screen.getAllByRole('columnheader');
+    const byText = (t: string) => ths.find((th) => th.textContent === t)!;
+    expect(byText('STT')).toHaveClass('sticky-left');
+    expect(byText('STT')).toHaveStyle({ left: '0px' });
+    expect(byText('Mã hàng')).toHaveStyle({ left: '42px' });
+    expect(byText('Tên hàng')).toHaveStyle({ left: '162px' });
+    expect(byText('Số còn lại')).toHaveClass('sticky-right');
+    expect(byText('Số còn lại')).toHaveStyle({ right: '42px' });
+    expect(byText('ĐVT')).not.toHaveClass('sticky-left');
+    // Toolbar sits above the table.
+    const toolbar = screen.getByRole('button', { name: /Thêm dòng/ });
+    expect(toolbar.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The fixed-layout table is exactly as wide as the column sum, so the sticky offsets match real widths.
+    expect(screen.getByRole('table')).toHaveStyle({ width: '1428px', minWidth: '1428px' });
+  });
+
+  it('a read-only grid keeps the toolbar settings but has no Thêm dòng', () => {
+    renderGrid({ lines: [line()], readOnly: true });
+    expect(screen.queryByRole('button', { name: /Thêm dòng/ })).toBeNull();
+    expect(document.querySelector('.stock-grid-toolbar')).not.toBeNull();
+  });
 });

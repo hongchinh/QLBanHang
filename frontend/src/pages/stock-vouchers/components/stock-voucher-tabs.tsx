@@ -31,7 +31,7 @@ export function StockVoucherTabs(props: StockVoucherTabsProps) {
         <Trigger value="payment" label="Thanh toán" hotkey="Alt+3" error={errorTabs.has('payment')} />
         {history && <Trigger value="history" label="Lịch sử" hotkey="Alt+4" error={false} />}
       </TabsList>
-      <TabsContent value="lines" forceMount className={`${PANEL} min-h-[280px] flex-1 overflow-auto rounded-b-md border border-t-0 bg-card`}>
+      <TabsContent value="lines" forceMount className={`${PANEL} min-h-[280px] flex flex-1 flex-col overflow-hidden rounded-b-md border border-t-0 bg-card`}>
         {lines}
       </TabsContent>
       <TabsContent value="other" forceMount className={`${PANEL} rounded-b-md border border-t-0 bg-card`}>

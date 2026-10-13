@@ -26,6 +26,7 @@ import {
   type OptionalColumn,
 } from '@/pages/stock-vouchers/utils/use-stock-grid-prefs';
 import '@/pages/quotations/components/line-items-grid.css';
+import './stock-line-grid.css';
 
 const fmt = new Intl.NumberFormat('vi-VN');
 
@@ -222,9 +223,21 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const columns = COLUMNS.filter((c) => isShown(c.key) && !(readOnly && c.key === 'action'));
   const minWidth = columns.reduce((sum, c) => sum + c.width, 0);
 
-  const stickyOffset = new Map<ColumnKey, CSSProperties>(); // filled in Task 4.2
+  const stickyOffset = new Map<ColumnKey, CSSProperties>();
+  let left = 0;
+  for (const c of columns) if (c.sticky === 'left') { stickyOffset.set(c.key, { left }); left += c.width; }
+  let right = 0;
+  for (const c of [...columns].reverse()) if (c.sticky === 'right') { stickyOffset.set(c.key, { right }); right += c.width; }
+  const stickyRight = right; // total width of the right-pinned columns
   const cellClass = (c: GridColumn, extra?: string) =>
-    cn(c.numeric && 'cell-number', c.key === 'row-no' && 'row-no', c.key === 'action' && 'cell-action', extra);
+    cn(
+      c.numeric && 'cell-number',
+      c.key === 'row-no' && 'row-no',
+      c.key === 'action' && 'cell-action',
+      c.sticky === 'left' && 'sticky-left',
+      c.sticky === 'right' && 'sticky-right',
+      extra,
+    );
 
   const errorOf = (idx: number, field: keyof StockLineFormValues): string | undefined => {
     const lineError = lineErrors?.[idx] as Record<string, { message?: string } | undefined> | undefined;
@@ -522,10 +535,32 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   };
 
   return (
-    <div className="space-y-2">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="stock-grid-toolbar flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-2 py-1.5">
+        <div className="flex items-center gap-2">
+          {!readOnly && (
+            <button type="button" className="lib-btn" onClick={addLine}>
+              <Plus className="h-4 w-4 text-cyan-600" />
+              Thêm dòng
+            </button>
+          )}
+          {/* Task 4.3 adds <StockGridSettingsPopover … /> here */}
+        </div>
+        <div className="keyboard-guide">
+          <span><span className="kbd">Enter</span> Tiếp</span>
+          <span><span className="kbd">Shift</span>+<span className="kbd">Enter</span> Lùi</span>
+          <span><span className="kbd">Ctrl</span>+<span className="kbd">S</span> Lưu</span>
+          <span><span className="kbd">Insert</span> Thêm dòng</span>
+        </div>
+      </div>
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
-      <div className="accounting-grid-wrap" tabIndex={-1} onKeyDown={handleGridKeyDown}>
-        <table className="accounting-grid" style={{ minWidth }}>
+      <div
+        className="accounting-grid-wrap stock-grid-wrap min-h-0 flex-1"
+        tabIndex={-1}
+        onKeyDown={handleGridKeyDown}
+        style={{ '--stock-grid-left': `${left}px`, '--stock-grid-right': `${stickyRight}px` } as CSSProperties}
+      >
+        <table className="accounting-grid stock-grid" style={{ width: minWidth, minWidth }}>
           <colgroup>
             {columns.map((c) => (
               <col key={c.key} style={{ width: c.width }} />
@@ -564,25 +599,6 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           </tbody>
         </table>
       </div>
-
-      {!readOnly && (
-        <>
-          <div className="line-items-footer">
-            <div className="keyboard-guide">
-              <span><span className="kbd">Enter</span> Tiếp</span>
-              <span><span className="kbd">Shift</span>+<span className="kbd">Enter</span> Lùi</span>
-              <span><span className="kbd">Ctrl</span>+<span className="kbd">S</span> Lưu</span>
-              <span><span className="kbd">Insert</span> Thêm dòng</span>
-            </div>
-          </div>
-          <div className="line-items-toolbar">
-            <button type="button" className="lib-btn" onClick={addLine}>
-              <Plus className="h-4 w-4 text-cyan-600" />
-              Thêm dòng
-            </button>
-          </div>
-        </>
-      )}
     </div>
   );
 }

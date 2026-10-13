@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
 import { CellError } from '@/components/money-cell/money-cell';
@@ -220,6 +220,16 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
   const watched = useWatch({ control: form.control, name: 'lines' }) as StockLineFormValues[] | undefined;
   const rows = watched ?? [];
+
+  // Focus to apply after a row removal, once the watched rows have caught up with the field array.
+  const pendingFocus = useRef<{ field: LineFocusField; rowIndex: number } | null>(null);
+  useEffect(() => {
+    const pending = pendingFocus.current;
+    if (!pending || rows.length !== fields.length) return;
+    pendingFocus.current = null;
+    const to = Math.min(pending.rowIndex, rows.length - 1);
+    if (to >= 0) focusCell(verticalTarget(rows[to].pricingMode ?? 'PerUnit', pending.field, isShown), to);
+  });
   const lineErrors = form.formState.errors.lines;
 
   const userId = useAuthStore((s) => s.user?.id ?? '');
@@ -346,12 +356,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       const current = parseCellId(target.id);
       if (!current) return;
       e.preventDefault();
+      pendingFocus.current = current;
       remove(current.rowIndex);
-      setTimeout(() => {
-        const lines = form.getValues('lines');
-        const to = Math.min(current.rowIndex, lines.length - 1);
-        if (to >= 0) focusCell(verticalTarget(lines[to].pricingMode, current.field, isVisible), to);
-      }, 0);
       return;
     }
 
@@ -622,11 +628,14 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
             </tr>
           </thead>
           <tbody>
+            {/* Keyed from the field-array item, not the watched row: right after remove() the watched rows still
+                hold the removed one, and keying from them would unmount the last <tr> instead. field.id is
+                regenerated on every nested setValue, so the item's own _uiKey is the stable key. */}
             {fields.map((field, idx) => {
               const line = rows[idx] ?? (field as unknown as StockLineFormValues);
               const result = computed[idx];
               return (
-                <tr key={line._uiKey ?? field.id}>
+                <tr key={(field as { _uiKey?: string })._uiKey ?? field.id}>
                   {columns.map((c) => (
                     <td key={c.key} className={cellClass(c)} style={stickyOffset.get(c.key)}>
                       {renderCell(c.key, idx, line, result)}

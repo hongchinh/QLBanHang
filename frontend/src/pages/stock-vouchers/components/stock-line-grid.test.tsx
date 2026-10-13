@@ -509,6 +509,23 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(focused()).toBe('stock-line-quantity-0'));
   });
 
+  it('Ctrl+Delete on the first of three lines removes the DOM node of that row and keeps the others mounted and focused', async () => {
+    const { values } = renderGrid({
+      lines: [line({ _uiKey: 'a', productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' }), line({ _uiKey: 'c', productCode: 'C' })],
+    });
+    const rowA = byId('stock-line-quantity-0');
+    const rowB = byId('stock-line-quantity-1');
+    const rowC = byId('stock-line-quantity-2');
+    act(() => rowA.focus());
+    fireEvent.keyDown(rowA, { key: 'Delete', ctrlKey: true });
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B', 'C']));
+    // The right row is removed in the first commit: B and C are never torn down and rebuilt.
+    expect(rowA.isConnected).toBe(false);
+    expect(rowB.isConnected).toBe(true);
+    expect(rowC.isConnected).toBe(true);
+    await waitFor(() => expect(document.activeElement).toBe(rowB));
+  });
+
   it('Ctrl+Delete does nothing on a read-only grid', async () => {
     const { values } = renderGrid({
       lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' })],

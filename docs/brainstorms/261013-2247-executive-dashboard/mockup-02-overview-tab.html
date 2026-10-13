@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Superpowers Brainstorming</title>
+  <style>
+    /*
+     * BRAINSTORM COMPANION FRAME TEMPLATE
+     *
+     * This template provides a consistent frame with:
+     * - OS-aware light/dark theming
+     * - Fixed header and selection indicator bar
+     * - Scrollable main content area
+     * - CSS helpers for common UI patterns
+     *
+     * Content is injected via placeholder comment in #claude-content.
+     */
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ===== THEME VARIABLES ===== */
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    /* ===== FRAME STRUCTURE ===== */
+    .header {
+      background: var(--bg-secondary);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
+    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; }
+    .header .status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+    .main { flex: 1; overflow-y: auto; }
+    #claude-content { padding: 2rem; min-height: 100%; }
+
+    .indicator-bar {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1.5rem;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .indicator-bar span {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .indicator-bar .selected-text {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+    /* ===== OPTIONS (for A/B/C choices) ===== */
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .option:hover { border-color: var(--accent); }
+    .option.selected { background: var(--selected-bg); border-color: var(--selected-border); }
+    .option .letter {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      width: 1.75rem; height: 1.75rem;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .option.selected .letter { background: var(--accent); color: white; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+
+    /* ===== CARDS (for showing designs/mockups) ===== */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .card.selected { border-color: var(--selected-border); border-width: 2px; }
+    .card-image { background: var(--bg-tertiary); aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+
+    /* ===== MOCKUP CONTAINER ===== */
+    .mockup {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .mockup-header {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-body { padding: 1.5rem; }
+
+    /* ===== SPLIT VIEW (side-by-side comparison) ===== */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+    /* ===== PROS/CONS ===== */
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+
+    /* ===== PLACEHOLDER (for mockup areas) ===== */
+    .placeholder {
+      background: var(--bg-tertiary);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-tertiary);
+    }
+
+    /* ===== INLINE MOCKUP ELEMENTS ===== */
+    .mock-nav { background: var(--accent); color: white; padding: 0.75rem 1rem; display: flex; gap: 1.5rem; font-size: 0.9rem; }
+    .mock-sidebar { background: var(--bg-tertiary); padding: 1rem; min-width: 180px; }
+    .mock-content { padding: 1.5rem; flex: 1; }
+    .mock-button { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; }
+    .mock-input { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><a href="https://github.com/obra/superpowers" style="color: inherit; text-decoration: none;">Superpowers Brainstorming</a></h1>
+    <div class="status">Connected</div>
+  </div>
+
+  <div class="main">
+    <div id="claude-content">
+<style>
+  .db { --p:#2563eb; --ok:#16a34a; --bad:#dc2626; --amb:#d97706; --cogs:#94a3b8;
+        font-size:12px; color:var(--text-primary); min-width:1080px; }
+  .db * { box-sizing:border-box; }
+  .db .top { display:flex; justify-content:space-between; align-items:flex-end; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+  .db h4 { font-size:18px; font-weight:600; letter-spacing:-.01em; }
+  .db .sub { color:var(--text-secondary); font-size:11px; }
+  .db .live { color:var(--ok); font-size:11px; margin-left:8px; }
+  .db .live::before { content:''; display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ok); margin-right:5px; box-shadow:0 0 0 3px rgba(22,163,74,.18); }
+  .db .ctl { display:flex; gap:8px; align-items:center; }
+  .db .sel { border:1px solid var(--border); border-radius:7px; padding:5px 10px; background:var(--bg-secondary); }
+  .db .seg { display:flex; border:1px solid var(--border); border-radius:7px; overflow:hidden; background:var(--bg-secondary); }
+  .db .seg span { padding:5px 10px; border-right:1px solid var(--border); color:var(--text-secondary); }
+  .db .seg span:last-child { border-right:0; }
+  .db .seg .on { background:var(--p); color:#fff; font-weight:600; }
+  .db .tabs { display:flex; gap:2px; border-bottom:1px solid var(--border); margin-bottom:12px; }
+  .db .tab { padding:6px 12px; color:var(--text-secondary); }
+  .db .tab.on { color:var(--p); border-bottom:2px solid var(--p); font-weight:600; margin-bottom:-1px; }
+  .db .grp { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); margin:0 0 5px 2px; }
+  .db .kpis { display:grid; grid-template-columns:3fr 4fr; gap:14px; margin-bottom:12px; }
+  .db .krow { display:grid; gap:8px; }
+  .db .k3 { grid-template-columns:repeat(3,1fr); } .db .k4 { grid-template-columns:repeat(4,1fr); }
+  .db .c { background:var(--bg-secondary); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+  .db .c .l { color:var(--text-secondary); font-size:11px; display:flex; justify-content:space-between; }
+  .db .c .n { font-size:19px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.01em; margin-top:2px; }
+  .db .c .d { font-size:11px; margin-top:2px; color:var(--text-secondary); }
+  .db .up { color:var(--ok); } .db .dn { color:var(--bad); } .db .am { color:var(--amb); }
+  .db .body { display:grid; grid-template-columns:1fr 270px; gap:12px; }
+  .db .g2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+  .db .h { display:flex; justify-content:space-between; align-items:center; font-weight:600; margin-bottom:6px; }
+  .db .h a { color:var(--p); font-weight:400; font-size:11px; text-decoration:none; }
+  .db .lg { display:flex; gap:12px; font-size:11px; color:var(--text-secondary); font-weight:400; }
+  .db .lg i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:4px; }
+  .db table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums; }
+  .db td, .db th { padding:3px 0; text-align:right; border-bottom:1px solid var(--border); font-weight:400; }
+  .db th { color:var(--text-secondary); font-size:10px; } .db td:first-child, .db th:first-child { text-align:left; }
+  .db tr:last-child td { border-bottom:0; }
+  .db .ag { display:flex; height:16px; border-radius:5px; overflow:hidden; margin:6px 0 8px; }
+  .db .al { display:flex; align-items:center; gap:9px; padding:7px 0; border-bottom:1px solid var(--border); }
+  .db .al:last-child { border-bottom:0; }
+  .db .al b { font-size:15px; min-width:26px; text-align:right; font-variant-numeric:tabular-nums; }
+  .db .al small { color:var(--text-secondary); display:block; }
+  .db .dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .db .fd { padding:6px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; gap:8px; }
+  .db .fd:last-child { border-bottom:0; }
+  .db .fd small { color:var(--text-secondary); display:block; }
+  .db .tag { font-size:10px; padding:0 5px; border-radius:4px; margin-right:4px; }
+  .db .t-in { background:rgba(22,163,74,.14); color:var(--ok); } .db .t-out { background:rgba(220,38,38,.12); color:var(--bad); } .db .t-st { background:rgba(37,99,235,.12); color:var(--p); }
+  .note { font-size:.8rem; color:var(--text-secondary); margin-top:1rem; }
+  .note b { color:var(--text-primary); }
+</style>
+
+<h2>Tab "Tổng quan" — dashboard Giám đốc</h2>
+<p class="subtitle">Bố cục C + các tab đào sâu, bộ lọc kỳ: Hôm nay · Tuần này · Tháng này · Năm nay · Tuỳ chọn. Số liệu minh hoạ.</p>
+
+<div class="mockup"><div class="mockup-header">/dashboard/executive — 1366×768</div>
+<div class="mockup-body" style="overflow-x:auto"><div class="db">
+
+  <div class="top">
+    <div>
+      <h4>Điều hành <span class="live">Trực tiếp · cập nhật 14:32:05</span></h4>
+      <div class="sub">01/10/2026 – 13/10/2026 · so với 18/09 – 30/09</div>
+    </div>
+    <div class="ctl">
+      <span class="sel">Toàn công ty ▾</span>
+      <div class="seg"><span>Hôm nay</span><span>Tuần này</span><span class="on">Tháng này</span><span>Năm nay</span><span>Tuỳ chọn ▾</span></div>
+    </div>
+  </div>
+
+  <div class="tabs"><span class="tab on">Tổng quan</span><span class="tab">Kinh doanh</span><span class="tab">Tiền</span><span class="tab">Công nợ</span><span class="tab">Kho</span></div>
+
+  <div class="kpis">
+    <div>
+      <div class="grp">Trong kỳ</div>
+      <div class="krow k3">
+        <div class="c"><div class="l">Doanh thu xuất bán</div><div class="n">2,84 tỷ</div><div class="d"><span class="up">▲ 12,4%</span> so kỳ trước</div></div>
+        <div class="c"><div class="l">Lãi gộp <span class="am">tạm tính</span></div><div class="n">412 tr</div><div class="d">Tỷ suất 14,5% <span class="up">▲ 0,8đ</span></div></div>
+        <div class="c"><div class="l">Thu − chi ròng</div><div class="n">+186 tr</div><div class="d">Thu 2,10 tỷ · Chi 1,91 tỷ</div></div>
+      </div>
+    </div>
+    <div>
+      <div class="grp">Hiện tại (không theo bộ lọc kỳ)</div>
+      <div class="krow k4">
+        <div class="c"><div class="l">Tồn quỹ</div><div class="n">1,26 tỷ</div><div class="d">TM 210 tr · NH 1,05 tỷ</div></div>
+        <div class="c"><div class="l">Phải thu</div><div class="n">3,10 tỷ</div><div class="d"><span class="dn">Quá hạn 420 tr</span></div></div>
+        <div class="c"><div class="l">Phải trả</div><div class="n">1,75 tỷ</div><div class="d"><span class="am">Đến hạn 7 ngày: 310 tr</span></div></div>
+        <div class="c"><div class="l">Giá trị tồn kho</div><div class="n">4,62 tỷ</div><div class="d">318 mã · 3 kho</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div>
+      <div class="c">
+        <div class="h"><span>Doanh thu – giá vốn – lãi gộp</span>
+          <span class="lg"><span><i style="background:var(--p)"></i>Doanh thu</span><span><i style="background:var(--cogs)"></i>Giá vốn</span><span><i style="background:var(--ok)"></i>Lãi gộp</span><a href="#">Chi tiết →</a></span></div>
+        <svg viewBox="0 0 720 130" width="100%" height="130" preserveAspectRatio="none">
+          <g stroke="currentColor" stroke-opacity=".12"><line x1="0" y1="32" x2="720" y2="32"/><line x1="0" y1="65" x2="720" y2="65"/><line x1="0" y1="98" x2="720" y2="98"/></g>
+          <g fill="#2563eb"><rect x="14" y="60" width="16" height="70"/><rect x="69" y="40" width="16" height="90"/><rect x="124" y="72" width="16" height="58"/><rect x="179" y="30" width="16" height="100"/><rect x="234" y="52" width="16" height="78"/><rect x="289" y="96" width="16" height="34"/><rect x="344" y="44" width="16" height="86"/><rect x="399" y="22" width="16" height="108"/><rect x="454" y="58" width="16" height="72"/><rect x="509" y="36" width="16" height="94"/><rect x="564" y="66" width="16" height="64"/><rect x="619" y="48" width="16" height="82"/><rect x="674" y="78" width="16" height="52"/></g>
+          <g fill="#94a3b8"><rect x="32" y="70" width="16" height="60"/><rect x="87" y="54" width="16" height="76"/><rect x="142" y="80" width="16" height="50"/><rect x="197" y="46" width="16" height="84"/><rect x="252" y="64" width="16" height="66"/><rect x="307" y="101" width="16" height="29"/><rect x="362" y="57" width="16" height="73"/><rect x="417" y="38" width="16" height="92"/><rect x="472" y="68" width="16" height="62"/><rect x="527" y="50" width="16" height="80"/><rect x="582" y="75" width="16" height="55"/><rect x="637" y="60" width="16" height="70"/><rect x="692" y="86" width="16" height="44"/></g>
+          <polyline fill="none" stroke="#16a34a" stroke-width="2" points="31,112 86,108 141,116 196,104 251,110 306,122 361,109 416,102 471,112 526,106 581,115 636,110 691,118"/>
+        </svg>
+      </div>
+
+      <div class="g2">
+        <div class="c">
+          <div class="h"><span>Dòng tiền thu – chi</span><a href="#">Sổ quỹ →</a></div>
+          <svg viewBox="0 0 340 70" width="100%" height="70" preserveAspectRatio="none">
+            <line x1="0" y1="35" x2="340" y2="35" stroke="currentColor" stroke-opacity=".2"/>
+            <g fill="#16a34a"><rect x="8" y="14" width="14" height="21"/><rect x="34" y="6" width="14" height="29"/><rect x="60" y="20" width="14" height="15"/><rect x="86" y="10" width="14" height="25"/><rect x="112" y="24" width="14" height="11"/><rect x="138" y="4" width="14" height="31"/><rect x="164" y="16" width="14" height="19"/><rect x="190" y="12" width="14" height="23"/><rect x="216" y="22" width="14" height="13"/><rect x="242" y="8" width="14" height="27"/><rect x="268" y="18" width="14" height="17"/><rect x="294" y="13" width="14" height="22"/><rect x="320" y="20" width="14" height="15"/></g>
+            <g fill="#dc2626" fill-opacity=".8"><rect x="8" y="35" width="14" height="16"/><rect x="34" y="35" width="14" height="24"/><rect x="60" y="35" width="14" height="9"/><rect x="86" y="35" width="14" height="30"/><rect x="112" y="35" width="14" height="12"/><rect x="138" y="35" width="14" height="20"/><rect x="164" y="35" width="14" height="14"/><rect x="190" y="35" width="14" height="27"/><rect x="216" y="35" width="14" height="8"/><rect x="242" y="35" width="14" height="18"/><rect x="268" y="35" width="14" height="22"/><rect x="294" y="35" width="14" height="11"/><rect x="320" y="35" width="14" height="17"/></g>
+          </svg>
+          <table><tr><th>Quỹ</th><th>Số dư</th></tr><tr><td>Tiền mặt (QTM)</td><td>210.400.000</td></tr><tr><td>VCB – 0071…</td><td>820.150.000</td></tr><tr><td>ACB – 2219…</td><td>229.800.000</td></tr></table>
+        </div>
+        <div class="c">
+          <div class="h"><span>Tuổi nợ phải thu</span><a href="#">Tuổi nợ →</a></div>
+          <div class="ag"><span style="width:58%;background:#2563eb"></span><span style="width:20%;background:#f59e0b"></span><span style="width:13%;background:#f97316"></span><span style="width:9%;background:#dc2626"></span></div>
+          <table><tr><th>Nhóm</th><th>Số tiền</th><th>%</th></tr>
+            <tr><td>Trong hạn</td><td>1.798.000.000</td><td>58%</td></tr><tr><td>Quá hạn 1–30 ngày</td><td>620.000.000</td><td>20%</td></tr><tr><td>31–60 ngày</td><td>403.000.000</td><td>13%</td></tr><tr><td>Trên 60 ngày</td><td>279.000.000</td><td>9%</td></tr></table>
+        </div>
+      </div>
+
+      <div class="g2">
+        <div class="c">
+          <div class="h"><span>So sánh chi nhánh</span><a href="#">Kinh doanh →</a></div>
+          <table><tr><th>Chi nhánh</th><th>Doanh thu</th><th>Lãi gộp</th><th>Phải thu</th><th>Tồn kho</th></tr>
+            <tr><td>Hà Nội</td><td>1,62 tỷ</td><td>15,1%</td><td>1,80 tỷ</td><td>2,71 tỷ</td></tr><tr><td>Hưng Yên</td><td>0,84 tỷ</td><td>13,2%</td><td>0,92 tỷ</td><td>1,36 tỷ</td></tr><tr><td>Đà Nẵng</td><td>0,38 tỷ</td><td>14,9%</td><td>0,38 tỷ</td><td>0,55 tỷ</td></tr></table>
+        </div>
+        <div class="c">
+          <div class="h"><span>Top khách hàng theo doanh thu</span><a href="#">Xem thêm →</a></div>
+          <table><tr><th>Khách hàng</th><th>Doanh thu</th><th>Còn nợ</th></tr>
+            <tr><td>CT Xây dựng An Phát</td><td>412.000.000</td><td>180.000.000</td></tr><tr><td>Cơ điện lạnh Minh Long</td><td>356.500.000</td><td class="dn">240.000.000</td></tr><tr><td>Panel Việt Đức</td><td>298.000.000</td><td>0</td></tr></table>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="c" style="margin-bottom:10px">
+        <div class="h"><span>Cần chú ý</span></div>
+        <div class="al"><span class="dot" style="background:var(--bad)"></span><b>12</b><div>Khách nợ quá hạn<small>420.000.000 đ · mở Nợ quá hạn</small></div></div>
+        <div class="al"><span class="dot" style="background:var(--bad)"></span><b>3</b><div>Khách vượt hạn mức nợ<small>vượt 96.000.000 đ</small></div></div>
+        <div class="al"><span class="dot" style="background:var(--amb)"></span><b>5</b><div>Mã hàng tồn âm<small>2 kho · mở Tồn kho</small></div></div>
+        <div class="al"><span class="dot" style="background:var(--amb)"></span><b>4</b><div>Khoản phải trả đến hạn 7 ngày<small>310.000.000 đ</small></div></div>
+        <div class="al"><span class="dot" style="background:var(--ok)"></span><b>0</b><div>Quỹ âm<small>Không có</small></div></div>
+      </div>
+      <div class="c">
+        <div class="h"><span>Vừa phát sinh</span><span class="sub">hôm nay</span></div>
+        <div class="fd"><div><span class="tag t-in">Thu</span>PT00124<small>An Phát · N.T.Hoa · 14:31</small></div><b class="up">+45.000.000</b></div>
+        <div class="fd"><div><span class="tag t-st">Xuất</span>XK00311<small>Minh Long · T.V.Nam · 14:12</small></div><b>128.400.000</b></div>
+        <div class="fd"><div><span class="tag t-out">Chi</span>PC00087<small>Vận chuyển · N.T.Hoa · 13:50</small></div><b class="dn">−12.000.000</b></div>
+        <div class="fd"><div><span class="tag t-st">Nhập</span>NK00092<small>NCC Hoà Phát · L.Q.Huy · 11:05</small></div><b>260.000.000</b></div>
+        <div class="fd"><div><span class="tag t-in">Thu</span>PT00123<small>Việt Đức · N.T.Hoa · 10:40</small></div><b class="up">+98.000.000</b></div>
+      </div>
+    </div>
+  </div>
+
+</div></div></div>
+
+<p class="note"><b>Cách đọc:</b> nhóm "Trong kỳ" đổi theo bộ lọc kỳ và có so sánh với kỳ liền trước cùng độ dài. Nhóm "Hiện tại" là số dư tại thời điểm xem, không đổi theo kỳ. Lãi gộp gắn nhãn "tạm tính" khi kỳ tính giá vốn chưa kết thúc. Mỗi thẻ, mỗi dòng cảnh báo và mỗi chứng từ đều bấm được để mở báo cáo hoặc chứng từ tương ứng. Khi có chứng từ mới, các thẻ liên quan tự tải lại và nháy nhẹ.</p>
+    </div>
+  </div>
+
+  <div class="indicator-bar">
+    <span id="indicator-text">Click an option above, then return to the terminal</span>
+  </div>
+
+</body>
+</html>

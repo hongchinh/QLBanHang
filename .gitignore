@@ -52,3 +52,4 @@ bin.zip
 *.user
 *.pdb
 *.exe
+.superpowers/

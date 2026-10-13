@@ -11,6 +11,8 @@ public sealed class Tt133FormBuilder
     private const string MoneyFormat = "#,##0;(#,##0)";
     private const string QuantityFormat = "#,##0.###;(#,##0.###)";
     private const string DateFormat = "dd/MM/yyyy";
+    private const int MaxSheetNameLength = 31;
+    private static readonly char[] InvalidSheetChars = ['[', ']', ':', '*', '?', '/', '\\'];
 
     private readonly Tt133FormContext _context;
     private readonly IReadOnlyList<Tt133Column> _columns;
@@ -219,6 +221,88 @@ public sealed class Tt133FormBuilder
             cell.Style.Font.Bold = true;
         }
         Bordered(Sheet.Range(Row, 1, Row, _columns.Count));
+        Row++;
+        _gapAfterTitle = false;
+    }
+
+    /// "Sổ này có…" lines, the print date and the three signatures.
+    public void WriteBookFooter()
+    {
+        var count = _columns.Count;
+        Skip();
+        WriteText("- Sổ này có … trang, đánh số từ trang 01 đến trang …");
+        WriteText(_context.OpeningDate is { } opening
+            ? $"- Ngày mở sổ: {opening:dd/MM/yyyy}"
+            : "- Ngày mở sổ: …");
+
+        var rightStart = count - Math.Max(1, count / 3) + 1;
+        var dateCell = Merged(Row, rightStart, count);
+        dateCell.Value = $"Ngày {_context.PrintDate:dd} tháng {_context.PrintDate:MM} năm {_context.PrintDate:yyyy}";
+        dateCell.Style.Font.Italic = true;
+        dateCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Right;
+        Row++;
+
+        string[] titles = ["Người ghi sổ", "Kế toán trưởng", "Người đại diện theo pháp luật"];
+        string[] hints = ["(Ký, họ tên)", "(Ký, họ tên)", "(Ký, họ tên, đóng dấu)"];
+        string?[] names = [_context.BookkeeperName, _context.ChiefAccountantName, _context.LegalRepresentativeName];
+
+        WriteSignatureRow(titles, bold: true, italic: false);
+        WriteSignatureRow(hints, bold: false, italic: true);
+        Skip(4);
+        WriteSignatureRow(names, bold: true, italic: false);
+
+        if (!string.IsNullOrWhiteSpace(_context.AccountingServiceNote))
+            WriteText(_context.AccountingServiceNote, italic: true);
+    }
+
+    /// Column widths and print setup. The table header rows repeat on every page unless repeatTableHeader is false.
+    public void Finish(bool repeatTableHeader = true)
+    {
+        for (var i = 0; i < _columns.Count; i++)
+            Sheet.Column(i + 1).Width = _columns[i].Width;
+
+        var setup = Sheet.PageSetup;
+        setup.PaperSize = XLPaperSize.A4Paper;
+        setup.PageOrientation = _landscape ? XLPageOrientation.Landscape : XLPageOrientation.Portrait;
+        setup.FitToPages(1, 0);
+        setup.Margins.Left = setup.Margins.Right = setup.Margins.Top = setup.Margins.Bottom = 0.59;
+        if (repeatTableHeader && TableHeaderFirstRow > 0)
+            setup.SetRowsToRepeatAtTop(TableHeaderFirstRow, TableHeaderLastRow);
+    }
+
+    /// Replaces [ ] : * ? / \ with _, cuts to 31 characters and makes the name unique (case-insensitive); adds the result to used.
+    public static string SheetName(string code, ISet<string> used)
+    {
+        var chars = (code ?? string.Empty).Trim().ToCharArray();
+        for (var i = 0; i < chars.Length; i++)
+            if (InvalidSheetChars.Contains(chars[i])) chars[i] = '_';
+        var baseName = new string(chars).Trim();
+        if (baseName.Length > MaxSheetNameLength) baseName = baseName[..MaxSheetNameLength].TrimEnd();
+        if (baseName.Length == 0) baseName = "Sheet";
+
+        var name = baseName;
+        for (var n = 2; used.Any(u => string.Equals(u, name, StringComparison.OrdinalIgnoreCase)); n++)
+        {
+            var suffix = $" ({n})";
+            name = baseName[..Math.Min(baseName.Length, MaxSheetNameLength - suffix.Length)] + suffix;
+        }
+        used.Add(name);
+        return name;
+    }
+
+    private void WriteSignatureRow(string?[] texts, bool bold, bool italic)
+    {
+        var count = _columns.Count;
+        for (var k = 0; k < 3; k++)
+        {
+            var first = Math.Clamp(k * count / 3 + 1, 1, count);
+            var last = Math.Clamp((k + 1) * count / 3, first, count);
+            var cell = Merged(Row, first, last);
+            cell.Value = texts[k] ?? string.Empty;
+            cell.Style.Font.Bold = bold;
+            cell.Style.Font.Italic = italic;
+            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        }
         Row++;
         _gapAfterTitle = false;
     }

@@ -312,4 +312,123 @@ public class Tt133FormBuilderTests
         sheet2.Cell(1, 1).GetString().Should().Be("Tổng");
         sheet2.Cell(1, 2).IsEmpty().Should().BeTrue();
     }
+
+    [Fact]
+    public void Book_footer_prints_pages_opening_date_print_date_and_signers()
+    {
+        var (b, ws) = NewBuilder(Context());
+
+        b.WriteBookFooter();
+
+        var texts = Texts(ws);
+        texts.Should().Contain("- Sổ này có … trang, đánh số từ trang 01 đến trang …");
+        texts.Should().Contain("- Ngày mở sổ: 01/10/2026");
+        texts.Should().Contain("Ngày 13 tháng 10 năm 2026");
+        texts.Should().Contain("(Ký, họ tên, đóng dấu)");
+
+        foreach (var (title, name) in new[]
+                 {
+                     ("Người ghi sổ", "Lê C"),
+                     ("Kế toán trưởng", "Trần B"),
+                     ("Người đại diện theo pháp luật", "Nguyễn A"),
+                 })
+        {
+            var titleCell = CellWith(ws, title);
+            var nameCell = CellWith(ws, name);
+            nameCell.Address.ColumnNumber.Should().Be(titleCell.Address.ColumnNumber);
+            nameCell.Address.RowNumber.Should().BeGreaterThan(titleCell.Address.RowNumber);
+        }
+    }
+
+    [Fact]
+    public void Book_footer_without_an_opening_date_prints_dots()
+    {
+        var context = Context();
+        context.OpeningDate = null;
+        var (b, ws) = NewBuilder(context);
+
+        b.WriteBookFooter();
+
+        Texts(ws).Should().Contain("- Ngày mở sổ: …");
+    }
+
+    [Fact]
+    public void Book_footer_adds_the_accounting_service_note()
+    {
+        var context = Context();
+        context.AccountingServiceNote = "Dịch vụ kế toán: Công ty XYZ";
+        var (b, ws) = NewBuilder(context);
+        b.WriteBookFooter();
+        Texts(ws).Should().Contain("Dịch vụ kế toán: Công ty XYZ");
+
+        var (b2, ws2) = NewBuilder(Context());
+        b2.WriteBookFooter();
+        Texts(ws2).Should().NotContain(t => t.Contains("Dịch vụ kế toán"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Finish_sets_the_page_setup(bool landscape)
+    {
+        var (b, ws) = NewBuilder(Context(), landscape);
+        b.WriteTableHeader();
+
+        b.Finish();
+
+        ws.PageSetup.PaperSize.Should().Be(XLPaperSize.A4Paper);
+        ws.PageSetup.PageOrientation.Should().Be(landscape ? XLPageOrientation.Landscape : XLPageOrientation.Portrait);
+        ws.PageSetup.PagesWide.Should().Be(1);
+        ws.PageSetup.PagesTall.Should().Be(0);
+        ws.PageSetup.FirstRowToRepeatAtTop.Should().Be(b.TableHeaderFirstRow);
+        ws.PageSetup.LastRowToRepeatAtTop.Should().Be(b.TableHeaderLastRow);
+        ws.PageSetup.Margins.Left.Should().BeApproximately(0.59, 0.01);
+        ws.Column(1).Width.Should().BeApproximately(12, 0.01);
+        ws.Column(2).Width.Should().BeApproximately(30, 0.01);
+    }
+
+    [Fact]
+    public void Finish_without_repeat_leaves_no_rows_to_repeat()
+    {
+        var (b, ws) = NewBuilder(Context());
+        b.WriteTableHeader();
+
+        b.Finish(repeatTableHeader: false);
+
+        ws.PageSetup.FirstRowToRepeatAtTop.Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("QTM", "QTM")]
+    [InlineData("KH/01:A", "KH_01_A")]
+    [InlineData("0123456789012345678901234567890123456789", "0123456789012345678901234567890")]
+    [InlineData("", "Sheet")]
+    public void Sheet_name(string code, string expected)
+    {
+        Tt133FormBuilder.SheetName(code, new HashSet<string>(StringComparer.OrdinalIgnoreCase)).Should().Be(expected);
+    }
+
+    [Fact]
+    public void Sheet_name_is_made_unique_inside_31_characters()
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Tt133FormBuilder.SheetName("QTM", used).Should().Be("QTM");
+        Tt133FormBuilder.SheetName("QTM", used).Should().Be("QTM (2)");
+        Tt133FormBuilder.SheetName("qtm", used).Should().Be("qtm (3)");
+
+        var used2 = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var code = new string('X', 31);
+        Tt133FormBuilder.SheetName(code, used2).Should().Be(code);
+        var second = Tt133FormBuilder.SheetName(code, used2);
+        second.Should().EndWith(" (2)");
+        second.Length.Should().Be(31);
+    }
+
+    [Fact]
+    public void Sheet_name_ignores_case_when_checking_for_duplicates()
+    {
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        Tt133FormBuilder.SheetName("QTM", used);
+        Tt133FormBuilder.SheetName("qtm", used).Should().Be("qtm (2)");
+    }
 }

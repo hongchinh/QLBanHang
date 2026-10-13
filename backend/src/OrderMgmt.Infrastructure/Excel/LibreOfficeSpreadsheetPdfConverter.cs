@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Options;
-using OrderMgmt.Application.Sales.Quotations.Interfaces;
+using OrderMgmt.Application.Common.Interfaces;
 
 namespace OrderMgmt.Infrastructure.Excel;
 
-public class LibreOfficeSpreadsheetPdfConverter : IQuotationSpreadsheetPdfConverter
+public class LibreOfficeSpreadsheetPdfConverter : ISpreadsheetPdfConverter
 {
     private readonly IOptions<QuotationExportOptions> _options;
 

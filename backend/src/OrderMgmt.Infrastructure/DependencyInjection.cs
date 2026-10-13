@@ -68,7 +68,7 @@ public static class DependencyInjection
         services.AddScoped<IQuotationExcelRenderer, QuotationExcelRenderer>();
         services.AddScoped<IHandoverExcelRenderer, HandoverExcelRenderer>();
         services.AddScoped<IRevenueReportExcelRenderer, RevenueReportExcelRenderer>();
-        services.AddScoped<IQuotationSpreadsheetPdfConverter, LibreOfficeSpreadsheetPdfConverter>();
+        services.AddScoped<ISpreadsheetPdfConverter, LibreOfficeSpreadsheetPdfConverter>();
         services.AddScoped<IQuotationExportPathResolver, QuotationExportPathResolver>();
 
         return services;

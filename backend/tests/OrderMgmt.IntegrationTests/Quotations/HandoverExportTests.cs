@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Identity.Models;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
@@ -248,14 +249,14 @@ file sealed class WebAppFactoryWithFakeHandoverPdfConverter : WebAppFactory
         builder.ConfigureServices(services =>
         {
             var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(IQuotationSpreadsheetPdfConverter));
+                d => d.ServiceType == typeof(ISpreadsheetPdfConverter));
             if (descriptor is not null) services.Remove(descriptor);
-            services.AddScoped<IQuotationSpreadsheetPdfConverter, FakeHandoverPdfConverter>();
+            services.AddScoped<ISpreadsheetPdfConverter, FakeHandoverPdfConverter>();
         });
     }
 }
 
-file sealed class FakeHandoverPdfConverter : IQuotationSpreadsheetPdfConverter
+file sealed class FakeHandoverPdfConverter : ISpreadsheetPdfConverter
 {
     private static readonly byte[] FakePdf = "%PDF-1.0 fake\n"u8.ToArray();
     public Task<byte[]> ConvertAsync(byte[] xlsxBytes, CancellationToken ct = default)

@@ -110,6 +110,70 @@ public class CashBookExportTests : CashDebtTestBase
         (total - opening - 1).Should().Be(group.Rows.Count);
     }
 
+    [Fact]
+    public async Task S05_for_the_bank_funds()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        await InDbAsync(db => db.Funds.Where(f => f.Code == "NH01" && f.BranchId == ids.MainBranchId).ExecuteUpdateAsync(s => s
+            .SetProperty(f => f.BankName, "Vietcombank")
+            .SetProperty(f => f.AccountNumber, "0123456789")));
+        await CreateBankFundAsync("NH02", ids.MainBranchId, opening: 7_000m);
+        var client = MainBranchClient(ids);
+
+        var response = await client.GetAsync($"/api/reports/cash-book/export?kind=Bank&{October}&format=xlsx");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        response.Content.Headers.ContentDisposition!.FileName.Should().Be("S05-DNN_20261001_20261031.xlsx");
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        wb.Worksheets.Select(w => w.Name).Should().Equal("NH01", "NH02");
+
+        var ws = wb.Worksheet("NH01");
+        Tt133Sheet.Contains(ws, "Mẫu số S05-DNN").Should().BeTrue();
+        Tt133Sheet.Contains(ws, "SỔ TIỀN GỬI NGÂN HÀNG").Should().BeTrue();
+        Tt133Sheet.Contains(ws, "Nơi mở tài khoản giao dịch: Vietcombank").Should().BeTrue();
+        Tt133Sheet.Contains(ws, "Số hiệu tài khoản tại nơi gửi: 0123456789").Should().BeTrue();
+
+        var opening = Tt133Sheet.RowOf(ws, "Số dư đầu kỳ");
+        Tt133Sheet.Number(ws, opening, 8).Should().Be(20_000m);
+        string[] codes = ["PC00001", "PC00002", "CQ00001"];
+        decimal[] paid = [2_000m, 3_000m, 5_000m];
+        decimal[] running = [18_000m, 15_000m, 10_000m];
+        for (var i = 0; i < codes.Length; i++)
+        {
+            var row = opening + 1 + i;
+            ws.Cell(row, 2).GetString().Should().Be(codes[i]);
+            ws.Cell(row, 6).IsEmpty().Should().BeTrue();
+            Tt133Sheet.Number(ws, row, 7).Should().Be(paid[i]);
+            Tt133Sheet.Number(ws, row, 8).Should().Be(running[i]);
+        }
+        var total = Tt133Sheet.RowOf(ws, "Cộng số phát sinh trong kỳ");
+        total.Should().Be(opening + 1 + codes.Length);
+        Tt133Sheet.Number(ws, total, 6).Should().Be(0m);
+        Tt133Sheet.Number(ws, total, 7).Should().Be(10_000m);
+        Tt133Sheet.Number(ws, Tt133Sheet.RowOf(ws, "Số dư cuối kỳ"), 8).Should().Be(10_000m);
+
+        var empty = wb.Worksheet("NH02");
+        var emptyOpening = Tt133Sheet.RowOf(empty, "Số dư đầu kỳ");
+        Tt133Sheet.Number(empty, emptyOpening, 8).Should().Be(7_000m);
+        Tt133Sheet.RowOf(empty, "Cộng số phát sinh trong kỳ").Should().Be(emptyOpening + 1);
+        Tt133Sheet.Number(empty, Tt133Sheet.RowOf(empty, "Số dư cuối kỳ"), 8).Should().Be(7_000m);
+    }
+
+    [Fact]
+    public async Task One_fund_only()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        await CreateBankFundAsync("NH02", ids.MainBranchId, opening: 7_000m);
+        var nh01 = await InDbAsync(db => db.Funds.Where(f => f.Code == "NH01" && f.BranchId == ids.MainBranchId).Select(f => f.Id).SingleAsync());
+        var client = MainBranchClient(ids);
+
+        var response = await client.GetAsync($"/api/reports/cash-book/export?kind=Bank&fundId={nh01}&{October}");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        wb.Worksheets.Should().ContainSingle().Which.Name.Should().Be("NH01");
+    }
+
     private HttpClient MainBranchClient(ReportIds ids)
     {
         var client = CloneAdminClient();

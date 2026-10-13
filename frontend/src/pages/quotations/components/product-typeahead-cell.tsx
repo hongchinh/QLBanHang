@@ -174,6 +174,8 @@ export function ProductTypeaheadCell({
             position: 'fixed',
             left: dropdownRect.left,
             top: dropdownRect.bottom + 4,
+            // A modal dialog sets pointer-events: none on <body>, where this list is portaled.
+            pointerEvents: 'auto',
           }}
         >
           <div className="flex items-center justify-between border-b bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">

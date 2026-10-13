@@ -125,8 +125,11 @@ export function ProductTypeaheadCell({
     const header = list.querySelector('thead')?.getBoundingClientRect().height ?? 0;
     const box = list.getBoundingClientRect();
     const row = option.getBoundingClientRect();
-    if (row.top < box.top + header) list.scrollTop -= box.top + header - row.top;
-    else if (row.bottom > box.bottom) list.scrollTop += row.bottom - box.bottom;
+    // The header sticks inside the list border, so measure from the padding box.
+    const top = box.top + list.clientTop + header;
+    const bottom = box.bottom - list.clientTop;
+    if (row.top < top) list.scrollTop -= top - row.top;
+    else if (row.bottom > bottom) list.scrollTop += row.bottom - bottom;
   }, [open, highlightedId]);
 
   const commit = useCallback(

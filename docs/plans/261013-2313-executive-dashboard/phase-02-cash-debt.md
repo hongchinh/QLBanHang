@@ -16,11 +16,14 @@ Backend:
 - `backend/src/OrderMgmt.Application/Dashboards/Executive/Common/OpenDebtItem.cs`, `DebtPositionMath.cs` (new)
 - `backend/src/OrderMgmt.Application/Dashboards/Executive/Interfaces/ICashMetricsService.cs`, `IDebtMetricsService.cs` (new)
 - `backend/src/OrderMgmt.Application/Dashboards/Executive/Services/CashMetricsService.cs`, `DebtMetricsService.cs` (new)
-- `backend/src/OrderMgmt.Application/DependencyInjection.cs` (modify — two registrations)
+- `backend/src/OrderMgmt.Application/Dashboards/Executive/Services/ExecutiveLookups.cs` (new — the name lookups shared by every metrics service)
+- `backend/src/OrderMgmt.Application/Dashboards/Executive/Services/SalesMetricsService.cs` (modify — use `ExecutiveLookups`)
+- `backend/src/OrderMgmt.Application/DependencyInjection.cs` (modify — three registrations)
 - `backend/src/OrderMgmt.WebApi/Controllers/ExecutiveDashboardController.cs` (modify — five actions)
 
 Tests:
 - `backend/tests/OrderMgmt.IntegrationTests/ExecutiveDashboard/CashSummaryTests.cs`, `CashSeriesTests.cs`, `CashBreakdownTests.cs`, `DebtSummaryTests.cs`, `DebtBreakdownTests.cs` (new)
+- `backend/tests/OrderMgmt.IntegrationTests/ExecutiveDashboard/ExecutiveRouteGuardTests.cs` (modify — one row per new route)
 - `backend/tests/OrderMgmt.IntegrationTests/ExecutiveDashboard/Unit/DebtPositionMathTests.cs` (new)
 
 ## Reference files (read-only)
@@ -211,9 +214,36 @@ public interface IDebtMetricsService
 }
 ```
 
-Both services inject `IAppDbContext`, `IExecutiveScopeResolver`, `IDateTime`, `ITransactionRunner`. Routes, permissions and query classes are in the route table of `SUMMARY.md`.
+Both services inject `IAppDbContext`, `IExecutiveScopeResolver`, `ExecutiveLookups`, `IDateTime`, `ITransactionRunner`. Routes, permissions and query classes are in the route table of `SUMMARY.md`.
+
+```csharp
+// Services/ExecutiveLookups.cs — scoped, injects IAppDbContext. Each method is ONE separate query by id with
+// IgnoreQueryFilters() (soft-deleted rows keep their names); an id that is not found is simply absent from the dictionary.
+public sealed class ExecutiveLookups
+{
+    public Task<Dictionary<Guid, string>> BranchCodesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
+    public Task<Dictionary<Guid, (string Code, string Name)>> PartnersAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
+    public Task<Dictionary<Guid, (string Code, string Name)>> ProductsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
+    public Task<Dictionary<Guid, string>> UserNamesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct);
+}
+```
 
 ## Rules
+
+### Shared lookups and guard rows
+
+- Task 2.1 creates `ExecutiveLookups` by moving the private name lookups of `SalesMetricsService` into it (same queries, same results; the sales tests of Phase 01 must stay green). Every later service resolves branch codes, partner, product and user names through it. A caller reads a name with `TryGetValue`, never with the indexer.
+- Every task that adds a route adds its row to the table of `ExecutiveRouteGuardTests` (Phase 01 Task 1.8): the route with its query string, its domain permission, how to read the checked total, and the expected `OwnBranch` and `Company` totals. The four theories of that class then cover the route. This replaces a separate "requires permission" case per test class. The rows of this phase:
+
+  | Route | Permission | Checked total | Own branch | Company |
+  |---|---|---|---|---|
+  | `cash/summary?{October}` | `reports.cash` | `Payments` | 5,700 | 5,823 |
+  | `cash/series?{October}&granularity=Day` | `reports.cash` | Σ `Payments` of the points | 5,700 | 5,823 |
+  | `cash/breakdown?{October}` | `reports.cash` | Σ `Total` of the `Payment` rows of `ByReason` | 5,700 | 5,823 |
+  | `debt/summary?at=2026-10-31` | `reports.debt` | `Receivable.Balance` | 1,500 | 11,499 |
+  | `debt/breakdown?at=2026-10-31` | `reports.debt` | Σ `Balance` of `TopDebtors` | 1,500 | 11,499 |
+
+  The dataset has no cash document in branch B, so the guard class's arrange method also posts one payment of 123 from branch B's cash fund on 10-06 with the reason `CK` (no partner, a person name, `AcknowledgeNegativeFund = true`, posted with a client on branch B). That reason has no debt effect, so the sales and debt rows keep the dataset figures.
 
 ### Cash
 
@@ -253,10 +283,10 @@ Set the test database first in every shell:
    - `Balance_is_as_at_the_given_date`: `cash/summary?{OctoberRange}&at=2026-10-14&branchId={main}` → fund `QtmId` 15,000, `Nh01Id` 15,000, `Balance 30000` (the transfer of 10-15 and the payment of 10-16 are not counted yet), while `Receipts 5000` and `Payments 5700` are unchanged.
    - `Summary_equals_the_cash_book`: main client, `GET /api/reports/cash-book?kind=All&from=2026-10-01&to=2026-10-31` → `GrandIn == Receipts`, `GrandOut == Payments`, `GrandClosing == Balance`, and each group's `Closing` equals the fund's `Balance`.
    - `Company_wide_includes_every_branch`: no `branchId` → `Balance 29300`, and `Funds` contains a fund of `BranchBId`.
-   - `Requires_reports_cash`: a user with only `dashboard.executive` → 403.
-2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~CashSummaryTests"`. Expected: FAIL — build error, `CashSummaryDto` does not exist.
-3. Implement `Models/CashModels.cs`, `ICashMetricsService`, `CashMetricsService.GetSummaryAsync`, the action `GET cash/summary` and the `AddScoped` line.
-4. Run the same command. Expected: PASS.
+   - the `cash/summary` row of `ExecutiveRouteGuardTests` (with the branch-B payment arrangement).
+2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~CashSummaryTests|FullyQualifiedName~ExecutiveRouteGuardTests"`. Expected: FAIL — build error, `CashSummaryDto` does not exist.
+3. Implement `ExecutiveLookups` (moving the name lookups out of `SalesMetricsService`, which now uses it), `Models/CashModels.cs`, `ICashMetricsService`, `CashMetricsService.GetSummaryAsync`, the action `GET cash/summary` and the `AddScoped` lines.
+4. Run the same command, then `--filter "FullyQualifiedName~Sales"` (the lookups moved). Expected: PASS.
 5. Commit: `git commit -m "feat(dashboard): cash summary endpoint"`.
 
 ### Task 2.2 — `cash/series`
@@ -264,7 +294,7 @@ Set the test database first in every shell:
 1. Write the failing test `CashSeriesTests` (`cash/series?{October}&granularity=Day&branchId={main}`):
    - `Daily_points`: 31 points; 10-03 → `Receipts 1000`; 10-05 → `Receipts 4000`; 10-10 → `Payments 2000`; 10-12 → `Payments 3000`; 10-16 → `Payments 700`; 10-15 (the transfer) and 10-18 (the cancelled receipt) → both 0.
    - `Monthly_point`: `granularity=Month` → one point with `Receipts 5000`, `Payments 5700`.
-   - `Requires_reports_cash`: 403 for a user with only `dashboard.executive`.
+   - the `cash/series` row of `ExecutiveRouteGuardTests`.
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~CashSeriesTests"`. Expected: FAIL — 404 (no route).
 3. Implement `GetSeriesAsync` and the action `GET cash/series`.
 4. Run the same command. Expected: PASS.
@@ -275,7 +305,7 @@ Set the test database first in every shell:
 1. Write the failing test `CashBreakdownTests` (`cash/breakdown?{October}&branchId={main}`):
    - `By_reason`: five rows; receipts first: `TKH` (`Receipt`, `Total 4000`, `Count 1`), `TPX` (`Receipt`, `Total 1000`, the automatic receipt); then payments: `TNCC` (`Total 3000`), `CPN` (`Total 2000`, the automatic payment), `CK` (`Total 700`); the receipt rows sum to 5,000 and the payment rows to 5,700.
    - `Largest_documents`: `Largest` codes in order `PT00002, PC00002, PC00001, PT00001, PC00003` with totals `4000, 3000, 2000, 1000, 700`; `PT00003` (cancelled) is absent.
-   - `Requires_reports_cash`: 403.
+   - the `cash/breakdown` row of `ExecutiveRouteGuardTests`.
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~CashBreakdownTests"`. Expected: FAIL — 404 (no route).
 3. Implement `GetBreakdownAsync` and the action `GET cash/breakdown`.
 4. Run `--filter "FullyQualifiedName~CashBreakdownTests|FullyQualifiedName~CashSummaryTests|FullyQualifiedName~CashSeriesTests"`. Expected: PASS.
@@ -310,7 +340,7 @@ Set the test database first in every shell:
    - `Position_is_as_at_the_given_date`: `at=2026-10-04&branchId={main}` → `Receivable.TotalOpen 7000`, `Unallocated 1000`, `Balance 6000` (the receipt of 10-05 and the return of 10-08 are not counted yet).
    - `Company_wide_adds_branches`: `at=2026-10-31` without `branchId` → `Receivable.Balance 11499`.
    - `Due_soon_counts_the_next_seven_days`: post one more unpaid NMH of 800 from `Ncc1Id` on 10-20 with `DueDate 2026-10-25` into `MainWarehouseId` (an untracked product, 1 × 800; build the request by hand as the posting recipe of `SUMMARY.md` says); `debt/summary?at=2026-10-21&branchId={main}` → `Payable.DueSoon 800`, `DueSoonCount 1`; `at=2026-10-26` → `Payable.DueSoon 0` and `Payable.Overdue` is 800 more than at 10-21.
-   - `Requires_reports_debt`: 403 for a user with only `dashboard.executive`.
+   - the `debt/summary` row of `ExecutiveRouteGuardTests`.
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~DebtSummaryTests"`. Expected: FAIL — build error, `DebtSummaryDto` does not exist.
 3. Implement `Models/DebtModels.cs`, `IDebtMetricsService`, `DebtMetricsService.GetSummaryAsync`, the action `GET debt/summary` and the `AddScoped` line.
 4. Run the same command. Expected: PASS. If an identity with a report fails, read that report's code in `DebtPositionReportService` and mirror its rule; do not change the report.
@@ -323,7 +353,7 @@ Set the test database first in every shell:
    - `Over_limit`: set the limit of `Kh1Id` to 1,000 in the main branch (`PUT /api/credit-limits/{Kh1Id}` with the main client) → one row: `Balance 1500`, `Limit 1000`, `Over 500`, `BranchId MainBranchId`; with the limit at 2,000 → no row.
    - `By_employee_equals_the_report`: `branchId={main}` → two rows: the admin user with `Open 2000`, `Overdue 2000`, then the row without an owner (`OwnerUserId null`) with `Open 1000`, `Overdue 1000`; for each row of `GET /api/reports/debt-by-salesperson?side=Receivable&from=2026-10-01&to=2026-10-31` (main client), the breakdown row with the same `OwnerUserId` has `Open == ClosingOpen` and `Overdue == ClosingOverdue`.
    - `Payables_due_within_thirty_days`: one more unpaid NMH of 800 from `Ncc1Id` on 10-20 with `DueDate 2026-11-15` (built by hand, as above); `debt/breakdown?at=2026-10-21&branchId={main}` → one row with that voucher's code, `DueDate 2026-11-15`, `Open 800`, `SourceType StockIn`; in a second test with `DueDate 2026-11-25` → no row.
-   - `Requires_reports_debt`: 403.
+   - the `debt/breakdown` row of `ExecutiveRouteGuardTests`.
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~DebtBreakdownTests"`. Expected: FAIL — 404 (no route).
 3. Implement `GetBreakdownAsync` and the action `GET debt/breakdown`.
 4. Run `--filter "FullyQualifiedName~DebtBreakdownTests|FullyQualifiedName~DebtSummaryTests"`. Expected: PASS.

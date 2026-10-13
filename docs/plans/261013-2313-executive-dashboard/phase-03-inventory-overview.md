@@ -25,6 +25,7 @@ Backend:
 Tests:
 - `backend/tests/OrderMgmt.IntegrationTests/Inventory/Unit/StockValueSplitTests.cs` (new — pure helpers of `Inventory/Common` are tested there by convention)
 - `backend/tests/OrderMgmt.IntegrationTests/ExecutiveDashboard/InventorySummaryTests.cs`, `InventoryBreakdownTests.cs`, `BranchComparisonTests.cs`, `AttentionTests.cs`, `RecentDocumentsTests.cs` (new)
+- `backend/tests/OrderMgmt.IntegrationTests/ExecutiveDashboard/ExecutiveRouteGuardTests.cs` (modify — two rows)
 
 ## Reference files (read-only)
 
@@ -165,9 +166,22 @@ public sealed record NegativeFunds(int Count, decimal Amount);
 Task<NegativeFunds> GetNegativeFundsAsync(ExecutiveScope scope, DateOnly at, CancellationToken ct = default);
 ```
 
-`InventoryMetricsService` injects `IAppDbContext`, `ICurrentUser`, `IExecutiveScopeResolver`, `IDateTime`, `ITransactionRunner`. `ExecutiveOverviewService` injects `IAppDbContext`, `ICurrentUser`, `IExecutiveScopeResolver`, `IDateTime`, `ITransactionRunner` and the four metrics services.
+`InventoryMetricsService` injects `IAppDbContext`, `ICurrentUser`, `IExecutiveScopeResolver`, `ExecutiveLookups`, `IDateTime`, `ITransactionRunner`. `ExecutiveOverviewService` injects `IAppDbContext`, `ICurrentUser`, `IExecutiveScopeResolver`, `ExecutiveLookups`, `IDateTime`, `ITransactionRunner` and the four metrics services. Warehouse and product-group names are specific to inventory and are looked up inside `InventoryMetricsService` (separate queries by id with `IgnoreQueryFilters()`).
 
 ## Rules
+
+### Guard rows and cross-domain methods
+
+- Every route of this phase with a domain permission adds its row to `ExecutiveRouteGuardTests`, as in Phase 02:
+
+  | Route | Permission | Checked total | Own branch | Company |
+  |---|---|---|---|---|
+  | `inventory/summary?{OctoberRange}` | `reports.inventory` | `ProductCount` | 1 | 2 |
+  | `inventory/breakdown` | `reports.inventory` | number of `ByWarehouse` rows | 1 | 2 |
+
+  The dataset holds no tracked stock, so the guard class's arrange method also posts NMH 1 × 77 of a tracked product into the main warehouse and NMH 1 × 50 of another tracked product into branch B's warehouse (`ReportIds` does not carry that warehouse's id: read it from `Warehouses` by `BranchId == ids.BranchBId`). The guard users have no `inventory.view_cost`, which is why the rows check counts.
+- `branches`, `attention` and `recent` have no domain permission; their own test classes cover the permission parts. Each of `AttentionTests` and `RecentDocumentsTests` also gets `Foreign_branch_is_refused`: a user with `dashboard.executive` and default branch main asking `branchId={branchB}` → 403. `AttentionTests` also gets `Own_branch_by_default`: a user with `dashboard.executive` and `reports.debt`, default branch main, `attention?at=2026-10-31` without `branchId` → `OverdueReceivables.Amount 3000` (the admin without `branchId` gets 12,999).
+- `GetByBranchAsync` needs the branch of each voucher: add `BranchId` to the private voucher row of `SalesMetricsService` and replace its private totals type with `SalesTotals`. The methods added for the overview service take a resolved scope and do no permission check; they are still called inside the overview service's snapshot.
 
 ### Inventory
 
@@ -229,7 +243,7 @@ Set the test database first in every shell:
    - `Company_wide_sums_branches`: a second fresh branch Y with a warehouse and NMH of a tracked product E 2 × 50; without `branchId` → `StockValue 2700`, `ProductCount 3`, `WarehouseCount 3`; with `branchId={Y}` → `StockValue 100`.
    - `Negative_stock_is_counted`: XBH 3 of a tracked product C that has no stock, from W1, with `AcknowledgeNegativeStock = true` → `NegativeCount 1`.
    - `Values_are_hidden_without_view_cost`: a user with `dashboard.executive` and `reports.inventory` (default branch X) → `StockValue`, `InValue`, `OutCost` null, `CanViewCost false`, `ProductCount 2`.
-   - `Requires_reports_inventory`: 403 for a user with only `dashboard.executive`.
+   - the `inventory/summary` row of `ExecutiveRouteGuardTests` (with the tracked-stock arrangement).
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~InventorySummaryTests"`. Expected: FAIL — build error, `InventorySummaryDto` does not exist.
 3. Implement `Models/InventoryModels.cs`, `IInventoryMetricsService` (the two public DTO methods), `InventoryMetricsService.GetSummaryAsync`, the action `GET inventory/summary` and the `AddScoped` line.
 4. Run the same command. Expected: PASS.
@@ -244,7 +258,7 @@ Set the test database first in every shell:
    - `Top_by_value`: first row product A, `Value 1600`, `Quantity 16`; second row product B, `Value 1000`, `Quantity 5`.
    - `Negative_rows`: after an XBH 3 of a tracked product C without stock from W1 (`AcknowledgeNegativeStock = true`) → one row: product C, warehouse W1, `Quantity -3`.
    - `Values_are_hidden_without_view_cost`: a user without `inventory.view_cost` → every `Value` null, `TopByValue` empty, `CanViewCost false`, the warehouse rows still present with their `ProductCount`.
-   - `Requires_reports_inventory`: 403.
+   - the `inventory/breakdown` row of `ExecutiveRouteGuardTests`.
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~InventoryBreakdownTests"`. Expected: FAIL — 404 (no route).
 3. Implement `GetBreakdownAsync` and the action `GET inventory/breakdown`.
 4. Run `--filter "FullyQualifiedName~InventoryBreakdownTests|FullyQualifiedName~InventorySummaryTests"`. Expected: PASS.
@@ -272,7 +286,8 @@ Set the test database first in every shell:
    - `Negative_fund`: a payment of 50,000 from the fund `QtmId` on 10-20 with `AcknowledgeNegativeFund = true` → `NegativeFunds { Count 1, Amount 30700 }`.
    - `Negative_stock`: an XBH 3 of a tracked product without stock from `MainWarehouseId` to `Kh1Id`, with `AcknowledgeNegativeStock = true` → `NegativeStock { Count 1, Amount null }`.
    - `Parts_follow_the_permissions`: a user with `dashboard.executive` and `reports.cash` (default branch main) → the three debt items and `NegativeStock` are null, `NegativeFunds` is not.
-   - `Needs_only_dashboard_executive`: a user with only `dashboard.executive` → 200 with all five items null.
+   - `Needs_only_dashboard_executive`: a user with only `dashboard.executive` (default branch main) → 200 with all five items null.
+   - `Foreign_branch_is_refused`: the same user with `branchId={branchB}` → 403.
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~AttentionTests"`. Expected: FAIL — 404 (no route).
 3. Implement `IDebtMetricsService.GetAttentionAsync`, `ICashMetricsService.GetNegativeFundsAsync`, `IInventoryMetricsService.CountNegativeStockAsync`, `ExecutiveOverviewService.GetAttentionAsync` and the action `GET attention`.
 4. Run the same command. Expected: PASS.
@@ -285,7 +300,8 @@ Set the test database first in every shell:
    - `One_branch`: `recent?limit=50&branchId={main}` → 6 rows, none of `BranchBSaleId`.
    - `Deleted_documents_are_left_out`: post one more unpaid XBH of 700 in the main branch and one more receipt of 200, then delete both (`DELETE /api/stock-vouchers/{id}`, `DeleteCashAsync`) → `recent?limit=50&branchId={main}` still has 6 rows.
    - `Limit`: `recent?limit=2` → 2 rows; `recent?limit=0` → 400 with a `limit` detail; `recent` without `limit` → at most 10 rows.
-   - `Rows_follow_the_permissions`: a user with `dashboard.executive` and `reports.cash` (default branch main) → only `Receipt` and `Payment` rows; a user with only `dashboard.executive` → 200 and an empty list.
+   - `Rows_follow_the_permissions`: a user with `dashboard.executive` and `reports.cash` (default branch main) → only `Receipt` and `Payment` rows, all of the main branch; a user with only `dashboard.executive` → 200 and an empty list.
+   - `Foreign_branch_is_refused`: a user with `dashboard.executive` and default branch main asking `recent?branchId={branchB}` → 403.
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~RecentDocumentsTests"`. Expected: FAIL — 404 (no route).
 3. Implement `ExecutiveOverviewService.GetRecentAsync`, `RecentQueryValidator` in `ExecutiveQueryValidators.cs` (`Limit` from 1 to 50 → key `limit`, "Số dòng từ 1 đến 50.") and the action `GET recent` (with `IValidator<RecentQuery>`).
 4. Run the same command. Expected: PASS.

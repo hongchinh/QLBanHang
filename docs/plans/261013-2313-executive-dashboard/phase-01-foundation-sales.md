@@ -1,6 +1,6 @@
 # Phase 01 — Backend foundation and sales metrics
 
-**Status:** [ ] pending
+**Status:** [x] complete (2026-10-14, commits e28faf5..b2b539d; spec review compliant, quality review approved after two fix rounds)
 **Complexity:** L
 
 ## Objective
@@ -142,7 +142,7 @@ The limits apply to the resolved period, so a request with only one date is chec
 
 `SalesTopQueryValidator : AbstractValidator<SalesTopQuery>` (Task 1.7): `Include(new ExecutiveQueryValidator(clock))`; `Limit` from 1 to 50 → key `limit`, "Số dòng từ 1 đến 50.".
 
-There is no "in enum" rule: an unknown enum name fails model binding before any validator runs and ASP.NET answers 400 by itself.
+Enums: there is no "in enum" rule. An unknown enum name and a number outside the enum (`granularity=7`) both fail model binding before any validator runs, and ASP.NET answers 400 by itself. That body is the framework's `ValidationProblemDetails` (`errors` keyed by the PascalCase property name), not the `ApiResponse` envelope, so there is no `error.details`. This was measured during the Phase 01 run; two tests pin the status code.
 
 Validators are registered by the assembly scan in `DependencyInjection.cs`; the controller injects `IValidator<T>` for each query type and calls `ValidateAndThrowAsync`.
 
@@ -161,7 +161,7 @@ Validators are registered by the assembly scan in `DependencyInjection.cs`; the 
   - `Customer`: group by `PartnerId` (XBH and NTL always carry a customer); `Code` and `Name` from `Customers.IgnoreQueryFilters()`.
   - `Product`: group lines by `ProductId` (revenue from lines, cost from ledger rows grouped by `ProductId`); `Code` and `Name` from `Products.IgnoreQueryFilters()`.
   - `Employee`: group by the voucher's `OwnerUserId`; `Name` = `Users.IgnoreQueryFilters().FullName`; `Code` is `null`.
-  - Order by the sort column descending, then `Name` (ordinal); take `Limit`. `Sort == GrossProfit` without `inventory.view_cost` orders by revenue.
+  - Order by the sort column descending, then `Name` (ordinal), then `Id`, so the order is total; take `Limit`. `Sort == GrossProfit` without `inventory.view_cost` orders by revenue.
 
 ### Query shapes (guidance; change the shape, never the rule, if EF refuses to translate one, and say so in the report)
 
@@ -310,6 +310,7 @@ Set the test database first in every shell:
    - `Monthly_point`: `granularity=Month` → one point `2026-10-01` with 2,500.
    - `Buckets_follow_vn_dates`: two more unpaid XBH of 100 at `2026-10-20 23:30` and `2026-10-21 00:30` (VN time) → the 10-20 point and the 10-21 point each hold 100.
    - `Daily_series_over_a_year_is_rejected`: `from=2025-01-01&to=2026-10-01&granularity=Day` → 400 with a `granularity` detail; the same range with `granularity=Month` → 200.
+   - `Undefined_granularity_number_is_rejected`: `{October}&granularity=7` → status 400 (the framework's own response; assert the status only). It passes before any implementation, so it has no RED step.
    - `Requires_reports_profit`: 403 for a user with only `dashboard.executive`.
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~SalesSeriesTests"`. Expected: FAIL — 404 (no route).
 3. Implement `GetSeriesAsync`, `ExecutiveSeriesQueryValidator` and the action `GET sales/series` (validator call, `[HasPermission(Permissions.Reports.Profit)]`).
@@ -326,10 +327,32 @@ Set the test database first in every shell:
    - `Sort_by_gross_profit`: a fresh branch with two tracked products (VAT 0), each bought with NMH 10 × 100; A sold with XBH 2 × 150 (revenue 300, cost 200, profit 100), B sold with XBH 4 × 110 (revenue 440, cost 400, profit 40). `by=Product&sort=Revenue` → B first; `by=Product&sort=GrossProfit` → A first, with `GrossProfit 100` and `40`.
    - `Gross_profit_sort_without_view_cost_falls_back_to_revenue`: the same data for a user without `inventory.view_cost` (default branch = that branch) and `sort=GrossProfit` → B first and `GrossProfit null` on each row.
    - `Limit_is_applied_and_validated`: `by=Product&limit=1` → one row; `limit=0` and `limit=51` → 400 with a `limit` detail.
+   - `Undefined_by_or_sort_number_is_rejected`: `{October}&by=7` and `{October}&by=Customer&sort=7` → status 400 (the framework's own response; assert the status only; no RED step).
 2. Run `dotnet test tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~SalesTopTests"`. Expected: FAIL — 404 (no route).
 3. Implement `GetTopAsync`, `SalesTopQueryValidator` and the action `GET sales/top`.
 4. Run the same command. Expected: PASS.
 5. Commit: `git commit -m "feat(dashboard): sales top lists endpoint"`.
+
+### Task 1.8 — Review follow-up (added after the quality review of Tasks 1.1–1.7)
+
+The review found no wrong figure, but several one-line changes to the revenue and cost code passed every test, and `sales/top` had no guard test. These tests cover existing behaviour, so each is proven by a mutation instead of a RED run: break the line it guards, see the test fail, restore the line.
+
+1. Figure tests:
+   - `SalesSummaryTests.Line_and_order_discounts_reduce_revenue`: one more XBH on 10-20 in the main branch, 10 × 100 with a 10 % line discount and an order discount of 90 → `Revenue 3310`; its `by=Product` row has `Revenue 810`.
+   - `SalesTopTests.Vat_inclusive_price_is_reduced_on_the_product_list`: 1 × 1,100 VAT-inclusive at 10 % → product `Revenue 1000`.
+   - `SalesCostTests.Previous_period_has_its_own_cost_and_margin`: NMH 20 × 100 on 10-01, XBH 4 × 150 on 10-04, XBH 2 × 180 on 10-07; `from=2026-10-06&to=2026-10-08` → `Revenue 360`, `PrevRevenue 600`, `RevenueDeltaPct -40`, `Cost 200`, `GrossProfit 160`, `MarginPct 44.44`, `PrevMarginPct 33.33` (the two periods must have different gross profits, or a previous margin computed from the current profit would pass).
+   - `SalesTopTests.Tracked_return_reduces_product_cost`: NMH 10 × 100, XBH 4 × 150, NTL 1 × 150 → product `Revenue 450`, `GrossProfit` = 450 − (Σ `CostAmount` of the XBH rows − Σ `InValue` of the NTL rows).
+   - `SalesSeriesTests.Tracked_sale_has_cost_and_gross_profit_points`: the 10-04 point has `Revenue 600`, `Cost 400`, `GrossProfit 200`; every other point 0.
+   - `SalesTopTests.Customers_sorted_by_gross_profit`: C1 buys 2 × 150 and C2 buys 4 × 110 of a product costing 100 → by revenue C2 first, by gross profit C1 first (100, then 40).
+   - `SalesTopTests.Employee_gross_profit_adds_up_the_sales_of_both_customers`: the same scenario with `by=Employee` → one row with `Revenue 740`, `GrossProfit 140`.
+   - `SalesTopTests.Limit_keeps_the_first_row_of_the_order`: equal revenue → the name that sorts first (given to the product with the larger id, so the name decides); equal names too → the smaller `Id`, the same on every call.
+   - `SalesTopTests.Customers_with_the_same_name_and_revenue_are_ordered_by_id`: two customers with the same name and revenue, the larger id sold to first → the smaller id comes first.
+   - Product-list VAT conditions: a VAT-exclusive product 1 × 1,000 at 10 % → `Revenue 1000`; a VAT-inclusive product sold 2 × 1,100 and returned 1 × 1,100 → `Revenue 900` (a stock-in line is priced before VAT, so nothing is taken off the return).
+   - `SalesCostTests.Provisional_follows_the_costing_period` also covers a range from the first day of last month to today → `IsProvisional true` (the flag follows the end of the range).
+2. Guard test `ExecutiveRouteGuardTests`, one table row per route (`sales/summary`, `sales/series`, `sales/top`), all with `{OctoberRange}`. A row carries the route, its extra query string, its domain permission, how to read the checked total, and the expected totals `OwnBranch` (2,500) and `Company` (12,499). Four theories run over the table: `Requires_the_domain_permission` (403 with only `dashboard.executive`), `Foreign_branch_is_refused` (403 for `branchId={branchB}`), `Own_branch_by_default` (the branch user gets `OwnBranch`), `Company_wide_for_access_all` (the admin without `branchId` gets `Company`). All seeding sits in one private arrange method. **Phases 02 and 03 add one row for every route they create** and put their extra documents in that arrange method.
+3. Test fixes: `Only_from_is_accepted` uses the first day of the current VN month (the fixed date would exceed the 1,100-day cap from October 2029); `Defaults_to_the_current_month` also asserts `To` is VN today; `GetSummaryAsync` moves to the test base; tests that read no dataset figure do not seed the dataset.
+4. Code fixes: the total order of the top lists (rule above); explicit enum cases with `ArgumentOutOfRangeException` instead of a default branch in `ExecutiveSeries` and in the `SalesTopBy` switch; a clearer name for the method that builds the counted-vouchers query; comments name the rule instead of a plan decision id (ids such as P3 already mean Round 2A decisions in this codebase); `DbSeeder` uses `StockReasonCodes` for the XBH and NTL rows.
+5. Three commits: `test(dashboard): cover discounts, VAT, previous-period cost and route guards`, `refactor(dashboard): total order for top lists, explicit enum cases, reason code constants`, and `test(dashboard): close the remaining review gaps on sales figures and guards`.
 
 ## Verification
 
@@ -345,4 +368,4 @@ From `backend/`, with `TEST_DB_CONNECTION` set:
 - A user without `branches.access_all` can never read another branch.
 - Cancelled and deleted vouchers and removed lines are never counted.
 - `InventoryReportService` returns the same results as before (its tests pass).
-- Seven commits, one per task, on `feat/executive-dashboard`.
+- One commit per task for Tasks 1.1–1.7, plus the follow-up commits of Task 1.8, on `feat/executive-dashboard`.

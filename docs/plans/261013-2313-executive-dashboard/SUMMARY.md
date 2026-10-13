@@ -75,9 +75,9 @@ Give directors and managers one page, `/dashboard/executive`, that shows sales (
 
 ## Risks
 
-- **Company-wide reads are heavy.** Debt loads every counted entry of each branch and side; cash loads the full movement history of every fund. Each dashboard refresh repeats that. Mitigation: the signal is batched per second and the fallback runs once a minute; Phase 08 lists the response times of the 13 routes on real-like data as a manual check, and an index or a short cache is a separate decision if a route takes over one second.
+- **Company-wide reads are heavy.** Debt loads every counted entry of each branch and side; cash loads the full movement history of every fund. Each dashboard refresh repeats that. Mitigation: the signal is batched per second and the fallback runs once a minute; Phase 08 lists the response times of the 13 routes on real-like data as a manual check, and an index or a short cache is a separate decision if a route takes over one second. Measured in Phase 01 on a synthetic year (20,001 sales vouchers, 40,001 lines and 40,000 ledger rows in one branch; second call): `sales/summary` 0.35 s, `sales/series` 0.36–0.37 s, `sales/top` by customer 0.38 s and by product 0.13 s on a quiet machine, 0.9–1.35 s on a loaded one. The summary reads two periods and the synthetic previous year was empty, so in steady state it is about twice that (roughly 0.7 s at 20,000 vouchers a year) and it passes one second near 30,000 sales vouchers a year. That volume is the trigger for the follow-up: sum revenue with a grouped query over the lines (the shape the product list already uses) instead of shipping one row per voucher; the Phase 01 tests make that change safe.
 - **Figures drift from the reports.** Mitigation: the services call the reports' own query helpers (`DebtPositionQuery`, `FundMovementQuery`) and each phase has tests that compare a dashboard figure with the report route for the same branch and date.
-- **Merge with `feat/tt133-report-forms`.** Both branches edit `Permissions.cs`, `DbSeeder.cs`, `permissions.ts`, `route-permissions.ts`, `nav-config.ts`, `App.tsx`, `InventoryReportService.cs` and the docs. The edits here are small and local; whichever branch merges second resolves by keeping both sides.
+- **Merge with `feat/tt133-report-forms`.** Both branches edit `Permissions.cs`, `DbSeeder.cs`, `permissions.ts`, `route-permissions.ts`, `nav-config.ts`, `App.tsx`, `InventoryReportService.cs` and the docs. The edits here are small and local; whichever branch merges second resolves by keeping both sides. Known on 2026-10-14: `DependencyInjection.cs` will conflict where both branches add registrations after the report services (keep all of them); `Permissions.cs` and `DbSeeder.cs` merge cleanly; the other branch now adds `GetStockSummaryAsync` to `InventoryReportService.cs` directly above `SplitByQuantity` and calls the private `IsProvisional`, so Phase 03 Task 3.1 (moving `SplitByQuantity` out) will conflict there — keep their method, apply the move, and keep the private `IsProvisional` wrapper.
 - **A signal is missed** (a controller without the attribute, a dropped connection). Mitigation: every executive query refetches every 60 seconds while the tab is visible.
 - **EF translation of the sales queries** (a conditional inside `Sum`, `Any` over a filtered voucher query). Mitigation: Phase 01 gives the query shapes; if a shape does not translate, the implementer changes the shape, not the rule, and reports it.
 - **Baseline failures.** `main` has 19 backend and 3 frontend known failures (`BASELINE.md`). Later runs compare test by test.
@@ -85,7 +85,8 @@ Give directors and managers one page, `/dashboard/executive`, that shows sales (
 ## Open questions (for the BA / accountant; none blocks development)
 
 - Should a user-created stock reason that increases the receivable count as a sale (P3)?
-- Is "cost of a return = the value at which it re-enters stock" the figure the accountant wants (P5)?
+- **Gross profit on returns (P5) — answer before the figures are shown to users (Phase 06).** A return re-enters stock at the price typed on the return voucher, which is normally the selling price, and the dashboard subtracts that value from cost. Example: buy 10 × 100, sell 4 × 150, return 1 × 150 → the dashboard shows revenue 450, cost 268, gross profit 182; valued at goods cost the gross profit is 150. Returning all four gives revenue 0 and gross profit +143. The stock ledger already books returns this way; the question is whether the accountant wants returns valued at cost instead (a change to stock posting, not only to the dashboard).
+- **Input VAT inside cost (P4/P5) — same deadline.** With the seeded setting `PurchaseCostIncludesVat = true`, the cost of goods includes input VAT while revenue excludes output VAT. Example: buy 10 × 100 plus 10 % VAT, sell 4 × 150 → the margin shows 26.67 % instead of 33.33 %. Either the setting is switched off at go-live for a company that deducts VAT, or the dashboard should compare like with like.
 - Revenue before or after VAT; freight as revenue (P4)?
 - Should ACCOUNTANT get `dashboard.executive` now or wait for the accountant dashboard?
 - Should `/dashboard/executive` replace `/admin/dashboard` as the landing page of ADMIN and MANAGER?
@@ -94,7 +95,7 @@ Give directors and managers one page, `/dashboard/executive`, that shows sales (
 ## Phases
 
 - [x] Phase 00 — Workspace, docs commit and failure baseline (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Backend foundation and sales metrics (L) — `phase-01-foundation-sales.md`
+- [x] Phase 01 — Backend foundation and sales metrics (L) — `phase-01-foundation-sales.md`
 - [ ] Phase 02 — Cash and debt metrics (L) — `phase-02-cash-debt.md`
 - [ ] Phase 03 — Inventory metrics, branch comparison, attention, recent documents (L) — `phase-03-inventory-overview.md`
 - [ ] Phase 04 — Real-time signal (M) — `phase-04-realtime-signal.md`

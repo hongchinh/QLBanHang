@@ -454,4 +454,52 @@ describe('StockLineGrid', () => {
     expect(focused()).toBe('stock-line-product-code-0');
     expect(document.getElementById('stock-line-product-code-1')).toBeNull();
   });
+
+  it('ArrowDown keeps the column, or falls back to Mã when the row below cannot use it', () => {
+    renderGrid({
+      lines: [line({ pricingMode: 'PerSquareMeter' }), line({ _uiKey: 'b', pricingMode: 'PerUnit' }), line({ _uiKey: 'c', pricingMode: 'PerUnit' })],
+    });
+    fireEvent.keyDown(byId('stock-line-width-0'), { key: 'ArrowDown' });
+    expect(focused()).toBe('stock-line-product-code-1');
+    fireEvent.keyDown(byId('stock-line-unit-price-1'), { key: 'ArrowDown' });
+    expect(focused()).toBe('stock-line-unit-price-2');
+    fireEvent.keyDown(byId('stock-line-unit-price-2'), { key: 'ArrowUp' });
+    expect(focused()).toBe('stock-line-unit-price-1');
+  });
+
+  // Programmatic focus on a filled Mã cell must not open the suggestion list: an open list would swallow
+  // up/down (list highlight) and Enter (re-pick item 0, resetting quantity and price).
+  it('focusing a filled Mã does not open the list; ArrowDown moves rows and keeps the quantity', () => {
+    const { values } = renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b' })] });
+    act(() => byId('stock-line-product-code-0').focus());
+    expect(screen.queryByRole('listbox')).toBeNull();
+    fireEvent.keyDown(byId('stock-line-product-code-0'), { key: 'ArrowDown' });
+    expect(focused()).toBe('stock-line-product-code-1');
+    expect(values().lines[0].quantity).toBe(5);
+  });
+
+  it('arrows leave the warehouse select alone', () => {
+    showAllColumns();
+    renderGrid({ lines: [line(), line({ _uiKey: 'b' })] });
+    byId('stock-line-warehouse-0').focus();
+    fireEvent.keyDown(byId('stock-line-warehouse-0'), { key: 'ArrowDown' });
+    expect(focused()).toBe('stock-line-warehouse-0');
+  });
+
+  it('Ctrl+Delete removes the focused line and keeps the column on the next one', async () => {
+    const { values } = renderGrid({
+      lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' })],
+    });
+    fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 'Delete', ctrlKey: true });
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B']));
+    await waitFor(() => expect(focused()).toBe('stock-line-quantity-0'));
+  });
+
+  it('the keyboard guide lists the new keys', () => {
+    renderGrid({ lines: [line()] });
+    const guide = document.querySelector('.keyboard-guide')!;
+    expect(guide).toHaveTextContent('Ctrl+Del');
+    expect(guide).toHaveTextContent('Alt+1…4');
+    expect(guide).toHaveTextContent('Dòng trên/dưới');
+  });
 });

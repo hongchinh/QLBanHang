@@ -25,6 +25,7 @@ import {
   LINE_FOCUS_FIELDS,
   nextStop,
   prevStop,
+  verticalTarget,
   type LineFocusField,
 } from '@/pages/stock-vouchers/utils/line-navigation';
 import {
@@ -329,8 +330,33 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       addLine();
       return;
     }
+    const target = e.target as HTMLElement;
+    const noMods = !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && noMods && target.tagName !== 'SELECT') {
+      const current = parseCellId(target.id);
+      const to = current ? current.rowIndex + (e.key === 'ArrowDown' ? 1 : -1) : -1;
+      if (!current || to < 0 || to >= fields.length) return;
+      e.preventDefault();
+      focusCell(verticalTarget(rows[to]?.pricingMode ?? 'PerUnit', current.field, isVisible), to);
+      return;
+    }
+
+    if (e.key === 'Delete' && e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey && !readOnly) {
+      const current = parseCellId(target.id);
+      if (!current) return;
+      e.preventDefault();
+      remove(current.rowIndex);
+      setTimeout(() => {
+        const lines = form.getValues('lines');
+        const to = Math.min(current.rowIndex, lines.length - 1);
+        if (to >= 0) focusCell(verticalTarget(lines[to].pricingMode, current.field, isVisible), to);
+      }, 0);
+      return;
+    }
+
     if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey) return;
-    const current = parseCellId((e.target as HTMLElement).id);
+    const current = parseCellId(target.id);
     if (!current) return;
     e.preventDefault();
     moveFocus(current, e.shiftKey ? -1 : 1);
@@ -405,6 +431,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                 inputId={cellId('product-code', idx)}
                 value={line.productCode ?? ''}
                 onChange={(v) => setLineField(idx, 'productCode', v)}
+                openOnFocus={false}
                 onSelect={(s) => {
                   applyProduct(idx, s);
                   const next = nextStop(enterPath(s.pricingMode, prefs.enterStops[s.pricingMode], isVisible), 'product-code');
@@ -565,8 +592,11 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         <div className="keyboard-guide">
           <span><span className="kbd">Enter</span> Tiếp</span>
           <span><span className="kbd">Shift</span>+<span className="kbd">Enter</span> Lùi</span>
-          <span><span className="kbd">Ctrl</span>+<span className="kbd">S</span> Lưu</span>
+          <span><span className="kbd">↑</span><span className="kbd">↓</span> Dòng trên/dưới</span>
           <span><span className="kbd">Insert</span> Thêm dòng</span>
+          <span><span className="kbd">Ctrl</span>+<span className="kbd">Del</span> Xóa dòng</span>
+          <span><span className="kbd">Ctrl</span>+<span className="kbd">S</span> Lưu</span>
+          <span><span className="kbd">Alt</span>+<span className="kbd">1…4</span> Chuyển tab</span>
         </div>
       </div>
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}

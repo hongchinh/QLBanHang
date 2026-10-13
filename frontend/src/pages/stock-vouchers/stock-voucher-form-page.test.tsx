@@ -719,6 +719,85 @@ describe('StockVoucherFormPage', () => {
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
   });
 
+  describe('server errors clear when the user corrects the field', () => {
+    async function saveWithServerErrors(details: Record<string, string[]>) {
+      createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', details));
+      renderPage('In');
+      await fillPerUnitLine(3);
+      await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    }
+
+    it('the fund error and the tab dot go away when a new payment method auto-fills a fund', async () => {
+      await saveWithServerErrors({ fundId: ['Chi nhánh chưa có quỹ mặc định loại ngân hàng.'] });
+      expect(await screen.findByText('Chi nhánh chưa có quỹ mặc định loại ngân hàng.')).toBeInTheDocument();
+      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-payment-method'), { target: { value: PM_BANK } });
+
+      await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_BANK));
+      await waitFor(() => expect(screen.queryByText('Chi nhánh chưa có quỹ mặc định loại ngân hàng.')).toBeNull());
+      expect(screen.queryByTestId('tab-error-payment')).toBeNull();
+    });
+
+    it('the fund error goes away when the user picks a fund', async () => {
+      await saveWithServerErrors({ fundId: ['Quỹ không hợp lệ'] });
+      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-fund'), { target: { value: FUND_CASH2 } });
+
+      await waitFor(() => expect(screen.queryByText('Quỹ không hợp lệ')).toBeNull());
+      expect(screen.queryByTestId('tab-error-payment')).toBeNull();
+    });
+
+    it('a line error goes away when that cell changes, and an unrelated error stays', async () => {
+      await saveWithServerErrors({ 'lines[0].quantity': ['Số lượng không hợp lệ'], fundId: ['Quỹ không hợp lệ'] });
+      await screen.findByText('Quỹ không hợp lệ');
+      await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true'));
+
+      // The fund is corrected: the line error is another field's and stays.
+      fireEvent.change(byId('stock-fund'), { target: { value: FUND_CASH2 } });
+      await waitFor(() => expect(screen.queryByText('Quỹ không hợp lệ')).toBeNull());
+      expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true');
+
+      fireEvent.change(byId('stock-line-quantity-0'), { target: { value: '4' } });
+      await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBeNull());
+    });
+
+    it('a line error on another cell of the same line stays when this cell changes', async () => {
+      await saveWithServerErrors({ 'lines[0].quantity': ['Số lượng không hợp lệ'] });
+      await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true'));
+
+      fireEvent.change(byId('stock-line-unit-price-0'), { target: { value: '60000' } });
+
+      expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true');
+    });
+
+    it('picking another product on a line clears the server errors of that line', async () => {
+      await saveWithServerErrors({ 'lines[0].quantity': ['Số lượng không hợp lệ'] });
+      await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true'));
+
+      fireEvent.change(byId('stock-line-product-code-0'), { target: { value: 'SP0' } });
+      fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('SP01'));
+
+      await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBeNull());
+    });
+
+    it('a client schema error is not cleared by an unrelated change', async () => {
+      renderPage('In');
+      await fillPerUnitLine(3);
+      fireEvent.keyDown(byId('stock-voucher-at'), { key: '3', altKey: true });
+      fireEvent.change(byId('stock-freight'), { target: { value: '-5' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+      expect(await screen.findByText('Phí vận chuyển không được âm')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-payment-method'), { target: { value: PM_BANK } });
+      await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_BANK));
+
+      expect(screen.getByText('Phí vận chuyển không được âm')).toBeInTheDocument();
+    });
+  });
+
   it('server due date error shows under the due date', async () => {
     createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', { dueDate: ['Hạn thanh toán không hợp lệ'] }));
     partnerResults.data = [supplier];

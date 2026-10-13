@@ -166,6 +166,25 @@ function errorKeysOf(errors: FieldErrors<StockVoucherFormValues>): string[] {
   return keys;
 }
 
+// Header fields whose server error also goes away when the listed field changes (it is what drives them).
+const SERVER_ERROR_DRIVERS: Record<string, string[]> = {
+  fundId: ['paymentMethodId'],
+  paidAmount: ['paymentMethodId'],
+  dueDate: ['voucherAt', 'reasonId'],
+};
+
+// Keys whose server error is stale once `changed` has a new value.
+function staleServerErrorKeys(changed: string): string[] {
+  if (/^lines\.\d+\.\w+$/.test(changed)) return [changed];
+  // A whole line replaced at once (a product picked): every field of it was rewritten.
+  const row = /^lines\.(\d+)$/.exec(changed);
+  if (row) return [...LINE_ERROR_FIELDS].map((field) => `lines.${row[1]}.${field}`);
+  const driven = Object.entries(SERVER_ERROR_DRIVERS)
+    .filter(([, drivers]) => drivers.includes(changed))
+    .map(([field]) => field);
+  return HEADER_ERROR_FIELDS.has(changed) ? [changed, ...driven] : driven;
+}
+
 // Accepts form keys and server keys (`lines[3].width`).
 function focusIdOf(key: string): string | undefined {
   const line = /^lines(?:\.|\[)(\d+)(?:\]\.|\.)(\w+)$/.exec(key);
@@ -275,6 +294,19 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     initialHasDraft: !!mountData.draft,
     initialSavedAt: mountData.draft ? new Date(mountData.draft.savedAt) : null,
   });
+
+  // A server error describes the value that was sent: it goes as soon as that value (or what drives it) changes.
+  // Client (zod) errors are left to the resolver.
+  useEffect(() => {
+    const subscription = form.watch((_values, { name }) => {
+      if (!name) return;
+      for (const key of staleServerErrorKeys(name)) {
+        const path = key as FieldPath<StockVoucherFormValues>;
+        if (form.getFieldState(path).error?.type === 'server') form.clearErrors(path);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   const status = voucher?.status ?? 'Active';
   const readOnly = isEdit && (status === 'Cancelled' || !voucher?.canEdit);

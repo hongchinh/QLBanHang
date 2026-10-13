@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useForm, useWatch, type FieldPath, type Resolver } from 'react-hook-form';
+import { useForm, useWatch, type FieldErrors, type FieldPath, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { addDays, format } from 'date-fns';
@@ -49,7 +49,6 @@ import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/conf
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonLoader } from '@/components/ui/button-loader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -62,10 +61,14 @@ import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { fromDateTimeLocalValue, toDateTimeLocalValue } from '@/lib/vn-datetime';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
-import { CustomerDebtPanel } from './components/customer-debt-panel';
+import { PartnerDebtStrip } from './components/partner-debt-strip';
 import { StockLineGrid } from './components/stock-line-grid';
-import { StockTotalsPanel } from './components/stock-totals-panel';
+import { StockTotalsBar, type TotalsJumpField } from './components/stock-totals-bar';
 import { StockVoucherMainFields, FieldError, SELECT_CLASS } from './components/stock-voucher-main-fields';
+import { StockVoucherPaymentTab } from './components/stock-voucher-payment-tab';
+import { StockVoucherTabs } from './components/stock-voucher-tabs';
+import { savedImpactOf } from './utils/debt-after-voucher';
+import { errorTabs, firstErrorTab, tabOfField, type StockVoucherTab } from './utils/voucher-tabs';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
 
@@ -112,6 +115,66 @@ const LINE_ERROR_FIELDS = new Set<string>([
   'vatRate',
   'note',
 ]);
+
+const ALT_TABS: Record<string, StockVoucherTab> = { '1': 'lines', '2': 'other', '3': 'payment', '4': 'history' };
+
+const JUMP_IDS: Record<TotalsJumpField, string> = {
+  freight: 'stock-freight',
+  orderDiscount: 'stock-order-discount',
+  paidAmount: 'stock-paid-amount',
+};
+
+// Form key -> element id for the fields that live in a tab.
+const FIELD_FOCUS_IDS: Record<string, string> = {
+  partnerTaxCode: 'stock-partner-tax-code',
+  handlerName: 'stock-handler-name',
+  note: 'stock-voucher-note',
+  freight: 'stock-freight',
+  orderDiscount: 'stock-order-discount',
+  paidAmount: 'stock-paid-amount',
+  fundId: 'stock-fund',
+  dueDate: 'stock-due-date',
+};
+// Line form field -> cell id part; cell ids are `stock-line-<cell>-<row>` (`cellId` in stock-line-grid.tsx).
+const LINE_CELL_IDS: Record<string, string> = {
+  productId: 'product-code',
+  warehouseId: 'warehouse',
+  sheetCount: 'sheet-count',
+  length: 'length',
+  width: 'width',
+  thickness: 'thickness',
+  quantity: 'quantity',
+  unitPrice: 'unit-price',
+  discountRate: 'discount-rate',
+  discountAmount: 'discount-amount',
+  vatRate: 'vat-rate',
+  note: 'note',
+};
+
+// Flattens react-hook-form errors into keys (`note`, `lines.2.width`); a non-array `lines` error (min 1 line) stays `lines`.
+function errorKeysOf(errors: FieldErrors<StockVoucherFormValues>): string[] {
+  const keys: string[] = [];
+  for (const [key, value] of Object.entries(errors)) {
+    if (key === 'lines' && Array.isArray(value)) {
+      value.forEach((row, i) => {
+        for (const field of Object.keys(row ?? {})) keys.push(`lines.${i}.${field}`);
+      });
+    } else {
+      keys.push(key);
+    }
+  }
+  return keys;
+}
+
+// Accepts form keys and server keys (`lines[3].width`).
+function focusIdOf(key: string): string | undefined {
+  const line = /^lines(?:\.|\[)(\d+)(?:\]\.|\.)(\w+)$/.exec(key);
+  if (line) {
+    const cell = LINE_CELL_IDS[line[2]];
+    return cell ? `stock-line-${cell}-${line[1]}` : undefined;
+  }
+  return key === 'lines' ? 'stock-line-product-code-0' : FIELD_FOCUS_IDS[key];
+}
 
 export function StockVoucherFormPage({ type }: { type: StockDirection }) {
   const { id } = useParams<{ id: string }>();
@@ -161,6 +224,7 @@ interface FormProps {
 
 function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormProps) {
   const isEdit = !!id;
+  const [activeTab, setActiveTab] = useState<StockVoucherTab>('lines');
   const labels: StockVoucherLabels = STOCK_VOUCHER_LABELS[type];
   const navigate = useNavigate();
 
@@ -313,13 +377,13 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   const activitiesQuery = useStockVoucherActivities(id, isEdit);
 
-  // Customer debt panel (P6): stock-out sales to a picked partner, for debt.partner_summary or reports.debt.
+  // Partner debt strip (P6): a picked partner, for debt.partner_summary or reports.debt (D9).
   const hasPermission = useAuthStore((s) => s.hasPermission);
   const canSeePartnerDebt = hasPermission('debt.partner_summary') || hasPermission('reports.debt');
-  const debtPanelPartnerId =
-    type === 'Out' && selectedReason?.debtEffect === 'ReceivableIncrease' && canSeePartnerDebt
-      ? selectedPartner?.id
-      : undefined;
+  const debtStripPartnerId = canSeePartnerDebt ? selectedPartner?.id : undefined;
+  // Stored impact of the voucher being edited (Active, same partner).
+  const savedImpact = savedImpactOf(voucher, selectedPartner?.id);
+  const lineCount = watchedLines.filter((l) => !!l.productId).length;
 
   function resetTo(fresh: StockVoucher) {
     lastVersionRef.current = fresh.version;
@@ -372,18 +436,37 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   // Maps `lines[i].field` keys onto the grid and the header keys onto their fields; returns true when every key was mapped.
   function applyServerErrors(details: Record<string, string[]>): boolean {
     let allMapped = true;
+    const mappedKeys: string[] = [];
     for (const [key, messages] of Object.entries(details)) {
       const match = /^lines\[(\d+)\]\.(\w+)$/.exec(key);
       if (match && LINE_ERROR_FIELDS.has(match[2])) {
         const path = `lines.${match[1]}.${match[2]}` as FieldPath<StockVoucherFormValues>;
         form.setError(path, { type: 'server', message: messages[0] });
+        mappedKeys.push(key);
       } else if (HEADER_ERROR_FIELDS.has(key)) {
         form.setError(key as FieldPath<StockVoucherFormValues>, { type: 'server', message: messages[0] });
+        mappedKeys.push(key);
       } else {
         allMapped = false;
       }
     }
+    focusFirstError(mappedKeys);
     return allMapped;
+  }
+
+  // Switches to the first tab with an error and focuses its first erroring field.
+  function focusFirstError(keys: string[]) {
+    const tab = firstErrorTab(keys);
+    if (!tab) return;
+    setActiveTab(tab);
+    const id = keys.filter((k) => tabOfField(k) === tab).map(focusIdOf).find((v) => !!v);
+    // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
+    if (id) setTimeout(() => document.getElementById(id)?.focus(), 0);
+  }
+
+  function jumpTo(field: TotalsJumpField) {
+    setActiveTab('payment');
+    setTimeout(() => document.getElementById(JUMP_IDS[field])?.focus(), 0);
   }
 
   // Trailing rows the user never picked a product for are dropped instead of failing validation.
@@ -398,7 +481,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     submittingRef.current = true;
     dropBlankLines();
     void form
-      .handleSubmit((parsed) => {
+      .handleSubmit(
+        (parsed) => {
         // Hidden fields are not sent: the server applies its own defaults.
         const visible = {
           ...parsed,
@@ -406,7 +490,9 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           dueDate: dueDateShown ? parsed.dueDate : undefined,
         };
         return runAction({ kind: 'save', intent, payload: toUpsertPayload(type, visible), flags: {} });
-      })()
+        },
+        (invalid) => focusFirstError(errorKeysOf(invalid)),
+      )()
       .finally(() => {
         submittingRef.current = false;
       });
@@ -419,6 +505,14 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       submitWithIntent(isEdit ? 'update' : 'save-stay');
       return;
     }
+    const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[e.key] : undefined;
+    if (altTab && (altTab !== 'history' || isEdit)) {
+      e.preventDefault();
+      setActiveTab(altTab);
+      // The focused cell may sit in a panel that is about to be hidden; keep the focus in the form so Ctrl+S / Alt+n keep working.
+      setTimeout(() => document.querySelector<HTMLElement>('[role="tab"][data-state="active"]')?.focus(), 0);
+      return;
+    }
     // D7: Enter never submits the form.
     const tag = (e.target as HTMLElement).tagName;
     if (e.key === 'Enter' && (tag === 'INPUT' || tag === 'SELECT')) e.preventDefault();
@@ -426,6 +520,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   // Enter from the main area: the first line without a product, or a new one.
   function enterGrid() {
+    setActiveTab('lines');
     const lines = form.getValues('lines');
     let idx = lines.findIndex((l) => !l.productId);
     if (idx === -1) {
@@ -487,8 +582,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const linesRootMessage = linesError?.root?.message ?? linesError?.message;
 
   return (
-    <div className="space-y-4">
-      <div className="sticky top-0 z-30 -mx-4 border-b bg-background/95 px-4 py-3 shadow-sm backdrop-blur md:-mx-3 md:px-3">
+    <div className="flex h-full min-h-[560px] flex-col gap-2">
+      <div className="sticky top-0 z-30 shrink-0 -mx-4 border-b bg-background/95 px-4 py-3 shadow-sm backdrop-blur md:-mx-3 md:px-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
@@ -526,17 +621,17 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           <div className="flex flex-wrap justify-end gap-2">
             {!isEdit && (
               <>
-                <Button type="button" variant="outline" size="sm" onClick={() => submitWithIntent('save-exit')} disabled={busy}>
+                <Button type="button" variant="outline" size="sm" onClick={() => submitWithIntent('save-exit')} disabled={busy} title="Ctrl+S">
                   Lưu và thoát
                 </Button>
-                <Button type="button" size="sm" onClick={() => submitWithIntent('save-stay')} disabled={busy}>
+                <Button type="button" size="sm" onClick={() => submitWithIntent('save-stay')} disabled={busy} title="Ctrl+S">
                   {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
                   Lưu tạm
                 </Button>
               </>
             )}
             {isEdit && !readOnly && (
-              <Button type="button" size="sm" onClick={() => submitWithIntent('update')} disabled={busy}>
+              <Button type="button" size="sm" onClick={() => submitWithIntent('update')} disabled={busy} title="Ctrl+S">
                 {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
                 Cập nhật
               </Button>
@@ -564,7 +659,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       </div>
 
       {isEdit && status === 'Active' && readOnly && (
-        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div className="shrink-0 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
           Bạn không có quyền sửa phiếu này.
         </div>
       )}
@@ -576,7 +671,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           submitWithIntent(isEdit ? 'update' : 'save-stay');
         }}
         onKeyDown={handleFormKeyDown}
-        className="space-y-4"
+        className="flex min-h-0 flex-1 flex-col gap-2"
       >
         <StockVoucherMainFields
           form={form}
@@ -597,74 +692,41 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           onEnterGrid={enterGrid}
         />
 
-        <div className="grid items-stretch gap-4 lg:grid-cols-[1fr_320px]">
-          <Card>
-            <CardHeader className="flex h-9 flex-row items-center border-b bg-blue-50 p-1 px-3">
-              <CardTitle>Thông tin chung</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-3 pt-2">
-              <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-[6px] border-0 p-0">
-                <div className="form-inline-grid form-cols-2">
-                  <Label htmlFor="stock-partner-tax-code" className="field-label">MST</Label>
-                  <Input id="stock-partner-tax-code" className="h-7" {...form.register('partnerTaxCode')} />
-                  <Label htmlFor="stock-handler-name" className="field-label">{labels.handlerLabel}</Label>
-                  <Input id="stock-handler-name" className="h-7" {...form.register('handlerName')} />
-                </div>
-
-                {(fundShown || dueDateShown) && (
-                  <div className="form-inline-grid form-cols-2">
-                    {fundShown && (
-                      <>
-                        <Label htmlFor="stock-fund" className="field-label">Quỹ</Label>
-                        <select
-                          id="stock-fund"
-                          className={SELECT_CLASS}
-                          value={fundId}
-                          onChange={(e) => {
-                            fundPickedRef.current = true;
-                            form.setValue('fundId', e.target.value, { shouldDirty: true });
-                          }}
-                        >
-                          {!fundId && <option value="">-- Chọn quỹ --</option>}
-                          {fundOptions.map((f) => (
-                            <option key={f.id} value={f.id}>
-                              {`${f.code} - ${f.name}`}
-                            </option>
-                          ))}
-                        </select>
-                      </>
-                    )}
-                    {dueDateShown && (
-                      <>
-                        <Label htmlFor="stock-due-date" className="field-label">Hạn thanh toán</Label>
-                        <Input
-                          id="stock-due-date"
-                          type="date"
-                          className="h-7"
-                          {...form.register('dueDate', {
-                            onChange: () => {
-                              dueDateTouchedRef.current = true;
-                            },
-                          })}
-                        />
-                      </>
-                    )}
-                    <FieldError message={errors.fundId?.message ?? errors.dueDate?.message} />
-                  </div>
-                )}
-
-                <div className="form-inline-grid">
-                  <Label htmlFor="stock-voucher-note" className="field-label">Ghi chú</Label>
-                  <Input id="stock-voucher-note" className="h-7" {...form.register('note')} />
-                </div>
-              </fieldset>
-            </CardContent>
-          </Card>
-
-          <div className="flex flex-col gap-4 [&>*:first-child]:flex-1">
-            <StockTotalsPanel
+        <StockVoucherTabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          lineCount={lineCount}
+          errorTabs={errorTabs(errorKeysOf(errors))}
+          lines={
+            <>
+              <StockLineGrid
+                form={form}
+                type={type}
+                warehouses={gridWarehouses}
+                computed={computed.lines}
+                stockAt={stockAt}
+                readOnly={readOnly}
+              />
+              {linesRootMessage && <p className="shrink-0 px-6 pb-4 pt-2 text-sm text-destructive">{linesRootMessage}</p>}
+            </>
+          }
+          other={
+            <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-[6px] border-0 p-0">
+              <div className="form-inline-grid form-cols-2 p-3">
+                <Label htmlFor="stock-partner-tax-code" className="field-label">MST</Label>
+                <Input id="stock-partner-tax-code" className="h-7" {...form.register('partnerTaxCode')} />
+                <Label htmlFor="stock-handler-name" className="field-label">{labels.handlerLabel}</Label>
+                <Input id="stock-handler-name" className="h-7" {...form.register('handlerName')} />
+              </div>
+              <div className="form-inline-grid px-3 pb-3">
+                <Label htmlFor="stock-voucher-note" className="field-label">Ghi chú</Label>
+                <Input id="stock-voucher-note" className="h-7" {...form.register('note')} />
+              </div>
+            </fieldset>
+          }
+          payment={
+            <StockVoucherPaymentTab
               type={type}
-              totals={computed.totals}
               freight={freight}
               orderDiscount={orderDiscount}
               paidAmount={effectivePaid}
@@ -686,42 +748,85 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
               }
               autoVoucher={autoVoucherOf(voucher)}
               readOnly={readOnly}
+            >
+              <fieldset disabled={readOnly} className="m-0 min-w-0 space-y-[6px] border-0 p-0">
+                {fundShown && (
+                  <div className="form-inline-grid">
+                    <Label htmlFor="stock-fund" className="field-label">Quỹ</Label>
+                    <select
+                      id="stock-fund"
+                      className={SELECT_CLASS}
+                      value={fundId}
+                      onChange={(e) => {
+                        fundPickedRef.current = true;
+                        form.setValue('fundId', e.target.value, { shouldDirty: true });
+                      }}
+                    >
+                      {!fundId && <option value="">-- Chọn quỹ --</option>}
+                      {fundOptions.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {`${f.code} - ${f.name}`}
+                        </option>
+                      ))}
+                    </select>
+                    <FieldError message={errors.fundId?.message} />
+                  </div>
+                )}
+                {dueDateShown && (
+                  <div className="form-inline-grid">
+                    <Label htmlFor="stock-due-date" className="field-label">Hạn thanh toán</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="stock-due-date"
+                        type="date"
+                        className="h-7"
+                        {...form.register('dueDate', {
+                          onChange: () => {
+                            dueDateTouchedRef.current = true;
+                          },
+                        })}
+                      />
+                      {creditDays != null && <span className="text-xs text-muted-foreground">({creditDays} ngày)</span>}
+                    </div>
+                    <FieldError message={errors.dueDate?.message} />
+                  </div>
+                )}
+              </fieldset>
+            </StockVoucherPaymentTab>
+          }
+          history={
+            isEdit ? (
+              <ActivityHistory
+                activities={activitiesQuery.data ?? []}
+                isLoading={activitiesQuery.isLoading}
+                isError={activitiesQuery.isError}
+                errorMessage={getErrorMessage(activitiesQuery.error)}
+                onRetry={() => void activitiesQuery.refetch()}
+              />
+            ) : undefined
+          }
+        />
+
+        <div className="sticky bottom-0 z-20 shrink-0 rounded-md border bg-card shadow-[0_-2px_6px_rgba(0,0,0,0.06)]">
+          <StockTotalsBar
+            totals={computed.totals}
+            freight={freight}
+            orderDiscount={orderDiscount}
+            paidAmount={effectivePaid}
+            lineCount={lineCount}
+            onJump={jumpTo}
+          />
+          {debtStripPartnerId && selectedPartner && (
+            <PartnerDebtStrip
+              partnerId={debtStripPartnerId}
+              partnerLabel={`${selectedPartner.code} — ${selectedPartner.name}`}
+              current={{ effect: selectedReason?.debtEffect ?? 'None', total, paid: effectivePaid }}
+              saved={savedImpact}
+              cancelled={status === 'Cancelled'}
             />
-            {debtPanelPartnerId && <CustomerDebtPanel partnerId={debtPanelPartnerId} />}
-          </div>
+          )}
         </div>
-
-        <Card>
-          <CardContent className="p-0">
-            <StockLineGrid
-              form={form}
-              type={type}
-              warehouses={gridWarehouses}
-              computed={computed.lines}
-              stockAt={stockAt}
-              readOnly={readOnly}
-            />
-            {linesRootMessage && <p className="px-6 pb-4 pt-2 text-sm text-destructive">{linesRootMessage}</p>}
-          </CardContent>
-        </Card>
       </form>
-
-      {isEdit && (
-        <Card>
-          <CardHeader className="flex h-9 flex-row items-center border-b bg-blue-50 p-1 px-3">
-            <CardTitle>Lịch sử</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-3">
-            <ActivityHistory
-              activities={activitiesQuery.data ?? []}
-              isLoading={activitiesQuery.isLoading}
-              isError={activitiesQuery.isError}
-              errorMessage={getErrorMessage(activitiesQuery.error)}
-              onRetry={() => void activitiesQuery.refetch()}
-            />
-          </CardContent>
-        </Card>
-      )}
 
       <ConfirmDialog
         open={confirmKind === 'cancel'}

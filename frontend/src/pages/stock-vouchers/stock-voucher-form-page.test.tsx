@@ -338,6 +338,7 @@ describe('StockVoucherFormPage', () => {
       data: {
         partnerId: customer.id,
         receivableBalance: 7_000_000,
+        payableBalance: 0,
         creditLimit: 5_000_000,
         available: -2_000_000,
         overdueAmount: 0,
@@ -904,52 +905,98 @@ describe('StockVoucherFormPage', () => {
     expect(screen.getByText('Phiếu thu/chi tự động')).toBeInTheDocument();
   });
 
-  it('debt panel only for stock-out sale with permission', async () => {
-    partnerResults.data = [customer];
-    const panelShown = () => screen.queryByText('Dư nợ phải thu') !== null;
+  function tab(name: RegExp) {
+    return screen.getByRole('tab', { name });
+  }
 
-    // New stock-out with the sale reason: nothing until a partner is picked.
+  it('Alt+3 opens the payment tab and Alt+1 goes back to the lines', () => {
+    renderPage('In');
+    fireEvent.keyDown(byId('stock-voucher-at'), { key: '3', altKey: true });
+    expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active');
+    fireEvent.keyDown(byId('stock-voucher-at'), { key: '1', altKey: true });
+    expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active');
+  });
+
+  // Hiding the panel of the focused cell would drop the focus on <body> and kill Ctrl+S / Alt+n.
+  it('Alt+3 from a grid cell keeps the focus inside the page', async () => {
+    renderPage('In');
+    byId('stock-line-product-code-0').focus();
+    fireEvent.keyDown(byId('stock-line-product-code-0'), { key: '3', altKey: true });
+    await waitFor(() => expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active'));
+    await waitFor(() => expect(document.activeElement).toBe(tab(/Thanh toán/)));
+  });
+
+  it('clicking Phí VC on the totals bar focuses the freight input in the payment tab', async () => {
+    renderPage('In');
+    fireEvent.click(screen.getByRole('button', { name: /Phí VC/ }));
+    expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active');
+    await waitFor(() => expect(document.activeElement).toBe(byId('stock-freight')));
+  });
+
+  it('a server error on the fund switches to the payment tab, marks it and focuses the fund', async () => {
+    createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', { fundId: ['Quỹ không hợp lệ'] }));
+    renderPage('In');
+    await fillPerUnitLine(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    await waitFor(() => expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active'));
+    expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(byId('stock-fund')));
+  });
+
+  it('saving an incomplete line from another tab switches back to the lines and focuses the cell', async () => {
+    renderPage('In');
+    fireEvent.keyDown(byId('stock-voucher-at'), { key: '2', altKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    await waitFor(() => expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active'));
+    expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-0')));
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('a cancelled voucher keeps the fund and due date disabled', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher({ type: 'Out', status: 'Cancelled', canEdit: false, reasonId: R_OUT, reasonDebtEffect: 'ReceivableIncrease' });
+    renderPage('Out');
+    expect(byId('stock-due-date')).toBeDisabled();
+  });
+
+  it('a client error on Phí VC switches to the payment tab and focuses the input', async () => {
+    renderPage('In');
+    await fillPerUnitLine(3);
+    fireEvent.keyDown(byId('stock-voucher-at'), { key: '3', altKey: true });
+    fireEvent.change(byId('stock-freight'), { target: { value: '-5' } });
+    fireEvent.keyDown(byId('stock-voucher-at'), { key: '1', altKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    await waitFor(() => expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active'));
+    await waitFor(() => expect(document.activeElement).toBe(byId('stock-freight')));
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it('debt strip for a picked partner with permission, on both directions', async () => {
+    partnerResults.data = [customer];
+    partnerSummaryMock.mockReturnValue({
+      data: { partnerId: customer.id, receivableBalance: 7_000_000, payableBalance: 0, creditLimit: 5_000_000, available: -2_000_000, overdueAmount: 0, creditDays: 15 },
+      isLoading: false,
+      isError: false,
+    });
+    const stripShown = () => screen.queryByTestId('partner-debt-receivable') !== null;
+
     const { unmount } = renderPage('Out');
-    expect(panelShown()).toBe(false);
+    expect(stripShown()).toBe(false);
     fireEvent.change(byId('stock-partner'), { target: { value: 'KH' } });
     fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('KH01'));
-    await waitFor(() => expect(panelShown()).toBe(true));
+    await waitFor(() => expect(stripShown()).toBe(true));
     expect(partnerSummaryMock).toHaveBeenCalledWith(customer.id, { enabled: true });
-    expect(screen.getByTestId('customer-debt-available')).toHaveTextContent('-2.000.000');
-
-    // A reason that does not raise the receivable hides it.
+    // XBH raises the receivable: "after" shows, and is 7.000.000 + unpaid total (0 lines → 0).
+    expect(screen.getByTestId('partner-debt-receivable-after')).toHaveTextContent('7.000.000');
+    // A reason without debt keeps the strip but drops the after-voucher value.
     fireEvent.change(byId('stock-reason'), { target: { value: R_OUT_GIFT } });
-    await waitFor(() => expect(panelShown()).toBe(false));
+    await waitFor(() => expect(screen.queryByTestId('partner-debt-receivable-after')).toBeNull());
+    expect(stripShown()).toBe(true);
     unmount();
 
+    // Stock-in shows it too (customer return).
     routeParams.id = V1;
-    const sale = voucher({
-      type: 'Out',
-      code: 'PX00007',
-      reasonId: R_OUT,
-      reasonDebtEffect: 'ReceivableIncrease',
-      partnerId: customer.id,
-      partnerCode: customer.code,
-      partnerName: customer.name,
-    });
-    voucherState.data = sale;
-
-    // reports.debt alone grants the panel.
-    permissionState.granted = ['stock_out.view', 'reports.debt'];
-    const second = renderPage('Out');
-    expect(panelShown()).toBe(true);
-    second.unmount();
-
-    // Neither debt.partner_summary nor reports.debt: hidden, and the summary is never requested.
-    permissionState.granted = ['stock_out.view', 'stock_out.edit'];
-    partnerSummaryMock.mockClear();
-    const third = renderPage('Out');
-    expect(panelShown()).toBe(false);
-    expect(partnerSummaryMock).not.toHaveBeenCalled();
-    third.unmount();
-
-    // Stock-in never shows it, even for a customer reason.
-    permissionState.granted = null;
     voucherState.data = voucher({
       reasonId: R_IN_CUSTOMER,
       reasonDebtEffect: 'ReceivableDecrease',
@@ -957,8 +1004,16 @@ describe('StockVoucherFormPage', () => {
       partnerCode: customer.code,
       partnerName: customer.name,
     });
+    const second = renderPage('In');
+    expect(stripShown()).toBe(true);
+    second.unmount();
+
+    // Without debt.partner_summary and reports.debt: hidden, and never requested.
+    permissionState.granted = ['stock_in.view', 'stock_in.edit'];
+    partnerSummaryMock.mockClear();
     renderPage('In');
-    expect(panelShown()).toBe(false);
+    expect(stripShown()).toBe(false);
+    expect(partnerSummaryMock).not.toHaveBeenCalled();
   });
 
   it('Enter moves through the main fields, never saves, and lands on the first empty line', async () => {

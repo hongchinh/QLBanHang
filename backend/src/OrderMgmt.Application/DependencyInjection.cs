@@ -70,6 +70,8 @@ using OrderMgmt.Application.Inventory.Warehouses.Interfaces;
 using OrderMgmt.Application.Inventory.Warehouses.Services;
 using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Services;
+using OrderMgmt.Application.Organization.Company.Interfaces;
+using OrderMgmt.Application.Organization.Company.Services;
 using OrderMgmt.Application.Payments.Interfaces;
 using OrderMgmt.Application.Payments.Services;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
@@ -124,6 +126,7 @@ public static class DependencyInjection
         services.AddScoped<IPaymentMethodService, PaymentMethodService>();
         services.AddScoped<IInventorySettingsService, InventorySettingsService>();
         services.AddScoped<ICashDebtSettingsService, CashDebtSettingsService>();
+        services.AddScoped<ICompanyProfileService, CompanyProfileService>();
         services.AddScoped<ICashReasonService, CashReasonService>();
         services.AddScoped<IFundService, FundService>();
         services.AddScoped<ICreditLimitService, CreditLimitService>();

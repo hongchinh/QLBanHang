@@ -62,6 +62,11 @@ public static class Permissions
         public const string ManageSettings = "system.manage_settings";
     }
 
+    public static class CompanySettings
+    {
+        public const string Manage = "settings.company";
+    }
+
     public static class UserSettings
     {
         public const string Manage = "user_settings.manage";

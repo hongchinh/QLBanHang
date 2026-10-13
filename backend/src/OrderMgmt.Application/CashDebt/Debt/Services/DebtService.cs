@@ -58,6 +58,7 @@ public class DebtService : IDebtService
             ?? throw new NotFoundException(nameof(Customer), partnerId);
 
         var balance = await _debtQuery.BalanceAsync(branchId, partnerId, DebtSide.Receivable, null, ct);
+        var payable = await _debtQuery.BalanceAsync(branchId, partnerId, DebtSide.Payable, null, ct);
         var limit = await _db.CreditLimits.AsNoTracking()
             .Where(l => l.BranchId == branchId && l.CustomerId == partnerId)
             .Select(l => (decimal?)l.Amount)
@@ -77,6 +78,7 @@ public class DebtService : IDebtService
         {
             PartnerId = partnerId,
             ReceivableBalance = balance,
+            PayableBalance = payable,
             CreditLimit = limit,
             Available = limit - balance,
             OverdueAmount = overdue,

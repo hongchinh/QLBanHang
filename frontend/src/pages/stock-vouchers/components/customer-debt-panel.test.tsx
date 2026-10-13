@@ -17,6 +17,7 @@ function summary(overrides: Partial<PartnerDebtSummary> = {}): PartnerDebtSummar
   return {
     partnerId: P1,
     receivableBalance: 7_000_000,
+    payableBalance: 0,
     creditLimit: 5_000_000,
     available: -2_000_000,
     overdueAmount: 1_500_000,

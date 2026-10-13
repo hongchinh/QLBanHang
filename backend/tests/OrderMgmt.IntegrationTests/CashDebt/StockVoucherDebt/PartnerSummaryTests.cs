@@ -99,6 +99,42 @@ public class PartnerSummaryTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Summary_shows_payable_balance_next_to_receivable()
+    {
+        // A partner that is both customer and supplier.
+        var partner = await CreatePartnerAsync(NewCode("DT"), isCustomer: true, isSupplier: true);
+        var yesterday = $"{_today.AddDays(-1):yyyy-MM-dd} 09:00";
+        var product = await CreateInventoryProductAsync(NewCode("SP"), track: false);
+
+        // XBH 3,000 unpaid → receivable 3,000.
+        var sale = VoucherRequest(StockDirection.Out, await ReasonIdAsync("XBH"), yesterday, LineRequest(product, 3, 1_000));
+        sale.WarehouseId = _warehouseId;
+        sale.PartnerId = partner;
+        sale.PaidAmount = 0;
+        var (saleStatus, _, saleError) = await PostVoucherAsync(_branchClient, sale);
+        saleStatus.Should().Be(HttpStatusCode.OK, saleError?.Message);
+
+        // NMH 2,000 unpaid → payable 2,000.
+        var purchase = VoucherRequest(StockDirection.In, await ReasonIdAsync("NMH"), yesterday, LineRequest(product, 2, 1_000));
+        purchase.WarehouseId = _warehouseId;
+        purchase.PartnerId = partner;
+        purchase.PaidAmount = 0;
+        var (buyStatus, _, buyError) = await PostVoucherAsync(_branchClient, purchase);
+        buyStatus.Should().Be(HttpStatusCode.OK, buyError?.Message);
+
+        var summary = await GetSummaryAsync(_branchClient, partner);
+        summary.ReceivableBalance.Should().Be(3_000m);
+        summary.PayableBalance.Should().Be(2_000m);
+
+        // Per working branch, like the receivable.
+        var other = CloneAdminClient();
+        UseBranch(other, MainBranchId);
+        (await GetSummaryAsync(other, partner)).PayableBalance.Should().Be(0m);
+
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
     public async Task Permission_rules()
     {
         var customer = await CreatePartnerAsync(NewCode("KH"), isCustomer: true, isSupplier: false);

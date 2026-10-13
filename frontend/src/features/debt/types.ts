@@ -46,10 +46,12 @@ export interface OpenItemsParams {
   forSourceId?: string;
 }
 
-// GET /api/debt/partner-summary (P6): the partner's receivable position in the working branch.
+// GET /api/debt/partner-summary (P6): the partner's receivable and payable position in the working branch.
 export interface PartnerDebtSummary {
   partnerId: string;
   receivableBalance: number;
+  // Σ Increase − Σ Decrease of the payable side.
+  payableBalance: number;
   // null: no credit limit for the partner in the branch.
   creditLimit?: number | null;
   // creditLimit − receivableBalance, may be negative; null without a limit.

@@ -86,7 +86,7 @@ The backend adds `PayableBalance` to the partner debt summary.
 - [x] Phase 01 — Branch, baseline, backend `PayableBalance`, permission seed label (S) — `phase-01-backend-payable-balance.md`
 - [x] Phase 02 — Pure logic: line navigation, grid prefs, debt after voucher, error tabs (M) — `phase-02-pure-logic.md`
 - [x] Phase 03 — Form layout T2: main fields, tabs, totals bar, debt strip, full height (L) — `phase-03-form-layout.md`
-- [ ] Phase 04 — Grid: columns, sticky, settings popover, keyboard navigation (L) — `phase-04-grid.md`
+- [x] Phase 04 — Grid: columns, sticky, settings popover, keyboard navigation (L) — `phase-04-grid.md`
 - [ ] Phase 05 — Docs, manual check, final verification (S) — `phase-05-docs-and-verification.md`
 
 Phases run in order. Each phase ends with green targeted tests, `npm run typecheck`, `npm run lint` and `npm run build` (frontend phases), or the targeted `dotnet test` (Phase 01).

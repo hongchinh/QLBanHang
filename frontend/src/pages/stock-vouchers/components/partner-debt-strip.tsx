@@ -46,7 +46,7 @@ export function PartnerDebtStrip({ partnerId, partnerLabel, current, saved, canc
       <span>
         {after?.receivableChanged ? 'Còn được nợ sau phiếu' : 'Còn được nợ'}{' '}
         <b
-          className={cn('tabular-nums text-foreground', available != null && available < 0 && 'text-destructive')}
+          className={cn('tabular-nums text-foreground', available != null && available < 0 && 'text-destructive dark:text-red-400')}
           data-testid="partner-debt-available"
         >
           {available == null ? UNLIMITED : fmt.format(available)}
@@ -54,7 +54,7 @@ export function PartnerDebtStrip({ partnerId, partnerLabel, current, saved, canc
       </span>
       <span>
         Quá hạn{' '}
-        <b className={cn('tabular-nums text-foreground', data.overdueAmount > 0 && 'text-destructive')} data-testid="partner-debt-overdue">
+        <b className={cn('tabular-nums text-foreground', data.overdueAmount > 0 && 'text-destructive dark:text-red-400')} data-testid="partner-debt-overdue">
           {fmt.format(data.overdueAmount)}
         </b>
         {data.overdueAmount > 0 && canViewOverdueReport && (

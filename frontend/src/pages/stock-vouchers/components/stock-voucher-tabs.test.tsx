@@ -35,6 +35,7 @@ describe('StockVoucherTabs', () => {
   it('marks tabs with errors and shows history only when given', () => {
     renderTabs({ errorTabs: new Set(['payment']), history: <p>log</p> });
     expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-error-payment')).toHaveClass('bg-destructive', 'dark:bg-red-500');
     expect(screen.queryByTestId('tab-error-other')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Lịch sử/ })).toBeInTheDocument();
   });

@@ -61,6 +61,9 @@ describe('PartnerDebtStrip', () => {
     expect(screen.getByTestId('partner-debt-limit')).toHaveTextContent('10.000.000');
     expect(screen.getByTestId('partner-debt-available')).toHaveTextContent('-1.000.000');
     expect(screen.getByTestId('partner-debt-available')).toHaveClass('text-destructive');
+    // The dark theme's destructive red is ~1.8:1 on the card: a lighter red there.
+    expect(screen.getByTestId('partner-debt-available')).toHaveClass('dark:text-red-400');
+    expect(screen.getByTestId('partner-debt-overdue')).toHaveClass('text-destructive', 'dark:text-red-400');
     expect(screen.getByTestId('partner-debt-overdue')).toHaveTextContent('1.500.000');
     expect(screen.getByRole('link', { name: 'Xem' })).toHaveAttribute(
       'href', `/reports/debt-overdue?side=Receivable&partnerId=${P1}`,

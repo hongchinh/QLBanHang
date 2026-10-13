@@ -54,7 +54,7 @@ function Trigger({ value, label, hotkey, error, children }: { value: StockVouche
     <TabsTrigger value={value} className={TRIGGER} title={hotkey}>
       <span>{label}</span>
       {children}
-      {error && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-destructive" data-testid={`tab-error-${value}`} aria-label="có lỗi" />}
+      {error && <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-destructive dark:bg-red-500" data-testid={`tab-error-${value}`} aria-label="có lỗi" />}
     </TabsTrigger>
   );
 }

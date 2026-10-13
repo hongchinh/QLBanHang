@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from 'react';
+import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Plus, Trash2 } from 'lucide-react';
 import { CellError } from '@/components/money-cell/money-cell';
@@ -11,12 +11,20 @@ import type {
 import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
+import { cn } from '@/lib/utils';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
 import { toOptionalNumber } from '@/lib/to-number';
+import { useAuthStore } from '@/stores/auth-store';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
 import { isFieldDisabled, LINE_FOCUS_FIELDS, type LineFocusField } from '@/pages/stock-vouchers/utils/line-navigation';
+import {
+  forcedColumns,
+  OPTIONAL_COLUMNS,
+  useStockGridPrefs,
+  type OptionalColumn,
+} from '@/pages/stock-vouchers/utils/use-stock-grid-prefs';
 import '@/pages/quotations/components/line-items-grid.css';
 
 const fmt = new Intl.NumberFormat('vi-VN');
@@ -27,6 +35,44 @@ const METRE_UNITS: Partial<Record<PricingMode, string>> = {
   PerSquareMeter: 'm²',
   PerCubicMeter: 'm³',
 };
+
+type ColumnKey =
+  | 'row-no' | 'product-code' | 'product-name' | 'unit' | 'warehouse' | 'sheet-count' | 'length' | 'width'
+  | 'thickness' | 'quantity' | 'stock-at' | 'unit-price' | 'amount' | 'discount-rate' | 'discount-amount'
+  | 'vat-rate' | 'vat-amount' | 'note' | 'net-amount' | 'action';
+
+interface GridColumn {
+  key: ColumnKey;
+  header: string;
+  width: number;
+  numeric?: boolean;
+  sticky?: 'left' | 'right';
+}
+
+const COLUMNS: readonly GridColumn[] = [
+  { key: 'row-no', header: 'STT', width: 42, sticky: 'left' },
+  { key: 'product-code', header: 'Mã hàng', width: 120, sticky: 'left' },
+  { key: 'product-name', header: 'Tên hàng', width: 220, sticky: 'left' },
+  { key: 'unit', header: 'ĐVT', width: 56 },
+  { key: 'warehouse', header: 'Kho', width: 130 },
+  { key: 'sheet-count', header: 'Số tấm', width: 70, numeric: true },
+  { key: 'length', header: 'Dài', width: 76, numeric: true },
+  { key: 'width', header: 'Rộng', width: 76, numeric: true },
+  { key: 'thickness', header: 'Dày', width: 64, numeric: true },
+  { key: 'quantity', header: 'SL', width: 96, numeric: true },
+  { key: 'stock-at', header: 'SL tồn', width: 96, numeric: true },
+  { key: 'unit-price', header: 'Đơn giá', width: 110, numeric: true },
+  { key: 'amount', header: 'Số tiền', width: 120, numeric: true },
+  { key: 'discount-rate', header: '%CK', width: 60, numeric: true },
+  { key: 'discount-amount', header: 'Tiền CK', width: 104, numeric: true },
+  { key: 'vat-rate', header: '%VAT', width: 60, numeric: true },
+  { key: 'vat-amount', header: 'Tiền VAT', width: 104, numeric: true },
+  { key: 'note', header: 'Ghi chú', width: 160 },
+  { key: 'net-amount', header: 'Số còn lại', width: 120, numeric: true, sticky: 'right' },
+  { key: 'action', header: '', width: 42, sticky: 'right' },
+];
+
+const isOptional = (key: ColumnKey): key is OptionalColumn => (OPTIONAL_COLUMNS as readonly string[]).includes(key);
 
 function cellId(field: LineFocusField | 'stock-at', idx: number): string {
   return `stock-line-${field}-${idx}`;
@@ -166,6 +212,20 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const rows = watched ?? [];
   const lineErrors = form.formState.errors.lines;
 
+  const userId = useAuthStore((s) => s.user?.id ?? '');
+  const { prefs, toggleColumn, toggleEnterStop, reset } = useStockGridPrefs(userId, type);
+  void toggleColumn; void toggleEnterStop; void reset;
+  const headerWarehouseId = useWatch({ control: form.control, name: 'warehouseId' }) ?? '';
+  const forced = forcedColumns(rows, headerWarehouseId, lineErrors);
+  const isShown = (key: ColumnKey) =>
+    !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key);
+  const columns = COLUMNS.filter((c) => isShown(c.key) && !(readOnly && c.key === 'action'));
+  const minWidth = columns.reduce((sum, c) => sum + c.width, 0);
+
+  const stickyOffset = new Map<ColumnKey, CSSProperties>(); // filled in Task 4.2
+  const cellClass = (c: GridColumn, extra?: string) =>
+    cn(c.numeric && 'cell-number', c.key === 'row-no' && 'row-no', c.key === 'action' && 'cell-action', extra);
+
   const errorOf = (idx: number, field: keyof StockLineFormValues): string | undefined => {
     const lineError = lineErrors?.[idx] as Record<string, { message?: string } | undefined> | undefined;
     return lineError?.[field]?.message;
@@ -251,12 +311,13 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     moveFocus(current, e.shiftKey ? -1 : 1);
   }
 
+
   const numberInput = (idx: number, field: 'sheetCount' | 'length' | 'width' | 'thickness', focusField: LineFocusField, label: string) => {
     const line = rows[idx];
     const disabled = readOnly || isFieldDisabled(line?.pricingMode ?? 'PerUnit', focusField);
     const error = errorOf(idx, field);
     return (
-      <td className="cell-number">
+      <>
         <input
           id={cellId(focusField, idx)}
           className="cell-input cell-number tabular-nums"
@@ -269,14 +330,14 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           onChange={(e) => setLineField(idx, field, toOptionalNumber(e.target.value) ?? '')}
         />
         <CellError id={errorId(focusField, idx)} message={error} />
-      </td>
+      </>
     );
   };
 
   const percentInput = (idx: number, field: 'discountRate' | 'vatRate', focusField: LineFocusField, label: string) => {
     const error = errorOf(idx, field);
     return (
-      <td className="cell-number">
+      <>
         <PercentCell
           field={focusField}
           rowIndex={idx}
@@ -292,216 +353,210 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           }}
         />
         <CellError id={errorId(focusField, idx)} message={error} />
-      </td>
+      </>
     );
+  };
+
+  // Content of one cell; the column loop owns the surrounding td.
+  const renderCell = (key: ColumnKey, idx: number, line: StockLineFormValues, result: StockLineComputed | undefined) => {
+    const mode = line.pricingMode;
+    switch (key) {
+      case 'row-no':
+        return idx + 1;
+      case 'product-code':
+        return (
+          <>
+            {readOnly ? (
+              <input
+                id={cellId('product-code', idx)}
+                className="cell-input"
+                aria-label={rowLabel('Mã hàng', idx)}
+                value={line.productCode ?? ''}
+                disabled
+              />
+            ) : (
+              <ProductTypeaheadCell
+                variant="cell"
+                inputId={cellId('product-code', idx)}
+                nextFocusId={cellId('warehouse', idx)}
+                value={line.productCode ?? ''}
+                onChange={(v) => setLineField(idx, 'productCode', v)}
+                onSelect={(s) => applyProduct(idx, s)}
+              />
+            )}
+            <CellError id={errorId('product-code', idx)} message={errorOf(idx, 'productId')} />
+          </>
+        );
+      case 'product-name':
+        return (
+          <div className="cell-readonly" title={line.productName}>
+            {line.productName}
+          </div>
+        );
+      case 'unit':
+        return <div className="cell-readonly">{line.unitName}</div>;
+      case 'warehouse': {
+        const warehouseError = errorOf(idx, 'warehouseId');
+        return (
+          <>
+            <select
+              id={cellId('warehouse', idx)}
+              className="cell-input"
+              aria-label={rowLabel('Kho', idx)}
+              {...errorProps('warehouse', idx, warehouseError)}
+              disabled={readOnly}
+              value={line.warehouseId ?? ''}
+              onChange={(e) => setLineField(idx, 'warehouseId', e.target.value)}
+            >
+              {!line.warehouseId && <option value="">-- Chọn kho --</option>}
+              {warehouses.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+            <CellError id={errorId('warehouse', idx)} message={warehouseError} />
+          </>
+        );
+      }
+      case 'sheet-count':
+        return numberInput(idx, 'sheetCount', 'sheet-count', 'Số tấm');
+      case 'length':
+        return numberInput(idx, 'length', 'length', 'Dài');
+      case 'width':
+        return numberInput(idx, 'width', 'width', 'Rộng');
+      case 'thickness':
+        return numberInput(idx, 'thickness', 'thickness', 'Dày');
+      case 'quantity':
+        return (
+          <>
+            <NumberCell
+              field="quantity"
+              rowIndex={idx}
+              label="Số lượng"
+              value={mode === 'PerUnit' ? toOptionalNumber(line.quantity) : result?.quantity}
+              format={formatStockQuantity}
+              parse={parseQuantityInput}
+              onCommit={(v) => setLineField(idx, 'quantity', v ?? 0)}
+              disabled={readOnly || isFieldDisabled(mode, 'quantity')}
+              error={errorOf(idx, 'quantity')}
+            />
+            <CellError id={errorId('quantity', idx)} message={errorOf(idx, 'quantity')} />
+          </>
+        );
+      case 'stock-at':
+        return (
+          <div id={cellId('stock-at', idx)} className="cell-readonly cell-number tabular-nums">
+            {!line.productId
+              ? ''
+              : line.trackInventory
+                ? formatStockQuantity(stockAt[`${line.productId}:${line.warehouseId}`])
+                : '—'}
+          </div>
+        );
+      case 'unit-price':
+        return (
+          <>
+            <NumberCell
+              field="unit-price"
+              rowIndex={idx}
+              label="Đơn giá"
+              value={toOptionalNumber(line.unitPrice)}
+              format={formatMoneyForDisplay}
+              parse={parseMoneyInput}
+              onCommit={(v) => setLineField(idx, 'unitPrice', v ?? 0)}
+              disabled={readOnly}
+              error={errorOf(idx, 'unitPrice')}
+            />
+            <CellError id={errorId('unit-price', idx)} message={errorOf(idx, 'unitPrice')} />
+          </>
+        );
+      case 'amount':
+        return <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.amount ?? 0)}</div>;
+      case 'discount-rate':
+        return percentInput(idx, 'discountRate', 'discount-rate', '%CK');
+      case 'discount-amount':
+        return (
+          <>
+            <NumberCell
+              field="discount-amount"
+              rowIndex={idx}
+              label="Tiền CK"
+              value={line.discountManual ? toOptionalNumber(line.discountAmount) : result?.discountAmount}
+              format={formatMoneyForDisplay}
+              parse={parseMoneyInput}
+              onCommit={(v) => {
+                setLineField(idx, 'discountManual', true);
+                setLineField(idx, 'discountAmount', v ?? 0);
+              }}
+              disabled={readOnly}
+              error={errorOf(idx, 'discountAmount')}
+            />
+            <CellError id={errorId('discount-amount', idx)} message={errorOf(idx, 'discountAmount')} />
+          </>
+        );
+      case 'vat-rate':
+        return percentInput(idx, 'vatRate', 'vat-rate', '%VAT');
+      case 'vat-amount':
+        return <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.vatAmount ?? 0)}</div>;
+      case 'note':
+        return (
+          <input
+            id={cellId('note', idx)}
+            className="cell-input"
+            aria-label={rowLabel('Ghi chú', idx)}
+            disabled={readOnly}
+            value={line.note ?? ''}
+            onChange={(e) => setLineField(idx, 'note', e.target.value)}
+          />
+        );
+      case 'net-amount':
+        return <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.netAmount ?? 0)}</div>;
+      case 'action':
+        return (
+          <button type="button" aria-label={rowLabel('Xóa', idx)} onClick={() => remove(idx)}>
+            <Trash2 className="h-4 w-4 text-red-600" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+          </button>
+        );
+    }
   };
 
   return (
     <div className="space-y-2">
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
       <div className="accounting-grid-wrap" tabIndex={-1} onKeyDown={handleGridKeyDown}>
-        <table className="accounting-grid" style={{ minWidth: 2000 }}>
+        <table className="accounting-grid" style={{ minWidth }}>
           <colgroup>
-            <col style={{ width: 42 }} />
-            <col style={{ width: 120 }} />
-            <col style={{ minWidth: 200 }} />
-            <col style={{ width: 56 }} />
-            <col style={{ width: 130 }} />
-            <col style={{ width: 70 }} />
-            <col style={{ width: 76 }} />
-            <col style={{ width: 76 }} />
-            <col style={{ width: 64 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 96 }} />
-            <col style={{ width: 110 }} />
-            <col style={{ width: 120 }} />
-            <col style={{ width: 60 }} />
-            <col style={{ width: 104 }} />
-            <col style={{ width: 60 }} />
-            <col style={{ width: 104 }} />
-            <col style={{ width: 120 }} />
-            <col style={{ width: 160 }} />
-            {!readOnly && <col style={{ width: 42 }} />}
+            {columns.map((c) => (
+              <col key={c.key} style={{ width: c.width }} />
+            ))}
           </colgroup>
           <thead>
             <tr>
-              <th className="row-no">STT</th>
-              <th>Mã hàng</th>
-              <th>Tên hàng</th>
-              <th>ĐVT</th>
-              <th>Kho</th>
-              <th className="cell-number">Số tấm</th>
-              <th className="cell-number">Dài</th>
-              <th className="cell-number">Rộng</th>
-              <th className="cell-number">Dày</th>
-              <th className="cell-number">SL</th>
-              <th className="cell-number">SL tồn</th>
-              <th className="cell-number">Đơn giá</th>
-              <th className="cell-number">Số tiền</th>
-              <th className="cell-number">%CK</th>
-              <th className="cell-number">Tiền CK</th>
-              <th className="cell-number">%VAT</th>
-              <th className="cell-number">Tiền VAT</th>
-              <th className="cell-number">Số còn lại</th>
-              <th>Ghi chú</th>
-              {!readOnly && <th></th>}
+              {columns.map((c) => (
+                <th key={c.key} className={cellClass(c)} style={stickyOffset.get(c.key)}>
+                  {c.header}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {fields.map((field, idx) => {
               const line = rows[idx] ?? (field as unknown as StockLineFormValues);
               const result = computed[idx];
-              const mode = line.pricingMode;
-              const stockKey = `${line.productId}:${line.warehouseId}`;
-              const productError = errorOf(idx, 'productId');
-              const warehouseError = errorOf(idx, 'warehouseId');
-              const quantityValue = mode === 'PerUnit' ? toOptionalNumber(line.quantity) : result?.quantity;
               return (
                 <tr key={line._uiKey ?? field.id}>
-                  <td className="row-no">{idx + 1}</td>
-                  <td>
-                    {readOnly ? (
-                      <input
-                        id={cellId('product-code', idx)}
-                        className="cell-input"
-                        aria-label={rowLabel('Mã hàng', idx)}
-                        value={line.productCode ?? ''}
-                        disabled
-                      />
-                    ) : (
-                      <ProductTypeaheadCell
-                        variant="cell"
-                        inputId={cellId('product-code', idx)}
-                        nextFocusId={cellId('warehouse', idx)}
-                        value={line.productCode ?? ''}
-                        onChange={(v) => setLineField(idx, 'productCode', v)}
-                        onSelect={(s) => applyProduct(idx, s)}
-                      />
-                    )}
-                    <CellError id={errorId('product-code', idx)} message={productError} />
-                  </td>
-                  <td>
-                    <div className="cell-readonly" title={line.productName}>
-                      {line.productName}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="cell-readonly">{line.unitName}</div>
-                  </td>
-                  <td>
-                    <select
-                      id={cellId('warehouse', idx)}
-                      className="cell-input"
-                      aria-label={rowLabel('Kho', idx)}
-                      {...errorProps('warehouse', idx, warehouseError)}
-                      disabled={readOnly}
-                      value={line.warehouseId ?? ''}
-                      onChange={(e) => setLineField(idx, 'warehouseId', e.target.value)}
-                    >
-                      {!line.warehouseId && <option value="">-- Chọn kho --</option>}
-                      {warehouses.map((w) => (
-                        <option key={w.id} value={w.id}>
-                          {w.name}
-                        </option>
-                      ))}
-                    </select>
-                    <CellError id={errorId('warehouse', idx)} message={warehouseError} />
-                  </td>
-                  {numberInput(idx, 'sheetCount', 'sheet-count', 'Số tấm')}
-                  {numberInput(idx, 'length', 'length', 'Dài')}
-                  {numberInput(idx, 'width', 'width', 'Rộng')}
-                  {numberInput(idx, 'thickness', 'thickness', 'Dày')}
-                  <td className="cell-number">
-                    <NumberCell
-                      field="quantity"
-                      rowIndex={idx}
-                      label="Số lượng"
-                      value={quantityValue}
-                      format={formatStockQuantity}
-                      parse={parseQuantityInput}
-                      onCommit={(v) => setLineField(idx, 'quantity', v ?? 0)}
-                      disabled={readOnly || isFieldDisabled(mode, 'quantity')}
-                      error={errorOf(idx, 'quantity')}
-                    />
-                    <CellError id={errorId('quantity', idx)} message={errorOf(idx, 'quantity')} />
-                  </td>
-                  <td className="cell-number">
-                    <div id={cellId('stock-at', idx)} className="cell-readonly cell-number tabular-nums">
-                      {!line.productId
-                        ? ''
-                        : line.trackInventory
-                          ? formatStockQuantity(stockAt[stockKey])
-                          : '—'}
-                    </div>
-                  </td>
-                  <td className="cell-number">
-                    <NumberCell
-                      field="unit-price"
-                      rowIndex={idx}
-                      label="Đơn giá"
-                      value={toOptionalNumber(line.unitPrice)}
-                      format={formatMoneyForDisplay}
-                      parse={parseMoneyInput}
-                      onCommit={(v) => setLineField(idx, 'unitPrice', v ?? 0)}
-                      disabled={readOnly}
-                      error={errorOf(idx, 'unitPrice')}
-                    />
-                    <CellError id={errorId('unit-price', idx)} message={errorOf(idx, 'unitPrice')} />
-                  </td>
-                  <td className="cell-number">
-                    <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.amount ?? 0)}</div>
-                  </td>
-                  {percentInput(idx, 'discountRate', 'discount-rate', '%CK')}
-                  <td className="cell-number">
-                    <NumberCell
-                      field="discount-amount"
-                      rowIndex={idx}
-                      label="Tiền CK"
-                      value={line.discountManual ? toOptionalNumber(line.discountAmount) : result?.discountAmount}
-                      format={formatMoneyForDisplay}
-                      parse={parseMoneyInput}
-                      onCommit={(v) => {
-                        setLineField(idx, 'discountManual', true);
-                        setLineField(idx, 'discountAmount', v ?? 0);
-                      }}
-                      disabled={readOnly}
-                      error={errorOf(idx, 'discountAmount')}
-                    />
-                    <CellError id={errorId('discount-amount', idx)} message={errorOf(idx, 'discountAmount')} />
-                  </td>
-                  {percentInput(idx, 'vatRate', 'vat-rate', '%VAT')}
-                  <td className="cell-number">
-                    <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.vatAmount ?? 0)}</div>
-                  </td>
-                  <td className="cell-number">
-                    <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.netAmount ?? 0)}</div>
-                  </td>
-                  <td>
-                    <input
-                      id={cellId('note', idx)}
-                      className="cell-input"
-                      aria-label={rowLabel('Ghi chú', idx)}
-                      disabled={readOnly}
-                      value={line.note ?? ''}
-                      onChange={(e) => setLineField(idx, 'note', e.target.value)}
-                    />
-                  </td>
-                  {!readOnly && (
-                    <td className="cell-action">
-                      <button type="button" aria-label={rowLabel('Xóa', idx)} onClick={() => remove(idx)}>
-                        <Trash2
-                          className="h-4 w-4 text-red-600"
-                          style={{ display: 'inline-block', verticalAlign: 'middle' }}
-                        />
-                      </button>
+                  {columns.map((c) => (
+                    <td key={c.key} className={cellClass(c)} style={stickyOffset.get(c.key)}>
+                      {renderCell(c.key, idx, line, result)}
                     </td>
-                  )}
+                  ))}
                 </tr>
               );
             })}
             {fields.length === 0 && (
               <tr>
-                <td colSpan={readOnly ? 19 : 20} className="empty-placeholder">
+                <td colSpan={columns.length} className="empty-placeholder">
                   Chưa có dòng nào.
                 </td>
               </tr>

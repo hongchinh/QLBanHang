@@ -953,6 +953,18 @@ describe('StockVoucherFormPage', () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
+  it('saving a voucher with no lines from another tab lands the focus on Thêm dòng, not on the body', async () => {
+    renderPage('In');
+    fireEvent.keyDown(byId('stock-line-product-code-0'), { key: 'Delete', ctrlKey: true });
+    await waitFor(() => expect(document.getElementById('stock-line-product-code-0')).toBeNull());
+    fireEvent.keyDown(byId('stock-voucher-at'), { key: '2', altKey: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    await waitFor(() => expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active'));
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Thêm dòng' }));
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
   it('a cancelled voucher keeps the fund and due date disabled', () => {
     routeParams.id = V1;
     voucherState.data = voucher({ type: 'Out', status: 'Cancelled', canEdit: false, reasonId: R_OUT, reasonDebtEffect: 'ReceivableIncrease' });

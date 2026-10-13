@@ -461,7 +461,19 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     setActiveTab(tab);
     const id = keys.filter((k) => tabOfField(k) === tab).map(focusIdOf).find((v) => !!v);
     // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
-    if (id) setTimeout(() => document.getElementById(id)?.focus(), 0);
+    // A missing target (e.g. a voucher with no lines has no first cell) falls back to a control inside the form.
+    setTimeout(() => {
+      const candidates = [
+        id ? document.getElementById(id) : null,
+        document.getElementById('stock-line-add'),
+        document.querySelector<HTMLElement>('[role="tab"][data-state="active"]'),
+      ];
+      // A control in a hidden panel refuses focus, so take the first candidate that actually receives it.
+      for (const el of candidates) {
+        el?.focus();
+        if (el && document.activeElement === el) return;
+      }
+    }, 0);
   }
 
   function jumpTo(field: TotalsJumpField) {

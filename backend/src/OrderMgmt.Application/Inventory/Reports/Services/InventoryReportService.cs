@@ -265,7 +265,7 @@ public class InventoryReportService : IInventoryReportService
 
     /// The costing period containing `date` has not ended yet (VN today).
     private bool IsProvisional(DateOnly date, CostingPeriod period) =>
-        CostingPeriodCalendar.PeriodOf(date, period).End >= VnTime.ToVnDate(_clock.UtcNow);
+        CostProvisional.IsProvisional(date, period, VnTime.ToVnDate(_clock.UtcNow));
 
     private static decimal R0(decimal x) => Math.Round(x, 0, MidpointRounding.AwayFromZero);
 

@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Inventory.StockVouchers.Models;
+using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
 
@@ -30,6 +32,33 @@ public abstract class ExecutiveDashboardTestBase : CashDebtTestBase
 
     protected static Task<HttpResponseMessage> GetExecRawAsync(HttpClient client, string pathAndQuery) =>
         client.GetAsync($"/api/dashboard/executive/{pathAndQuery}");
+
+    /// A fresh branch with a warehouse, a customer and a supplier; `Client` is an admin client working in it.
+    protected sealed record FreshBranch(Guid BranchId, Guid WarehouseId, Guid CustomerId, Guid SupplierId, HttpClient Client);
+
+    protected async Task<FreshBranch> CreateFreshBranchAsync()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var branchId = await CreateBranchAsync("FB" + suffix);
+        var warehouseId = await CreateWarehouseAsync(branchId, "FB" + suffix);
+        var customerId = await CreatePartnerAsync("FKH" + suffix, isCustomer: true, isSupplier: false);
+        var supplierId = await CreatePartnerAsync("FNC" + suffix, isCustomer: false, isSupplier: true);
+        var client = CloneAdminClient();
+        UseBranch(client, branchId);
+        return new FreshBranch(branchId, warehouseId, customerId, supplierId, client);
+    }
+
+    /// An unpaid one-line stock voucher of the branch (reason NMH takes a supplier, XBH and NTL a customer); asserts 200.
+    protected async Task<StockVoucherDto> PostLineAsync(FreshBranch branch, StockDirection type, string reasonCode,
+        string at, Guid partnerId, Guid productId, decimal quantity, decimal unitPrice)
+    {
+        var request = VoucherRequest(type, await ReasonIdAsync(reasonCode), at, LineRequest(productId, quantity, unitPrice));
+        request.WarehouseId = branch.WarehouseId;
+        request.PartnerId = partnerId;
+        var (status, voucher, error) = await PostVoucherAsync(branch.Client, request);
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        return voucher!;
+    }
 
     /// Asserts a 400 whose validation details name `key` and, when given, carry `message` for it.
     protected static async Task AssertBadRequestKeyAsync(

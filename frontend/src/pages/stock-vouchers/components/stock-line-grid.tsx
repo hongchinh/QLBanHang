@@ -345,9 +345,11 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
 
     if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && noMods && target.tagName !== 'SELECT') {
       const current = parseCellId(target.id);
-      const to = current ? current.rowIndex + (e.key === 'ArrowDown' ? 1 : -1) : -1;
-      if (!current || to < 0 || to >= fields.length) return;
+      if (!current) return;
+      // Swallow the key even at the first/last row: a number cell would otherwise step its value.
       e.preventDefault();
+      const to = current.rowIndex + (e.key === 'ArrowDown' ? 1 : -1);
+      if (to < 0 || to >= fields.length) return;
       focusCell(verticalTarget(rows[to]?.pricingMode ?? 'PerUnit', current.field, isVisible), to);
       return;
     }

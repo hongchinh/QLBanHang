@@ -478,6 +478,16 @@ describe('StockLineGrid', () => {
     expect(values().lines[0].quantity).toBe(5);
   });
 
+  it('ArrowUp on the first row and ArrowDown on the last row are swallowed so number cells keep their value', () => {
+    renderGrid({ lines: [line({ pricingMode: 'PerSquareMeter', width: 1200 }), line({ _uiKey: 'b', pricingMode: 'PerSquareMeter', width: 800 })] });
+    const first = byId('stock-line-width-0');
+    const last = byId('stock-line-width-1');
+    expect(first).toHaveAttribute('type', 'number');
+    // fireEvent returns false when the event was cancelled (the browser would otherwise step the value).
+    expect(fireEvent.keyDown(first, { key: 'ArrowUp' })).toBe(false);
+    expect(fireEvent.keyDown(last, { key: 'ArrowDown' })).toBe(false);
+  });
+
   it('arrows leave the warehouse select alone', () => {
     showAllColumns();
     renderGrid({ lines: [line(), line({ _uiKey: 'b' })] });

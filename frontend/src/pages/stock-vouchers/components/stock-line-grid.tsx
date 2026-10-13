@@ -18,6 +18,7 @@ import { toOptionalNumber } from '@/lib/to-number';
 import { useAuthStore } from '@/stores/auth-store';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
+import { StockGridSettingsPopover } from './stock-grid-settings-popover';
 import { isFieldDisabled, LINE_FOCUS_FIELDS, type LineFocusField } from '@/pages/stock-vouchers/utils/line-navigation';
 import {
   forcedColumns,
@@ -215,7 +216,6 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
 
   const userId = useAuthStore((s) => s.user?.id ?? '');
   const { prefs, toggleColumn, toggleEnterStop, reset } = useStockGridPrefs(userId, type);
-  void toggleColumn; void toggleEnterStop; void reset;
   const headerWarehouseId = useWatch({ control: form.control, name: 'warehouseId' }) ?? '';
   const forced = forcedColumns(rows, headerWarehouseId, lineErrors);
   const isShown = (key: ColumnKey) =>
@@ -544,7 +544,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
               Thêm dòng
             </button>
           )}
-          {/* Task 4.3 adds <StockGridSettingsPopover … /> here */}
+          <StockGridSettingsPopover prefs={prefs} onToggleColumn={toggleColumn} onToggleEnterStop={toggleEnterStop} onReset={reset} />
         </div>
         <div className="keyboard-guide">
           <span><span className="kbd">Enter</span> Tiếp</span>

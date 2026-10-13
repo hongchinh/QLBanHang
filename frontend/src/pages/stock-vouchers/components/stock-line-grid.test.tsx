@@ -387,4 +387,24 @@ describe('StockLineGrid', () => {
     expect(screen.queryByRole('button', { name: /Thêm dòng/ })).toBeNull();
     expect(document.querySelector('.stock-grid-toolbar')).not.toBeNull();
   });
+
+  // Assert on the grid itself: the popover's own matrix table also has a "Ghi chú" columnheader,
+  // so headers() would pass before the click.
+  it('the settings popover shows a hidden column at once and stores the choice', () => {
+    renderGrid({ lines: [line()] });
+    expect(document.getElementById('stock-line-note-0')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Cột & phím Enter/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ghi chú' }));
+    expect(document.getElementById('stock-line-note-0')).not.toBeNull();
+    const stored = JSON.parse(localStorage.getItem(stockGridPrefsKey('', 'In'))!);
+    expect(stored.hiddenColumns).not.toContain('note');
+  });
+
+  it('a read-only grid can still reveal a hidden column from the popover', () => {
+    renderGrid({ lines: [line()], readOnly: true });
+    expect(document.getElementById('stock-line-note-0')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Cột & phím Enter/ }));
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Ghi chú' }));
+    expect(document.getElementById('stock-line-note-0')).not.toBeNull();
+  });
 });

@@ -94,7 +94,7 @@ Not checked: the real WAREHOUSE role and the server-side 403; real server number
 - Enter is swallowed on an open, empty partner list.
 - The permission label change does not reach existing databases.
 
-## Residual risks and follow-ups (browser findings, none fixed yet)
+## Residual risks and follow-ups (browser findings of the first check; see "Fix round" below for what was fixed)
 
 1. Ctrl+Delete loses focus on non-last rows. In `stock-line-grid.tsx` (Ctrl+Delete branch, row key near line 629) the first commit has the shortened `fields` but stale `rows`, so React removes the last `<tr>` and the `setTimeout(0)` refocus targets the row about to be removed. Fix: key rows from the field array (`_uiKey ?? field.id`) and/or refocus in an effect once `rows.length === fields.length`. jsdom tests do not see the two-step commit.
 2. Arrow keys on type=number cells at the grid edges: `handleGridKeyDown` returns before `preventDefault()`. Fix: call `preventDefault()` for grid cells before the range check.
@@ -106,6 +106,31 @@ Not checked: the real WAREHOUSE role and the server-side 403; real server number
 8. Low: NumberCell `select()` in `requestAnimationFrame` pulls focus back in Chrome if focus left within the same frame (two Enters 10 ms apart end on Đơn giá). Fix: guard with `document.activeElement === el`.
 9. Low, pre-existing: while the push-permission banner shows, the app is 54px taller than the window and the totals bar falls below the fold (`PushPermissionPrompt.tsx`, `app-layout.tsx`).
 10. Low: dark-mode destructive contrast (token in `index.css`; use `dark:text-red-400`, `dark:bg-red-500` in `partner-debt-strip.tsx` and `stock-voucher-tabs.tsx`). Only matters once a dark toggle exists.
-11. Untracked `backend/tests/OrderMgmt.IntegrationTests/TestResults/*.trx` (368 MB) exist locally, and `.superpowers/*` is already tracked on main by commit 524a7f9; neither was modified or staged here.
+11. Tracked `backend/tests/OrderMgmt.IntegrationTests/TestResults/*.trx` (368 MB) exist locally, and `.superpowers/*` is already tracked on main by commit 524a7f9; neither was modified or staged here.
 12. The 3 baseline vitest failures and 3 lint errors pre-exist and were not touched.
 13. Still open: a person must check the form against the real backend. Push, PR and the chat post are done by the main session.
+
+## Fix round after the browser check (2026-10-13)
+
+The first browser check (real Chrome, mocked API) failed 7 of 37 items. Seven defects caused by this plan were fixed, one commit each, and re-measured in the browser:
+
+| Commit | Fix | Browser re-check |
+|---|---|---|
+| e9586c7 | Ctrl+Delete removes the right row and keeps focus (rows keyed from the field item, refocus in an effect) | pass: 12/12 cases at both viewports end on the right cell |
+| 1454dbf | ↑ on the first row / ↓ on the last row no longer step `type=number` cells | pass |
+| 44674b8 | The page scrolls instead of letting the totals bar cover the grid (min height propagates; bar no longer sticky) | pass: gap 8 px, overlap 0 at 1366×657 with the banner, 1366×500 and 1366×420 |
+| f1c9a7f | Saving a voucher without lines keeps the focus inside the form | pass |
+| ba0628b | Phí vận chuyển and CK cả đơn show their validation messages | pass |
+| b79fce9 | Number cells select their text only while still focused | pass |
+| 7e0588e | Toolbar and debt strip stay on one line at 1366 px (keyboard guide inline from 1536 px, "Phím tắt" popover below) | toolbar 43 px and bar 71 px: pass; visible rows: see below |
+| 7816e83 | Deleting the only line (Ctrl+Delete or its button) moves focus to "Thêm dòng"; the delete button keeps focus in the grid | automated tests only (added after the re-check; not re-measured in the browser) |
+
+After the fix round: `npx vitest run src/pages/stock-vouchers src/pages/quotations` 199 passed; `npm run test` 3 failed | 945 passed (the 3 baseline failures); typecheck pass; lint 17 problems (baseline); build pass.
+
+Still open after the fix round:
+
+1. **Visible rows on a 768p screen.** With the debt strip shown: 9 rows at a 1366×768 viewport, but 6 at 1366×657 (a normal browser window), 5 when the grid's horizontal scrollbar is drawn. The plan's checklist asked for at least 7. 1080p: 15 at 1920×969, 18 at 1920×1080. Remaining fixed height at 1366: title 61 + main fields 88 + tabs 34 + toolbar 43 + header 36 + bar 71 px.
+2. After Ctrl+Delete the focus is on `<body>` for about 45–63 ms (dev build, 20 lines) before it returns to the grid; a key pressed in that window is lost. No test distinguishes the effect-based refocus from the old `setTimeout(0)`.
+3. The debt strip still wraps to two lines at 1366 px with a long partner name plus 10-digit balances (bar 89 px, nothing covered).
+4. Not changed, user decision: the product suggestion list is cut by the bottom of the window on 768p (shared with quotations); dark-mode red is too dark (the app has no dark-mode switch); the push-permission banner makes the app 54 px taller than the window (older than this plan).
+5. Dark mode was not re-measured after the fix round. A check against the real backend by a person is still open.

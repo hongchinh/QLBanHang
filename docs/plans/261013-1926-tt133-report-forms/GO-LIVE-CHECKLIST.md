@@ -104,7 +104,7 @@ S06, S08 và S12 xuất được một, nhiều hoặc "Tất cả có phát sin
 | S06 | 3,1 giây | 61,5 giây | 64,6 giây | 600 |
 
 - Với 100 sổ, chuyển sang PDF mất 9,8 giây (S12), 6,8 giây (S08) và 20,7 giây (S06).
-- Trình duyệt chờ tối đa 120 giây cho một lần xuất. Phần mềm cho phép chuyển PDF tối đa 130 giây.
+- Trình duyệt chờ tối đa 120 giây cho một lần xuất. Phần mềm cho phép chuyển PDF tối đa 130 giây. Khi triển khai, đội kỹ thuật cần đặt thời gian chờ của máy chủ trung gian (reverse proxy) ít nhất 120 giây; nếu ngắn hơn, lần xuất PDF lớn sẽ bị cắt giữa chừng dù phần mềm vẫn đang xử lý.
 - Các con số trên đo bằng dữ liệu thử trên máy của nhóm phát triển, chưa đo trên máy chủ thật. Sổ dài hơn 20 dòng hoặc máy chủ yếu hơn thì chậm hơn. Xuất hàng loạt bản PDF của S06 là chậm nhất; nếu chờ lâu thì xuất Excel, hoặc chia theo từng kho.
 - Khi PDF lỗi, phần mềm báo "Xuất PDF thất bại, hãy dùng Excel." File Excel có cùng nội dung và in được từ Excel.
 - **Nhiều người xuất PDF cùng lúc:** lần thử đầu, khi chạy ba lần chuyển PDF cùng một lúc thì 7 trên 27 lần bị lỗi. Lỗi này đã được sửa ngày 14/10/2026 (mỗi lần chuyển PDF dùng một vùng làm việc riêng); thử lại chín lần chuyển cùng lúc thì cả chín lần đều thành công. Nếu vẫn gặp thông báo lỗi PDF thì bấm xuất lại hoặc dùng Excel, và báo cho đội phát triển.

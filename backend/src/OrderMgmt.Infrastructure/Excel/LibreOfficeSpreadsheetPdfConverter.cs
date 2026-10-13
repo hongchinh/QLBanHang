@@ -41,7 +41,16 @@ public class LibreOfficeSpreadsheetPdfConverter : ISpreadsheetPdfConverter
             using var process = System.Diagnostics.Process.Start(psi)
                 ?? throw new InvalidOperationException("Failed to start LibreOffice process.");
 
-            await process.WaitForExitAsync(cts.Token);
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                // Timeout or request abort: do not leave soffice running with the default profile.
+                try { process.Kill(entireProcessTree: true); } catch { /* the process may have just exited */ }
+                throw;
+            }
 
             if (process.ExitCode != 0)
             {

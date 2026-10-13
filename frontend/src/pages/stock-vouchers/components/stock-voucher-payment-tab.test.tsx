@@ -40,6 +40,28 @@ describe('StockVoucherPaymentTab', () => {
     expect(props.onPaidAmountChange).toHaveBeenLastCalledWith(500_000);
   });
 
+  it('renders the freight, order discount and paid amount messages under their rows', () => {
+    render(
+      <StockVoucherPaymentTab
+        type="In"
+        freight={-5}
+        orderDiscount={-7}
+        paidAmount={0}
+        freightError="Phí vận chuyển không được âm"
+        orderDiscountError="Chiết khấu không được âm"
+        paidAmountError="Quỹ không đủ"
+        onFreightChange={vi.fn()}
+        onOrderDiscountChange={vi.fn()}
+        onPaidAmountChange={vi.fn()}
+        readOnly={false}
+      />,
+    );
+    expect(screen.getByText('Phí vận chuyển không được âm')).toBeInTheDocument();
+    expect(screen.getByText('Chiết khấu không được âm')).toBeInTheDocument();
+    expect(screen.getByText('Quỹ không đủ')).toBeInTheDocument();
+    expect(screen.getByLabelText('Phí vận chuyển')).toHaveAttribute('aria-invalid', 'true');
+  });
+
   it('VAT-to-all input exists only for stock-in and calls onApplyVatToAll', () => {
     const props = renderPanel('In');
     fireEvent.change(screen.getByLabelText('% VAT cho mọi dòng'), { target: { value: '8' } });

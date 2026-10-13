@@ -748,6 +748,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
               paidAmount={effectivePaid}
               paidAmountDisabled={paidLocked}
               paidAmountError={errors.paidAmount?.message}
+              freightError={errors.freight?.message}
+              orderDiscountError={errors.orderDiscount?.message}
               onFreightChange={(v) => form.setValue('freight', v, { shouldDirty: true })}
               onOrderDiscountChange={(v) => form.setValue('orderDiscount', v, { shouldDirty: true })}
               onPaidAmountChange={(v) => {

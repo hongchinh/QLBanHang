@@ -984,6 +984,17 @@ describe('StockVoucherFormPage', () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
+  it('shows the schema messages of a negative Phí VC and CK cả đơn under their rows', async () => {
+    renderPage('In');
+    await fillPerUnitLine(3);
+    fireEvent.keyDown(byId('stock-voucher-at'), { key: '3', altKey: true });
+    fireEvent.change(byId('stock-freight'), { target: { value: '-5' } });
+    fireEvent.change(byId('stock-order-discount'), { target: { value: '-7' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+    expect(await screen.findByText('Phí vận chuyển không được âm')).toBeInTheDocument();
+    expect(screen.getByText('Chiết khấu không được âm')).toBeInTheDocument();
+  });
+
   it('debt strip for a picked partner with permission, on both directions', async () => {
     partnerResults.data = [customer];
     partnerSummaryMock.mockReturnValue({

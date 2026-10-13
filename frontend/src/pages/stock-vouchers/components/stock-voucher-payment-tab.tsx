@@ -27,6 +27,9 @@ export interface StockVoucherPaymentTabProps {
   paidAmountDisabled?: boolean;
   // Server message for the paid amount.
   paidAmountError?: string;
+  // Client validation messages of the two amounts above.
+  freightError?: string;
+  orderDiscountError?: string;
   onFreightChange: (value: number) => void;
   onOrderDiscountChange: (value: number) => void;
   onPaidAmountChange: (value: number) => void;
@@ -46,6 +49,8 @@ export function StockVoucherPaymentTab({
   paidAmount,
   paidAmountDisabled = false,
   paidAmountError,
+  freightError,
+  orderDiscountError,
   onFreightChange,
   onOrderDiscountChange,
   onPaidAmountChange,
@@ -65,13 +70,14 @@ export function StockVoucherPaymentTab({
   return (
     <div className="grid gap-x-8 gap-y-1.5 p-3 md:grid-cols-2">
       <div className="space-y-1.5">
-        <EditableRow id="stock-freight" label="Phí vận chuyển" value={freight} onChange={onFreightChange} disabled={readOnly} />
+        <EditableRow id="stock-freight" label="Phí vận chuyển" value={freight} onChange={onFreightChange} disabled={readOnly} error={freightError} />
         <EditableRow
           id="stock-order-discount"
           label="CK cả đơn"
           value={orderDiscount}
           onChange={onOrderDiscountChange}
           disabled={readOnly}
+          error={orderDiscountError}
         />
         <EditableRow
           id="stock-paid-amount"
@@ -79,8 +85,8 @@ export function StockVoucherPaymentTab({
           value={paidAmount}
           onChange={onPaidAmountChange}
           disabled={readOnly || paidAmountDisabled}
+          error={paidAmountError}
         />
-        {paidAmountError && <p className="text-right text-xs text-destructive">{paidAmountError}</p>}
 
         {autoVoucher && (
           <div className="text-right text-sm">
@@ -138,34 +144,44 @@ interface EditableRowProps {
   value: number;
   onChange: (value: number) => void;
   disabled: boolean;
+  error?: string;
 }
 
 // Same editing behaviour as the quotation totals panel: formatted when idle, raw while focused.
-function EditableRow({ id, label, value, onChange, disabled }: EditableRowProps) {
+function EditableRow({ id, label, value, onChange, disabled, error }: EditableRowProps) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
-    <div className="flex items-center justify-between gap-2">
-      <label htmlFor={id} className="text-sm text-muted-foreground">
-        {label}
-      </label>
-      <Input
-        id={id}
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        disabled={disabled}
-        value={!disabled && draft !== null ? draft : formatMoneyForDisplay(value)}
-        onFocus={(e) => {
-          setDraft(String(value ?? ''));
-          e.currentTarget.select();
-        }}
-        onBlur={() => setDraft(null)}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          onChange(parseMoneyInput(e.target.value) ?? 0);
-        }}
-        className="h-[26px] w-[120px] px-1.5 text-right tabular-nums"
-      />
-    </div>
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-sm text-muted-foreground">
+          {label}
+        </label>
+        <Input
+          id={id}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          disabled={disabled}
+          value={!disabled && draft !== null ? draft : formatMoneyForDisplay(value)}
+          onFocus={(e) => {
+            setDraft(String(value ?? ''));
+            e.currentTarget.select();
+          }}
+          onBlur={() => setDraft(null)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            onChange(parseMoneyInput(e.target.value) ?? 0);
+          }}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className="h-[26px] w-[120px] px-1.5 text-right tabular-nums"
+        />
+      </div>
+      {error && (
+        <p id={`${id}-error`} className="text-right text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </>
   );
 }

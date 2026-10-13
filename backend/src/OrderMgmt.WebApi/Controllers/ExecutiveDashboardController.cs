@@ -1,3 +1,4 @@
+using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Dashboards.Executive.Interfaces;
@@ -13,15 +14,20 @@ namespace OrderMgmt.WebApi.Controllers;
 public class ExecutiveDashboardController : ApiControllerBase
 {
     private readonly ISalesMetricsService _sales;
+    private readonly IValidator<ExecutiveQuery> _queryValidator;
 
-    public ExecutiveDashboardController(ISalesMetricsService sales)
+    public ExecutiveDashboardController(ISalesMetricsService sales, IValidator<ExecutiveQuery> queryValidator)
     {
         _sales = sales;
+        _queryValidator = queryValidator;
     }
 
     [HttpGet("sales/summary")]
     [HasPermission(Permissions.Reports.Profit)]
     public async Task<ActionResult<ApiResponse<SalesSummaryDto>>> SalesSummary(
-        [FromQuery] ExecutiveQuery query, CancellationToken ct) =>
-        Success(await _sales.GetSummaryAsync(query, ct));
+        [FromQuery] ExecutiveQuery query, CancellationToken ct)
+    {
+        await _queryValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _sales.GetSummaryAsync(query, ct));
+    }
 }

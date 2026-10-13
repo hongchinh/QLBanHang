@@ -1,3 +1,7 @@
+using System.Net;
+using System.Net.Http.Json;
+using FluentAssertions;
+using OrderMgmt.Application.Common.Models;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
 
@@ -26,4 +30,17 @@ public abstract class ExecutiveDashboardTestBase : CashDebtTestBase
 
     protected static Task<HttpResponseMessage> GetExecRawAsync(HttpClient client, string pathAndQuery) =>
         client.GetAsync($"/api/dashboard/executive/{pathAndQuery}");
+
+    /// Asserts a 400 whose validation details name `key` and, when given, carry `message` for it.
+    protected static async Task AssertBadRequestKeyAsync(
+        HttpClient client, string pathAndQuery, string key, string? message = null)
+    {
+        var response = await GetExecRawAsync(client, pathAndQuery);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest, pathAndQuery);
+        var details = (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details;
+        details.Should().ContainKey(key, pathAndQuery);
+        if (message is not null)
+            details![key].Should().Contain(message, pathAndQuery);
+    }
 }

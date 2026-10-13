@@ -28,10 +28,13 @@ public class LibreOfficeSpreadsheetPdfConverter : ISpreadsheetPdfConverter
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
             cts.CancelAfter(TimeSpan.FromSeconds(opts.ConversionTimeoutSeconds));
 
+            // One profile per conversion: conversions that run at the same time fail on a shared profile.
+            var profileUri = new Uri(Path.Combine(tmpDir, "profile")).AbsoluteUri;
+
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = opts.LibreOfficePath,
-                Arguments = $"--headless --convert-to pdf --outdir \"{tmpDir}\" \"{xlsxPath}\"",
+                Arguments = $"\"-env:UserInstallation={profileUri}\" --headless --convert-to pdf --outdir \"{tmpDir}\" \"{xlsxPath}\"",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
@@ -47,7 +50,7 @@ public class LibreOfficeSpreadsheetPdfConverter : ISpreadsheetPdfConverter
             }
             catch (OperationCanceledException)
             {
-                // Timeout or request abort: do not leave soffice running with the default profile.
+                // Timeout or request abort: do not leave soffice running.
                 try { process.Kill(entireProcessTree: true); } catch { /* the process may have just exited */ }
                 throw;
             }

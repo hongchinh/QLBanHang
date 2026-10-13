@@ -1,3 +1,6 @@
+using System.IO.Compression;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using ClosedXML.Excel;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Inventory.Reports.Models;
@@ -10,6 +13,9 @@ namespace OrderMgmt.Infrastructure.Excel.Tt133;
 /// Renders the TT133 forms with ClosedXML; each form is a class of this folder.
 public class Tt133FormRenderer : ITt133FormRenderer
 {
+    private static readonly XNamespace SpreadsheetMl = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    private static readonly Regex RelativeRows = new(@"!(\d+):(\d+)$", RegexOptions.Compiled);
+
     public byte[] RenderCashBook(Tt133FormContext context, CashBookReportDto report, FundKind kind) =>
         Render(workbook => CashBookForm.Write(workbook, context, report, kind));
 
@@ -37,6 +43,35 @@ public class Tt133FormRenderer : ITt133FormRenderer
         write(workbook);
         using var stream = new MemoryStream();
         workbook.SaveAs(stream);
+        MakePrintTitlesAbsolute(stream);
         return stream.ToArray();
+    }
+
+    /// ClosedXML writes the rows to repeat as "Sheet!9:11". Excel accepts that; LibreOffice (the PDF conversion) only
+    /// repeats them when the reference is absolute ("Sheet!$9:$11"), so the defined names are rewritten after saving.
+    private static void MakePrintTitlesAbsolute(MemoryStream stream)
+    {
+        using var zip = new ZipArchive(stream, ZipArchiveMode.Update, leaveOpen: true);
+        var entry = zip.GetEntry("xl/workbook.xml");
+        if (entry == null) return;
+
+        XDocument document;
+        using (var input = entry.Open())
+            document = XDocument.Load(input);
+
+        var changed = false;
+        foreach (var name in document.Descendants(SpreadsheetMl + "definedName"))
+        {
+            if ((string?)name.Attribute("name") != "_xlnm.Print_Titles") continue;
+            var absolute = RelativeRows.Replace(name.Value, "!$$$1:$$$2");
+            if (absolute == name.Value) continue;
+            name.Value = absolute;
+            changed = true;
+        }
+        if (!changed) return;
+
+        using var output = entry.Open();
+        output.SetLength(0);
+        document.Save(output);
     }
 }

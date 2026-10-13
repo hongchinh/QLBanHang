@@ -72,6 +72,20 @@ describe('PartnerDebtStrip', () => {
     expect(screen.getByText(/Còn được nợ sau phiếu/)).toBeInTheDocument();
   });
 
+  it('stays on one line: no wrapping, the partner label is the part that shrinks', () => {
+    summaryMock.mockReturnValue(result(summary({ receivableBalance: 1_234_567_890 })));
+    const label = 'KH0001 — Công ty TNHH Thương mại và Dịch vụ Một Cái Tên Rất Dài';
+    render(<PartnerDebtStrip {...base} partnerLabel={label} current={{ effect: 'ReceivableIncrease', total: 4_000_000, paid: 0 }} />);
+    const name = screen.getByText(label);
+    const strip = name.parentElement!;
+    expect(strip).not.toHaveClass('flex-wrap');
+    expect(strip).toHaveClass('flex-nowrap');
+    expect(name).toHaveClass('min-w-0', 'truncate');
+    expect(name).toHaveAttribute('title', label);
+    // Every other item keeps its width.
+    for (const item of Array.from(strip.children).slice(1)) expect(item).toHaveClass('shrink-0');
+  });
+
   it('the overdue link opens in a new tab', () => {
     setPermissions(['reports.debt']);
     summaryMock.mockReturnValue(result(summary()));

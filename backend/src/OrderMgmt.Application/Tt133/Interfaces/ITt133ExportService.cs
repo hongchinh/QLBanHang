@@ -14,4 +14,7 @@ public interface ITt133ExportService
 
     /// Bảng tổng hợp chi tiết thanh toán với người mua / người bán, for every partner (a partnerId is refused).
     Task<ExportFile> ExportDebtSummaryAsync(DebtBalanceReportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// Biên bản đối chiếu công nợ of one partner.
+    Task<ExportFile> ExportDebtReconciliationAsync(DebtReconciliationReportRequest request, ExportFormat format, CancellationToken ct = default);
 }

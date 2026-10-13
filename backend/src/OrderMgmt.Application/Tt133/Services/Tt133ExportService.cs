@@ -131,6 +131,21 @@ public class Tt133ExportService : ITt133ExportService
         return await ToFileAsync(xlsx, BaseName("TongHopCongNo", request.From, request.To), format, ct);
     }
 
+    public async Task<ExportFile> ExportDebtReconciliationAsync(DebtReconciliationReportRequest request, ExportFormat format, CancellationToken ct = default)
+    {
+        ReportScopeGuard.EnsureAllowed(_currentUser, request.Scope);
+
+        var (context, report) = await _transaction.RunSnapshotAsync(async token =>
+        {
+            var formContext = await BuildContextAsync(request.Scope, token);
+            var data = await _cashDebtReports.GetDebtReconciliationAsync(request, token);
+            return (formContext, data);
+        }, ct);
+
+        var xlsx = _renderer.RenderDebtReconciliation(context, report);
+        return await ToFileAsync(xlsx, BaseName($"DoiChieuCongNo_{report.PartnerCode}", request.From, request.To), format, ct);
+    }
+
     /// All: every partner the balance report lists (a non-zero opening balance or movement); otherwise the distinct ids.
     private async Task<List<Guid>> DebtLedgerTargetsAsync(DebtLedgerExportRequest request, CancellationToken ct)
     {

@@ -17,17 +17,20 @@ public class Tt133ExportController : ApiControllerBase
     private readonly IValidator<CashBookReportRequest> _cashBookValidator;
     private readonly IValidator<DebtLedgerExportRequest> _debtLedgerValidator;
     private readonly IValidator<DebtBalanceReportRequest> _debtBalanceValidator;
+    private readonly IValidator<DebtReconciliationReportRequest> _debtReconciliationValidator;
 
     public Tt133ExportController(
         ITt133ExportService exports,
         IValidator<CashBookReportRequest> cashBookValidator,
         IValidator<DebtLedgerExportRequest> debtLedgerValidator,
-        IValidator<DebtBalanceReportRequest> debtBalanceValidator)
+        IValidator<DebtBalanceReportRequest> debtBalanceValidator,
+        IValidator<DebtReconciliationReportRequest> debtReconciliationValidator)
     {
         _exports = exports;
         _cashBookValidator = cashBookValidator;
         _debtLedgerValidator = debtLedgerValidator;
         _debtBalanceValidator = debtBalanceValidator;
+        _debtReconciliationValidator = debtReconciliationValidator;
     }
 
     /// S04a-DNN (kind=Cash) or S05-DNN (kind=Bank).
@@ -60,6 +63,17 @@ public class Tt133ExportController : ApiControllerBase
     {
         await _debtBalanceValidator.ValidateAndThrowAsync(request, ct);
         var file = await _exports.ExportDebtSummaryAsync(request, format, ct);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
+
+    /// Biên bản đối chiếu công nợ of one partner.
+    [HttpGet("debt-reconciliation/export")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<IActionResult> DebtReconciliation(
+        [FromQuery] DebtReconciliationReportRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
+    {
+        await _debtReconciliationValidator.ValidateAndThrowAsync(request, ct);
+        var file = await _exports.ExportDebtReconciliationAsync(request, format, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 }

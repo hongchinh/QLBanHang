@@ -15,4 +15,7 @@ public interface ITt133FormRenderer
 
     /// Bảng tổng hợp chi tiết thanh toán: one sheet. search (trimmed, null when blank) prints the filter line (T22).
     byte[] RenderDebtSummary(Tt133FormContext context, DebtBalanceReportDto report, string? search);
+
+    /// Biên bản đối chiếu công nợ: one portrait sheet.
+    byte[] RenderDebtReconciliation(Tt133FormContext context, DebtReconciliationReportDto report);
 }

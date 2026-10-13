@@ -5,15 +5,18 @@
 
 ## Objective
 
-Create the work branch, record the frontend test and lint baseline, and add `PayableBalance` to `GET /api/debt/partner-summary`. The value is Σ Increase − Σ Decrease on the Payable side, over all dates, in the working branch. The frontend type gains the same field.
+Create the work branch, record the frontend test, lint and typecheck baseline, and add `PayableBalance` to `GET /api/debt/partner-summary`. The value is Σ Increase − Σ Decrease on the Payable side, over all dates, in the working branch. The frontend type gains the same field. The seed label of the `debt.partner_summary` permission is reworded, because it now covers stock-in too (SUMMARY D1).
 
 ## Files
 
 - `docs/plans/261013-0622-stock-voucher-form-tabs/BASELINE.md` (new)
 - `backend/src/OrderMgmt.Application/CashDebt/Debt/Models/DebtDtos.cs` (modify)
 - `backend/src/OrderMgmt.Application/CashDebt/Debt/Services/DebtService.cs` (modify)
+- `backend/src/OrderMgmt.Infrastructure/Persistence/Seed/DbSeeder.cs` (modify: one label string, around line 166)
 - `backend/tests/OrderMgmt.IntegrationTests/CashDebt/StockVoucherDebt/PartnerSummaryTests.cs` (modify)
 - `frontend/src/features/debt/types.ts` (modify)
+- `frontend/src/pages/stock-vouchers/components/customer-debt-panel.test.tsx` (modify: `payableBalance: 0` in `summary()`)
+- `docs/plans/261013-0622-stock-voucher-form-tabs/SUMMARY.md` and this file (status tick, Task 1.4)
 
 ## Tasks
 
@@ -28,8 +31,10 @@ Create the work branch, record the frontend test and lint baseline, and add `Pay
    ```bash
    npm run test 2>&1 | grep -E "FAIL|Tests " > /tmp/qlbh-baseline-test.txt
    npm run lint 2>&1 | tail -5 > /tmp/qlbh-baseline-lint.txt
+   npm run typecheck > /tmp/qlbh-baseline-typecheck.txt 2>&1; echo "typecheck exit code: $?" >> /tmp/qlbh-baseline-typecheck.txt
    ```
-3. Write `docs/plans/261013-0622-stock-voucher-form-tabs/BASELINE.md`. It holds the date, the `qlbanhang/main` commit hash, the list of `FAIL` lines (or "none"), the test totals line, and the lint error/warning counts.
+   Use `grep -E "FAIL|Tests " | sort -u` if vitest prints the same `FAIL` line more than once.
+3. Write `docs/plans/261013-0622-stock-voucher-form-tabs/BASELINE.md`. It holds the date, the `qlbanhang/main` commit hash, the list of `FAIL` lines (or "none"), the test totals line, the lint error/warning counts, and the `npm run typecheck` result (exit code and the first error lines, or "pass"). A pre-existing typecheck failure must be known here, because every phase requires typecheck to pass.
 4. Commit:
    ```bash
    git add docs/plans/261013-0622-stock-voucher-form-tabs/BASELINE.md
@@ -76,7 +81,7 @@ Create the work branch, record the frontend test and lint baseline, and add `Pay
        await AssertCashDebtInvariantsAsync();
    }
    ```
-   If the XBH/NMH lines carry VAT by default, so that the totals are not 3,000/2,000, read the expected totals from the POST responses' `Total` instead of hard-coding them. Keep the assertion "payable equals the NMH total".
+   `VoucherRequest` defaults `VatRate`, discounts and freight to 0 (`InventoryTestBase`), so the totals are 3,000 and 2,000.
 2. **Run it to verify it fails** (with `TEST_DB_CONNECTION` exported, see SUMMARY):
    ```bash
    dotnet test backend/tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~PartnerSummaryTests.Summary_shows_payable_balance_next_to_receivable"
@@ -103,14 +108,53 @@ Create the work branch, record the frontend test and lint baseline, and add `Pay
    // Σ Increase − Σ Decrease of the payable side.
    payableBalance: number;
    ```
-   Then run `npm run typecheck` from `frontend/`. Expected: PASS. If a test fixture typed as `PartnerDebtSummary` now fails to compile, add `payableBalance: 0` to it, for example in the `partnerSummaryMock.mockReturnValue` in `stock-voucher-form-page.test.tsx` and in `customer-debt-panel.test.tsx`.
+   Then run `npm run typecheck` from `frontend/`. Expected: PASS. Typecheck excludes test files (`tsconfig.app.json` excludes `src/**/*.test.ts(x)`), so it will not flag fixtures. Add `payableBalance: 0` to the typed `summary()` helper in `frontend/src/pages/stock-vouchers/components/customer-debt-panel.test.tsx` now and stage it. Leave the untyped `partnerSummaryMock.mockReturnValue` in `stock-voucher-form-page.test.tsx` to Phase 03 Task 3.6.
 6. **Commit:**
    ```bash
    git add backend/src/OrderMgmt.Application/CashDebt/Debt/Models/DebtDtos.cs \
      backend/src/OrderMgmt.Application/CashDebt/Debt/Services/DebtService.cs \
      backend/tests/OrderMgmt.IntegrationTests/CashDebt/StockVoucherDebt/PartnerSummaryTests.cs \
-     frontend/src/features/debt/types.ts <any test fixture touched in step 5>
+     frontend/src/features/debt/types.ts \
+     frontend/src/pages/stock-vouchers/components/customer-debt-panel.test.tsx
    git commit -m "feat(backend): payable balance in the partner debt summary"
+   ```
+
+### Task 1.3 — Permission label covers stock-in (D1)
+
+The permission `debt.partner_summary` keeps its code. Only the display name changes, in the seed, as the brainstorm asks. `DbSeeder` inserts missing permission codes only, so **new databases get the new label; existing rows keep the old `Name` and no migration is written** (cosmetic only).
+
+1. **Find pins of the old label first.** From the repo root:
+   ```bash
+   grep -rn "Xem công nợ khách trên phiếu xuất" backend/src backend/tests
+   ```
+   Expected: only `DbSeeder.cs` (around line 166). If a test under `backend/tests` pins the old string, update it to the new label in this task and add that file to the `git add` below.
+2. **Change the label.** In `backend/src/OrderMgmt.Infrastructure/Persistence/Seed/DbSeeder.cs`, replace the string of the `Permissions.Debt.PartnerSummary` tuple:
+   ```csharp
+   (Permissions.Debt.PartnerSummary, Permissions.CashModule, "Xem công nợ đối tượng trên phiếu nhập/xuất"),
+   ```
+   This is a label-only change, so there is no new failing test. The guard is the existing suite.
+3. **Run:**
+   ```bash
+   grep -rn "Xem công nợ khách trên phiếu xuất" backend/src backend/tests
+   dotnet test backend/tests/OrderMgmt.IntegrationTests --filter "FullyQualifiedName~PartnerSummaryTests|FullyQualifiedName~CashDebtSeedTests"
+   ```
+   Expected: grep prints nothing; tests PASS.
+4. **Commit:**
+   ```bash
+   git add backend/src/OrderMgmt.Infrastructure/Persistence/Seed/DbSeeder.cs
+   git commit -m "feat(backend): partner debt permission label covers stock-in"
+   ```
+   (Phase 05 updates `docs/architecture/system-architecture.md` to the new label.)
+
+### Task 1.4 — Close the phase
+
+1. Run the Verification commands below. All must pass.
+2. In this file, change `**Status:** [ ] pending` to `**Status:** [x] complete`. In `SUMMARY.md`, tick `- [x] Phase 01`.
+3. Commit:
+   ```bash
+   git add docs/plans/261013-0622-stock-voucher-form-tabs/phase-01-backend-payable-balance.md \
+     docs/plans/261013-0622-stock-voucher-form-tabs/SUMMARY.md
+   git commit -m "chore(plan): stock voucher form phase 01 complete"
    ```
 
 ## Verification
@@ -120,7 +164,9 @@ Create the work branch, record the frontend test and lint baseline, and add `Pay
 
 ## Exit Criteria
 
-- Branch `feat/stock-voucher-form-tabs` exists with `BASELINE.md` committed.
+- Branch `feat/stock-voucher-form-tabs` exists with `BASELINE.md` committed (tests, lint and typecheck).
 - `GET /api/debt/partner-summary` returns `payableBalance`, covered by the new fact.
 - The frontend `PartnerDebtSummary` has `payableBalance: number`.
+- The seed label of `debt.partner_summary` is "Xem công nợ đối tượng trên phiếu nhập/xuất" (new databases only).
+- The phase-complete commit exists (Task 1.4).
 - A team chat summary is posted.

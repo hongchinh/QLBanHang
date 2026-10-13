@@ -118,7 +118,15 @@ export function ProductTypeaheadCell({
   const highlightedId = items[highlightedIndex]?.id;
   useEffect(() => {
     if (!open || !highlightedId) return;
-    document.getElementById(`product-option-${highlightedId}`)?.scrollIntoView?.({ block: 'nearest' });
+    const list = dropdownRef.current;
+    const option = document.getElementById(`product-option-${highlightedId}`);
+    if (!list || !option) return;
+    // Scroll by hand: scrollIntoView would leave the option under the sticky table header.
+    const header = list.querySelector('thead')?.getBoundingClientRect().height ?? 0;
+    const box = list.getBoundingClientRect();
+    const row = option.getBoundingClientRect();
+    if (row.top < box.top + header) list.scrollTop -= box.top + header - row.top;
+    else if (row.bottom > box.bottom) list.scrollTop += row.bottom - box.bottom;
   }, [open, highlightedId]);
 
   const commit = useCallback(

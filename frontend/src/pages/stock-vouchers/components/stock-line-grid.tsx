@@ -254,7 +254,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   // Remove a row without a focus gap: the focused cell lives in the row being removed, so move the focus to a
   // surviving row BEFORE removing. Its key keeps that row mounted, so the focus stays there and nothing has to
   // re-focus later (a later re-focus would undo a key the user pressed in between). With no line left the focus
-  // goes to "Thêm dòng", so Insert, Ctrl+S and Alt+n still work.
+  // goes to "Thêm dòng", so Ctrl+S and Alt+n still work and Enter adds a line.
   const removeLine = (rowIndex: number, field: LineFocusField) => {
     const survivor = rowIndex + 1 < fields.length ? rowIndex + 1 : rowIndex - 1;
     if (survivor >= 0) focusCell(verticalTarget(rows[survivor]?.pricingMode ?? 'PerUnit', field, isShown), survivor);
@@ -627,7 +627,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           )}
           <StockGridSettingsPopover prefs={prefs} onToggleColumn={toggleColumn} onToggleEnterStop={toggleEnterStop} onReset={reset} />
         </div>
-        {/* Full guide on wide screens; a compact "Phím tắt" popover below 2xl so the toolbar stays on one line. */}
+        {/* Full guide on wide screens; a compact "Phím tắt" popover below 1860px so the toolbar stays on one line. */}
         <div className="keyboard-guide keyboard-guide-inline">
           <KeyboardGuideItems />
         </div>

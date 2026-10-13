@@ -118,13 +118,13 @@
   margin: 0 2px;
 }
 
-/* The full guide needs a 2xl screen (1536px); below that it lives in the "Phím tắt" popover so the toolbar
+/* The full guide fits beside the tabs only from 1860px (sidebar open); below that it lives in the "Phím tắt" popover so the toolbar
  * stays on one line at 1366px (one more grid row). */
 .stock-grid-toolbar .keyboard-guide-inline {
   display: none;
 }
 
-@media (min-width: 1800px) {
+@media (min-width: 1860px) {
   .stock-grid-toolbar .keyboard-guide-inline {
     display: flex;
   }

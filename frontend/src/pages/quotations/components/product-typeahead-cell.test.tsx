@@ -47,6 +47,27 @@ describe('ProductTypeaheadCell', () => {
     expect(screen.queryByRole('listbox')).toBeNull();
   });
 
+  it('keeps the highlighted option clear of the sticky header and of the list bottom', () => {
+    // List box 100..420 with a 28px sticky header; the highlighted row is measured at 100..128 (under the header).
+    const rect = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 0, width: 0, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const rowRect = rect(100, 128);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      if (this.tagName === 'THEAD') return rect(100, 128);
+      if (this.getAttribute('role') === 'option') return rowRect;
+      return rect(100, 420);
+    });
+    const scrolls: number[] = [];
+    let top = 300;
+    Object.defineProperty(HTMLElement.prototype, 'scrollTop', { configurable: true, get: () => top, set: (v: number) => { top = v; scrolls.push(v); } });
+    try {
+      renderCell();
+      expect(scrolls).toEqual([272]); // 28px up, out from under the header
+    } finally {
+      delete (HTMLElement.prototype as { scrollTop?: number }).scrollTop;
+      vi.restoreAllMocks();
+    }
+  });
+
   describe('placement against the window', () => {
     function placeCell(inputRect: { top: number; bottom: number }, listHeight: number, innerHeight = 768) {
       vi.spyOn(window, 'innerHeight', 'get').mockReturnValue(innerHeight);

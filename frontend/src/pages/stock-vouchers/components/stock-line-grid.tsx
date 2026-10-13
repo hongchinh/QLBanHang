@@ -16,6 +16,7 @@ import { formatStockQuantity } from '@/lib/stock-quantity';
 import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
+import { isFieldDisabled, LINE_FOCUS_FIELDS, type LineFocusField } from '@/pages/stock-vouchers/utils/line-navigation';
 import '@/pages/quotations/components/line-items-grid.css';
 
 const fmt = new Intl.NumberFormat('vi-VN');
@@ -26,23 +27,6 @@ const METRE_UNITS: Partial<Record<PricingMode, string>> = {
   PerSquareMeter: 'm²',
   PerCubicMeter: 'm³',
 };
-
-const LINE_FOCUS_FIELDS = [
-  'product-code',
-  'warehouse',
-  'sheet-count',
-  'length',
-  'width',
-  'thickness',
-  'quantity',
-  'unit-price',
-  'discount-rate',
-  'discount-amount',
-  'vat-rate',
-  'note',
-] as const;
-
-type LineFocusField = (typeof LINE_FOCUS_FIELDS)[number];
 
 function cellId(field: LineFocusField | 'stock-at', idx: number): string {
   return `stock-line-${field}-${idx}`;
@@ -78,23 +62,6 @@ function focusCell(field: LineFocusField, rowIndex: number, afterRender = false)
   const focus = () => document.getElementById(cellId(field, rowIndex))?.focus();
   if (afterRender) setTimeout(focus, 0);
   else focus();
-}
-
-// Số tấm for non-PerUnit; Dài for metre modes; Rộng for m² / m³; Dày for m³; SL only for PerUnit.
-function isFieldDisabled(mode: PricingMode, field: LineFocusField): boolean {
-  switch (field) {
-    case 'sheet-count':
-    case 'length':
-      return mode === 'PerUnit';
-    case 'width':
-      return mode !== 'PerSquareMeter' && mode !== 'PerCubicMeter';
-    case 'thickness':
-      return mode !== 'PerCubicMeter';
-    case 'quantity':
-      return mode !== 'PerUnit';
-    default:
-      return false;
-  }
 }
 
 function parseQuantityInput(text: string): number | undefined {

@@ -214,4 +214,12 @@ describe('cash and debt routes', () => {
     expectRule('/settings/cash', 'cash.settings');
     expect(canAccessRoute('/settings/cash', ['inventory.settings'], [])).toBe(false);
   });
+
+  it('/dashboard/executive needs dashboard.executive', () => {
+    expectRule('/dashboard/executive', 'dashboard.executive');
+    // The quotation dashboard permission does not open it.
+    expect(canAccessRoute('/dashboard/executive', ['quotations.view_all'], ['ADMIN'])).toBe(false);
+    const codes: readonly string[] = PERMISSIONS;
+    expect(codes).toContain('dashboard.executive');
+  });
 });

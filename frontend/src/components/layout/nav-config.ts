@@ -28,6 +28,7 @@ import {
   ListOrdered,
   Package,
   PiggyBank,
+  Presentation,
   QrCode,
   Scale,
   ScrollText,
@@ -136,6 +137,7 @@ const navGroups: NavGroupConfig[] = [
     color: 'bg-nav-reports',
     defaultOpen: true,
     items: [
+      { to: '/dashboard/executive', label: 'Điều hành', icon: Presentation, section: 'Tổng hợp', permission: 'dashboard.executive' },
       { to: '/reports/revenue', label: 'Doanh thu', icon: TrendingUp, section: 'Doanh thu', permission: 'reports.revenue' },
       { to: '/reports/sales-revenue', label: 'Doanh thu sale', icon: BadgeDollarSign, section: 'Doanh thu', permission: 'reports.revenue' },
       { to: '/reports/vehicle-revenue', label: 'Doanh thu xe', icon: CarFront, section: 'Doanh thu', permission: 'reports.revenue' },

@@ -38,7 +38,7 @@ describe('Sidebar sections', () => {
     renderSidebar('/');
     const reports = screen.getByRole('list', { name: 'Báo cáo' });
     expect(within(reports).getAllByRole('heading', { level: 4 }).map((h) => h.textContent))
-      .toEqual(['Doanh thu', 'Kho', 'Quỹ', 'Công nợ']);
+      .toEqual(['Tổng hợp', 'Doanh thu', 'Kho', 'Quỹ', 'Công nợ']);
   });
 });
 

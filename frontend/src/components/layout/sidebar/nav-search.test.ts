@@ -70,7 +70,7 @@ describe('filterNavGroups', () => {
   it('a group label match returns every item of the group', () => {
     const r = filterNavGroups(groups, 'bao cao');
     expect(ids(r)).toEqual(['reports']);
-    expect(r.count).toBe(14);
+    expect(r.count).toBe(15);
     expect(r.matches.size).toBe(0);
   });
 

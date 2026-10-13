@@ -105,7 +105,7 @@ The plan also delivers what the forms need and the software lacks: the company p
 - [x] Phase 02 — Form builder, export infrastructure, S04a and S05 (L) — `phase-02-form-builder-cash-forms.md`
 - [x] Phase 03 — Debt scope, ledger fields, S12, debt summary, reconciliation record (L) — `phase-03-debt-forms.md`
 - [x] Phase 04 — Stock summary (S07) report and page, S06, S08 (L) — `phase-04-stock-forms.md`
-- [-] Phase 05 — Measurements, docs, final verification (M) — `phase-05-docs-and-verification.md`
+- [x] Phase 05 — Measurements, docs, final verification (M) — `phase-05-docs-and-verification.md`
 
 Phases run in order. Phase 02 freezes the builder, the export service shape and the frontend export button; Phases 03 and 04 only add forms to them.
 

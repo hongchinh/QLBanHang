@@ -4,7 +4,7 @@
 
 ## Outcome
 
-Phases 00–04 are complete. Phase 05 is **left in progress**: its measurements, docs and final suites are done, but some of its steps wait for a user decision (see "Open decisions"), and the browser smoke test was not run.
+All six phases (00–05) are complete. The five decisions that Phase 05 raised were taken by the user on 2026-10-14 (see "Decisions taken at the end of the run"), and the user reported the browser smoke test as verified.
 
 The branch delivers the eight forms (S04a, S05, S06, S07, S08, S12, debt summary, reconciliation record) as Excel and PDF, the company profile with its settings page, the stock in–out–balance report and page, the branch/company scope of the debt reports and S07, the reason, due-date and branch-code fields, and `VndAmountInWords`.
 
@@ -64,7 +64,7 @@ Conditions: 20 rows per sheet, October 2026, `all: true`, in-process test server
   - `d94cf24` — page 2 had no header rows, because LibreOffice needs absolute print titles (`$9:$11`). The builder rewrites `xl/workbook.xml` after ClosedXML saves.
 - Concurrent conversions (substitute for step 6): three parallel `soffice` processes, three rounds, three containers. **7 of 27 failed** (exit code 1, no PDF, no hang). With one profile directory per conversion, 9 of 9 succeeded.
 
-## Open decisions (for the user)
+## Decisions taken at the end of the run
 
 1. **Container checks over HTTP were not run — DECIDED: accepted.** The project settings deny `curl`, `wget` and `Invoke-WebRequest`, so Task 5.2 steps 2, 3, 4 and 6 and the API parts of the smoke test were not carried out against the running container. On 2026-10-14 the user accepted the in-process exports, the direct `soffice` runs in the image and the nine parallel conversions through the converter as the evidence. The HTTP path of the container (login, routes, the converter called by the running application) remains unexercised.
 2. **R2: concurrent PDF conversions — DECIDED and fixed.** On the shared default profile about one conversion in three failed (503 `PDF_EXPORT_FAILED` for that user). The user chose a profile directory per conversion on 2026-10-14 (no semaphore). `c5439c1` adds `-env:UserInstallation` under the conversion's temp folder, with the unit test `Each_conversion_gets_its_own_profile_directory` (RED first). Check: nine parallel conversions (3 × 3 rounds) of `S12-DNN_Receivable.xlsx` through `LibreOfficeSpreadsheetPdfConverter` with the local LibreOffice on Windows all returned a PDF (3.6–6.7 s each). That check ran after the final full-suite run, in a temporary test that was not committed; only the three converter tests were re-run after the fix, not the full suite, and the fix was not re-measured inside the Docker image.
@@ -81,9 +81,9 @@ Conditions: 20 rows per sheet, October 2026, `all: true`, in-process test server
 | D-3 | `Tt133ExportOptions` is bound in `WebApi/Program.cs`. | `Application/DependencyInjection.cs` has no `IConfiguration`; the plan allows "where FeatureOptions is bound". |
 | D-4 | New file `components/report-scope-select/use-report-scope.ts`. | The three debt pages and the stock summary page share the URL scope logic. |
 | D-5 | `ProductTypeaheadCell` (shared with quotations and stock vouchers) got `pointerEvents: 'auto'` on its suggestion list. | Fix of the Task 4.7 review finding. |
-| D-6 | Task 5.2 used an in-process test and direct `soffice` runs. | HTTP clients are denied (open decision 1). |
+| D-6 | Task 5.2 used an in-process test and direct `soffice` runs. | HTTP clients are denied (decision 1). |
 | D-7 | LibreOffice is installed on the dev machine, unlike the plan's assumption. | Found while preparing Phase 05; the measurements still use the Docker image. |
-| D-8 | Phase 05 is not marked complete and the folder is not archived. | Open decisions 1 and 5. |
+| D-8 | The plan folder is not archived on this branch. | Decision 5. |
 | D-9 | A LibreOffice profile per conversion, which review S3 had rejected. | User decision 2026-10-14 after the R2 measurement. |
 | D-10 | `backend/Dockerfile` changed (locale and `soffice` wrapper); it is not in the plan's files. | User decision 2026-10-14 on PDF number separators. |
 
@@ -111,8 +111,8 @@ Frontend:
 
 ## Not done
 
-- **Browser smoke test** (Task 5.5 step 2, ten items): not run. The matching behaviour is covered by integration and page tests, which is not the same as a manual check.
-- **Task 5.2 steps 2, 3, 4, 6** through the container API: not run (open decision 1).
+- **Browser smoke test** (Task 5.5 step 2, ten items): not run by the executing session. The user reported it as verified on 2026-10-14; this report holds no record of the individual items.
+- **Task 5.2 steps 2, 3, 4, 6** through the container API: not run (decision 1).
 
 ## Residual risks and follow-ups
 

@@ -19,7 +19,14 @@ import { useAuthStore } from '@/stores/auth-store';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
 import { StockGridSettingsPopover } from './stock-grid-settings-popover';
-import { isFieldDisabled, LINE_FOCUS_FIELDS, type LineFocusField } from '@/pages/stock-vouchers/utils/line-navigation';
+import {
+  enterPath,
+  isFieldDisabled,
+  LINE_FOCUS_FIELDS,
+  nextStop,
+  prevStop,
+  type LineFocusField,
+} from '@/pages/stock-vouchers/utils/line-navigation';
 import {
   forcedColumns,
   OPTIONAL_COLUMNS,
@@ -287,26 +294,31 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     focusCell('product-code', fields.length, true);
   };
 
-  function enabledFields(rowIndex: number): readonly LineFocusField[] {
+  const isVisible = (field: LineFocusField) => isShown(field);
+  const pathOf = (rowIndex: number) => {
     const mode = rows[rowIndex]?.pricingMode ?? 'PerUnit';
-    return LINE_FOCUS_FIELDS.filter((field) => !isFieldDisabled(mode, field));
+    return enterPath(mode, prefs.enterStops[mode], isVisible);
+  };
+
+  function goNextRow(rowIndex: number) {
+    if (rowIndex < fields.length - 1) focusCell('product-code', rowIndex + 1);
+    else if (!readOnly) addLine();
   }
 
   function moveFocus(current: { field: LineFocusField; rowIndex: number }, direction: 1 | -1) {
-    const fieldsInRow = enabledFields(current.rowIndex);
-    const position = fieldsInRow.indexOf(current.field);
-    if (position === -1) return;
-
     if (direction === 1) {
-      if (position < fieldsInRow.length - 1) return focusCell(fieldsInRow[position + 1], current.rowIndex);
-      if (current.rowIndex < fields.length - 1) return focusCell('product-code', current.rowIndex + 1);
-      if (!readOnly) addLine();
+      // A row needs a product before Enter leaves the code cell (no empty rows).
+      if (current.field === 'product-code' && !rows[current.rowIndex]?.productId) return;
+      const next = nextStop(pathOf(current.rowIndex), current.field);
+      if (next) focusCell(next, current.rowIndex);
+      else goNextRow(current.rowIndex);
       return;
     }
-    if (position > 0) return focusCell(fieldsInRow[position - 1], current.rowIndex);
+    const previous = prevStop(pathOf(current.rowIndex), current.field);
+    if (previous) return focusCell(previous, current.rowIndex);
     if (current.rowIndex > 0) {
-      const previous = enabledFields(current.rowIndex - 1);
-      focusCell(previous[previous.length - 1], current.rowIndex - 1);
+      const above = pathOf(current.rowIndex - 1);
+      focusCell(above[above.length - 1], current.rowIndex - 1);
     }
   }
 
@@ -391,10 +403,14 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
               <ProductTypeaheadCell
                 variant="cell"
                 inputId={cellId('product-code', idx)}
-                nextFocusId={cellId('warehouse', idx)}
                 value={line.productCode ?? ''}
                 onChange={(v) => setLineField(idx, 'productCode', v)}
-                onSelect={(s) => applyProduct(idx, s)}
+                onSelect={(s) => {
+                  applyProduct(idx, s);
+                  const next = nextStop(enterPath(s.pricingMode, prefs.enterStops[s.pricingMode], isVisible), 'product-code');
+                  if (next) focusCell(next, idx, true);
+                  else setTimeout(() => goNextRow(idx), 0);
+                }}
               />
             )}
             <CellError id={errorId('product-code', idx)} message={errorOf(idx, 'productId')} />

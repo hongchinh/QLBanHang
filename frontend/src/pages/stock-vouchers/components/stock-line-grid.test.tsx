@@ -407,4 +407,51 @@ describe('StockLineGrid', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: 'Ghi chú' }));
     expect(document.getElementById('stock-line-note-0')).not.toBeNull();
   });
+
+  const enter = (id: string, shift = false) => fireEvent.keyDown(byId(id), { key: 'Enter', shiftKey: shift });
+  const focused = () => document.activeElement?.id;
+
+  it('picking a m² product focuses Số tấm, then Enter walks Dài, Rộng, Đơn giá and opens a new line', async () => {
+    renderGrid({ lines: [createEmptyStockLine(0, WH1)] });
+    await pickFromTypeahead('TON01');
+    await waitFor(() => expect(focused()).toBe('stock-line-sheet-count-0'));
+    enter('stock-line-sheet-count-0');
+    expect(focused()).toBe('stock-line-length-0');
+    enter('stock-line-length-0');
+    expect(focused()).toBe('stock-line-width-0');
+    enter('stock-line-width-0');
+    expect(focused()).toBe('stock-line-unit-price-0');
+    enter('stock-line-unit-price-0');
+    await waitFor(() => expect(focused()).toBe('stock-line-product-code-1'));
+  });
+
+  it('a PerUnit line stops at SL and Đơn giá; stored stops add %VAT', () => {
+    storePrefs({ hiddenColumns: [], enterStops: { PerUnit: ['quantity', 'unit-price', 'vat-rate'] } });
+    renderGrid({ lines: [line({ pricingMode: 'PerUnit' }), line({ _uiKey: 'b', pricingMode: 'PerUnit' })] });
+    enter('stock-line-product-code-0');
+    expect(focused()).toBe('stock-line-quantity-0');
+    enter('stock-line-quantity-0');
+    expect(focused()).toBe('stock-line-unit-price-0');
+    enter('stock-line-unit-price-0');
+    expect(focused()).toBe('stock-line-vat-rate-0');
+    enter('stock-line-vat-rate-0');
+    expect(focused()).toBe('stock-line-product-code-1');
+  });
+
+  it('Shift+Enter from a product code goes to the last stop of the line above, by its mode', () => {
+    renderGrid({ lines: [line({ pricingMode: 'PerSquareMeter' }), line({ _uiKey: 'b' })] });
+    enter('stock-line-product-code-1', true);
+    expect(focused()).toBe('stock-line-unit-price-0');
+    enter('stock-line-unit-price-0', true);
+    expect(focused()).toBe('stock-line-width-0');
+  });
+
+  it('Enter on a product code without a product does nothing', () => {
+    showAllColumns(); // Kho visible: the old code would move to the Kho select, so this test fails in RED
+    renderGrid({ lines: [createEmptyStockLine(0, WH1)] });
+    byId('stock-line-product-code-0').focus();
+    enter('stock-line-product-code-0');
+    expect(focused()).toBe('stock-line-product-code-0');
+    expect(document.getElementById('stock-line-product-code-1')).toBeNull();
+  });
 });

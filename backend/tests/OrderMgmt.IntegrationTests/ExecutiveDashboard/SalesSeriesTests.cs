@@ -86,6 +86,19 @@ public class SalesSeriesTests : ExecutiveDashboardTestBase
     }
 
     [Fact]
+    public async Task Cost_is_hidden_without_view_cost()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var user = await CreateClientWithPermissionsAsync("series_no_cost", ids.MainBranchId,
+            Permissions.Dashboard.Executive, Permissions.Reports.Profit);
+
+        var series = await GetSeriesAsync(user, $"{OctoberRange}&granularity=Month");
+
+        series.Points.Should().ContainSingle().Which.Revenue.Should().Be(2_500m);
+        series.Points.Should().OnlyContain(p => p.Cost == null && p.GrossProfit == null);
+    }
+
+    [Fact]
     public async Task Requires_reports_profit()
     {
         var ids = await ReportDataset.SeedAsync(this);

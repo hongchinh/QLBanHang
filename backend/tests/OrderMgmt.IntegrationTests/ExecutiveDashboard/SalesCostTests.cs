@@ -3,7 +3,6 @@ using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
-using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
 

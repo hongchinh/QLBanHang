@@ -101,6 +101,21 @@ public class ExecutiveScopeTests : ExecutiveDashboardTestBase
     }
 
     [Fact]
+    public async Task Dates_outside_the_accepted_range_are_rejected()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainClient(ids);
+
+        await AssertBadRequestKeyAsync(client, "sales/summary?from=1999-12-31", "from", "Từ ngày không hợp lệ.");
+        await AssertBadRequestKeyAsync(client, "sales/summary?to=2101-01-01", "to", "Đến ngày không hợp lệ.");
+        await AssertBadRequestKeyAsync(client, "sales/summary?at=1999-12-31", "at", "Ngày xem số dư không hợp lệ.");
+
+        // Dates at the edge of the calendar cannot build a period: the date rules answer, the server does not fail.
+        await AssertBadRequestKeyAsync(client, "sales/summary?from=0001-01-01", "from", "Từ ngày không hợp lệ.");
+        await AssertBadRequestKeyAsync(client, "sales/summary?to=9999-12-31", "to", "Đến ngày không hợp lệ.");
+    }
+
+    [Fact]
     public async Task Only_to_is_accepted()
     {
         var ids = await ReportDataset.SeedAsync(this);

@@ -18,6 +18,8 @@ public class CashDebtReportService : ICashDebtReportService
     // The escape character EscapeLike uses; every ILike must pass it (see CashVoucherService).
     private const string LikeEscape = "\\";
 
+    private const string OffsetReasonName = "Bù trừ công nợ";
+
     private readonly IAppDbContext _db;
     private readonly ICurrentBranch _currentBranch;
     private readonly ITransactionRunner _transaction;
@@ -153,6 +155,8 @@ public class CashDebtReportService : ICashDebtReportService
             .Where(e => e.SourceType != DebtSourceType.Opening && e.PostedAt >= start && e.PostedAt < end)
             .ToListAsync(ct);
 
+        var reasonNames = await LoadReasonNamesAsync(periodEntries, ct);
+
         var running = openingBalance;
         var rows = new List<DebtLedgerRowDto>();
         foreach (var e in periodEntries
@@ -173,6 +177,8 @@ public class CashDebtReportService : ICashDebtReportService
                 SourceType = e.SourceType,
                 SourceId = e.SourceId,
                 Description = e.Description,
+                ReasonName = reasonNames.GetValueOrDefault((e.SourceType, e.SourceId)),
+                DueDate = e.DueDate,
                 Increase = increase,
                 Decrease = decrease,
                 RunningBalance = running,
@@ -199,6 +205,59 @@ public class CashDebtReportService : ICashDebtReportService
             ClosingDebit = closingDebit,
             ClosingCredit = closingCredit,
         };
+    }
+
+    // Reason of each period row (T8), read in two queries. Soft-deleted vouchers and reasons keep their history.
+    private async Task<Dictionary<(DebtSourceType, Guid), string>> LoadReasonNamesAsync(
+        IReadOnlyCollection<DebtEntry> entries, CancellationToken ct)
+    {
+        var names = new Dictionary<(DebtSourceType, Guid), string>();
+        foreach (var e in entries.Where(e => e.SourceType == DebtSourceType.Offset))
+            names[(e.SourceType, e.SourceId)] = OffsetReasonName;
+
+        var stockIds = entries
+            .Where(e => e.SourceType is DebtSourceType.StockIn or DebtSourceType.StockOut)
+            .Select(e => e.SourceId).Distinct().ToList();
+        if (stockIds.Count > 0)
+        {
+            var stock = await _db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+                .Where(v => stockIds.Contains(v.Id))
+                .Select(v => new
+                {
+                    v.Id,
+                    Name = _db.StockReasons.IgnoreQueryFilters()
+                        .Where(r => r.Id == v.ReasonId).Select(r => r.Name).FirstOrDefault(),
+                })
+                .ToListAsync(ct);
+            foreach (var v in stock.Where(v => v.Name is not null))
+            {
+                names[(DebtSourceType.StockIn, v.Id)] = v.Name!;
+                names[(DebtSourceType.StockOut, v.Id)] = v.Name!;
+            }
+        }
+
+        var cashIds = entries
+            .Where(e => e.SourceType is DebtSourceType.Receipt or DebtSourceType.Payment)
+            .Select(e => e.SourceId).Distinct().ToList();
+        if (cashIds.Count > 0)
+        {
+            var cash = await _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+                .Where(v => cashIds.Contains(v.Id))
+                .Select(v => new
+                {
+                    v.Id,
+                    Name = _db.CashReasons.IgnoreQueryFilters()
+                        .Where(r => r.Id == v.ReasonId).Select(r => r.Name).FirstOrDefault(),
+                })
+                .ToListAsync(ct);
+            foreach (var v in cash.Where(v => v.Name is not null))
+            {
+                names[(DebtSourceType.Receipt, v.Id)] = v.Name!;
+                names[(DebtSourceType.Payment, v.Id)] = v.Name!;
+            }
+        }
+
+        return names;
     }
 
     /// One REPEATABLE READ snapshot, so both ledgers see the same state.

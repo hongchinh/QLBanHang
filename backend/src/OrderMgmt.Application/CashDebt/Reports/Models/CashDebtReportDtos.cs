@@ -85,6 +85,12 @@ public class DebtLedgerRowDto
     public DebtSourceType SourceType { get; set; }
     public Guid SourceId { get; set; }
     public string? Description { get; set; }
+
+    /// The voucher's reason (stock or cash), "Bù trừ công nợ" for an offset (T8).
+    public string? ReasonName { get; set; }
+
+    /// DebtEntry.DueDate: set on Increase rows only.
+    public DateOnly? DueDate { get; set; }
     public decimal Increase { get; set; }
     public decimal Decrease { get; set; }
 

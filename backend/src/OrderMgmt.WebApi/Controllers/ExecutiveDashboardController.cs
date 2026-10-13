@@ -16,13 +16,15 @@ public class ExecutiveDashboardController : ApiControllerBase
     private readonly ISalesMetricsService _sales;
     private readonly IValidator<ExecutiveQuery> _queryValidator;
     private readonly IValidator<ExecutiveSeriesQuery> _seriesValidator;
+    private readonly IValidator<SalesTopQuery> _topValidator;
 
     public ExecutiveDashboardController(ISalesMetricsService sales, IValidator<ExecutiveQuery> queryValidator,
-        IValidator<ExecutiveSeriesQuery> seriesValidator)
+        IValidator<ExecutiveSeriesQuery> seriesValidator, IValidator<SalesTopQuery> topValidator)
     {
         _sales = sales;
         _queryValidator = queryValidator;
         _seriesValidator = seriesValidator;
+        _topValidator = topValidator;
     }
 
     [HttpGet("sales/summary")]
@@ -41,5 +43,14 @@ public class ExecutiveDashboardController : ApiControllerBase
     {
         await _seriesValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _sales.GetSeriesAsync(query, ct));
+    }
+
+    [HttpGet("sales/top")]
+    [HasPermission(Permissions.Reports.Profit)]
+    public async Task<ActionResult<ApiResponse<List<SalesTopRowDto>>>> SalesTop(
+        [FromQuery] SalesTopQuery query, CancellationToken ct)
+    {
+        await _topValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _sales.GetTopAsync(query, ct));
     }
 }

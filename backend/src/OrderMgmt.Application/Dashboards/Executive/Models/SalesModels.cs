@@ -37,3 +37,15 @@ public class SalesPointDto
     public decimal? Cost { get; set; }
     public decimal? GrossProfit { get; set; }
 }
+
+public class SalesTopRowDto
+{
+    /// Partner, product or user id.
+    public Guid Id { get; set; }
+
+    /// Partner or product code; null for employees.
+    public string? Code { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public decimal Revenue { get; set; }
+    public decimal? GrossProfit { get; set; }
+}

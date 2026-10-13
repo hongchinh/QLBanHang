@@ -6,4 +6,5 @@ public interface ISalesMetricsService
 {
     Task<SalesSummaryDto> GetSummaryAsync(ExecutiveQuery query, CancellationToken ct = default);
     Task<SalesSeriesDto> GetSeriesAsync(ExecutiveSeriesQuery query, CancellationToken ct = default);
+    Task<List<SalesTopRowDto>> GetTopAsync(SalesTopQuery query, CancellationToken ct = default);
 }

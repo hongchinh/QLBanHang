@@ -551,6 +551,32 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(document.activeElement).toBe(rowB));
   });
 
+  it('focus never rests on <body> while the row is removed (Ctrl+Delete and the delete button)', async () => {
+    // A setTimeout/effect refocus passes the waitFor checks above but leaves a window with the focus on <body>.
+    // Record the active element right after every DOM removal: it must already sit on a grid cell.
+    const resting: Array<Element | null> = [];
+    const original = Node.prototype.removeChild;
+    const spy = vi.spyOn(Node.prototype, 'removeChild').mockImplementation(function <T extends Node>(this: Node, child: T): T {
+      const result = original.call(this, child) as T;
+      if ((child as Element).tagName === 'TR') resting.push(document.activeElement);
+      return result;
+    });
+    try {
+      const { values } = renderGrid({
+        lines: [line({ _uiKey: 'a', productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' }), line({ _uiKey: 'c', productCode: 'C' })],
+      });
+      act(() => byId('stock-line-quantity-1').focus());
+      fireEvent.keyDown(byId('stock-line-quantity-1'), { key: 'Delete', ctrlKey: true });
+      await waitFor(() => expect(values().lines).toHaveLength(2));
+      fireEvent.click(screen.getAllByRole('button', { name: /Xóa/ })[1]);
+      await waitFor(() => expect(values().lines).toHaveLength(1));
+    } finally {
+      spy.mockRestore();
+    }
+    expect(resting).toHaveLength(2);
+    for (const el of resting) expect(el).not.toBe(document.body);
+  });
+
   it('deleting the only line, by Ctrl+Delete or by its button, moves focus to Thêm dòng', async () => {
     const { values } = renderGrid({ lines: [line({ productCode: 'A' })] });
     fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 'Delete', ctrlKey: true });

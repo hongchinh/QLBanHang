@@ -258,6 +258,15 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const forced = forcedColumns(rows, headerWarehouseId, lineErrors);
   const isShown = (key: ColumnKey) =>
     !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key);
+  // Remove a row without a focus gap: the focused cell lives in the row being removed, so move the focus to a
+  // surviving row (kept mounted by its key) BEFORE removing; the effect above then only re-asserts it.
+  const removeLine = (rowIndex: number, field: LineFocusField) => {
+    pendingFocus.current = { field, rowIndex };
+    const survivor = rowIndex + 1 < fields.length ? rowIndex + 1 : rowIndex - 1;
+    if (survivor >= 0) focusCell(verticalTarget(rows[survivor]?.pricingMode ?? 'PerUnit', field, isShown), survivor);
+    else document.getElementById('stock-line-add')?.focus();
+    remove(rowIndex);
+  };
   const columns = COLUMNS.filter((c) => isShown(c.key) && !(readOnly && c.key === 'action'));
   const minWidth = columns.reduce((sum, c) => sum + c.width, 0);
 
@@ -378,8 +387,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       const current = parseCellId(target.id);
       if (!current) return;
       e.preventDefault();
-      pendingFocus.current = current;
-      remove(current.rowIndex);
+      removeLine(current.rowIndex, current.field);
       return;
     }
 
@@ -600,8 +608,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         return (
           <button type="button" aria-label={rowLabel('Xóa', idx)} onClick={() => {
               // The button disappears with its row: move the focus to the line that takes its place.
-              pendingFocus.current = { field: 'product-code', rowIndex: idx };
-              remove(idx);
+              removeLine(idx, 'product-code');
             }}>
             <Trash2 className="h-4 w-4 text-red-600" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
           </button>

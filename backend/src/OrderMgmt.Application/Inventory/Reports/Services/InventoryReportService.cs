@@ -366,6 +366,57 @@ public class InventoryReportService : IInventoryReportService
         };
     }
 
+    /// One REPEATABLE READ snapshot for all the report's queries.
+    public Task<List<StockCardTargetDto>> ListStockCardTargetsAsync(StockCardTargetsRequest request, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildStockCardTargetsAsync(request, c), ct);
+
+    private async Task<List<StockCardTargetDto>> BuildStockCardTargetsAsync(StockCardTargetsRequest request, CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var start = VnTime.StartOfDay(request.From);
+        var end = VnTime.StartOfNextDay(request.To);
+
+        var ledger = _db.InventoryLedger.AsNoTracking().Where(e => e.BranchId == branchId && e.PostedAt < end);
+        if (request.WarehouseId is { } warehouseId)
+            ledger = ledger.Where(e => e.WarehouseId == warehouseId);
+        if (request.ProductIds is { } requestedProducts)
+            ledger = ledger.Where(e => requestedProducts.Contains(e.ProductId));
+        var pairs = await ledger
+            .GroupBy(e => new { e.ProductId, e.WarehouseId })
+            .Select(g => new
+            {
+                g.Key.ProductId,
+                g.Key.WarehouseId,
+                OpeningQty = g.Sum(e => e.PostedAt < start ? e.QtyIn - e.QtyOut : 0m),
+                InPeriod = g.Count(e => e.PostedAt >= start),
+            })
+            .ToListAsync(ct);
+        var active = pairs.Where(p => p.OpeningQty != 0m || p.InPeriod > 0).ToList();
+
+        var productIds = active.Select(p => p.ProductId).Distinct().ToList();
+        var products = await _db.Products.IgnoreQueryFilters().AsNoTracking()
+            .Where(p => productIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, p => p.Code, ct);
+        var warehouseIds = active.Select(p => p.WarehouseId).Distinct().ToList();
+        var warehouses = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+            .Where(w => warehouseIds.Contains(w.Id))
+            .Select(w => new { w.Id, w.Code, w.Name })
+            .ToDictionaryAsync(w => w.Id, ct);
+
+        return active
+            .Select(p => new StockCardTargetDto
+            {
+                ProductId = p.ProductId,
+                ProductCode = products.GetValueOrDefault(p.ProductId) ?? "",
+                WarehouseId = p.WarehouseId,
+                WarehouseCode = warehouses[p.WarehouseId].Code,
+                WarehouseName = warehouses[p.WarehouseId].Name,
+            })
+            .OrderBy(t => t.ProductCode, StringComparer.Ordinal)
+            .ThenBy(t => t.WarehouseCode, StringComparer.Ordinal)
+            .ToList();
+    }
+
     /// Branch scope (D32): each warehouse gets R0(scopeValue × qty / scopeQty); the rounding residual goes to the last
     /// warehouse (by code) holding stock. A zero scope quantity gives every warehouse 0.
     private static List<decimal> SplitByQuantity(decimal scopeValue, IReadOnlyList<decimal> quantities)

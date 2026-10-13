@@ -184,6 +184,19 @@ public class Tt133ExportService : ITt133ExportService
         return await ToFileAsync(xlsx, BaseName("S07-DNN", report.From, report.To), format, ct);
     }
 
+    public async Task<ExportFile> ExportStockCardsAsync(StockCardExportRequest request, ExportFormat format, CancellationToken ct = default)
+    {
+        var (context, sheets) = await _transaction.RunSnapshotAsync(async token =>
+        {
+            var formContext = await BuildContextAsync(ReportScope.Branch, token);
+            var data = await ResolveStockSheetsAsync(request, token);
+            return (formContext, data);
+        }, ct);
+
+        var xlsx = _renderer.RenderStockCards(context, sheets);
+        return await ToFileAsync(xlsx, BaseName("S08-DNN", request.From!.Value, request.To!.Value), format, ct);
+    }
+
     /// All: every partner the balance report lists (a non-zero opening balance or movement); otherwise the distinct ids.
     private async Task<List<Guid>> DebtLedgerTargetsAsync(DebtLedgerExportRequest request, CancellationToken ct)
     {
@@ -197,6 +210,69 @@ public class Tt133ExportService : ITt133ExportService
             Scope = request.Scope,
         }, ct);
         return balance.Rows.Where(r => r.PartnerId.HasValue).Select(r => r.PartnerId!.Value).ToList();
+    }
+
+    /// The sheets of S06 / S08 (T20): one stock card per product x warehouse, in product code then warehouse code order.
+    private async Task<List<StockCardSheet>> ResolveStockSheetsAsync(StockCardExportRequest request, CancellationToken ct)
+    {
+        var from = request.From!.Value;
+        var to = request.To!.Value;
+
+        List<StockCardTargetDto> targets;
+        if (request.All)
+        {
+            targets = await _inventoryReports.ListStockCardTargetsAsync(new StockCardTargetsRequest
+            {
+                From = from,
+                To = to,
+                WarehouseId = request.WarehouseId,
+            }, ct);
+        }
+        else if (request.WarehouseId is { } warehouseId)
+        {
+            // An explicit product with a warehouse is always a sheet; GetStockCardAsync answers 404 / 403 for a bad id.
+            var warehouse = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+                .Where(w => w.Id == warehouseId)
+                .Select(w => new { w.Code, w.Name })
+                .FirstOrDefaultAsync(ct)
+                ?? throw new NotFoundException("Warehouse", warehouseId);
+            targets = request.ProductIds.Distinct()
+                .Select(productId => new StockCardTargetDto
+                {
+                    ProductId = productId,
+                    WarehouseId = warehouseId,
+                    WarehouseCode = warehouse.Code,
+                    WarehouseName = warehouse.Name,
+                })
+                .ToList();
+        }
+        else
+        {
+            targets = await _inventoryReports.ListStockCardTargetsAsync(new StockCardTargetsRequest
+            {
+                From = from,
+                To = to,
+                ProductIds = request.ProductIds.Distinct().ToList(),
+            }, ct);
+        }
+        EnsureSheetCount(targets.Count);
+
+        var sheets = new List<StockCardSheet>(targets.Count);
+        foreach (var target in targets)
+        {
+            var card = await _inventoryReports.GetStockCardAsync(new StockCardRequest
+            {
+                ProductId = target.ProductId,
+                WarehouseId = target.WarehouseId,
+                From = from,
+                To = to,
+            }, ct);
+            sheets.Add(new StockCardSheet(card, target.WarehouseCode, target.WarehouseName));
+        }
+        return sheets
+            .OrderBy(s => s.Card.ProductCode, StringComparer.Ordinal)
+            .ThenBy(s => s.WarehouseCode, StringComparer.Ordinal)
+            .ToList();
     }
 
     /// Company profile, working branch and signer of the form. Scope Company prints no branch.

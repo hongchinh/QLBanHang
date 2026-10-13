@@ -25,6 +25,9 @@ public class Tt133FormRenderer : ITt133FormRenderer
     public byte[] RenderStockSummary(Tt133FormContext context, StockSummaryReportDto report, string warehouseLabel, string? productGroupName, string? search) =>
         Render(workbook => StockSummaryForm.Write(workbook, context, report, warehouseLabel, productGroupName, search));
 
+    public byte[] RenderStockCards(Tt133FormContext context, IReadOnlyList<StockCardSheet> sheets) =>
+        Render(workbook => StockCardForm.Write(workbook, context, sheets));
+
     private static byte[] Render(Action<XLWorkbook> write)
     {
         using var workbook = new XLWorkbook();

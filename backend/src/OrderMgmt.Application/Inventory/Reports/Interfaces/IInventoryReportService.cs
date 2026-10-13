@@ -12,4 +12,7 @@ public interface IInventoryReportService
 
     // Opening / in / out / closing per product between two VN dates (S07), quantities and values.
     Task<StockSummaryReportDto> GetStockSummaryAsync(StockSummaryRequest request, CancellationToken ct = default);
+
+    // Product × warehouse pairs of the working branch with a non-zero opening quantity or a ledger row in the period (T20).
+    Task<List<StockCardTargetDto>> ListStockCardTargetsAsync(StockCardTargetsRequest request, CancellationToken ct = default);
 }

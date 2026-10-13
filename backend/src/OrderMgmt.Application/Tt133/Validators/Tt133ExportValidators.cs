@@ -18,3 +18,19 @@ public class DebtLedgerExportRequestValidator : AbstractValidator<DebtLedgerExpo
             .WithMessage("Chọn ít nhất một đối tượng hoặc xuất tất cả.");
     }
 }
+
+/// Rules of the S06 / S08 export body. The list of products has no cap here: the export service applies MaxSheets (T5).
+public class StockCardExportRequestValidator : AbstractValidator<StockCardExportRequest>
+{
+    public StockCardExportRequestValidator()
+    {
+        RuleFor(x => x.From).NotNull().WithMessage("Vui lòng chọn từ ngày.")
+            .InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Từ ngày không hợp lệ.");
+        RuleFor(x => x.To).NotNull().WithMessage("Vui lòng chọn đến ngày.")
+            .InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Đến ngày không hợp lệ.");
+        RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From).When(x => x.From.HasValue && x.To.HasValue)
+            .WithMessage("Đến ngày phải sau hoặc bằng từ ngày.");
+        RuleFor(x => x.ProductIds).NotEmpty().When(x => !x.All)
+            .WithMessage("Chọn ít nhất một mặt hàng hoặc xuất tất cả.");
+    }
+}

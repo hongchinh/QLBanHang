@@ -20,6 +20,7 @@ public class Tt133ExportController : ApiControllerBase
     private readonly IValidator<DebtBalanceReportRequest> _debtBalanceValidator;
     private readonly IValidator<DebtReconciliationReportRequest> _debtReconciliationValidator;
     private readonly IValidator<StockSummaryRequest> _stockSummaryValidator;
+    private readonly IValidator<StockCardExportRequest> _stockCardValidator;
 
     public Tt133ExportController(
         ITt133ExportService exports,
@@ -27,7 +28,8 @@ public class Tt133ExportController : ApiControllerBase
         IValidator<DebtLedgerExportRequest> debtLedgerValidator,
         IValidator<DebtBalanceReportRequest> debtBalanceValidator,
         IValidator<DebtReconciliationReportRequest> debtReconciliationValidator,
-        IValidator<StockSummaryRequest> stockSummaryValidator)
+        IValidator<StockSummaryRequest> stockSummaryValidator,
+        IValidator<StockCardExportRequest> stockCardValidator)
     {
         _exports = exports;
         _cashBookValidator = cashBookValidator;
@@ -35,6 +37,7 @@ public class Tt133ExportController : ApiControllerBase
         _debtBalanceValidator = debtBalanceValidator;
         _debtReconciliationValidator = debtReconciliationValidator;
         _stockSummaryValidator = stockSummaryValidator;
+        _stockCardValidator = stockCardValidator;
     }
 
     /// S04a-DNN (kind=Cash) or S05-DNN (kind=Bank).
@@ -89,6 +92,17 @@ public class Tt133ExportController : ApiControllerBase
     {
         await _stockSummaryValidator.ValidateAndThrowAsync(request, ct);
         var file = await _exports.ExportStockSummaryAsync(request, format, ct);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
+
+    /// S08-DNN: the body names the products (a POST, because a list of ids does not fit a URL).
+    [HttpPost("stock-card/export")]
+    [HasPermission(Permissions.Reports.Inventory)]
+    public async Task<IActionResult> StockCard(
+        [FromBody] StockCardExportRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
+    {
+        await _stockCardValidator.ValidateAndThrowAsync(request, ct);
+        var file = await _exports.ExportStockCardsAsync(request, format, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 }

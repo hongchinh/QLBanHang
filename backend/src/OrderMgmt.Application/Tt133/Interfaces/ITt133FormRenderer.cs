@@ -23,4 +23,7 @@ public interface ITt133FormRenderer
     /// S07-DNN: one landscape sheet. warehouseLabel is "Tất cả kho" or "{Code} – {Name}"; productGroupName and search
     /// (trimmed, null when blank; T22) print their parameter lines only when given.
     byte[] RenderStockSummary(Tt133FormContext context, StockSummaryReportDto report, string warehouseLabel, string? productGroupName, string? search);
+
+    /// S08-DNN: one portrait sheet per stock card, in the order given; "Tờ số" is the 1-based index.
+    byte[] RenderStockCards(Tt133FormContext context, IReadOnlyList<StockCardSheet> sheets);
 }

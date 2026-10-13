@@ -1,4 +1,5 @@
 using OrderMgmt.Application.Common;
+using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Tt133.Models;
@@ -34,3 +35,19 @@ public class DebtLedgerExportRequest
     /// Every partner with an opening balance or movement in the period; PartnerIds is ignored.
     public bool All { get; set; }
 }
+
+/// Body of `POST api/reports/stock-card/export` (S08-DNN) and `stock-detail/export` (S06-DNN): the product x warehouse
+/// pairs to print, one sheet each.
+public class StockCardExportRequest
+{
+    public DateOnly? From { get; set; }
+    public DateOnly? To { get; set; }
+    public Guid? WarehouseId { get; set; }
+    public List<Guid> ProductIds { get; set; } = new();
+
+    /// Every product x warehouse pair of the working branch with an opening quantity or movement in the period; ProductIds is ignored.
+    public bool All { get; set; }
+}
+
+/// One sheet of S06 / S08: the stock card of a product in one warehouse.
+public record StockCardSheet(StockCardDto Card, string WarehouseCode, string WarehouseName);

@@ -21,4 +21,7 @@ public interface ITt133ExportService
 
     /// S07-DNN, the stock in-out-balance summary as the screen shows it (same filters, same cost masking).
     Task<ExportFile> ExportStockSummaryAsync(StockSummaryRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// S08-DNN: one sheet per product x warehouse (T20), quantities only.
+    Task<ExportFile> ExportStockCardsAsync(StockCardExportRequest request, ExportFormat format, CancellationToken ct = default);
 }

@@ -136,3 +136,22 @@ public class StockSummaryRowDto
     public decimal ClosingQty { get; set; }
     public decimal? ClosingValue { get; set; }
 }
+
+/// Product × warehouse pairs of the working branch that have a stock card worth printing (S06, S08; T20).
+public class StockCardTargetsRequest
+{
+    public DateOnly From { get; set; }
+    public DateOnly To { get; set; }
+    public Guid? WarehouseId { get; set; }
+    /// Null = every product.
+    public List<Guid>? ProductIds { get; set; }
+}
+
+public class StockCardTargetDto
+{
+    public Guid ProductId { get; set; }
+    public string ProductCode { get; set; } = "";
+    public Guid WarehouseId { get; set; }
+    public string WarehouseCode { get; set; } = "";
+    public string WarehouseName { get; set; } = "";
+}

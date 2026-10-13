@@ -154,6 +154,9 @@ public class CashBookRowDto
     /// Receipt/payment: Description, else the reason name. Transfer: Description, else "Chuyển quỹ {from} → {to}".
     public string? Description { get; set; }
 
+    /// Reason name of the voucher; a transfer half is "Chuyển quỹ".
+    public string? ReasonName { get; set; }
+
     public decimal In { get; set; }
     public decimal Out { get; set; }
 

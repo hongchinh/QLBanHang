@@ -42,7 +42,7 @@ function FundGroupSection({ group }: { group: CashBookGroup }) {
             {bankInfo && <p className="text-sm text-muted-foreground">{bankInfo}</p>}
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] text-sm">
+            <table className="w-full min-w-[1080px] text-sm">
               <thead>
                 <tr className="border-b text-left text-muted-foreground">
                   <th className="px-2 py-2">Ngày</th>
@@ -50,6 +50,7 @@ function FundGroupSection({ group }: { group: CashBookGroup }) {
                   <th className="px-2 py-2">Số phiếu chi</th>
                   <th className="px-2 py-2">Đối tượng/Người nộp-nhận</th>
                   <th className="px-2 py-2">Diễn giải</th>
+                  <th className="px-2 py-2">Lý do</th>
                   <th className="px-2 py-2 text-right">Thu</th>
                   <th className="px-2 py-2 text-right">Chi</th>
                   <th className="px-2 py-2 text-right">Tồn</th>
@@ -57,7 +58,7 @@ function FundGroupSection({ group }: { group: CashBookGroup }) {
               </thead>
               <tbody>
                 <tr className="border-b font-medium">
-                  <td colSpan={7} className="px-2 py-2">
+                  <td colSpan={8} className="px-2 py-2">
                     Tồn đầu kỳ
                   </td>
                   <td className={NUMERIC_CELL}>{formatCurrencyVnd(group.opening)}</td>
@@ -73,6 +74,7 @@ function FundGroupSection({ group }: { group: CashBookGroup }) {
                     </td>
                     <td className="px-2 py-2">{row.partnerOrPerson}</td>
                     <td className="px-2 py-2">{row.description}</td>
+                    <td className="px-2 py-2">{row.reasonName}</td>
                     <td className={NUMERIC_CELL}>{formatAmountCell(row.in)}</td>
                     <td className={NUMERIC_CELL}>{formatAmountCell(row.out)}</td>
                     <td className={NUMERIC_CELL}>{formatCurrencyVnd(row.running)}</td>
@@ -80,7 +82,7 @@ function FundGroupSection({ group }: { group: CashBookGroup }) {
                 ))}
                 {group.rows.length === 0 && (
                   <tr className="border-b">
-                    <td colSpan={8} className="px-2 py-4 text-center text-muted-foreground">
+                    <td colSpan={9} className="px-2 py-4 text-center text-muted-foreground">
                       Không có phát sinh trong khoảng thời gian này
                     </td>
                   </tr>
@@ -88,7 +90,7 @@ function FundGroupSection({ group }: { group: CashBookGroup }) {
               </tbody>
               <tfoot>
                 <tr className="border-b font-semibold">
-                  <td colSpan={5} className="px-2 py-2">
+                  <td colSpan={6} className="px-2 py-2">
                     Cộng
                   </td>
                   <td className={NUMERIC_CELL}>{formatCurrencyVnd(group.totalIn)}</td>
@@ -96,7 +98,7 @@ function FundGroupSection({ group }: { group: CashBookGroup }) {
                   <td />
                 </tr>
                 <tr className="font-semibold">
-                  <td colSpan={7} className="px-2 py-2">
+                  <td colSpan={8} className="px-2 py-2">
                     Tồn cuối kỳ
                   </td>
                   <td className={NUMERIC_CELL}>{formatCurrencyVnd(group.closing)}</td>

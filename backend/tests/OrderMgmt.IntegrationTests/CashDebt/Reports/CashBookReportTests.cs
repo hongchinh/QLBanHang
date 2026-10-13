@@ -68,6 +68,22 @@ public class CashBookReportTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Rows_carry_the_reason_name()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+        var autoReason = await InDbAsync(async db => await db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+            .Where(v => v.Id == ids.AutoReceiptId).Select(v => v.Reason!.Name).SingleAsync());
+
+        var cash = await GetCashBookAsync(client, $"kind=Cash&{October}");
+        cash.Groups.Single().Rows.Select(r => r.ReasonName)
+            .Should().Equal(autoReason, "Thu tiền khách hàng", "Chuyển quỹ", "Chi khác");
+
+        var bank = await GetCashBookAsync(client, $"kind=Bank&{October}");
+        bank.Groups.Single().Rows.Single(r => r.TransferCode == "CQ00001").ReasonName.Should().Be("Chuyển quỹ");
+    }
+
+    [Fact]
     public async Task Bank_book_all_accounts()
     {
         var ids = await ReportDataset.SeedAsync(this);

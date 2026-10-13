@@ -321,6 +321,7 @@ public class CashDebtReportService : ICashDebtReportService
                     TransferCode = m.Kind is FundMovementKind.TransferIn or FundMovementKind.TransferOut ? m.Code : null,
                     PartnerOrPerson = m.PartnerOrPerson,
                     Description = m.Description,
+                    ReasonName = m.ReasonName,
                     In = @in,
                     Out = @out,
                     Running = running,

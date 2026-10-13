@@ -154,6 +154,8 @@ export interface CashBookRow {
   // Partner name snapshot, else the person name.
   partnerOrPerson?: string | null;
   description?: string | null;
+  // Reason name of the voucher; a transfer half is "Chuyển quỹ".
+  reasonName?: string | null;
   in: number;
   out: number;
   // Group opening plus Σ In − Σ Out up to and including this row.

@@ -38,15 +38,15 @@ const cashGroup: CashBookGroup = {
   rows: [
     {
       at: '2026-10-02T02:00:00Z', sourceType: 'Receipt', sourceId: 'r1', receiptCode: 'PT00001', paymentCode: null,
-      transferCode: null, partnerOrPerson: 'KH Minh Long', description: 'Thu tiền hàng', in: 500_000, out: 0, running: 1_500_000,
+      transferCode: null, partnerOrPerson: 'KH Minh Long', description: 'Thu tiền hàng', reasonName: 'Thu tiền khách hàng', in: 500_000, out: 0, running: 1_500_000,
     },
     {
       at: '2026-10-03T02:00:00Z', sourceType: 'Payment', sourceId: 'p1', receiptCode: null, paymentCode: 'PC00001',
-      transferCode: null, partnerOrPerson: 'NCC Hòa Phát', description: 'Trả tiền NCC', in: 0, out: 200_000, running: 1_300_000,
+      transferCode: null, partnerOrPerson: 'NCC Hòa Phát', description: 'Trả tiền NCC', reasonName: 'Trả tiền NCC', in: 0, out: 200_000, running: 1_300_000,
     },
     {
       at: '2026-10-04T02:00:00Z', sourceType: 'TransferOut', sourceId: 't1', receiptCode: null, paymentCode: null,
-      transferCode: 'CQ00001', partnerOrPerson: null, description: 'Chuyển quỹ QTM → VCB', in: 0, out: 300_000, running: 1_000_000,
+      transferCode: 'CQ00001', partnerOrPerson: null, description: 'Chuyển quỹ QTM → VCB', reasonName: 'Chuyển quỹ', in: 0, out: 300_000, running: 1_000_000,
     },
   ],
   totalIn: 500_000, totalOut: 500_000, closing: 1_000_000,
@@ -57,7 +57,7 @@ const bankGroup: CashBookGroup = {
   rows: [
     {
       at: '2026-10-04T02:00:00Z', sourceType: 'TransferIn', sourceId: 't1', receiptCode: null, paymentCode: null,
-      transferCode: 'CQ00001', partnerOrPerson: null, description: 'Chuyển quỹ QTM → VCB', in: 300_000, out: 0, running: 300_000,
+      transferCode: 'CQ00001', partnerOrPerson: null, description: 'Chuyển quỹ QTM → VCB', reasonName: 'Chuyển quỹ', in: 300_000, out: 0, running: 300_000,
     },
   ],
   totalIn: 300_000, totalOut: 0, closing: 300_000,
@@ -98,7 +98,7 @@ describe('CashBookPage', () => {
     });
 
     const section = screen.getByRole('region', { name: 'QTM – Quỹ tiền mặt' });
-    for (const name of ['Ngày', 'Số phiếu thu', 'Số phiếu chi', 'Đối tượng/Người nộp-nhận', 'Diễn giải', 'Thu', 'Chi', 'Tồn']) {
+    for (const name of ['Ngày', 'Số phiếu thu', 'Số phiếu chi', 'Đối tượng/Người nộp-nhận', 'Diễn giải', 'Lý do', 'Thu', 'Chi', 'Tồn']) {
       expect(within(section).getByRole('columnheader', { name })).toBeInTheDocument();
     }
     const opening = within(section).getByText('Tồn đầu kỳ').closest('tr')!;
@@ -107,7 +107,7 @@ describe('CashBookPage', () => {
     const receipt = within(section).getByRole('link', { name: 'PT00001' });
     expect(receipt).toHaveAttribute('href', '/receipts/r1');
     expect(within(receipt.closest('tr')!).getAllByRole('cell').map((c) => c.textContent)).toEqual([
-      '02/10/2026', 'PT00001', '', 'KH Minh Long', 'Thu tiền hàng', '500.000', '', '1.500.000',
+      '02/10/2026', 'PT00001', '', 'KH Minh Long', 'Thu tiền hàng', 'Thu tiền khách hàng', '500.000', '', '1.500.000',
     ]);
     expect(within(section).getByRole('link', { name: 'PC00001' })).toHaveAttribute('href', '/payments/p1');
 
@@ -117,8 +117,8 @@ describe('CashBookPage', () => {
     const transferCells = within(transfer.closest('tr')!).getAllByRole('cell');
     expect(transferCells[1]).toHaveTextContent('');
     expect(transferCells[2]).toHaveTextContent('CQ00001');
-    expect(transferCells[6]).toHaveTextContent('300.000');
-    expect(transferCells[6]).toHaveClass('text-right', 'tabular-nums');
+    expect(transferCells[7]).toHaveTextContent('300.000');
+    expect(transferCells[7]).toHaveClass('text-right', 'tabular-nums');
 
     const total = within(section).getByText('Cộng').closest('tr')!;
     expect(within(total).getAllByText('500.000')).toHaveLength(2);

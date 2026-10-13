@@ -17,7 +17,9 @@ The branch delivers the eight forms (S04a, S05, S06, S07, S08, S12, debt summary
 | `npm run test` | 3 failed / 948 total | 3 failed / 1035 total (1032 passed) | ✅ the same 3 tests |
 | `npm run build` | passes | passes | ✅ |
 
-The suites grew by 131 backend tests and 87 frontend tests. The change is 142 files, +13,486 / −135 lines against `a76ce85`.
+**Re-run after the later changes (`248ac91`).** Two fixes (decisions 2 and 3) and a merge of `qlbanhang/main` came after the run in the table. The backend suite was run again on the two fixes: 973 tests, 954 passed, 19 failed, the same 19 names (41 m 42 s; the machine was under load). The merge then brought in PR #11 (stock voucher form follow-ups, frontend files only), so the frontend checks were run again on `248ac91`: typecheck clean, lint 3 errors / 14 warnings, 1048 tests with the same 3 failures, build passes. The backend suite was not run again after the merge, which changed no backend file.
+
+The suites grew by 132 backend tests and 100 frontend tests (13 of the frontend tests came with PR #11). The change is 142 files, +13,486 / −135 lines against `a76ce85`.
 
 ## Commits per phase
 
@@ -123,6 +125,6 @@ Frontend:
 - The default Kế toán role lacks `reports.inventory`, `inventory.view_cost` and `branches.access_all`; the checklist tells the admin to grant them where needed.
 - Two frontend tests (`stock-reason-list-page`, `cash-reason-list-page`) time out at 5000 ms under load. Not caused by this branch.
 - The tracked IDE cache `OrderMgmt.Application.csproj.lscache` still names `IQuotationSpreadsheetPdfConverter`; no source file does.
-- The five commits of `fix/stock-voucher-form-followups` are not in `qlbanhang/main`, so they are not in this branch.
+- `486ee9a` (the report and checklist edits for decisions 4 and 5) and `248ac91` (merge of `qlbanhang/main` with PR #11, the stock voucher form follow-ups) were committed on this branch from outside this session while the backend suite was running. PR #11 also changed `product-typeahead-cell.tsx`; the `pointerEvents: 'auto'` fix of D-5 is still in the merged file and its test passes.
 - During Phase 01 another session's uncommitted change to `docs/SUMMARY.md` and an untracked `docs/brainstorms/261013-2247-executive-dashboard/` folder disappeared from the shared checkout. This run did not touch them.
 - Leftovers outside the repository: the `qlbh-backend` Docker image, `%TEMP%\tt133-samples\`, the `tt133-bulk-*` files, `%TEMP%\qlbh-tt133-trx\`, and `qldonhang_integtest_tt133*` databases.

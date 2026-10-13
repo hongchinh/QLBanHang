@@ -551,6 +551,32 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(document.activeElement).toBe(rowB));
   });
 
+  it('focus never rests on <body> while the row is removed (Ctrl+Delete and the delete button)', async () => {
+    // A setTimeout/effect refocus passes the waitFor checks above but leaves a window with the focus on <body>.
+    // Record the active element right after every DOM removal: it must already sit on a grid cell.
+    const resting: Array<Element | null> = [];
+    const original = Node.prototype.removeChild;
+    const spy = vi.spyOn(Node.prototype, 'removeChild').mockImplementation(function <T extends Node>(this: Node, child: T): T {
+      const result = original.call(this, child) as T;
+      if ((child as Element).tagName === 'TR') resting.push(document.activeElement);
+      return result;
+    });
+    try {
+      const { values } = renderGrid({
+        lines: [line({ _uiKey: 'a', productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' }), line({ _uiKey: 'c', productCode: 'C' })],
+      });
+      act(() => byId('stock-line-quantity-1').focus());
+      fireEvent.keyDown(byId('stock-line-quantity-1'), { key: 'Delete', ctrlKey: true });
+      await waitFor(() => expect(values().lines).toHaveLength(2));
+      fireEvent.click(screen.getAllByRole('button', { name: /Xóa/ })[1]);
+      await waitFor(() => expect(values().lines).toHaveLength(1));
+    } finally {
+      spy.mockRestore();
+    }
+    expect(resting).toHaveLength(2);
+    for (const el of resting) expect(el).not.toBe(document.body);
+  });
+
   it('deleting the only line, by Ctrl+Delete or by its button, moves focus to Thêm dòng', async () => {
     const { values } = renderGrid({ lines: [line({ productCode: 'A' })] });
     fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 'Delete', ctrlKey: true });
@@ -572,6 +598,20 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(focused()).toBe('stock-line-product-code-0'));
   });
 
+  it('a key pressed right after Ctrl+Delete is kept: nothing re-focuses the old row later', async () => {
+    const { values } = renderGrid({
+      lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' }), line({ _uiKey: 'c', productCode: 'C' })],
+    });
+    fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 'Delete', ctrlKey: true });
+    // No wait: the user goes one row down at once (from B to C).
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowDown' });
+    const onC = document.activeElement;
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B', 'C']));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(document.activeElement).toBe(onC);
+    expect(focused()).toBe('stock-line-quantity-1');
+  });
+
   it('Ctrl+Delete does nothing on a read-only grid', async () => {
     const { values } = renderGrid({
       lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' })],
@@ -580,6 +620,26 @@ describe('StockLineGrid', () => {
     fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 'Delete', ctrlKey: true });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(values().lines.map((l) => l.productCode)).toEqual(['A', 'B']);
+  });
+
+  it('renders its toolbar into the given slot (on the tab row) instead of above the grid', () => {
+    const slot = document.createElement('div');
+    document.body.appendChild(slot);
+    const formRef: { current: UseFormReturn<StockVoucherFormValues, unknown, StockVoucherFormParsed> | null } = { current: null };
+    function Harness() {
+      const form = useForm<StockVoucherFormValues, unknown, StockVoucherFormParsed>({
+        defaultValues: { ...toFormDefaults(), warehouseId: WH1, lines: [line()] },
+      });
+      formRef.current = form;
+      return <StockLineGrid form={form} type="In" warehouses={warehouses} computed={[]} stockAt={{}} readOnly={false} toolbarSlot={slot} />;
+    }
+    render(<Harness />);
+    expect(within(slot).getByRole('button', { name: /Thêm dòng/ })).toBeInTheDocument();
+    expect(within(slot).getByRole('button', { name: /Phím tắt/ })).toBeInTheDocument();
+    expect(within(slot).getByRole('button', { name: /Cột|Cài đặt|tùy chọn/i })).toBeInTheDocument();
+    expect(document.querySelectorAll('.stock-grid-toolbar')).toHaveLength(1);
+    expect(slot.querySelector('.stock-grid-toolbar')).not.toBeNull();
+    slot.remove();
   });
 
   it('the keyboard guide lists the new keys', () => {

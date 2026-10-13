@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
+import { useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Keyboard, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -232,24 +233,16 @@ export interface StockLineGridProps {
   // Keyed `${productId}:${warehouseId}`.
   stockAt: Record<string, number>;
   readOnly: boolean;
+  // Element on the tab row to host the toolbar (null while it is not mounted yet). Omitted: the toolbar renders
+  // above the grid.
+  toolbarSlot?: HTMLElement | null;
 }
 
-export function StockLineGrid({ form, type, warehouses, computed, stockAt, readOnly }: StockLineGridProps) {
+export function StockLineGrid({ form, type, warehouses, computed, stockAt, readOnly, toolbarSlot }: StockLineGridProps) {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
   const watched = useWatch({ control: form.control, name: 'lines' }) as StockLineFormValues[] | undefined;
   const rows = watched ?? [];
 
-  // Focus to apply after a row removal, once the watched rows have caught up with the field array.
-  const pendingFocus = useRef<{ field: LineFocusField; rowIndex: number } | null>(null);
-  useEffect(() => {
-    const pending = pendingFocus.current;
-    if (!pending || rows.length !== fields.length) return;
-    pendingFocus.current = null;
-    const to = Math.min(pending.rowIndex, rows.length - 1);
-    if (to >= 0) focusCell(verticalTarget(rows[to].pricingMode ?? 'PerUnit', pending.field, isShown), to);
-    // No line left: keep the focus inside the form so Insert, Ctrl+S and Alt+n still work.
-    else document.getElementById('stock-line-add')?.focus();
-  });
   const lineErrors = form.formState.errors.lines;
 
   const userId = useAuthStore((s) => s.user?.id ?? '');
@@ -258,6 +251,16 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const forced = forcedColumns(rows, headerWarehouseId, lineErrors);
   const isShown = (key: ColumnKey) =>
     !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key);
+  // Remove a row without a focus gap: the focused cell lives in the row being removed, so move the focus to a
+  // surviving row BEFORE removing. Its key keeps that row mounted, so the focus stays there and nothing has to
+  // re-focus later (a later re-focus would undo a key the user pressed in between). With no line left the focus
+  // goes to "Thêm dòng", so Ctrl+S and Alt+n still work and Enter adds a line.
+  const removeLine = (rowIndex: number, field: LineFocusField) => {
+    const survivor = rowIndex + 1 < fields.length ? rowIndex + 1 : rowIndex - 1;
+    if (survivor >= 0) focusCell(verticalTarget(rows[survivor]?.pricingMode ?? 'PerUnit', field, isShown), survivor);
+    else document.getElementById('stock-line-add')?.focus();
+    remove(rowIndex);
+  };
   const columns = COLUMNS.filter((c) => isShown(c.key) && !(readOnly && c.key === 'action'));
   const minWidth = columns.reduce((sum, c) => sum + c.width, 0);
 
@@ -378,8 +381,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       const current = parseCellId(target.id);
       if (!current) return;
       e.preventDefault();
-      pendingFocus.current = current;
-      remove(current.rowIndex);
+      removeLine(current.rowIndex, current.field);
       return;
     }
 
@@ -600,8 +602,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         return (
           <button type="button" aria-label={rowLabel('Xóa', idx)} onClick={() => {
               // The button disappears with its row: move the focus to the line that takes its place.
-              pendingFocus.current = { field: 'product-code', rowIndex: idx };
-              remove(idx);
+              removeLine(idx, 'product-code');
             }}>
             <Trash2 className="h-4 w-4 text-red-600" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
           </button>
@@ -609,9 +610,14 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     }
   };
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="stock-grid-toolbar flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-2 py-1.5">
+  // On the tab row (slot) the toolbar has no border or padding of its own; above the grid it is a row of its own.
+  const toolbar = (inSlot: boolean) => (
+    <div
+      className={cn(
+        'stock-grid-toolbar flex items-center gap-2',
+        inSlot ? 'justify-end' : 'shrink-0 flex-wrap justify-between border-b px-2 py-1.5',
+      )}
+    >
         <div className="flex items-center gap-2">
           {!readOnly && (
             <button type="button" id="stock-line-add" className="lib-btn" onClick={addLine}>
@@ -621,7 +627,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           )}
           <StockGridSettingsPopover prefs={prefs} onToggleColumn={toggleColumn} onToggleEnterStop={toggleEnterStop} onReset={reset} />
         </div>
-        {/* Full guide on wide screens; a compact "Phím tắt" popover below 2xl so the toolbar stays on one line. */}
+        {/* Full guide on wide screens; a compact "Phím tắt" popover below 1860px so the toolbar stays on one line. */}
         <div className="keyboard-guide keyboard-guide-inline">
           <KeyboardGuideItems />
         </div>
@@ -636,7 +642,13 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
             <KeyboardGuideItems />
           </PopoverContent>
         </Popover>
-      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {toolbarSlot === undefined && toolbar(false)}
+      {toolbarSlot && createPortal(toolbar(true), toolbarSlot)}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
       <div
         className="accounting-grid-wrap stock-grid-wrap min-h-0 flex-1"

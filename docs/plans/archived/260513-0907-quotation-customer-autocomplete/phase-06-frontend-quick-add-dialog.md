@@ -117,7 +117,7 @@ Refactor `customer-form-page` để tách phần form (fields + submit) thành c
 ## Verification
 
 ```powershell
-cd d:\Projects\QLDonHang\frontend
+cd d:\Projects\QLBanHang\frontend
 npm run typecheck
 npm run lint
 npm run dev

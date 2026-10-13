@@ -83,7 +83,7 @@ Wiring lớp data cho FE: thêm type `CustomerSearchItem`, `customersApi.search`
 ## Verification
 
 ```powershell
-cd d:\Projects\QLDonHang\frontend
+cd d:\Projects\QLBanHang\frontend
 npm run typecheck
 ```
 

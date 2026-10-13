@@ -35,15 +35,15 @@ Thêm trường `AdvancePayment` (số tiền khách đã đặt cọc/ứng tr�
 ## Final Verification
 ```powershell
 # Backend build
-cd d:\Projects\QLDonHang\backend
+cd d:\Projects\QLBanHang\backend
 dotnet build src/OrderMgmt.WebApi
 
 # Frontend unit tests
-cd d:\Projects\QLDonHang\frontend
+cd d:\Projects\QLBanHang\frontend
 npx vitest run src/pages/quotations/utils/compute-line.test.ts
 
 # Integration tests (ensure TEST_DB_CONNECTION points to test DB, not dev DB)
-cd d:\Projects\QLDonHang\backend
+cd d:\Projects\QLBanHang\backend
 dotnet test tests/OrderMgmt.IntegrationTests --filter "QuotationCrudTests|QuotationExportTests"
 ```
 

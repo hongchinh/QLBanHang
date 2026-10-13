@@ -124,7 +124,7 @@ Thay `<Select>` cũ trong block "Thông tin khách hàng" bằng `CustomerAutoco
 ## Verification
 
 ```powershell
-cd d:\Projects\QLDonHang\frontend
+cd d:\Projects\QLBanHang\frontend
 npm run typecheck
 npm run lint
 npm run dev  # local manual check

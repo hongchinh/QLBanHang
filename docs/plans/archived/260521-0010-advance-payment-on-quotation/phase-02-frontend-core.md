@@ -94,7 +94,7 @@ it('totals: remainingBalance = total when advancePayment = 0', () => {
 
 ## Verification
 ```powershell
-cd d:\Projects\QLDonHang\frontend
+cd d:\Projects\QLBanHang\frontend
 npx vitest run src/pages/quotations/utils/compute-line.test.ts
 ```
 

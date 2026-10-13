@@ -13,7 +13,7 @@ Create a reusable hook `useColumnSizingPersist(storageKey, initialSizing?)` that
 ## Tasks
 
 ### Task 1: Confirm TanStack Table version supports required APIs
-1. Run `grep -n "@tanstack/react-table" d:/Projects/QLDonHang/frontend/package.json` (or open the file) to confirm the installed major version is v8+.
+1. Run `grep -n "@tanstack/react-table" d:/Projects/QLBanHang/frontend/package.json` (or open the file) to confirm the installed major version is v8+.
 2. Expected: version string starting with `^8.` or `8.` — these APIs (`columnResizeMode`, `getCanResize`, `getResizeHandler`, `getIsResizing`, `getSize`, `getTotalSize`) are stable since v8.0. If the version is older, stop and flag to the user before continuing (out of scope to upgrade TanStack Table in this plan).
 
 ### Task 2: Write the failing test for `useColumnSizingPersist`

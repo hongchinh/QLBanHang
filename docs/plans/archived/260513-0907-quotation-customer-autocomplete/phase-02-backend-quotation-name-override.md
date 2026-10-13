@@ -60,8 +60,8 @@ PDF không cần đổi: `QuotationPdfRenderer` đã đọc từ `q.CustomerName
 ## Verification
 
 ```powershell
-dotnet build d:\Projects\QLDonHang\backend\src\OrderMgmt.Application
-dotnet test d:\Projects\QLDonHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj --filter "FullyQualifiedName~QuotationCrud"
+dotnet build d:\Projects\QLBanHang\backend\src\OrderMgmt.Application
+dotnet test d:\Projects\QLBanHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj --filter "FullyQualifiedName~QuotationCrud"
 ```
 
 **Manual** (nếu WebApi đang chạy — chỉ rebuild Application/Infrastructure lib):

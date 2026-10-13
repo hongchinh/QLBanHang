@@ -2,7 +2,7 @@
 
 ## Goal
 
-Thêm SignalR vào QLDonHang để cập nhật badge số đỏ trên chuông notification ngay lập tức khi có notification mới — thay vì chờ polling 60 giây. Tất cả tab đang mở của cùng một user đều được cập nhật đồng thời.
+Thêm SignalR vào QLBanHang để cập nhật badge số đỏ trên chuông notification ngay lập tức khi có notification mới — thay vì chờ polling 60 giây. Tất cả tab đang mở của cùng một user đều được cập nhật đồng thời.
 
 ## Scope
 

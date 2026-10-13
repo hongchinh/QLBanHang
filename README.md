@@ -1,4 +1,4 @@
-# QLDonHang - Phần mềm Quản lý Báo giá
+# QLBanHang - Phần mềm Quản lý Báo giá
 
 Hệ thống quản lý quy trình báo giá theo luồng:
 
@@ -38,7 +38,7 @@ Hệ thống quản lý quy trình báo giá theo luồng:
 ## Cấu trúc thư mục
 
 ```
-QLDonHang/
+QLBanHang/
 ├── backend/
 │   ├── OrderMgmt.sln
 │   ├── Directory.Build.props
@@ -289,7 +289,7 @@ Trong service Frontend → tab **Variables**, thêm:
 |---|---|
 | `https://<backend>/health` | 200 `Healthy` |
 | `https://<backend>/health/ready` | 200 `Healthy` (đã kết nối Postgres) |
-| `https://<frontend>` | Trang login QLDonHang |
+| `https://<frontend>` | Trang login QLBanHang |
 | Login `admin` / `Seed__AdminPassword` | Vào dashboard |
 
 ### Troubleshooting

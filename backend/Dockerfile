@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # -----------------------------------------------------------------------------
-# QLDonHang Backend - .NET 9 Web API
+# QLBanHang Backend - .NET 9 Web API
 # Multi-stage build for Railway deployment.
 # -----------------------------------------------------------------------------
 

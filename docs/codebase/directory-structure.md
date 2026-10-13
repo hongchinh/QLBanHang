@@ -3,7 +3,7 @@
 ## Repository Layout
 
 ```
-QLDonHang/
+QLBanHang/
 ├── backend/
 │   ├── OrderMgmt.sln
 │   ├── Directory.Build.props

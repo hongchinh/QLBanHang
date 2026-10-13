@@ -159,7 +159,7 @@ Dòng "Còn lại" chỉ hiển thị khi `advancePayment > 0`. Giá trị tô �
 6. Lưu → reload → tạm ứng giữ nguyên
 
 ```powershell
-cd d:\Projects\QLDonHang\frontend
+cd d:\Projects\QLBanHang\frontend
 npm run dev
 ```
 

@@ -17,7 +17,7 @@ Tạo file `mockup-dropdown.html` trong thư mục plan, render đúng visual m�
    - Footer mockup ghi rõ chú thích: "Đây là mockup confirm trước khi apply tokens. Sau khi user confirm → Phase 02 sẽ thêm `--popover: 0 0% 100%` (light) / `222.2 84% 4.9%` (dark) vào index.css."
 
 2. **User confirmation gate**:
-   - Hiển thị đường dẫn tuyệt đối cho user: `d:\Projects\QLDonHang\docs\plans\260513-1632-add-popover-tokens\mockup-dropdown.html`.
+   - Hiển thị đường dẫn tuyệt đối cho user: `d:\Projects\QLBanHang\docs\plans\260513-1632-add-popover-tokens\mockup-dropdown.html`.
    - Dùng `AskUserQuestion` với options:
      - `Confirm mockup → proceed Phase 02`
      - `Need adjustment` (yêu cầu user nêu cụ thể: màu nền, kbd hints, sample rows, v.v.)

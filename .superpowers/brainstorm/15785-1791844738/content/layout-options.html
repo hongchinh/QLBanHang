@@ -1,0 +1,106 @@
+<style>
+  .vp { border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; height:430px; display:flex; flex-direction:column; overflow:hidden; font-size:10px; color:#334155; }
+  .topbar { background:#1d4ed8; height:16px; flex:none; }
+  .titlebar { display:flex; justify-content:space-between; align-items:center; padding:4px 8px; background:#fff; border-bottom:1px solid #e2e8f0; flex:none; font-weight:700; }
+  .btns span { display:inline-block; padding:1px 6px; border:1px solid #93c5fd; border-radius:3px; margin-left:3px; font-weight:500; }
+  .btns span.p { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .hdr { background:#fff; border:1px solid #e2e8f0; margin:4px 6px; border-radius:4px; padding:4px 6px; flex:none; }
+  .hrow { display:grid; gap:4px; margin-bottom:3px; }
+  .f { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:2px; height:13px; padding:0 3px; line-height:13px; white-space:nowrap; overflow:hidden; }
+  .f b { color:#64748b; font-weight:500; }
+  .grid { flex:1; margin:0 6px; background:#fff; border:1px solid #e2e8f0; border-radius:4px; overflow:hidden; display:flex; flex-direction:column; min-height:0; }
+  .gh { background:#1e40af; color:#fff; height:14px; flex:none; display:grid; font-weight:600; }
+  .gh div { padding:0 3px; line-height:14px; border-right:1px solid rgba(255,255,255,.15); white-space:nowrap; overflow:hidden; }
+  .rows { flex:1; background:repeating-linear-gradient(#fff 0 13px, #e2e8f0 13px 14px); position:relative; }
+  .count { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:#dcfce7; color:#166534; border:1px solid #86efac; padding:2px 8px; border-radius:10px; font-weight:700; font-size:11px; }
+  .foot { flex:none; margin:4px 6px 6px; background:#fff; border:1px solid #e2e8f0; border-radius:4px; display:flex; justify-content:space-between; align-items:center; padding:4px 8px; gap:8px; }
+  .foot .t { display:flex; gap:10px; flex-wrap:wrap; }
+  .foot .t span b { font-weight:700; color:#0f172a; }
+  .foot .tot { font-weight:800; color:#1d4ed8; font-size:11px; }
+  .summary { background:#eff6ff; border:1px solid #bfdbfe; margin:4px 6px; border-radius:4px; padding:4px 8px; flex:none; display:flex; justify-content:space-between; align-items:center; }
+  .summary .chips span { display:inline-block; background:#fff; border:1px solid #bfdbfe; border-radius:8px; padding:0 5px; margin-right:3px; }
+  .side { width:34%; flex:none; display:flex; flex-direction:column; gap:4px; padding:4px 6px 6px 0; }
+  .side .box { background:#fff; border:1px solid #e2e8f0; border-radius:4px; padding:4px; }
+  .side .f { margin-bottom:3px; }
+  .note { font-size:12px; color:#475569; margin-top:6px; }
+</style>
+
+<h2>Bố cục phiếu nhập/xuất — 3 hướng</h2>
+<p class="subtitle">Mỗi khung mô phỏng màn hình 1920×1080 (đã bỏ sidebar trái). Số dòng hàng nhìn thấy ghi ở badge xanh — hiện tại chỉ ~1 dòng. Lưới đã bỏ bớt cột ít dùng (xem phần cột ở bước sau).</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div class="hdr">
+          <div class="hrow" style="grid-template-columns:1fr 1.2fr 1fr 1.4fr 2fr 1fr">
+            <div class="f"><b>Ngày</b> 10/07 09:03</div><div class="f"><b>Lý do</b> Xuất bán hàng</div><div class="f"><b>Kho</b> Kho chính</div><div class="f"><b>Đối tượng</b> hh1</div><div class="f"><b>Tên</b> khách hàng A</div><div class="f"><b>MST</b> 0102…</div>
+          </div>
+          <div class="hrow" style="grid-template-columns:2.4fr 1.2fr 1.2fr 1fr 2fr">
+            <div class="f"><b>Địa chỉ</b></div><div class="f"><b>Người nhận</b></div><div class="f"><b>HTTT</b> --</div><div class="f"><b>Hạn TT</b></div><div class="f"><b>Ghi chú</b></div>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="gh" style="grid-template-columns:5% 12% 26% 6% 7% 7% 7% 8% 10% 12%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>ĐVT</div><div>Tấm</div><div>Dài</div><div>Rộng</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+          <div class="rows"><span class="count">≈ 17 dòng (laptop ≈ 9)</span></div>
+        </div>
+        <div class="foot"><div class="t"><span>Tiền hàng <b>0</b></span><span>CK <b>0</b></span><span>VAT <b>0</b></span><span>Phí VC <b>[0]</b></span><span>CK đơn <b>[0]</b></span><span>Đã trả <b>[0]</b></span></div><div class="tot">Tổng TT: 0</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A · Header nén 2 dòng + Tổng ở thanh đáy</h3>
+      <p>Thông tin chung dồn thành 2 hàng ngang (6 + 5 trường), luôn hiện. "Tổng cộng" thành thanh dính đáy màn hình. Công nợ KH thành nút/popover. Lưới chiếm phần còn lại, cuộn dọc bên trong, tiêu đề cột dính.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div class="summary">
+          <div class="chips"><span>10/07 09:03</span><span>Xuất bán hàng</span><span>Kho chính</span><span><b>hh1 · khách hàng A</b></span><span>Nợ: 0 / KGH</span></div>
+          <span style="color:#1d4ed8;font-weight:600">▾ Sửa thông tin (Alt+1)</span>
+        </div>
+        <div class="grid">
+          <div class="gh" style="grid-template-columns:5% 12% 26% 6% 7% 7% 7% 8% 10% 12%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>ĐVT</div><div>Tấm</div><div>Dài</div><div>Rộng</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+          <div class="rows"><span class="count">≈ 20 dòng (laptop ≈ 11)</span></div>
+        </div>
+        <div class="foot"><div class="t"><span>Tiền hàng <b>0</b></span><span>CK <b>0</b></span><span>VAT <b>0</b></span><span>Phí VC <b>[0]</b></span><span>CK đơn <b>[0]</b></span><span>Đã trả <b>[0]</b></span></div><div class="tot">Tổng TT: 0</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B · Header thu gọn thành 1 dòng tóm tắt (đề xuất)</h3>
+      <p>Phiếu mới: header mở dạng nén như A. Khi chọn xong đối tượng (hoặc Enter vào lưới / phím tắt), header gập lại thành 1 dòng chip tóm tắt, bấm để mở lại. Phiếu cũ mở ra ở trạng thái gập. Tổng ở thanh đáy như A. Nhiều dòng nhất mà không mất chiều ngang.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div style="flex:1;display:flex;min-height:0">
+          <div class="grid" style="margin:4px 6px 6px">
+            <div class="gh" style="grid-template-columns:6% 14% 26% 8% 9% 9% 10% 18%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>Tấm</div><div>Dài</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+            <div class="rows"><span class="count">≈ 24 dòng</span></div>
+          </div>
+          <div class="side">
+            <div class="box"><div class="f"><b>Ngày</b> 10/07</div><div class="f"><b>Lý do</b> Xuất bán</div><div class="f"><b>Kho</b> Kho chính</div><div class="f"><b>Đối tượng</b> hh1</div><div class="f"><b>Tên</b> KH A</div><div class="f"><b>MST</b></div><div class="f"><b>Địa chỉ</b></div><div class="f"><b>HTTT</b></div><div class="f"><b>Ghi chú</b></div></div>
+            <div class="box" style="flex:1"><b>Tổng cộng</b><div class="f" style="margin-top:3px">Tiền hàng 0</div><div class="f">VAT 0</div><div class="f">Phí VC [0]</div><div class="f" style="font-weight:700">Tổng TT 0</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C · Lưới trái, Thông tin + Tổng ở cột phải</h3>
+      <p>Lưới cao hết màn hình (nhiều dòng nhất) nhưng mất ~1/3 chiều ngang → trên laptop 1366px lưới chỉ còn ~850px, phải cuộn ngang hoặc ẩn bớt cột. Giống bố cục phần mềm kế toán kiểu MISA.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="note">Bấm chọn 1 phương án (có thể ghi chú thêm ở terminal). Chi tiết cột lưới, phím tắt, chế độ toàn màn hình sẽ bàn ở bước sau.</p>

@@ -4,7 +4,7 @@
 
 ## Problem framing
 
-Phần mềm cũ (VB.NET WinForms + SQL Server) có form **PhieuNhapXuat** phục vụ cả Phiếu nhập kho và Phiếu xuất kho. Form này gắn với tồn kho, giá vốn (bình quân/FIFO), quy đổi ĐVT, công nợ, hạn mức nợ, phiếu thu/chi tự động, khóa sổ, nhiều chi nhánh. Yêu cầu: clone **nghiệp vụ phiếu nhập/xuất** sang QLDonHang (.NET 9 + React), UI theo pattern màn **Báo giá** (`/quotations`). Điều chuyển kho, kiểm kê, trả hàng (có trong source cũ) để sau.
+Phần mềm cũ (VB.NET WinForms + SQL Server) có form **PhieuNhapXuat** phục vụ cả Phiếu nhập kho và Phiếu xuất kho. Form này gắn với tồn kho, giá vốn (bình quân/FIFO), quy đổi ĐVT, công nợ, hạn mức nợ, phiếu thu/chi tự động, khóa sổ, nhiều chi nhánh. Yêu cầu: clone **nghiệp vụ phiếu nhập/xuất** sang QLBanHang (.NET 9 + React), UI theo pattern màn **Báo giá** (`/quotations`). Điều chuyển kho, kiểm kê, trả hàng (có trong source cũ) để sau.
 
 Doanh nghiệp là **thương mại** (tấm xốp EPS/XPS, bông khoáng…), không sản xuất, không cắt hàng; hàng bán theo cái / m dài / m² / m³ (`Product.PricingMode`).
 

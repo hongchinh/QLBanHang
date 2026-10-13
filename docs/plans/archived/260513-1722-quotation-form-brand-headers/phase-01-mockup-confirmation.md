@@ -34,7 +34,7 @@ Tạo `mockup-quotation-form-headers.html` preview cả 3 surface (Customer popo
    - (Optional) Hiển thị 1 "before vs after" mini block hoặc dải swatch để user thấy diff so với spreadsheet gray cũ — KHÔNG bắt buộc.
 
 2. **User confirmation gate**:
-   - In đường dẫn tuyệt đối: `d:\Projects\QLDonHang\docs\plans\260513-1722-quotation-form-brand-headers\mockup-quotation-form-headers.html`.
+   - In đường dẫn tuyệt đối: `d:\Projects\QLBanHang\docs\plans\260513-1722-quotation-form-brand-headers\mockup-quotation-form-headers.html`.
    - Dùng `AskUserQuestion` với 3 options:
      - `Confirm — proceed to Phase 02` → apply 3-file diff.
      - `Need adjustment` (user nêu cụ thể).

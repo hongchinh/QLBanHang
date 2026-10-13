@@ -164,7 +164,7 @@ Cho admin (`user_settings.manage`) upload **2 ảnh logo công ty** (logo ngang 
     - Logic render:
       - Nếu `collapsed` + `meta.hasLogoMark` → `<img src={logoUrl('mark', meta.updatedAt)} alt="Logo" className="h-8 w-8 object-contain" />`.
       - Nếu `!collapsed` + `meta.hasLogoFull` → `<img src={logoUrl('full', meta.updatedAt)} alt="Logo" className="h-8 object-contain" />`.
-      - Fallback (chưa upload variant tương ứng): icon `FileText` + text "QLDonHang" (như placeholder phase 01); khi collapsed thì chỉ icon.
+      - Fallback (chưa upload variant tương ứng): icon `FileText` + text "QLBanHang" (như placeholder phase 01); khi collapsed thì chỉ icon.
     - Bọc trong `<Link to="/">` để click logo về home.
     - Fix height container để tránh layout shift khi `<img>` load.
 

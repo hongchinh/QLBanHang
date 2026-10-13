@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Superpowers Brainstorming</title>
+  <style>
+    /*
+     * BRAINSTORM COMPANION FRAME TEMPLATE
+     *
+     * This template provides a consistent frame with:
+     * - OS-aware light/dark theming
+     * - Fixed header and selection indicator bar
+     * - Scrollable main content area
+     * - CSS helpers for common UI patterns
+     *
+     * Content is injected via placeholder comment in #claude-content.
+     */
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ===== THEME VARIABLES ===== */
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    /* ===== FRAME STRUCTURE ===== */
+    .header {
+      background: var(--bg-secondary);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
+    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; }
+    .header .status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+    .main { flex: 1; overflow-y: auto; }
+    #claude-content { padding: 2rem; min-height: 100%; }
+
+    .indicator-bar {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1.5rem;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .indicator-bar span {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .indicator-bar .selected-text {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+    /* ===== OPTIONS (for A/B/C choices) ===== */
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .option:hover { border-color: var(--accent); }
+    .option.selected { background: var(--selected-bg); border-color: var(--selected-border); }
+    .option .letter {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      width: 1.75rem; height: 1.75rem;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .option.selected .letter { background: var(--accent); color: white; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+
+    /* ===== CARDS (for showing designs/mockups) ===== */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .card.selected { border-color: var(--selected-border); border-width: 2px; }
+    .card-image { background: var(--bg-tertiary); aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+
+    /* ===== MOCKUP CONTAINER ===== */
+    .mockup {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .mockup-header {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-body { padding: 1.5rem; }
+
+    /* ===== SPLIT VIEW (side-by-side comparison) ===== */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+    /* ===== PROS/CONS ===== */
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+
+    /* ===== PLACEHOLDER (for mockup areas) ===== */
+    .placeholder {
+      background: var(--bg-tertiary);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-tertiary);
+    }
+
+    /* ===== INLINE MOCKUP ELEMENTS ===== */
+    .mock-nav { background: var(--accent); color: white; padding: 0.75rem 1rem; display: flex; gap: 1.5rem; font-size: 0.9rem; }
+    .mock-sidebar { background: var(--bg-tertiary); padding: 1rem; min-width: 180px; }
+    .mock-content { padding: 1.5rem; flex: 1; }
+    .mock-button { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; }
+    .mock-input { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><a href="https://github.com/obra/superpowers" style="color: inherit; text-decoration: none;">Superpowers Brainstorming</a></h1>
+    <div class="status">Connected</div>
+  </div>
+
+  <div class="main">
+    <div id="claude-content">
+      <style>
+  .pg { border:1px solid #cbd5e1; border-radius:6px; background:#f1f5f9; font-size:12px; color:#334155; overflow:hidden; }
+  .tb { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#fff; border-bottom:1px solid #e2e8f0; }
+  .tb h4 { margin:0; font-size:15px; }
+  .tb .meta { color:#64748b; font-weight:400; font-size:12px; margin-left:8px; }
+  .tb .draft { border:1px solid #fcd34d; background:#fffbeb; color:#92400e; border-radius:10px; padding:1px 8px; font-size:11px; margin-left:6px; }
+  .btn { display:inline-block; padding:4px 10px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; margin-left:4px; }
+  .btn.p { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .main { display:grid; grid-template-columns:auto 150px auto 170px auto 120px auto 1fr auto 160px; gap:6px; align-items:center; background:#fff; margin:8px 12px 0; padding:8px 10px; border:1px solid #e2e8f0; border-radius:6px; }
+  .lb { color:#64748b; text-align:right; white-space:nowrap; }
+  .lb.r::after { content:" *"; color:#dc2626; }
+  .in { border:1px solid #cbd5e1; border-radius:4px; height:24px; line-height:24px; padding:0 6px; background:#fff; white-space:nowrap; overflow:hidden; }
+  .in.sel::after { content:"▾"; float:right; color:#94a3b8; }
+  .main2 { background:#fff; margin:8px 12px 0; padding:8px 10px; border:1px solid #e2e8f0; border-radius:6px; }
+  .mr { display:grid; gap:6px; align-items:center; }
+  .mr + .mr { margin-top:6px; }
+  .tabs { display:flex; gap:2px; margin:8px 12px 0; border-bottom:1px solid #cbd5e1; align-items:flex-end; }
+  .tabs span { padding:5px 12px; border:1px solid #cbd5e1; border-bottom:none; border-radius:5px 5px 0 0; background:#e2e8f0; color:#475569; }
+  .tabs span.on { background:#fff; color:#1d4ed8; font-weight:700; margin-bottom:-1px; padding-bottom:6px; }
+  .tabs .n { background:#dbeafe; color:#1d4ed8; border-radius:8px; padding:0 5px; margin-left:4px; font-size:11px; }
+  .tabs .dot { display:inline-block; width:6px; height:6px; background:#dc2626; border-radius:50%; margin-left:4px; vertical-align:middle; }
+  .tabs .k { color:#94a3b8; font-size:10px; margin-left:4px; }
+  .tabs .sp { flex:1; border:none; background:none; }
+  .panel { background:#fff; margin:0 12px; border:1px solid #cbd5e1; border-top:none; }
+  .gtool { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:11px; color:#64748b; }
+  .kbd { display:inline-block; border:1px solid #cbd5e1; border-bottom-width:2px; border-radius:3px; padding:0 4px; font-size:10px; background:#f8fafc; color:#334155; }
+  table.g { width:100%; border-collapse:collapse; font-size:11.5px; table-layout:fixed; }
+  table.g th { background:#1e40af; color:#fff; font-weight:600; padding:5px 4px; border-right:1px solid rgba(255,255,255,.15); position:sticky; top:0; }
+  table.g td { border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:4px; height:16px; white-space:nowrap; overflow:hidden; }
+  table.g td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  table.g td.dis { background:#f1f5f9; color:#cbd5e1; }
+  table.g td.ro { color:#64748b; }
+  table.g .pinL { background:#f8fafc; }
+  table.g th.pinL, table.g th.pinR { background:#1e3a8a; }
+  table.g td.pinR { background:#f8fafc; font-weight:600; }
+  table.g td.stop { background:#fef9c3; box-shadow:inset 0 0 0 2px #3b82f6; }
+  table.g td .step { display:inline-block; background:#3b82f6; color:#fff; border-radius:7px; font-size:9px; padding:0 4px; margin-right:3px; }
+  .scrollhint { text-align:center; color:#94a3b8; font-size:11px; padding:3px; border-bottom:1px solid #e2e8f0; }
+  .bar { position:relative; display:flex; justify-content:space-between; align-items:center; background:#fff; border-top:2px solid #2563eb; margin:8px 0 0; padding:7px 12px; box-shadow:0 -2px 6px rgba(0,0,0,.06); }
+  .bar .t { display:flex; gap:16px; }
+  .bar .t span { color:#64748b; }
+  .bar .t b { color:#0f172a; }
+  .bar .tot { font-size:15px; font-weight:800; color:#1d4ed8; }
+  .debt { display:flex; gap:18px; flex-wrap:wrap; background:#f8fafc; border-top:1px dashed #cbd5e1; padding:5px 12px; font-size:11.5px; color:#64748b; }
+  .debt b { color:#0f172a; }
+  .debt b.neg { color:#dc2626; }
+  .debt .who { font-weight:700; color:#0f172a; }
+  .debt a { color:#2563eb; text-decoration:underline; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+  .pay { padding:10px 14px; display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; }
+  .pay .r { display:grid; grid-template-columns:140px 1fr; gap:6px; align-items:center; }
+  .pop { border:1px solid #cbd5e1; border-radius:8px; background:#fff; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:10px 12px; font-size:12px; }
+  .pop h5 { margin:0 0 6px; font-size:12px; color:#0f172a; }
+  .pop .cols { display:grid; grid-template-columns:1fr 1fr; gap:2px 12px; margin-bottom:10px; }
+  .pop table { border-collapse:collapse; width:100%; font-size:11px; }
+  .pop th, .pop td { border:1px solid #e2e8f0; padding:3px 4px; text-align:center; }
+  .pop th { background:#f1f5f9; font-weight:600; }
+  .pop td.na { background:#f8fafc; color:#cbd5e1; }
+  .pop td.l { text-align:left; font-weight:600; }
+  .cap { font-size:12px; color:#475569; margin:6px 0 2px; }
+</style>
+
+<h2>T2 chi tiết — phiếu xuất kho</h2>
+<p class="subtitle">Màn hình 1920px. Ô vàng có số = thứ tự phím Enter cho dòng đang nhập (dòng 3 là hàng tính theo m²).</p>
+
+<div class="pg">
+  <div class="tb">
+    <div><h4 style="display:inline">← Thêm phiếu xuất kho</h4><span class="meta">Số phiếu dự kiến: PX00002</span><span class="draft">Nháp chưa lưu từ 21:03 ✕</span></div>
+    <div><span class="btn">Lưu và thoát</span><span class="btn p">💾 Lưu tạm</span></div>
+  </div>
+
+  <div class="main2">
+    <div class="mr" style="grid-template-columns:auto 170px auto 190px auto 150px auto 170px 1fr">
+      <span class="lb r">Ngày xuất</span><div class="in">10/07/2026 09:03</div>
+      <span class="lb r">Lý do xuất</span><div class="in sel">Xuất bán hàng</div>
+      <span class="lb r">Kho</span><div class="in sel">Kho chính</div>
+      <span class="lb">HTTT</span><div class="in sel">Tiền mặt</div><span></span>
+    </div>
+    <div class="mr" style="grid-template-columns:auto 170px auto 300px auto 1fr">
+      <span class="lb">Mã đối tượng</span><div class="in" style="border-color:#3b82f6">hh1 <span style="float:right;color:#94a3b8">🔍 ✕</span></div>
+      <span class="lb">Tên đối tượng</span><div class="in">khách hàng A</div>
+      <span class="lb">Địa chỉ</span><div class="in">12 Nguyễn Trãi, Thanh Xuân, Hà Nội</div>
+    </div>
+  </div>
+  <div class="tabs">
+    <span class="on">Hàng hóa <span class="n">15</span><span class="k">Alt+1</span></span>
+    <span>Thông tin khác<span class="k">Alt+2</span></span>
+    <span>Thanh toán<span class="dot"></span><span class="k">Alt+3</span></span>
+    <span>Lịch sử<span class="k">Alt+4</span> <span style="font-size:10px;color:#94a3b8">(khi sửa)</span></span>
+    <span class="sp"></span>
+  </div>
+  <div class="panel">
+    <div class="gtool">
+      <div><span class="btn" style="margin:0">＋ Thêm dòng</span> <span class="btn">⚙ Cột &amp; phím Enter</span></div>
+      <div><span class="kbd">Enter</span> Tiếp · <span class="kbd">Shift</span>+<span class="kbd">Enter</span> Lùi · <span class="kbd">↑</span><span class="kbd">↓</span> Dòng trên/dưới · <span class="kbd">Insert</span> Thêm dòng · <span class="kbd">Ctrl</span>+<span class="kbd">Del</span> Xóa dòng · <span class="kbd">Ctrl</span>+<span class="kbd">S</span> Lưu</div>
+    </div>
+    <table class="g">
+      <colgroup><col style="width:34px"><col style="width:90px"><col style="width:200px"><col style="width:44px"><col style="width:50px"><col style="width:58px"><col style="width:58px"><col style="width:50px"><col style="width:70px"><col style="width:70px"><col style="width:90px"><col style="width:100px"><col style="width:48px"><col style="width:48px"><col style="width:110px"><col style="width:28px"></colgroup>
+      <thead><tr>
+        <th class="pinL">#</th><th class="pinL">Mã hàng</th><th class="pinL">Tên hàng</th><th>ĐVT</th><th>Tấm</th><th>Dài</th><th>Rộng</th><th>Dày</th><th>SL</th><th>SL tồn</th><th>Đơn giá</th><th>Số tiền</th><th>%CK</th><th>%VAT</th><th class="pinR">Còn lại</th><th></th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="pinL ro">1</td><td class="pinL">KT</td><td class="pinL">JP1 - E-Health</td><td class="ro">m²</td><td class="n">3</td><td class="n">2.4</td><td class="n">1.2</td><td class="dis"></td><td class="n ro">8.64</td><td class="n ro">1,400</td><td class="n">120,000</td><td class="n ro">1,036,800</td><td class="n">0</td><td class="n">10</td><td class="n pinR">1,140,480</td><td>🗑</td></tr>
+        <tr><td class="pinL ro">2</td><td class="pinL">OC-01</td><td class="pinL">Ốc vít inox M6</td><td class="ro">Cái</td><td class="dis"></td><td class="dis"></td><td class="dis"></td><td class="dis"></td><td class="n">200</td><td class="n ro">5,000</td><td class="n">1,500</td><td class="n ro">300,000</td><td class="n">0</td><td class="n">10</td><td class="n pinR">330,000</td><td>🗑</td></tr>
+        <tr><td class="pinL ro">3</td><td class="pinL stop"><span class="step">1</span>KT2</td><td class="pinL">Tấm Alu 3mm</td><td class="ro">m²</td><td class="n stop"><span class="step">2</span>5</td><td class="n stop"><span class="step">3</span>2.44</td><td class="n stop"><span class="step">4</span>1.22</td><td class="dis"></td><td class="n ro">14.88</td><td class="n ro">320</td><td class="n stop"><span class="step">5</span>95,000</td><td class="n ro">1,413,790</td><td class="n">0</td><td class="n">10</td><td class="n pinR">1,555,169</td><td>🗑</td></tr>
+        <tr><td class="pinL ro">4</td><td class="pinL">TH-60</td><td class="pinL">Thanh nhôm hộp 60</td><td class="ro">m</td><td class="n">4</td><td class="n">6</td><td class="dis"></td><td class="dis"></td><td class="n ro">24</td><td class="n ro">600</td><td class="n">45,000</td><td class="n ro">1,080,000</td><td class="n">0</td><td class="n">8</td><td class="n pinR">1,166,400</td><td>🗑</td></tr>
+        <tr><td class="pinL ro">5</td><td class="pinL"></td><td class="pinL"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="pinR"></td><td>🗑</td></tr>
+      </tbody>
+    </table>
+    <div class="scrollhint">⋮ lưới cuộn dọc bên trong, tiêu đề cột dính · cột #/Mã/Tên dính trái, Còn lại dính phải khi phải cuộn ngang (laptop) · ~20 dòng trên 1080p</div>
+  </div>
+
+  <div class="bar">
+    <div class="t"><span>15 dòng</span><span>Tiền hàng <b>12.480.000</b></span><span>CK <b>0</b></span><span>VAT <b>1.212.000</b></span><span>Phí VC <b>0</b></span><span>CK đơn <b>0</b></span><span>Đã thanh toán <b>13.692.000</b></span></div>
+    <div class="tot">Tổng thanh toán: 13.692.000</div>
+  </div>
+  <div class="debt">
+    <span class="who">hh1 — khách hàng A</span>
+    <span>Phải thu <b>25.000.000</b> → sau phiếu <b>25.000.000</b></span>
+    <span>Phải trả <b>0</b></span>
+    <span>Hạn mức <b>30.000.000</b></span>
+    <span>Còn được nợ sau phiếu <b class="neg">5.000.000</b></span>
+    <span>Quá hạn <b class="neg">3.000.000</b> <a>Xem</a></span>
+    <span>Số ngày nợ <b>30</b></span>
+  </div>
+</div>
+<p class="cap">Ví dụ phiếu ghi nợ: tổng 13.692.000, đã thanh toán 0 → "Phải thu sau phiếu" 38.692.000, "Còn được nợ sau phiếu" −8.692.000 (đỏ, cảnh báo vượt hạn mức trước khi lưu). Ảnh trên là trường hợp đã thanh toán đủ.</p>
+
+<div class="row2">
+  <div>
+    <p class="cap"><b>Tab Thanh toán</b> (Alt+3) — các ô nhập tiền + quỹ + hạn TT; chấm đỏ trên tab khi có lỗi bên trong.</p>
+    <div class="pg">
+      <div class="tabs" style="margin-top:8px">
+        <span>Hàng hóa <span class="n">15</span></span><span>Thông tin khác</span><span class="on">Thanh toán<span class="dot"></span></span><span class="sp"></span>
+      </div>
+      <div class="panel" style="margin-bottom:10px">
+        <div class="pay">
+          <div class="r"><span class="lb">Phí vận chuyển</span><div class="in" style="text-align:right">0</div></div>
+          <div class="r"><span class="lb">Quỹ</span><div class="in sel">TM01 - Quỹ tiền mặt</div></div>
+          <div class="r"><span class="lb">CK cả đơn</span><div class="in" style="text-align:right">0</div></div>
+          <div class="r"><span class="lb">Hạn thanh toán</span><div class="in">09/08/2026</div></div>
+          <div class="r"><span class="lb">Số tiền thanh toán</span><div class="in" style="text-align:right;border-color:#dc2626">13.692.000</div></div>
+          <div class="r"><span class="lb"></span><span style="color:#dc2626;font-size:11px">Vượt tổng thanh toán</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="cap" style="margin-top:10px"><b>Tab Thông tin khác</b>: MST · Người nhận hàng · Ghi chú. <b>Công nợ KH</b>: bỏ tab — đã hiện đủ ở dòng dư nợ dưới thanh tổng. <b>Lịch sử</b>: tab thêm khi sửa phiếu.</p>
+  </div>
+  <div>
+    <p class="cap"><b>Menu ⚙ Cột &amp; phím Enter</b> — lưu theo user, riêng cho Nhập và Xuất.</p>
+    <div class="pop">
+      <h5>Hiện cột</h5>
+      <div class="cols">
+        <label>☐ Kho (tự hiện khi có dòng khác kho phiếu)</label><label>☑ SL tồn</label>
+        <label>☑ Số tiền</label><label>☑ %CK</label>
+        <label>☐ Tiền CK</label><label>☑ %VAT</label>
+        <label>☐ Tiền VAT</label><label>☐ Ghi chú</label>
+      </div>
+      <h5>Phím Enter dừng ở (Mã hàng luôn là ô đầu)</h5>
+      <table>
+        <tr><th></th><th>Kho</th><th>Tấm</th><th>Dài</th><th>Rộng</th><th>Dày</th><th>SL</th><th>Đơn giá</th><th>%CK</th><th>Tiền CK</th><th>%VAT</th><th>Ghi chú</th></tr>
+        <tr><td class="l">Cái</td><td>☐</td><td class="na">–</td><td class="na">–</td><td class="na">–</td><td class="na">–</td><td>☑</td><td>☑</td><td>☐</td><td>☐</td><td>☐</td><td>☐</td></tr>
+        <tr><td class="l">md</td><td>☐</td><td>☑</td><td>☑</td><td class="na">–</td><td class="na">–</td><td class="na">–</td><td>☑</td><td>☐</td><td>☐</td><td>☐</td><td>☐</td></tr>
+        <tr><td class="l">m²</td><td>☐</td><td>☑</td><td>☑</td><td>☑</td><td class="na">–</td><td class="na">–</td><td>☑</td><td>☐</td><td>☐</td><td>☐</td><td>☐</td></tr>
+        <tr><td class="l">m³</td><td>☐</td><td>☑</td><td>☑</td><td>☑</td><td>☑</td><td class="na">–</td><td>☑</td><td>☐</td><td>☐</td><td>☐</td><td>☐</td></tr>
+      </table>
+      <div style="margin-top:8px;text-align:right"><span class="btn">Khôi phục mặc định</span></div>
+    </div>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+  <div class="indicator-bar">
+    <span id="indicator-text">Click an option above, then return to the terminal</span>
+  </div>
+
+</body>
+</html>

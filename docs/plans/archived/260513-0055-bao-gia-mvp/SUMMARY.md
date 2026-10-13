@@ -1,7 +1,7 @@
 # Báo Giá Module — MVP
 
 ## Goal
-Add a fully working Quotations (Báo giá) MVP to QLDonHang: CRUD with snapshot line items, automatic computation across four pricing modes, state machine (Draft → Sent → Confirmed → Cancelled), and server-rendered PDF using QuestPDF. The module follows the existing Clean Architecture and frontend feature-module conventions established by the Customer/Product modules.
+Add a fully working Quotations (Báo giá) MVP to QLBanHang: CRUD with snapshot line items, automatic computation across four pricing modes, state machine (Draft → Sent → Confirmed → Cancelled), and server-rendered PDF using QuestPDF. The module follows the existing Clean Architecture and frontend feature-module conventions established by the Customer/Product modules.
 
 ## Scope
 
@@ -52,7 +52,7 @@ Add a fully working Quotations (Báo giá) MVP to QLDonHang: CRUD with snapshot 
 
 ## Final Verification
 
-Run from `d:/Projects/QLDonHang`:
+Run from `d:/Projects/QLBanHang`:
 
 ```
 # Backend — build affected library projects (avoid full sln while WebApi runs)

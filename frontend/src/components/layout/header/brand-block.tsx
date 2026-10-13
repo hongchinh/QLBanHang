@@ -24,7 +24,7 @@ export function BrandBlock({ collapsed, onToggleCollapse }: BrandBlockProps) {
   ) : (
     <>
       <FileText className="h-6 w-6 shrink-0" />
-      <span className="truncate text-base font-bold">QLDonHang</span>
+      <span className="truncate text-base font-bold">QLBanHang</span>
     </>
   );
 

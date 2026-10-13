@@ -76,11 +76,11 @@
 
 ```powershell
 # Backend
-dotnet build d:\Projects\QLDonHang\backend\src\OrderMgmt.Application
-dotnet test d:\Projects\QLDonHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj
+dotnet build d:\Projects\QLBanHang\backend\src\OrderMgmt.Application
+dotnet test d:\Projects\QLBanHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj
 
 # Frontend
-cd d:\Projects\QLDonHang\frontend
+cd d:\Projects\QLBanHang\frontend
 npm run typecheck
 npm run lint
 npm test

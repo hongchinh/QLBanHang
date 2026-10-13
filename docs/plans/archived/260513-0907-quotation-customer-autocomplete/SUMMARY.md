@@ -60,11 +60,11 @@ Sau khi tất cả phase pass, chạy đồng thời:
 
 ```powershell
 # Backend
-dotnet build d:\Projects\QLDonHang\backend\src\OrderMgmt.Application\OrderMgmt.Application.csproj
-dotnet test d:\Projects\QLDonHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj --filter "FullyQualifiedName~Quotation|FullyQualifiedName~Customer"
+dotnet build d:\Projects\QLBanHang\backend\src\OrderMgmt.Application\OrderMgmt.Application.csproj
+dotnet test d:\Projects\QLBanHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj --filter "FullyQualifiedName~Quotation|FullyQualifiedName~Customer"
 
 # Frontend
-cd d:\Projects\QLDonHang\frontend; npm run typecheck; npm run lint; npm test
+cd d:\Projects\QLBanHang\frontend; npm run typecheck; npm run lint; npm test
 ```
 
 **Manual e2e**:

@@ -15,13 +15,13 @@ Cải tiến `frontend/src/pages/quotations/quotation-list-page.tsx` với 3 h�
 - Column visibility toggle (ẩn/hiện cột).
 - Sort theo các cột mới (Subtotal/Discount/Freight).
 - Footer summary "Tổng Subtotal trang".
-- Tương thích với client API khác ngoài FE này (chỉ FE QLDonHang gọi `/quotations`).
+- Tương thích với client API khác ngoài FE này (chỉ FE QLBanHang gọi `/quotations`).
 - Responsive design cho bảng (chấp nhận horizontal scroll trên màn hình hẹp).
 - Sửa semantic của `QuotationListItemDto.CanClone`. Hiện `CanClone = isOwnerDeleted` (chỉ true khi báo giá orphan), nên dropdown `⋯` cho báo giá thường thực chất chỉ chứa 2 mục (In PDF + Hủy). Tradeoff được chấp nhận để giữ scope nhỏ; mở rộng semantic cần brainstorm riêng.
 
 ## Assumptions
 - `Quotation` entity đã có các field `Subtotal`, `Discount`, `Freight` (decimal) — xác nhận qua test `QuotationCrudTests` line 63: `get.Data.Subtotal.Should().Be(200_000m)`.
-- Chỉ FE QLDonHang là client của endpoint `/quotations` — không cần giữ tương thích `?status=<SingleValue>` cho client nào khác. Tuy nhiên vẫn giữ hành vi đó như side effect tự nhiên của parse logic (single value vẫn là comma-separated với 1 phần tử).
+- Chỉ FE QLBanHang là client của endpoint `/quotations` — không cần giữ tương thích `?status=<SingleValue>` cho client nào khác. Tuy nhiên vẫn giữ hành vi đó như side effect tự nhiên của parse logic (single value vẫn là comma-separated với 1 phần tử).
 - Project không có dep `@radix-ui/react-popover` hoặc `@radix-ui/react-checkbox` (xác nhận qua glob). Tránh thêm dep mới — dùng `dropdown-menu.tsx` có sẵn.
 - Axios default serializer (qua `URLSearchParams`) sẽ phát ra `?key=a&key=b` (repeated, không brackets) cho array. Backend đang nhận format `?status=Draft,Sent` (comma-separated). → Cần convert array → comma-separated string ở tầng `api.ts` trước khi gọi `apiGet` để chuẩn hoá về 1 format duy nhất, không phụ thuộc axios version.
 - `useSearchParamString` (xem `frontend/src/lib/use-search-param-state.ts`) đã tự xoá key khi value rỗng (`if (!next) out.delete(key)`) → gọi `setStatusParam('')` không để lại `?status=` ugly. Verified.

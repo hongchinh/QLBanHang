@@ -1,0 +1,147 @@
+<style>
+  .pg { border:1px solid #cbd5e1; border-radius:6px; background:#f1f5f9; font-size:12px; color:#334155; overflow:hidden; }
+  .tb { display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#fff; border-bottom:1px solid #e2e8f0; }
+  .tb h4 { margin:0; font-size:15px; }
+  .tb .meta { color:#64748b; font-weight:400; font-size:12px; margin-left:8px; }
+  .tb .draft { border:1px solid #fcd34d; background:#fffbeb; color:#92400e; border-radius:10px; padding:1px 8px; font-size:11px; margin-left:6px; }
+  .btn { display:inline-block; padding:4px 10px; border:1px solid #cbd5e1; border-radius:5px; background:#fff; margin-left:4px; }
+  .btn.p { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .main { display:grid; grid-template-columns:auto 150px auto 170px auto 120px auto 1fr auto 160px; gap:6px; align-items:center; background:#fff; margin:8px 12px 0; padding:8px 10px; border:1px solid #e2e8f0; border-radius:6px; }
+  .lb { color:#64748b; text-align:right; white-space:nowrap; }
+  .lb.r::after { content:" *"; color:#dc2626; }
+  .in { border:1px solid #cbd5e1; border-radius:4px; height:24px; line-height:24px; padding:0 6px; background:#fff; white-space:nowrap; overflow:hidden; }
+  .in.sel::after { content:"▾"; float:right; color:#94a3b8; }
+  .tabs { display:flex; gap:2px; margin:8px 12px 0; border-bottom:1px solid #cbd5e1; align-items:flex-end; }
+  .tabs span { padding:5px 12px; border:1px solid #cbd5e1; border-bottom:none; border-radius:5px 5px 0 0; background:#e2e8f0; color:#475569; }
+  .tabs span.on { background:#fff; color:#1d4ed8; font-weight:700; margin-bottom:-1px; padding-bottom:6px; }
+  .tabs .n { background:#dbeafe; color:#1d4ed8; border-radius:8px; padding:0 5px; margin-left:4px; font-size:11px; }
+  .tabs .dot { display:inline-block; width:6px; height:6px; background:#dc2626; border-radius:50%; margin-left:4px; vertical-align:middle; }
+  .tabs .k { color:#94a3b8; font-size:10px; margin-left:4px; }
+  .tabs .sp { flex:1; border:none; background:none; }
+  .panel { background:#fff; margin:0 12px; border:1px solid #cbd5e1; border-top:none; }
+  .gtool { display:flex; justify-content:space-between; align-items:center; padding:5px 8px; border-bottom:1px solid #e2e8f0; font-size:11px; color:#64748b; }
+  .kbd { display:inline-block; border:1px solid #cbd5e1; border-bottom-width:2px; border-radius:3px; padding:0 4px; font-size:10px; background:#f8fafc; color:#334155; }
+  table.g { width:100%; border-collapse:collapse; font-size:11.5px; table-layout:fixed; }
+  table.g th { background:#1e40af; color:#fff; font-weight:600; padding:5px 4px; border-right:1px solid rgba(255,255,255,.15); position:sticky; top:0; }
+  table.g td { border-right:1px solid #e2e8f0; border-bottom:1px solid #e2e8f0; padding:4px; height:16px; white-space:nowrap; overflow:hidden; }
+  table.g td.n { text-align:right; font-variant-numeric:tabular-nums; }
+  table.g td.dis { background:#f1f5f9; color:#cbd5e1; }
+  table.g td.ro { color:#64748b; }
+  table.g .pinL { background:#f8fafc; }
+  table.g th.pinL, table.g th.pinR { background:#1e3a8a; }
+  table.g td.pinR { background:#f8fafc; font-weight:600; }
+  table.g td.stop { background:#fef9c3; box-shadow:inset 0 0 0 2px #3b82f6; }
+  table.g td .step { display:inline-block; background:#3b82f6; color:#fff; border-radius:7px; font-size:9px; padding:0 4px; margin-right:3px; }
+  .scrollhint { text-align:center; color:#94a3b8; font-size:11px; padding:3px; border-bottom:1px solid #e2e8f0; }
+  .bar { position:relative; display:flex; justify-content:space-between; align-items:center; background:#fff; border-top:2px solid #2563eb; margin:8px 0 0; padding:7px 12px; box-shadow:0 -2px 6px rgba(0,0,0,.06); }
+  .bar .t { display:flex; gap:16px; }
+  .bar .t span { color:#64748b; }
+  .bar .t b { color:#0f172a; }
+  .bar .tot { font-size:15px; font-weight:800; color:#1d4ed8; }
+  .row2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px; }
+  .pay { padding:10px 14px; display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; }
+  .pay .r { display:grid; grid-template-columns:140px 1fr; gap:6px; align-items:center; }
+  .pop { border:1px solid #cbd5e1; border-radius:8px; background:#fff; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:10px 12px; font-size:12px; }
+  .pop h5 { margin:0 0 6px; font-size:12px; color:#0f172a; }
+  .pop .cols { display:grid; grid-template-columns:1fr 1fr; gap:2px 12px; margin-bottom:10px; }
+  .pop table { border-collapse:collapse; width:100%; font-size:11px; }
+  .pop th, .pop td { border:1px solid #e2e8f0; padding:3px 4px; text-align:center; }
+  .pop th { background:#f1f5f9; font-weight:600; }
+  .pop td.na { background:#f8fafc; color:#cbd5e1; }
+  .pop td.l { text-align:left; font-weight:600; }
+  .cap { font-size:12px; color:#475569; margin:6px 0 2px; }
+</style>
+
+<h2>T2 chi tiết — phiếu xuất kho</h2>
+<p class="subtitle">Màn hình 1920px. Ô vàng có số = thứ tự phím Enter cho dòng đang nhập (dòng 3 là hàng tính theo m²).</p>
+
+<div class="pg">
+  <div class="tb">
+    <div><h4 style="display:inline">← Thêm phiếu xuất kho</h4><span class="meta">Số phiếu dự kiến: PX00002</span><span class="draft">Nháp chưa lưu từ 21:03 ✕</span></div>
+    <div><span class="btn">Lưu và thoát</span><span class="btn p">💾 Lưu tạm</span></div>
+  </div>
+
+  <div class="main">
+    <span class="lb r">Ngày xuất</span><div class="in">10/07/2026 09:03</div>
+    <span class="lb r">Lý do xuất</span><div class="in sel">Xuất bán hàng</div>
+    <span class="lb r">Kho</span><div class="in sel">Kho chính</div>
+    <span class="lb">Đối tượng</span><div class="in">hh1 — khách hàng A <span style="float:right;color:#94a3b8">✕</span></div>
+    <span class="lb">HTTT</span><div class="in sel">Tiền mặt</div>
+  </div>
+
+  <div class="tabs">
+    <span class="on">Hàng hóa <span class="n">15</span><span class="k">Alt+1</span></span>
+    <span>Đối tượng &amp; ghi chú<span class="k">Alt+2</span></span>
+    <span>Thanh toán<span class="dot"></span><span class="k">Alt+3</span></span>
+    <span>Công nợ KH<span class="k">Alt+4</span></span>
+    <span class="sp"></span>
+  </div>
+  <div class="panel">
+    <div class="gtool">
+      <div><span class="btn" style="margin:0">＋ Thêm dòng</span> <span class="btn">⚙ Cột &amp; phím Enter</span></div>
+      <div><span class="kbd">Enter</span> Tiếp · <span class="kbd">Shift</span>+<span class="kbd">Enter</span> Lùi · <span class="kbd">↑</span><span class="kbd">↓</span> Dòng trên/dưới · <span class="kbd">Insert</span> Thêm dòng · <span class="kbd">Ctrl</span>+<span class="kbd">Del</span> Xóa dòng · <span class="kbd">Ctrl</span>+<span class="kbd">S</span> Lưu</div>
+    </div>
+    <table class="g">
+      <colgroup><col style="width:34px"><col style="width:90px"><col style="width:200px"><col style="width:44px"><col style="width:50px"><col style="width:58px"><col style="width:58px"><col style="width:50px"><col style="width:70px"><col style="width:70px"><col style="width:90px"><col style="width:100px"><col style="width:48px"><col style="width:48px"><col style="width:110px"><col style="width:28px"></colgroup>
+      <thead><tr>
+        <th class="pinL">#</th><th class="pinL">Mã hàng</th><th class="pinL">Tên hàng</th><th>ĐVT</th><th>Tấm</th><th>Dài</th><th>Rộng</th><th>Dày</th><th>SL</th><th>SL tồn</th><th>Đơn giá</th><th>Số tiền</th><th>%CK</th><th>%VAT</th><th class="pinR">Còn lại</th><th></th>
+      </tr></thead>
+      <tbody>
+        <tr><td class="pinL ro">1</td><td class="pinL">KT</td><td class="pinL">JP1 - E-Health</td><td class="ro">m²</td><td class="n">3</td><td class="n">2.4</td><td class="n">1.2</td><td class="dis"></td><td class="n ro">8.64</td><td class="n ro">1,400</td><td class="n">120,000</td><td class="n ro">1,036,800</td><td class="n">0</td><td class="n">10</td><td class="n pinR">1,140,480</td><td>🗑</td></tr>
+        <tr><td class="pinL ro">2</td><td class="pinL">OC-01</td><td class="pinL">Ốc vít inox M6</td><td class="ro">Cái</td><td class="dis"></td><td class="dis"></td><td class="dis"></td><td class="dis"></td><td class="n">200</td><td class="n ro">5,000</td><td class="n">1,500</td><td class="n ro">300,000</td><td class="n">0</td><td class="n">10</td><td class="n pinR">330,000</td><td>🗑</td></tr>
+        <tr><td class="pinL ro">3</td><td class="pinL stop"><span class="step">1</span>KT2</td><td class="pinL">Tấm Alu 3mm</td><td class="ro">m²</td><td class="n stop"><span class="step">2</span>5</td><td class="n stop"><span class="step">3</span>2.44</td><td class="n stop"><span class="step">4</span>1.22</td><td class="dis"></td><td class="n ro">14.88</td><td class="n ro">320</td><td class="n stop"><span class="step">5</span>95,000</td><td class="n ro">1,413,790</td><td class="n">0</td><td class="n">10</td><td class="n pinR">1,555,169</td><td>🗑</td></tr>
+        <tr><td class="pinL ro">4</td><td class="pinL">TH-60</td><td class="pinL">Thanh nhôm hộp 60</td><td class="ro">m</td><td class="n">4</td><td class="n">6</td><td class="dis"></td><td class="dis"></td><td class="n ro">24</td><td class="n ro">600</td><td class="n">45,000</td><td class="n ro">1,080,000</td><td class="n">0</td><td class="n">8</td><td class="n pinR">1,166,400</td><td>🗑</td></tr>
+        <tr><td class="pinL ro">5</td><td class="pinL"></td><td class="pinL"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td class="pinR"></td><td>🗑</td></tr>
+      </tbody>
+    </table>
+    <div class="scrollhint">⋮ lưới cuộn dọc bên trong, tiêu đề cột dính · cột #/Mã/Tên dính trái, Còn lại dính phải khi phải cuộn ngang (laptop) · ~20 dòng trên 1080p</div>
+  </div>
+
+  <div class="bar">
+    <div class="t"><span>15 dòng</span><span>Tiền hàng <b>12.480.000</b></span><span>CK <b>0</b></span><span>VAT <b>1.212.000</b></span><span>Phí VC <b>0</b></span><span>CK đơn <b>0</b></span><span>Đã thanh toán <b>13.692.000</b></span></div>
+    <div class="tot">Tổng thanh toán: 13.692.000</div>
+  </div>
+</div>
+
+<div class="row2">
+  <div>
+    <p class="cap"><b>Tab Thanh toán</b> (Alt+3) — các ô nhập tiền + quỹ + hạn TT; chấm đỏ trên tab khi có lỗi bên trong.</p>
+    <div class="pg">
+      <div class="tabs" style="margin-top:8px">
+        <span>Hàng hóa <span class="n">15</span></span><span>Đối tượng &amp; ghi chú</span><span class="on">Thanh toán<span class="dot"></span></span><span>Công nợ KH</span><span class="sp"></span>
+      </div>
+      <div class="panel" style="margin-bottom:10px">
+        <div class="pay">
+          <div class="r"><span class="lb">Phí vận chuyển</span><div class="in" style="text-align:right">0</div></div>
+          <div class="r"><span class="lb">Quỹ</span><div class="in sel">TM01 - Quỹ tiền mặt</div></div>
+          <div class="r"><span class="lb">CK cả đơn</span><div class="in" style="text-align:right">0</div></div>
+          <div class="r"><span class="lb">Hạn thanh toán</span><div class="in">09/08/2026</div></div>
+          <div class="r"><span class="lb">Số tiền thanh toán</span><div class="in" style="text-align:right;border-color:#dc2626">13.692.000</div></div>
+          <div class="r"><span class="lb"></span><span style="color:#dc2626;font-size:11px">Vượt tổng thanh toán</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="cap" style="margin-top:10px"><b>Tab Đối tượng &amp; ghi chú</b>: Tên đối tượng · MST · Địa chỉ · Người nhận hàng · Ghi chú (2 cột). <b>Công nợ KH</b>: chỉ hiện với xuất bán có đối tượng + có quyền. <b>Lịch sử</b>: tab thêm khi sửa phiếu.</p>
+  </div>
+  <div>
+    <p class="cap"><b>Menu ⚙ Cột &amp; phím Enter</b> — lưu theo user, riêng cho Nhập và Xuất.</p>
+    <div class="pop">
+      <h5>Hiện cột</h5>
+      <div class="cols">
+        <label>☐ Kho (tự hiện khi có dòng khác kho phiếu)</label><label>☑ SL tồn</label>
+        <label>☑ Số tiền</label><label>☑ %CK</label>
+        <label>☐ Tiền CK</label><label>☑ %VAT</label>
+        <label>☐ Tiền VAT</label><label>☐ Ghi chú</label>
+      </div>
+      <h5>Phím Enter dừng ở (Mã hàng luôn là ô đầu)</h5>
+      <table>
+        <tr><th></th><th>Kho</th><th>Tấm</th><th>Dài</th><th>Rộng</th><th>Dày</th><th>SL</th><th>Đơn giá</th><th>%CK</th><th>Tiền CK</th><th>%VAT</th><th>Ghi chú</th></tr>
+        <tr><td class="l">Cái</td><td>☐</td><td class="na">–</td><td class="na">–</td><td class="na">–</td><td class="na">–</td><td>☑</td><td>☑</td><td>☐</td><td>☐</td><td>☐</td><td>☐</td></tr>
+        <tr><td class="l">md</td><td>☐</td><td>☑</td><td>☑</td><td class="na">–</td><td class="na">–</td><td class="na">–</td><td>☑</td><td>☐</td><td>☐</td><td>☐</td><td>☐</td></tr>
+        <tr><td class="l">m²</td><td>☐</td><td>☑</td><td>☑</td><td>☑</td><td class="na">–</td><td class="na">–</td><td>☑</td><td>☐</td><td>☐</td><td>☐</td><td>☐</td></tr>
+        <tr><td class="l">m³</td><td>☐</td><td>☑</td><td>☑</td><td>☑</td><td>☑</td><td class="na">–</td><td>☑</td><td>☐</td><td>☐</td><td>☐</td><td>☐</td></tr>
+      </table>
+      <div style="margin-top:8px;text-align:right"><span class="btn">Khôi phục mặc định</span></div>
+    </div>
+  </div>
+</div>

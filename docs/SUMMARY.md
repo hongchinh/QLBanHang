@@ -1,6 +1,6 @@
 # Documentation Summary
 
-**QLDonHang** — phần mềm quản lý báo giá, khách hàng, hàng hóa, dashboard và báo cáo doanh thu theo nhân viên kinh doanh. Backend dùng .NET 9 Clean Architecture + EF Core/Npgsql/PostgreSQL; frontend dùng React 18 + Vite + TypeScript + TanStack Query/Table.
+**QLBanHang** — phần mềm quản lý báo giá, khách hàng, hàng hóa, dashboard và báo cáo doanh thu theo nhân viên kinh doanh. Backend dùng .NET 9 Clean Architecture + EF Core/Npgsql/PostgreSQL; frontend dùng React 18 + Vite + TypeScript + TanStack Query/Table.
 
 ## Architecture
 
@@ -61,6 +61,7 @@ Repository-specific docs outside the standard topic folders.
 | [brainstorms/261012-2237-tt133-report-forms/SUMMARY.md](brainstorms/261012-2237-tt133-report-forms/SUMMARY.md) | Brainstorm for TT133 report forms — Excel/PDF exports of S04a/S05 (funds), S06/S07/S08 (inventory), S12 + debt summary + reconciliation record, company profile, shared ClosedXML form builder, branch/company scope (reviewed) |
 | [brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md](brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md) | Per-form specs — shared frame, column-to-source mapping, debit/credit rules, S07 invariants, amount-in-words test cases |
 | [brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md](brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md) | BA/SA review — branch vs company scope, CostingScope=Warehouse at go-live, report DTO additions, rejected proposals and recorded risks |
+| [brainstorms/261013-0615-stock-voucher-form-tabs/SUMMARY.md](brainstorms/261013-0615-stock-voucher-form-tabs/SUMMARY.md) | Brainstorm for the stock in/out voucher form redesign — main fields + tabs (T2), full-height line grid with optional/sticky columns, per-pricing-mode Enter path configurable per user, sticky totals bar with receivable/payable and after-voucher debt; HTML mockups alongside |
 | [plans/archived/260517-0749-quotation-list-totals-footer/SUMMARY.md](plans/archived/260517-0749-quotation-list-totals-footer/SUMMARY.md) | Archived plan for quotation-list totals footer |
 | [plans/archived/260517-0833-quotation-list-owner-filter/SUMMARY.md](plans/archived/260517-0833-quotation-list-owner-filter/SUMMARY.md) | Archived plan for quotation-list owner filter |
 | [plans/260522-2326-zalo-send-quotation/SUMMARY.md](plans/260522-2326-zalo-send-quotation/SUMMARY.md) | Plan for sending quotation files to a Zalo group via Zalo OA |

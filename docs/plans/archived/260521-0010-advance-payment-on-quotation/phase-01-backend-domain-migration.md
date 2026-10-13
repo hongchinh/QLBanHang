@@ -145,7 +145,7 @@ public async Task Clone_DoesNotCopyAdvancePayment()
 ## Verification
 ```powershell
 # Build toàn bộ backend
-cd d:\Projects\QLDonHang\backend
+cd d:\Projects\QLBanHang\backend
 dotnet build src/OrderMgmt.WebApi
 
 # Chạy integration tests (đảm bảo TEST_DB_CONNECTION ≠ dev DB)

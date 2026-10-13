@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # -----------------------------------------------------------------------------
-# QLDonHang Frontend - Vite + React + Caddy
+# QLBanHang Frontend - Vite + React + Caddy
 # Multi-stage build for Railway deployment.
 # -----------------------------------------------------------------------------
 

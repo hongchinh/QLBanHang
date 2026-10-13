@@ -130,7 +130,7 @@ interface CustomerAutocompleteProps {
 ## Verification
 
 ```powershell
-cd d:\Projects\QLDonHang\frontend
+cd d:\Projects\QLBanHang\frontend
 npm run typecheck
 npm test -- customer-autocomplete
 ```

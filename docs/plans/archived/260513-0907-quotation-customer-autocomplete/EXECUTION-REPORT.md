@@ -72,7 +72,7 @@
 
 ```powershell
 # Backend integration tests (need Docker)
-dotnet test d:\Projects\QLDonHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj `
+dotnet test d:\Projects\QLBanHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj `
   --filter "FullyQualifiedName~CustomerSearch|FullyQualifiedName~QuotationCrud"
 
 # Restart WebApi to pick up the new endpoint + migration

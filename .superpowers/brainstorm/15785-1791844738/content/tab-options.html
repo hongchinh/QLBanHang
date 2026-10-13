@@ -1,0 +1,130 @@
+<style>
+  .vp { border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; height:440px; display:flex; flex-direction:column; overflow:hidden; font-size:10px; color:#334155; }
+  .topbar { background:#1d4ed8; height:16px; flex:none; }
+  .titlebar { display:flex; justify-content:space-between; align-items:center; padding:4px 8px; background:#fff; border-bottom:1px solid #e2e8f0; flex:none; font-weight:700; }
+  .btns span { display:inline-block; padding:1px 6px; border:1px solid #93c5fd; border-radius:3px; margin-left:3px; font-weight:500; }
+  .btns span.p { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .hdr { background:#fff; border:1px solid #e2e8f0; margin:4px 6px 0; border-radius:4px; padding:4px 6px; flex:none; }
+  .hrow { display:grid; gap:4px; margin-bottom:3px; }
+  .hrow:last-child { margin-bottom:0; }
+  .f { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:2px; height:13px; padding:0 3px; line-height:13px; white-space:nowrap; overflow:hidden; }
+  .f b { color:#64748b; font-weight:500; }
+  .f.req b::after { content:" *"; color:#dc2626; }
+  .tabs { display:flex; gap:2px; padding:0 6px; margin-top:4px; flex:none; border-bottom:1px solid #cbd5e1; }
+  .tabs span { padding:3px 8px; border:1px solid #cbd5e1; border-bottom:none; border-radius:4px 4px 0 0; background:#e2e8f0; color:#475569; white-space:nowrap; }
+  .tabs span.on { background:#fff; color:#1d4ed8; font-weight:700; position:relative; top:1px; }
+  .tabs span .dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#dc2626; margin-left:3px; vertical-align:middle; }
+  .tabs span .n { background:#dbeafe; color:#1d4ed8; border-radius:6px; padding:0 4px; margin-left:3px; font-weight:700; }
+  .panel { flex:1; background:#fff; margin:0 6px; border:1px solid #cbd5e1; border-top:none; display:flex; flex-direction:column; min-height:0; }
+  .gh { background:#1e40af; color:#fff; height:14px; flex:none; display:grid; font-weight:600; }
+  .gh div { padding:0 3px; line-height:14px; border-right:1px solid rgba(255,255,255,.15); white-space:nowrap; overflow:hidden; }
+  .rows { flex:1; background:repeating-linear-gradient(#fff 0 13px, #e2e8f0 13px 14px); position:relative; }
+  .count { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:#dcfce7; color:#166534; border:1px solid #86efac; padding:2px 8px; border-radius:10px; font-weight:700; font-size:11px; }
+  .foot { flex:none; margin:4px 6px 6px; background:#fff; border:1px solid #e2e8f0; border-radius:4px; display:flex; justify-content:space-between; align-items:center; padding:4px 8px; gap:8px; }
+  .foot .t { display:flex; gap:10px; flex-wrap:wrap; }
+  .foot .t span b { font-weight:700; color:#0f172a; }
+  .foot .tot { font-weight:800; color:#1d4ed8; font-size:11px; }
+  .mini { display:flex; gap:6px; padding:3px 6px; flex:none; }
+  .peek { margin:6px; display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; }
+  .note { font-size:12px; color:#475569; margin-top:6px; }
+  .flow { font-size:11px; color:#475569; margin-top:4px; }
+</style>
+
+<h2>Bố cục dạng tab — 3 biến thể</h2>
+<p class="subtitle">Khung mô phỏng 1920×1080. Thanh tổng tiền luôn dính ở đáy trong cả 3 biến thể. Badge xanh = số dòng hàng nhìn thấy cùng lúc.</p>
+
+<div class="cards">
+
+  <!-- T1 -->
+  <div class="card" data-choice="t1" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div class="tabs">
+          <span>1 · Thông tin chung<span class="dot"></span></span>
+          <span class="on">2 · Hàng hóa <span class="n">15</span></span>
+          <span>3 · Thanh toán</span>
+          <span>Công nợ KH</span>
+          <span>Lịch sử</span>
+        </div>
+        <div class="panel">
+          <div class="gh" style="grid-template-columns:5% 12% 26% 6% 7% 7% 7% 8% 10% 12%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>ĐVT</div><div>Tấm</div><div>Dài</div><div>Rộng</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+          <div class="rows"><span class="count">≈ 22 dòng (laptop ≈ 13)</span></div>
+        </div>
+        <div class="foot"><div class="t"><span><b>khách hàng A</b> · Kho chính</span><span>Tiền hàng <b>0</b></span><span>VAT <b>0</b></span></div><div class="tot">Tổng TT: 0</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>T1 · Tab toàn trang</h3>
+      <p>Mọi thứ là tab ngang hàng: Thông tin chung · Hàng hóa · Thanh toán (HTTT, quỹ, hạn TT, phí VC, CK đơn, đã trả) · Công nợ KH · Lịch sử. Tab Hàng hóa chiếm trọn màn hình. Phiếu mới mở ở tab 1; phiếu cũ mở ở tab Hàng hóa. Tab thiếu trường bắt buộc có chấm đỏ. Ctrl+1/2/3 chuyển tab.</p>
+      <p class="flow"><b>Nhược:</b> khi đang nhập hàng không thấy Lý do / Đối tượng (chỉ tóm tắt ở thanh đáy).</p>
+    </div>
+  </div>
+
+  <!-- T2 -->
+  <div class="card" data-choice="t2" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div class="hdr">
+          <div class="hrow" style="grid-template-columns:1fr 1.3fr 1fr 2.6fr 1.3fr">
+            <div class="f req"><b>Ngày</b> 10/07 09:03</div><div class="f req"><b>Lý do</b> Xuất bán hàng</div><div class="f req"><b>Kho</b> Kho chính</div><div class="f"><b>Đối tượng</b> hh1 — khách hàng A</div><div class="f"><b>HTTT</b> Tiền mặt</div>
+          </div>
+        </div>
+        <div class="tabs">
+          <span class="on">Hàng hóa <span class="n">15</span></span>
+          <span>Đối tượng &amp; ghi chú</span>
+          <span>Thanh toán</span>
+          <span>Công nợ KH</span>
+          <span>Lịch sử</span>
+        </div>
+        <div class="panel">
+          <div class="gh" style="grid-template-columns:5% 12% 26% 6% 7% 7% 7% 8% 10% 12%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>ĐVT</div><div>Tấm</div><div>Dài</div><div>Rộng</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+          <div class="rows"><span class="count">≈ 20 dòng (laptop ≈ 12)</span></div>
+        </div>
+        <div class="foot"><div class="t"><span>Tiền hàng <b>0</b></span><span>CK <b>0</b></span><span>VAT <b>0</b></span><span>Phí VC <b>0</b></span></div><div class="tot">Tổng TT: 0</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>T2 · 1 dòng chính + tab bên dưới (đề xuất)</h3>
+      <p>Một dòng luôn hiện chứa các trường quyết định phiếu: Ngày, Lý do, Kho, Đối tượng, HTTT. Bên dưới là tab: <b>Hàng hóa</b> (mặc định) · Đối tượng &amp; ghi chú (tên, MST, địa chỉ, người nhận, ghi chú) · Thanh toán (quỹ, hạn TT, phí VC, CK đơn, đã trả) · Công nợ KH · Lịch sử. Kiểu MISA/Fast quen thuộc với kế toán.</p>
+      <p class="flow"><b>Luồng:</b> Ngày → Lý do → Kho → Đối tượng → Enter rơi thẳng vào ô Mã hàng dòng 1.</p>
+    </div>
+  </div>
+
+  <!-- T3 -->
+  <div class="card" data-choice="t3" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div class="tabs" style="margin-top:4px">
+          <span class="on">Chung</span><span>Đối tượng</span><span>Thanh toán</span><span>Công nợ KH</span>
+        </div>
+        <div class="hdr" style="margin-top:0;border-top:none;border-radius:0 0 4px 4px;border-color:#cbd5e1">
+          <div class="hrow" style="grid-template-columns:1fr 1.3fr 1fr 2.6fr">
+            <div class="f req"><b>Ngày</b> 10/07 09:03</div><div class="f req"><b>Lý do</b> Xuất bán hàng</div><div class="f req"><b>Kho</b> Kho chính</div><div class="f"><b>Đối tượng</b> hh1 — khách hàng A</div>
+          </div>
+          <div class="hrow" style="grid-template-columns:1fr">
+            <div class="f"><b>Ghi chú</b></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:4px;border-top:1px solid #cbd5e1">
+          <div class="gh" style="grid-template-columns:5% 12% 26% 6% 7% 7% 7% 8% 10% 12%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>ĐVT</div><div>Tấm</div><div>Dài</div><div>Rộng</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+          <div class="rows"><span class="count">≈ 18 dòng (laptop ≈ 10)</span></div>
+        </div>
+        <div class="foot"><div class="t"><span>Tiền hàng <b>0</b></span><span>CK <b>0</b></span><span>VAT <b>0</b></span><span>Phí VC <b>0</b></span></div><div class="tot">Tổng TT: 0</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>T3 · Tab chỉ trong khung thông tin, lưới luôn hiện</h3>
+      <p>Khung thông tin chung cố định 2 dòng, nội dung đổi theo tab (Chung / Đối tượng / Thanh toán / Công nợ KH). Lưới hàng hóa luôn nằm bên dưới, không bao giờ bị che. Lịch sử để cuối trang như hiện tại.</p>
+      <p class="flow"><b>Nhược:</b> ít dòng hơn T1/T2; trường bị ẩn trong tab khác khó thấy lỗi hơn.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="note">Bấm chọn 1 biến thể rồi trả lời ở terminal.</p>

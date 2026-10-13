@@ -2,16 +2,16 @@ node:fs:1952
   binding.unlink(getValidatedPath(path));
           ^
 
-Error: EPERM: operation not permitted, unlink 'D:\Projects\QLDonHang\.superpowers\brainstorm\codex-20260524205517\state\server-info'
+Error: EPERM: operation not permitted, unlink 'd:\Projects\QLBanHang\.superpowers\brainstorm\codex-20260524205517\state\server-info'
     at Object.unlinkSync (node:fs:1952:11)
-    at shutdown (D:\Projects\QLDonHang\.agents\skills\brainstorming\scripts\server.cjs:304:37)
-    at Timeout._onTimeout (D:\Projects\QLDonHang\.agents\skills\brainstorming\scripts\server.cjs:322:59)
+    at shutdown (d:\Projects\QLBanHang\.agents\skills\brainstorming\scripts\server.cjs:304:37)
+    at Timeout._onTimeout (d:\Projects\QLBanHang\.agents\skills\brainstorming\scripts\server.cjs:322:59)
     at listOnTimeout (node:internal/timers:588:17)
     at process.processTimers (node:internal/timers:523:7) {
   errno: -4048,
   code: 'EPERM',
   syscall: 'unlink',
-  path: 'D:\\Projects\\QLDonHang\\.superpowers\\brainstorm\\codex-20260524205517\\state\\server-info'
+  path: 'D:\\Projects\\QLBanHang\\.superpowers\\brainstorm\\codex-20260524205517\\state\\server-info'
 }
 
 Node.js v22.20.0

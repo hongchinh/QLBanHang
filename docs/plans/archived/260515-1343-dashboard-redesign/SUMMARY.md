@@ -61,7 +61,7 @@ Plan dựa trên brainstorm [docs/brainstorms/260515-1329-dashboard-redesign/SUM
 
 ## Final Verification
 
-Sau khi cả 6 phase đạt, chạy từ thư mục `d:\Projects\QLDonHang`:
+Sau khi cả 6 phase đạt, chạy từ thư mục `d:\Projects\QLBanHang`:
 
 ```powershell
 # Backend

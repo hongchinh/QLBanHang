@@ -2,7 +2,7 @@
 
 ## Goal
 
-Biến QLDonHang thành Progressive Web App theo 4 phases: (1) installable với static precache, (2) NetworkFirst API caching, (3) push notification backend (entity + service + controller + integration vào QuotationService), (4) push notification frontend (hook + soft-prompt UX). Push notification là delivery channel của hệ thống Notification hiện có — không tạo parallel system.
+Biến QLBanHang thành Progressive Web App theo 4 phases: (1) installable với static precache, (2) NetworkFirst API caching, (3) push notification backend (entity + service + controller + integration vào QuotationService), (4) push notification frontend (hook + soft-prompt UX). Push notification là delivery channel của hệ thống Notification hiện có — không tạo parallel system.
 
 ## Scope
 

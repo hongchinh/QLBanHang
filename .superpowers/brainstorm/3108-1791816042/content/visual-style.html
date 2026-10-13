@@ -1,0 +1,255 @@
+<style>
+  .sbx { --hb: hsl(212 78% 36%); --pr: hsl(221.2 83.2% 53.3%); --prs: hsl(221 83% 96%); --mu: hsl(215.4 16.3% 46.9%); --bd: hsl(214.3 31.8% 91.4%); --ac: hsl(210 40% 96.1%); --fg: hsl(222.2 84% 4.9%);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--fg); }
+  .sbx * { box-sizing: border-box; }
+  .sbx-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+  @media (max-width: 1100px) { .sbx-grid { grid-template-columns: 1fr; } }
+  .sbx-col h3 { margin-bottom: 4px; }
+  .sbx-col > p { font-size: 13px; margin-bottom: 10px; }
+  .sbx-app { background: #fff; border: 1px solid var(--bd); border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+  .sbx-top { height: 44px; background: var(--hb); color: #fff; display: flex; align-items: center; gap: 8px; padding: 0 12px; font-weight: 700; font-size: 14px; }
+  .sbx-top svg { width: 18px; height: 18px; }
+  .sbx-body { display: grid; grid-template-columns: 240px 1fr; height: 600px; background: hsl(210 40% 98%); }
+  .sbx-side { background: #fff; border-right: 1px solid var(--bd); display: flex; flex-direction: column; min-height: 0; }
+  .sbx-search { padding: 10px; border-bottom: 1px solid var(--bd); }
+  .sbx-search div { display: flex; align-items: center; gap: 6px; height: 34px; border: 1px solid var(--bd); border-radius: 6px; padding: 0 8px; font-size: 13px; color: var(--mu); background: #fff; }
+  .sbx-search svg { width: 15px; height: 15px; }
+  .sbx-nav { flex: 1; overflow-y: auto; padding: 8px 10px 16px; font-size: 13.5px; }
+  .sbx-nav svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .sbx-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; color: var(--mu); font-weight: 500; position: relative; white-space: nowrap; }
+  .sbx-item:hover { background: var(--ac); color: var(--fg); }
+  .sbx-item .pin { margin-left: auto; opacity: 0; color: var(--mu); }
+  .sbx-item:hover .pin { opacity: 1; }
+  .sbx-item .pin svg { width: 14px; height: 14px; }
+  .sbx-chev { margin-left: auto; color: var(--mu); }
+  .sbx-chev svg { width: 14px; height: 14px; }
+  .sbx-badge { font-size: 11px; color: var(--mu); background: var(--ac); border-radius: 999px; padding: 0 6px; line-height: 18px; }
+  .sbx-content { padding: 16px; }
+  .sbx-content .bar { height: 14px; border-radius: 4px; background: var(--bd); margin-bottom: 10px; }
+  .sbx-hint { font-size: 11.5px; color: var(--mu); margin-top: 8px; }
+
+  /* A — compact uppercase (close to current) */
+  .stA .sbx-gh { display: flex; align-items: center; gap: 6px; padding: 14px 10px 4px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--mu); }
+  .stA .sbx-gh .sbx-chev { margin-left: auto; }
+  .stA .sbx-item.active { background: var(--pr); color: #fff; }
+  .stA .sbx-sub { padding: 8px 10px 2px 10px; font-size: 11px; color: var(--mu); font-style: italic; }
+  .stA .sbx-pinrow .sbx-item svg.star { color: #f59e0b; }
+
+  /* B — icon group headers + guide line */
+  .stB .sbx-gh { display: flex; align-items: center; gap: 10px; padding: 8px 10px; margin-top: 2px; border-radius: 6px; font-weight: 600; color: var(--fg); }
+  .stB .sbx-gh:hover { background: var(--ac); }
+  .stB .sbx-gh.has-active { color: var(--pr); }
+  .stB .sbx-children { margin-left: 17px; border-left: 1px solid var(--bd); padding-left: 8px; }
+  .stB .sbx-children .sbx-item { padding: 6px 10px; }
+  .stB .sbx-children .sbx-item svg:first-child { display: none; }
+  .stB .sbx-item.active { background: var(--prs); color: var(--pr); font-weight: 600; }
+  .stB .sbx-item.active::before { content: ''; position: absolute; left: -9px; top: 6px; bottom: 6px; width: 2px; border-radius: 2px; background: var(--pr); }
+  .stB .sbx-sub { padding: 8px 10px 2px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--mu); }
+  .stB .sbx-sectionlabel { padding: 10px 10px 4px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--mu); display: flex; align-items: center; gap: 6px; }
+  .stB .sbx-sectionlabel svg { width: 13px; height: 13px; color: #f59e0b; }
+  .stB .sep { height: 1px; background: var(--bd); margin: 8px 0; }
+
+  /* C — pinned chips + soft group blocks */
+  .stC .chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 2px 10px; border-bottom: 1px dashed var(--bd); margin-bottom: 6px; }
+  .stC .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 4px 9px; border-radius: 999px; background: hsl(45 100% 95%); color: hsl(30 80% 30%); border: 1px solid hsl(45 90% 80%); }
+  .stC .chip svg { width: 12px; height: 12px; }
+  .stC .sbx-gh { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 8px; font-weight: 600; color: var(--fg); background: hsl(210 40% 97%); margin-top: 6px; }
+  .stC .sbx-gh .ic { width: 26px; height: 26px; border-radius: 6px; display: grid; place-items: center; color: #fff; }
+  .stC .sbx-gh .ic svg { width: 15px; height: 15px; }
+  .stC .sbx-children { padding: 4px 0 2px 8px; }
+  .stC .sbx-item.active { background: var(--pr); color: #fff; }
+  .stC .sbx-sub { padding: 8px 10px 2px; font-size: 11px; color: var(--mu); font-weight: 600; }
+</style>
+
+<div class="sbx">
+<h2>Phong cách hiển thị sidebar: chọn 1 trong 3</h2>
+<p class="subtitle">Cả 3 đều cùng cấu trúc đã chốt (tìm kiếm · Ghim · Tổng quan · 7 nhóm accordion). Chỉ khác cách trình bày. Trong mỗi mockup có thể cuộn phần menu và di chuột để thấy nút ghim ☆.</p>
+
+<div class="sbx-grid">
+
+<!-- ===================== A ===================== -->
+<div class="sbx-col option" data-choice="a" onclick="toggleSelect(this)">
+  <h3>A. Gọn, gần giống hiện tại</h3>
+  <p>Tiêu đề nhóm chữ IN HOA nhỏ, có mũi tên gập ở bên phải. Mục active tô nền xanh đậm như hiện nay. Ít thay đổi thói quen nhất.</p>
+  <div class="sbx-app stA">
+    <div class="sbx-top"><i data-lucide="file-text"></i> QLBanHang</div>
+    <div class="sbx-body">
+      <div class="sbx-side">
+        <div class="sbx-search"><div><i data-lucide="search"></i> Tìm chức năng…</div></div>
+        <div class="sbx-nav">
+          <div class="sbx-gh"><i data-lucide="star" style="width:12px;height:12px;color:#f59e0b"></i> Ghim</div>
+          <div class="sbx-pinrow">
+            <div class="sbx-item"><i data-lucide="file-text"></i> Báo giá <span class="pin"><i data-lucide="star"></i></span></div>
+            <div class="sbx-item"><i data-lucide="hand-coins"></i> Phiếu thu <span class="pin"><i data-lucide="star"></i></span></div>
+          </div>
+          <div class="sbx-item" style="margin-top:8px"><i data-lucide="layout-dashboard"></i> Tổng quan</div>
+          <div class="sbx-gh">Bán hàng <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-item active"><i data-lucide="file-text"></i> Báo giá</div>
+          <div class="sbx-item"><i data-lucide="users"></i> Khách hàng <span class="pin"><i data-lucide="star"></i></span></div>
+          <div class="sbx-item"><i data-lucide="qr-code"></i> Tạo mã QR thanh toán <span class="pin"><i data-lucide="star"></i></span></div>
+          <div class="sbx-gh">Kho <span class="sbx-chev"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh">Thu chi <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-item"><i data-lucide="hand-coins"></i> Phiếu thu</div>
+          <div class="sbx-item"><i data-lucide="banknote"></i> Phiếu chi <span class="pin"><i data-lucide="star"></i></span></div>
+          <div class="sbx-item"><i data-lucide="arrow-left-right"></i> Chuyển quỹ <span class="pin"><i data-lucide="star"></i></span></div>
+          <div class="sbx-gh">Công nợ <span class="sbx-chev"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh">Báo cáo <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-sub">Doanh thu</div>
+          <div class="sbx-item"><i data-lucide="trending-up"></i> Doanh thu</div>
+          <div class="sbx-item"><i data-lucide="user-check"></i> Doanh thu sale</div>
+          <div class="sbx-item"><i data-lucide="truck"></i> Doanh thu xe</div>
+          <div class="sbx-item"><i data-lucide="target"></i> Hiệu suất sale</div>
+          <div class="sbx-sub">Kho</div>
+          <div class="sbx-item"><i data-lucide="boxes"></i> Tồn kho</div>
+          <div class="sbx-item"><i data-lucide="scroll-text"></i> Thẻ kho</div>
+          <div class="sbx-sub">Quỹ</div>
+          <div class="sbx-item"><i data-lucide="book-open-check"></i> Sổ quỹ</div>
+          <div class="sbx-sub">Công nợ</div>
+          <div class="sbx-item"><i data-lucide="book-open"></i> Số dư công nợ</div>
+          <div class="sbx-item"><i data-lucide="book-text"></i> Sổ chi tiết công nợ</div>
+          <div class="sbx-item"><i data-lucide="files"></i> Công nợ theo chứng từ</div>
+          <div class="sbx-item"><i data-lucide="hourglass"></i> Tuổi nợ</div>
+          <div class="sbx-item"><i data-lucide="alarm-clock"></i> Nợ quá hạn</div>
+          <div class="sbx-item"><i data-lucide="user-round"></i> Công nợ theo nhân viên</div>
+          <div class="sbx-item"><i data-lucide="file-check"></i> Biên bản đối chiếu</div>
+          <div class="sbx-gh">Danh mục <span class="sbx-chev"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh">Hệ thống <span class="sbx-chev"><i data-lucide="chevron-right"></i></span></div>
+        </div>
+      </div>
+      <div class="sbx-content"><div class="bar" style="width:40%"></div><div class="bar"></div><div class="bar" style="width:80%"></div></div>
+    </div>
+  </div>
+  <div class="sbx-hint">Phân cấp nhẹ: tiêu đề nhóm và tiêu đề con khá giống nhau, khó tách khi nhóm Báo cáo mở dài.</div>
+</div>
+
+<!-- ===================== B ===================== -->
+<div class="sbx-col option" data-choice="b" onclick="toggleSelect(this)">
+  <h3>B. Nhóm có icon và đường dẫn hướng (khuyến nghị)</h3>
+  <p>Tiêu đề nhóm là một dòng có icon, đếm số mục khi gập. Mục con thụt vào theo đường kẻ dọc. Active dùng nền xanh nhạt và vạch xanh bên trái. Nhóm chứa trang hiện tại có chữ màu xanh.</p>
+  <div class="sbx-app stB">
+    <div class="sbx-top"><i data-lucide="file-text"></i> QLBanHang</div>
+    <div class="sbx-body">
+      <div class="sbx-side">
+        <div class="sbx-search"><div><i data-lucide="search"></i> Tìm chức năng…</div></div>
+        <div class="sbx-nav">
+          <div class="sbx-sectionlabel"><i data-lucide="star"></i> Đã ghim</div>
+          <div class="sbx-item"><i data-lucide="file-text"></i> Báo giá <span class="pin"><i data-lucide="star"></i></span></div>
+          <div class="sbx-item"><i data-lucide="hand-coins"></i> Phiếu thu <span class="pin"><i data-lucide="star"></i></span></div>
+          <div class="sep"></div>
+          <div class="sbx-item"><i data-lucide="layout-dashboard"></i> Tổng quan</div>
+          <div class="sbx-gh has-active"><i data-lucide="shopping-cart"></i> Bán hàng <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-children">
+            <div class="sbx-item active"><i data-lucide="file-text"></i> Báo giá</div>
+            <div class="sbx-item"><i data-lucide="users"></i> Khách hàng <span class="pin"><i data-lucide="star"></i></span></div>
+            <div class="sbx-item"><i data-lucide="qr-code"></i> Tạo mã QR thanh toán <span class="pin"><i data-lucide="star"></i></span></div>
+          </div>
+          <div class="sbx-gh"><i data-lucide="warehouse"></i> Kho <span class="sbx-badge" style="margin-left:auto">3</span><span class="sbx-chev" style="margin-left:4px"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh"><i data-lucide="wallet"></i> Thu chi <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-children">
+            <div class="sbx-item"><i data-lucide="hand-coins"></i> Phiếu thu</div>
+            <div class="sbx-item"><i data-lucide="banknote"></i> Phiếu chi <span class="pin"><i data-lucide="star"></i></span></div>
+            <div class="sbx-item"><i data-lucide="arrow-left-right"></i> Chuyển quỹ <span class="pin"><i data-lucide="star"></i></span></div>
+          </div>
+          <div class="sbx-gh"><i data-lucide="scale"></i> Công nợ <span class="sbx-badge" style="margin-left:auto">4</span><span class="sbx-chev" style="margin-left:4px"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh"><i data-lucide="bar-chart-3"></i> Báo cáo <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-children">
+            <div class="sbx-sub">Doanh thu</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Doanh thu</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Doanh thu sale</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Doanh thu xe</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Hiệu suất sale</div>
+            <div class="sbx-sub">Kho</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Tồn kho</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Thẻ kho</div>
+            <div class="sbx-sub">Quỹ</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Sổ quỹ</div>
+            <div class="sbx-sub">Công nợ</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Số dư công nợ</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Sổ chi tiết công nợ</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Công nợ theo chứng từ</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Tuổi nợ</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Nợ quá hạn</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Công nợ theo nhân viên</div>
+            <div class="sbx-item"><i data-lucide="x"></i> Biên bản đối chiếu</div>
+          </div>
+          <div class="sbx-gh"><i data-lucide="library"></i> Danh mục <span class="sbx-badge" style="margin-left:auto">8</span><span class="sbx-chev" style="margin-left:4px"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh"><i data-lucide="settings"></i> Hệ thống <span class="sbx-badge" style="margin-left:auto">4</span><span class="sbx-chev" style="margin-left:4px"><i data-lucide="chevron-right"></i></span></div>
+        </div>
+      </div>
+      <div class="sbx-content"><div class="bar" style="width:40%"></div><div class="bar"></div><div class="bar" style="width:80%"></div></div>
+    </div>
+  </div>
+  <div class="sbx-hint">Mục con không có icon riêng (icon ở cấp nhóm), nên menu dài vẫn thoáng. Icon nhóm cũng chính là icon dùng ở chế độ thu gọn.</div>
+</div>
+
+<!-- ===================== C ===================== -->
+<div class="sbx-col option" data-choice="c" onclick="toggleSelect(this)">
+  <h3>C. Ghim dạng chip, nhóm dạng khối màu</h3>
+  <p>Mục ghim hiện thành các chip nằm ngang ở đầu. Mỗi nhóm có ô icon màu riêng để nhận diện nhanh. Trông bắt mắt hơn nhưng nhiều màu.</p>
+  <div class="sbx-app stC">
+    <div class="sbx-top"><i data-lucide="file-text"></i> QLBanHang</div>
+    <div class="sbx-body">
+      <div class="sbx-side">
+        <div class="sbx-search"><div><i data-lucide="search"></i> Tìm chức năng…</div></div>
+        <div class="sbx-nav">
+          <div class="chips">
+            <span class="chip"><i data-lucide="star"></i> Báo giá</span>
+            <span class="chip"><i data-lucide="star"></i> Phiếu thu</span>
+          </div>
+          <div class="sbx-item"><i data-lucide="layout-dashboard"></i> Tổng quan</div>
+          <div class="sbx-gh"><span class="ic" style="background:#2563eb"><i data-lucide="shopping-cart"></i></span> Bán hàng <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-children">
+            <div class="sbx-item active"><i data-lucide="file-text"></i> Báo giá</div>
+            <div class="sbx-item"><i data-lucide="users"></i> Khách hàng <span class="pin"><i data-lucide="star"></i></span></div>
+            <div class="sbx-item"><i data-lucide="qr-code"></i> Tạo mã QR thanh toán <span class="pin"><i data-lucide="star"></i></span></div>
+          </div>
+          <div class="sbx-gh"><span class="ic" style="background:#d97706"><i data-lucide="warehouse"></i></span> Kho <span class="sbx-chev"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh"><span class="ic" style="background:#059669"><i data-lucide="wallet"></i></span> Thu chi <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-children">
+            <div class="sbx-item"><i data-lucide="hand-coins"></i> Phiếu thu</div>
+            <div class="sbx-item"><i data-lucide="banknote"></i> Phiếu chi <span class="pin"><i data-lucide="star"></i></span></div>
+            <div class="sbx-item"><i data-lucide="arrow-left-right"></i> Chuyển quỹ <span class="pin"><i data-lucide="star"></i></span></div>
+          </div>
+          <div class="sbx-gh"><span class="ic" style="background:#dc2626"><i data-lucide="scale"></i></span> Công nợ <span class="sbx-chev"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh"><span class="ic" style="background:#7c3aed"><i data-lucide="bar-chart-3"></i></span> Báo cáo <span class="sbx-chev"><i data-lucide="chevron-down"></i></span></div>
+          <div class="sbx-children">
+            <div class="sbx-sub">Doanh thu</div>
+            <div class="sbx-item"><i data-lucide="trending-up"></i> Doanh thu</div>
+            <div class="sbx-item"><i data-lucide="user-check"></i> Doanh thu sale</div>
+            <div class="sbx-item"><i data-lucide="truck"></i> Doanh thu xe</div>
+            <div class="sbx-item"><i data-lucide="target"></i> Hiệu suất sale</div>
+            <div class="sbx-sub">Kho</div>
+            <div class="sbx-item"><i data-lucide="boxes"></i> Tồn kho</div>
+            <div class="sbx-item"><i data-lucide="scroll-text"></i> Thẻ kho</div>
+            <div class="sbx-sub">Quỹ</div>
+            <div class="sbx-item"><i data-lucide="book-open-check"></i> Sổ quỹ</div>
+            <div class="sbx-sub">Công nợ</div>
+            <div class="sbx-item"><i data-lucide="book-open"></i> Số dư công nợ</div>
+            <div class="sbx-item"><i data-lucide="book-text"></i> Sổ chi tiết công nợ</div>
+            <div class="sbx-item"><i data-lucide="files"></i> Công nợ theo chứng từ</div>
+            <div class="sbx-item"><i data-lucide="hourglass"></i> Tuổi nợ</div>
+            <div class="sbx-item"><i data-lucide="alarm-clock"></i> Nợ quá hạn</div>
+            <div class="sbx-item"><i data-lucide="user-round"></i> Công nợ theo nhân viên</div>
+            <div class="sbx-item"><i data-lucide="file-check"></i> Biên bản đối chiếu</div>
+          </div>
+          <div class="sbx-gh"><span class="ic" style="background:#0891b2"><i data-lucide="library"></i></span> Danh mục <span class="sbx-chev"><i data-lucide="chevron-right"></i></span></div>
+          <div class="sbx-gh"><span class="ic" style="background:#475569"><i data-lucide="settings"></i></span> Hệ thống <span class="sbx-chev"><i data-lucide="chevron-right"></i></span></div>
+        </div>
+      </div>
+      <div class="sbx-content"><div class="bar" style="width:40%"></div><div class="bar"></div><div class="bar" style="width:80%"></div></div>
+    </div>
+  </div>
+  <div class="sbx-hint">Chip ghim tiết kiệm chiều cao, nhưng tên dài như "Sổ chi tiết công nợ" sẽ làm chip xuống dòng.</div>
+</div>
+
+</div>
+</div>
+
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+  if (window.lucide) {
+    lucide.createIcons();
+    // B: child items show no per-item icon
+    document.querySelectorAll('.stB .sbx-children .sbx-item > svg:first-child').forEach(function (s) { s.style.display = 'none'; });
+  }
+</script>

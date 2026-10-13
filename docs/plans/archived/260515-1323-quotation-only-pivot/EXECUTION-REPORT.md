@@ -68,8 +68,8 @@ During execution, another agent/IDE concurrently applied a subset of Phase 01 + 
 - `docs/architecture/system-architecture.md` — removed `<ConvertedToOrder` from lock-at order line.
 - `docs/project-pdr/product-goals.md` — new.
 - `docs/bd/phan-tich-yeu-cau-phan-mem-quan-ly-don-hang.md` → `docs/bd/archived/...` (moved + prepended ARCHIVED banner).
-- `~/.claude/projects/d--Projects-QLDonHang/memory/project_quotation_only_pivot.md` — new memory.
-- `~/.claude/projects/d--Projects-QLDonHang/memory/MEMORY.md` — index updated.
+- `~/.claude/projects/d--Projects-QLBanHang/memory/project_quotation_only_pivot.md` — new memory.
+- `~/.claude/projects/d--Projects-QLBanHang/memory/MEMORY.md` — index updated.
 
 ## Verification
 

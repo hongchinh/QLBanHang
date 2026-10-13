@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Superpowers Brainstorming</title>
+  <style>
+    /*
+     * BRAINSTORM COMPANION FRAME TEMPLATE
+     *
+     * This template provides a consistent frame with:
+     * - OS-aware light/dark theming
+     * - Fixed header and selection indicator bar
+     * - Scrollable main content area
+     * - CSS helpers for common UI patterns
+     *
+     * Content is injected via placeholder comment in #claude-content.
+     */
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ===== THEME VARIABLES ===== */
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    /* ===== FRAME STRUCTURE ===== */
+    .header {
+      background: var(--bg-secondary);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
+    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; }
+    .header .status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+    .main { flex: 1; overflow-y: auto; }
+    #claude-content { padding: 2rem; min-height: 100%; }
+
+    .indicator-bar {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1.5rem;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .indicator-bar span {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .indicator-bar .selected-text {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+    /* ===== OPTIONS (for A/B/C choices) ===== */
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .option:hover { border-color: var(--accent); }
+    .option.selected { background: var(--selected-bg); border-color: var(--selected-border); }
+    .option .letter {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      width: 1.75rem; height: 1.75rem;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .option.selected .letter { background: var(--accent); color: white; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+
+    /* ===== CARDS (for showing designs/mockups) ===== */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .card.selected { border-color: var(--selected-border); border-width: 2px; }
+    .card-image { background: var(--bg-tertiary); aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+
+    /* ===== MOCKUP CONTAINER ===== */
+    .mockup {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .mockup-header {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-body { padding: 1.5rem; }
+
+    /* ===== SPLIT VIEW (side-by-side comparison) ===== */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+    /* ===== PROS/CONS ===== */
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+
+    /* ===== PLACEHOLDER (for mockup areas) ===== */
+    .placeholder {
+      background: var(--bg-tertiary);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-tertiary);
+    }
+
+    /* ===== INLINE MOCKUP ELEMENTS ===== */
+    .mock-nav { background: var(--accent); color: white; padding: 0.75rem 1rem; display: flex; gap: 1.5rem; font-size: 0.9rem; }
+    .mock-sidebar { background: var(--bg-tertiary); padding: 1rem; min-width: 180px; }
+    .mock-content { padding: 1.5rem; flex: 1; }
+    .mock-button { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; }
+    .mock-input { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><a href="https://github.com/obra/superpowers" style="color: inherit; text-decoration: none;">Superpowers Brainstorming</a></h1>
+    <div class="status">Connected</div>
+  </div>
+
+  <div class="main">
+    <div id="claude-content">
+      <style>
+  .vp { border:1px solid #cbd5e1; border-radius:6px; background:#f8fafc; height:440px; display:flex; flex-direction:column; overflow:hidden; font-size:10px; color:#334155; }
+  .topbar { background:#1d4ed8; height:16px; flex:none; }
+  .titlebar { display:flex; justify-content:space-between; align-items:center; padding:4px 8px; background:#fff; border-bottom:1px solid #e2e8f0; flex:none; font-weight:700; }
+  .btns span { display:inline-block; padding:1px 6px; border:1px solid #93c5fd; border-radius:3px; margin-left:3px; font-weight:500; }
+  .btns span.p { background:#2563eb; color:#fff; border-color:#2563eb; }
+  .hdr { background:#fff; border:1px solid #e2e8f0; margin:4px 6px 0; border-radius:4px; padding:4px 6px; flex:none; }
+  .hrow { display:grid; gap:4px; margin-bottom:3px; }
+  .hrow:last-child { margin-bottom:0; }
+  .f { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:2px; height:13px; padding:0 3px; line-height:13px; white-space:nowrap; overflow:hidden; }
+  .f b { color:#64748b; font-weight:500; }
+  .f.req b::after { content:" *"; color:#dc2626; }
+  .tabs { display:flex; gap:2px; padding:0 6px; margin-top:4px; flex:none; border-bottom:1px solid #cbd5e1; }
+  .tabs span { padding:3px 8px; border:1px solid #cbd5e1; border-bottom:none; border-radius:4px 4px 0 0; background:#e2e8f0; color:#475569; white-space:nowrap; }
+  .tabs span.on { background:#fff; color:#1d4ed8; font-weight:700; position:relative; top:1px; }
+  .tabs span .dot { display:inline-block; width:5px; height:5px; border-radius:50%; background:#dc2626; margin-left:3px; vertical-align:middle; }
+  .tabs span .n { background:#dbeafe; color:#1d4ed8; border-radius:6px; padding:0 4px; margin-left:3px; font-weight:700; }
+  .panel { flex:1; background:#fff; margin:0 6px; border:1px solid #cbd5e1; border-top:none; display:flex; flex-direction:column; min-height:0; }
+  .gh { background:#1e40af; color:#fff; height:14px; flex:none; display:grid; font-weight:600; }
+  .gh div { padding:0 3px; line-height:14px; border-right:1px solid rgba(255,255,255,.15); white-space:nowrap; overflow:hidden; }
+  .rows { flex:1; background:repeating-linear-gradient(#fff 0 13px, #e2e8f0 13px 14px); position:relative; }
+  .count { position:absolute; right:6px; top:50%; transform:translateY(-50%); background:#dcfce7; color:#166534; border:1px solid #86efac; padding:2px 8px; border-radius:10px; font-weight:700; font-size:11px; }
+  .foot { flex:none; margin:4px 6px 6px; background:#fff; border:1px solid #e2e8f0; border-radius:4px; display:flex; justify-content:space-between; align-items:center; padding:4px 8px; gap:8px; }
+  .foot .t { display:flex; gap:10px; flex-wrap:wrap; }
+  .foot .t span b { font-weight:700; color:#0f172a; }
+  .foot .tot { font-weight:800; color:#1d4ed8; font-size:11px; }
+  .mini { display:flex; gap:6px; padding:3px 6px; flex:none; }
+  .peek { margin:6px; display:grid; grid-template-columns:1fr 1fr; gap:4px 10px; }
+  .note { font-size:12px; color:#475569; margin-top:6px; }
+  .flow { font-size:11px; color:#475569; margin-top:4px; }
+</style>
+
+<h2>Bố cục dạng tab — 3 biến thể</h2>
+<p class="subtitle">Khung mô phỏng 1920×1080. Thanh tổng tiền luôn dính ở đáy trong cả 3 biến thể. Badge xanh = số dòng hàng nhìn thấy cùng lúc.</p>
+
+<div class="cards">
+
+  <!-- T1 -->
+  <div class="card" data-choice="t1" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div class="tabs">
+          <span>1 · Thông tin chung<span class="dot"></span></span>
+          <span class="on">2 · Hàng hóa <span class="n">15</span></span>
+          <span>3 · Thanh toán</span>
+          <span>Công nợ KH</span>
+          <span>Lịch sử</span>
+        </div>
+        <div class="panel">
+          <div class="gh" style="grid-template-columns:5% 12% 26% 6% 7% 7% 7% 8% 10% 12%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>ĐVT</div><div>Tấm</div><div>Dài</div><div>Rộng</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+          <div class="rows"><span class="count">≈ 22 dòng (laptop ≈ 13)</span></div>
+        </div>
+        <div class="foot"><div class="t"><span><b>khách hàng A</b> · Kho chính</span><span>Tiền hàng <b>0</b></span><span>VAT <b>0</b></span></div><div class="tot">Tổng TT: 0</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>T1 · Tab toàn trang</h3>
+      <p>Mọi thứ là tab ngang hàng: Thông tin chung · Hàng hóa · Thanh toán (HTTT, quỹ, hạn TT, phí VC, CK đơn, đã trả) · Công nợ KH · Lịch sử. Tab Hàng hóa chiếm trọn màn hình. Phiếu mới mở ở tab 1; phiếu cũ mở ở tab Hàng hóa. Tab thiếu trường bắt buộc có chấm đỏ. Ctrl+1/2/3 chuyển tab.</p>
+      <p class="flow"><b>Nhược:</b> khi đang nhập hàng không thấy Lý do / Đối tượng (chỉ tóm tắt ở thanh đáy).</p>
+    </div>
+  </div>
+
+  <!-- T2 -->
+  <div class="card" data-choice="t2" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div class="hdr">
+          <div class="hrow" style="grid-template-columns:1fr 1.3fr 1fr 2.6fr 1.3fr">
+            <div class="f req"><b>Ngày</b> 10/07 09:03</div><div class="f req"><b>Lý do</b> Xuất bán hàng</div><div class="f req"><b>Kho</b> Kho chính</div><div class="f"><b>Đối tượng</b> hh1 — khách hàng A</div><div class="f"><b>HTTT</b> Tiền mặt</div>
+          </div>
+        </div>
+        <div class="tabs">
+          <span class="on">Hàng hóa <span class="n">15</span></span>
+          <span>Đối tượng &amp; ghi chú</span>
+          <span>Thanh toán</span>
+          <span>Công nợ KH</span>
+          <span>Lịch sử</span>
+        </div>
+        <div class="panel">
+          <div class="gh" style="grid-template-columns:5% 12% 26% 6% 7% 7% 7% 8% 10% 12%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>ĐVT</div><div>Tấm</div><div>Dài</div><div>Rộng</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+          <div class="rows"><span class="count">≈ 20 dòng (laptop ≈ 12)</span></div>
+        </div>
+        <div class="foot"><div class="t"><span>Tiền hàng <b>0</b></span><span>CK <b>0</b></span><span>VAT <b>0</b></span><span>Phí VC <b>0</b></span></div><div class="tot">Tổng TT: 0</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>T2 · 1 dòng chính + tab bên dưới (đề xuất)</h3>
+      <p>Một dòng luôn hiện chứa các trường quyết định phiếu: Ngày, Lý do, Kho, Đối tượng, HTTT. Bên dưới là tab: <b>Hàng hóa</b> (mặc định) · Đối tượng &amp; ghi chú (tên, MST, địa chỉ, người nhận, ghi chú) · Thanh toán (quỹ, hạn TT, phí VC, CK đơn, đã trả) · Công nợ KH · Lịch sử. Kiểu MISA/Fast quen thuộc với kế toán.</p>
+      <p class="flow"><b>Luồng:</b> Ngày → Lý do → Kho → Đối tượng → Enter rơi thẳng vào ô Mã hàng dòng 1.</p>
+    </div>
+  </div>
+
+  <!-- T3 -->
+  <div class="card" data-choice="t3" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="vp">
+        <div class="topbar"></div>
+        <div class="titlebar">Thêm phiếu xuất kho · PX00002 <span class="btns"><span>Lưu và thoát</span><span class="p">Lưu tạm</span></span></div>
+        <div class="tabs" style="margin-top:4px">
+          <span class="on">Chung</span><span>Đối tượng</span><span>Thanh toán</span><span>Công nợ KH</span>
+        </div>
+        <div class="hdr" style="margin-top:0;border-top:none;border-radius:0 0 4px 4px;border-color:#cbd5e1">
+          <div class="hrow" style="grid-template-columns:1fr 1.3fr 1fr 2.6fr">
+            <div class="f req"><b>Ngày</b> 10/07 09:03</div><div class="f req"><b>Lý do</b> Xuất bán hàng</div><div class="f req"><b>Kho</b> Kho chính</div><div class="f"><b>Đối tượng</b> hh1 — khách hàng A</div>
+          </div>
+          <div class="hrow" style="grid-template-columns:1fr">
+            <div class="f"><b>Ghi chú</b></div>
+          </div>
+        </div>
+        <div class="panel" style="margin-top:4px;border-top:1px solid #cbd5e1">
+          <div class="gh" style="grid-template-columns:5% 12% 26% 6% 7% 7% 7% 8% 10% 12%"><div>#</div><div>Mã</div><div>Tên hàng</div><div>ĐVT</div><div>Tấm</div><div>Dài</div><div>Rộng</div><div>SL</div><div>Đơn giá</div><div>Thành tiền</div></div>
+          <div class="rows"><span class="count">≈ 18 dòng (laptop ≈ 10)</span></div>
+        </div>
+        <div class="foot"><div class="t"><span>Tiền hàng <b>0</b></span><span>CK <b>0</b></span><span>VAT <b>0</b></span><span>Phí VC <b>0</b></span></div><div class="tot">Tổng TT: 0</div></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>T3 · Tab chỉ trong khung thông tin, lưới luôn hiện</h3>
+      <p>Khung thông tin chung cố định 2 dòng, nội dung đổi theo tab (Chung / Đối tượng / Thanh toán / Công nợ KH). Lưới hàng hóa luôn nằm bên dưới, không bao giờ bị che. Lịch sử để cuối trang như hiện tại.</p>
+      <p class="flow"><b>Nhược:</b> ít dòng hơn T1/T2; trường bị ẩn trong tab khác khó thấy lỗi hơn.</p>
+    </div>
+  </div>
+
+</div>
+
+<p class="note">Bấm chọn 1 biến thể rồi trả lời ở terminal.</p>
+
+    </div>
+  </div>
+
+  <div class="indicator-bar">
+    <span id="indicator-text">Click an option above, then return to the terminal</span>
+  </div>
+
+</body>
+</html>

@@ -1,4 +1,4 @@
-# PWA — Progressive Web App cho QLDonHang
+# PWA — Progressive Web App cho QLBanHang
 
 **Date:** 2026-05-23  
 **Status:** Design approved, pending implementation plan
@@ -7,7 +7,7 @@
 
 ## Problem Framing
 
-Project QLDonHang (Vite + React + ASP.NET Core) cần hỗ trợ cài đặt dưới dạng native app trên desktop và mobile, đồng thời hoạt động tốt khi mạng kém hoặc mất mạng, và có khả năng gửi push notifications.
+Project QLBanHang (Vite + React + ASP.NET Core) cần hỗ trợ cài đặt dưới dạng native app trên desktop và mobile, đồng thời hoạt động tốt khi mạng kém hoặc mất mạng, và có khả năng gửi push notifications.
 
 ---
 

@@ -1,7 +1,7 @@
-# Plan: GMO-Style Header for QLDonHang
+# Plan: GMO-Style Header for QLBanHang
 
 ## Goal
-Áp dụng visual language của style guide **ヘルステックONE byGMO** vào main layout của QLDonHang dưới dạng **hybrid**: header xanh GMO full-width chứa brand block (logo admin upload), nút collapse sidebar, search global, notification, user dropdown — sidebar giữ trắng nhưng support collapse 240↔64px. Không đụng `--primary` để không ảnh hưởng các button/link trong app.
+Áp dụng visual language của style guide **ヘルステックONE byGMO** vào main layout của QLBanHang dưới dạng **hybrid**: header xanh GMO full-width chứa brand block (logo admin upload), nút collapse sidebar, search global, notification, user dropdown — sidebar giữ trắng nhưng support collapse 240↔64px. Không đụng `--primary` để không ảnh hưởng các button/link trong app.
 
 ## Scope
 
@@ -23,7 +23,7 @@
 - Domain event hook auto-tạo notification (PR4 chỉ có endpoint + manual seed).
 - SignalR / realtime notifications (polling 60s là đủ).
 - Đổi `--primary` hoặc theme tổng thể (chỉ thêm `--header-*`).
-- Featured pill buttons (`クリニックマップ`, `AIアシスト`) — không có feature tương đương trong QLDonHang.
+- Featured pill buttons (`クリニックマップ`, `AIアシスト`) — không có feature tương đương trong QLBanHang.
 - 9-dot menu, Message icon, Settings icon shortcut — bỏ.
 - Chat nội bộ.
 - Mobile redesign sâu (chỉ responsive cơ bản: brand co còn 64px, search ẩn dưới 768px).

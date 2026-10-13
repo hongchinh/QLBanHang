@@ -29,7 +29,7 @@ Tạo `mockup-table-header.html` trong thư mục plan, render visual mục tiê
      - Hỏi rõ: "Nếu Card A trông xấu → Phase 02 sẽ apply `overflow-hidden` cho `<Card>` ở 3 trang list."
 
 2. **User confirmation gate**:
-   - In đường dẫn tuyệt đối cho user: `d:\Projects\QLDonHang\docs\plans\260513-1647-table-header-brand-color\mockup-table-header.html`.
+   - In đường dẫn tuyệt đối cho user: `d:\Projects\QLBanHang\docs\plans\260513-1647-table-header-brand-color\mockup-table-header.html`.
    - Dùng `AskUserQuestion` với 4 options:
      - `Confirm — apply primitive change ONLY (Card A is fine)` → Phase 02 chỉ sửa `table.tsx`.
      - `Confirm — apply primitive change + Card overflow-hidden (need clean rounded corners)` → Phase 02 sửa `table.tsx` + 3 file list page.

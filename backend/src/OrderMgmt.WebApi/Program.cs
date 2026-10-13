@@ -189,7 +189,7 @@ builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
-        Title = "QLDonHang API",
+        Title = "QLBanHang API",
         Version = "v1",
         Description = "Phần mềm Quản lý Đơn hàng - Báo giá - Bàn giao - Báo cáo",
     });
@@ -226,7 +226,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
-        c.SwaggerEndpoint("/swagger/v1/swagger.json", "QLDonHang API v1");
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "QLBanHang API v1");
         c.RoutePrefix = "swagger";
     });
 }

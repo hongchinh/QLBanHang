@@ -30,7 +30,7 @@ Tạo cấu trúc visual header xanh GMO + brand block + sidebar collapse. **Kh�
 
 ## Pre-tasks (chốt design trước khi code)
 
-**A. Pill hover color** — GMO style guide dùng pill **đen** trên header xanh, nhưng QLDonHang là B2B VN, có thể quá "harsh". Phase 01 task #1 prototype 2 variant cùng lúc trong CSS (comment 1 out), screenshot show stakeholder chọn trước khi merge:
+**A. Pill hover color** — GMO style guide dùng pill **đen** trên header xanh, nhưng QLBanHang là B2B VN, có thể quá "harsh". Phase 01 task #1 prototype 2 variant cùng lúc trong CSS (comment 1 out), screenshot show stakeholder chọn trước khi merge:
    - Variant A (default plan): `--header-active: 0 0% 10%` (đen GMO-style).
    - Variant B (mềm hơn): `--header-active: 212 78% 22%` (xanh đậm hơn header bg).
 
@@ -90,7 +90,7 @@ grep -rE "(change.?password|reset.?password|password.{0,10}modal)" frontend/src
    - Props: `collapsed: boolean`, `onToggleCollapse: () => void`, `showToggle: boolean` (false trên mobile).
    - Container: `bg-header-brand-bg` width `240px` (`64px` khi collapsed) trên desktop; **mobile <768px** giữ `160px` (đủ hiện logo + text, không co 64px — preserve brand recognition). Height `64px`, `border-r`, `transition-[width] duration-200 ease-in-out`.
    - Layout 2 phần (desktop):
-     - **Logo zone** (flex-1 click `<Link to="/">`): icon `FileText` lucide + text "QLDonHang" font-bold (ẩn text khi `collapsed`, chỉ icon center).
+     - **Logo zone** (flex-1 click `<Link to="/">`): icon `FileText` lucide + text "QLBanHang" font-bold (ẩn text khi `collapsed`, chỉ icon center).
      - **Toggle button** (chỉ render khi `showToggle`): icon `PanelLeftClose`/`PanelLeftOpen`, `aria-label="Thu gọn menu"`, click `onToggleCollapse`. Đặt trong brand block (góc phải) để gần sidebar — không tách ra header chính.
    - Mobile: ẩn toggle, logo zone chiếm full.
    - Comment TODO: "Phase 02 replace icon+text bằng `<img>` từ `useBrandingMeta()` — variant `mark` khi collapsed, `full` khi expanded".
@@ -165,7 +165,7 @@ grep -rE "(change.?password|reset.?password|password.{0,10}modal)" frontend/src
     - Test 1: render `<AppHeader />` với mock `useAuthStore` (user "Nguyễn Văn A") + `useUiStore` → expect text "Nguyễn Văn A" hoặc avatar fallback "NA" trong document.
     - Test 2: click hamburger mobile → expect `openMobileDrawer` mock được gọi.
     - Test 3: click toggle desktop → expect `toggleSidebar` mock được gọi.
-    - Test 4: render với `sidebarCollapsed=true` → brand text "QLDonHang" không visible (chỉ icon).
+    - Test 4: render với `sidebarCollapsed=true` → brand text "QLBanHang" không visible (chỉ icon).
 
 15. `npm run typecheck` từ thư mục `frontend`.
 
@@ -176,7 +176,7 @@ grep -rE "(change.?password|reset.?password|password.{0,10}modal)" frontend/src
 18. **Manual visual verification** với dev server (`npm run dev`):
     - 1920px: header full-width xanh GMO, brand 240px trắng, sidebar 240px trắng dưới brand.
     - 1280px: layout đầy đủ.
-    - 375px: brand **160px** (không co xuống 64), text "QLDonHang" vẫn đọc được; hamburger mở drawer; icon search visible.
+    - 375px: brand **160px** (không co xuống 64), text "QLBanHang" vẫn đọc được; hamburger mở drawer; icon search visible.
     - Click hamburger desktop (trong brand block) → sidebar co 64px + brand co 64px, F5 vẫn còn.
     - Collapsed: hover từng icon sidebar → tooltip hiện label (Radix, không phải `title` HTML).
     - Tab key từ đầu page → focus skip-link → Enter → focus vào main content.
@@ -206,7 +206,7 @@ npm run dev   # manual check 3 viewport + navigation + tooltip + skip-link
 - [ ] Notification button icon-only + Radix tooltip "Thông báo" (không có label `text-[10px]`).
 - [ ] User dropdown trigger: avatar (initials) luôn visible; tên + chevron ẩn dưới `lg` (1024px); tên truncate nếu dài.
 - [ ] User dropdown chỉ có "Đổi mật khẩu" khi task #0 verify thành công, không có dòng comment-out hoặc TODO trong code.
-- [ ] Mobile <768px: brand giữ **160px** (text "QLDonHang" đọc được); icon search button visible; collapse toggle desktop ẩn.
+- [ ] Mobile <768px: brand giữ **160px** (text "QLBanHang" đọc được); icon search button visible; collapse toggle desktop ẩn.
 - [ ] `mobileDrawerOpen` state nằm trong `ui-store` (không persist) — verify F5 sau khi mở drawer thì drawer đóng lại.
 - [ ] Transition sidebar/brand `duration-200` smooth, không jank.
 - [ ] Tab navigation qua header có focus ring rõ trên nền xanh (kiểm tra contrast).

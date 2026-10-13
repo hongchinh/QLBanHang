@@ -16,8 +16,8 @@ Thêm 2 dòng "Tạm ứng" và "Còn lại" vào template Excel, cập nhật r
 ### 1. Backup template
 ```powershell
 Copy-Item `
-  "d:\Projects\QLDonHang\backend\src\OrderMgmt.WebApi\templates\template_baogia.xlsx" `
-  "d:\Projects\QLDonHang\backend\src\OrderMgmt.WebApi\templates\template_baogia.xlsx.bak"
+  "d:\Projects\QLBanHang\backend\src\OrderMgmt.WebApi\templates\template_baogia.xlsx" `
+  "d:\Projects\QLBanHang\backend\src\OrderMgmt.WebApi\templates\template_baogia.xlsx.bak"
 ```
 
 ### 2. Mở template và xác định cấu trúc
@@ -121,7 +121,7 @@ internal const int RemainingBalanceRowOffset = 6;
 ## Verification
 ```powershell
 # Build để kiểm tra lỗi compile
-cd d:\Projects\QLDonHang\backend
+cd d:\Projects\QLBanHang\backend
 dotnet build src/OrderMgmt.Infrastructure
 dotnet build src/OrderMgmt.WebApi
 

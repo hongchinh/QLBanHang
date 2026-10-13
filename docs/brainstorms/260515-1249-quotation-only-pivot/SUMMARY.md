@@ -2,7 +2,7 @@
 
 ## Problem framing
 
-Goal hiện tại của QLDonHang (theo `docs/bd/phan-tich-yeu-cau-phan-mem-quan-ly-don-hang.md`) là pipeline đầy đủ:
+Goal hiện tại của QLBanHang (theo `docs/bd/phan-tich-yeu-cau-phan-mem-quan-ly-don-hang.md`) là pipeline đầy đủ:
 
 ```
 Báo giá → Đơn hàng → Bàn giao → Thanh toán → Báo cáo

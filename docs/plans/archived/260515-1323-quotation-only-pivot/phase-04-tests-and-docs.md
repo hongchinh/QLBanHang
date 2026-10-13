@@ -49,10 +49,10 @@ Bổ sung integration tests cho hành vi mới (snapshot ConfirmedAt, gating Can
 
 5. Tạo `docs/project-pdr/product-goals.md`:
    ```markdown
-   # QLDonHang — Product Goals
+   # QLBanHang — Product Goals
 
    ## Mục tiêu sản phẩm
-   QLDonHang là phần mềm quản lý báo giá. Báo giá là chứng từ duy nhất xuyên suốt vòng đời bán hàng. Khi báo giá đạt trạng thái Đã xác nhận, hệ thống ghi nhận doanh thu cho nhân viên kinh doanh sở hữu báo giá đó.
+   QLBanHang là phần mềm quản lý báo giá. Báo giá là chứng từ duy nhất xuyên suốt vòng đời bán hàng. Khi báo giá đạt trạng thái Đã xác nhận, hệ thống ghi nhận doanh thu cho nhân viên kinh doanh sở hữu báo giá đó.
 
    ## Đối tượng sử dụng
    - **Sale**: tạo báo giá, gửi khách, theo dõi trạng thái, xác nhận khi khách OK.
@@ -88,7 +88,7 @@ Bổ sung integration tests cho hành vi mới (snapshot ConfirmedAt, gating Can
    > **ARCHIVED (2026-05-15).** Tài liệu này phản ánh scope ban đầu (báo giá → đơn hàng → bàn giao → thanh toán → báo cáo). Sản phẩm đã pivot sang scope "báo giá là chứng từ duy nhất". Mục tiêu hiện tại xem [../../project-pdr/product-goals.md](../../project-pdr/product-goals.md). Giữ file này làm reference lịch sử.
    ```
 8. Cập nhật `docs/SUMMARY.md`:
-   - Sửa dòng `**QLDonHang** — Phần mềm Quản lý Đơn hàng, Báo giá, Bàn giao, Báo cáo.` thành `**QLDonHang** — Phần mềm Quản lý Báo giá.`.
+   - Sửa dòng `**QLBanHang** — Phần mềm Quản lý Đơn hàng, Báo giá, Bàn giao, Báo cáo.` thành `**QLBanHang** — Phần mềm Quản lý Báo giá.`.
    - Đổi mô tả: `Quản lý vòng đời báo giá: Draft → Sent → Confirmed → Cancelled. Doanh thu ghi nhận khi báo giá Confirmed.`.
    - Section "Project PDR" sửa pointer file thành `product-pdr/product-goals.md` (đã đúng path) và cập nhật description nếu cần.
 9. Cập nhật `docs/architecture/system-architecture.md`:
@@ -97,16 +97,16 @@ Bổ sung integration tests cho hành vi mới (snapshot ConfirmedAt, gating Can
 
 ### C. Memory update (auto-memory)
 
-10. Tạo memory file `C:\Users\admin\.claude\projects\d--Projects-QLDonHang\memory\project_quotation_only_pivot.md`:
+10. Tạo memory file `C:\Users\admin\.claude\projects\d--Projects-QLBanHang\memory\project_quotation_only_pivot.md`:
     ```markdown
     ---
     name: project-quotation-only-pivot
-    description: QLDonHang đã pivot scope (2026-05-15) — báo giá là chứng từ duy nhất, không còn module đơn hàng/bàn giao/thanh toán
+    description: QLBanHang đã pivot scope (2026-05-15) — báo giá là chứng từ duy nhất, không còn module đơn hàng/bàn giao/thanh toán
     metadata:
       type: project
     ---
 
-    QLDonHang pivot scope từ 2026-05-15: bỏ hoàn toàn module Đơn hàng + Bàn giao + Thanh toán. Báo giá là chứng từ duy nhất. Vòng đời `Draft → Sent → Confirmed → Cancelled`. Khi báo giá flip Confirmed → snapshot `ConfirmedAt` + `ConfirmedByUserId`, ghi nhận doanh thu cho owner sale. Hủy báo giá Confirmed cần permission `quotations.cancel_confirmed` (admin/manager).
+    QLBanHang pivot scope từ 2026-05-15: bỏ hoàn toàn module Đơn hàng + Bàn giao + Thanh toán. Báo giá là chứng từ duy nhất. Vòng đời `Draft → Sent → Confirmed → Cancelled`. Khi báo giá flip Confirmed → snapshot `ConfirmedAt` + `ConfirmedByUserId`, ghi nhận doanh thu cho owner sale. Hủy báo giá Confirmed cần permission `quotations.cancel_confirmed` (admin/manager).
 
     **Why:** User explicitly trimmed scope trong brainstorm `docs/brainstorms/260515-1249-quotation-only-pivot/` để tập trung vào MVP báo giá; module đơn hàng/bàn giao chưa hiện thực, không có lý do giữ lại.
 
@@ -114,7 +114,7 @@ Bổ sung integration tests cho hành vi mới (snapshot ConfirmedAt, gating Can
     ```
 11. Cập nhật `MEMORY.md` index, thêm dòng mới sau dòng existing:
     ```markdown
-    - [Quotation-only pivot](project_quotation_only_pivot.md) — QLDonHang scope pivot (2026-05-15) — báo giá là chứng từ duy nhất, không có Order/Delivery/Payment.
+    - [Quotation-only pivot](project_quotation_only_pivot.md) — QLBanHang scope pivot (2026-05-15) — báo giá là chứng từ duy nhất, không có Order/Delivery/Payment.
     ```
 
 ## Verification

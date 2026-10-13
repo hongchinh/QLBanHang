@@ -83,13 +83,13 @@ Tạo endpoint `GET /api/customers/search` tối ưu cho typeahead: tìm trên 5
 
 ```powershell
 # Apply migration (giả định project pattern dotnet ef migrations)
-dotnet ef database update --project d:\Projects\QLDonHang\backend\src\OrderMgmt.Infrastructure --startup-project d:\Projects\QLDonHang\backend\src\OrderMgmt.WebApi
+dotnet ef database update --project d:\Projects\QLBanHang\backend\src\OrderMgmt.Infrastructure --startup-project d:\Projects\QLBanHang\backend\src\OrderMgmt.WebApi
 
 # Build & test
-dotnet build d:\Projects\QLDonHang\backend\src\OrderMgmt.Application
-dotnet build d:\Projects\QLDonHang\backend\src\OrderMgmt.Infrastructure
-dotnet build d:\Projects\QLDonHang\backend\src\OrderMgmt.WebApi
-dotnet test d:\Projects\QLDonHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj --filter "FullyQualifiedName~CustomerSearch"
+dotnet build d:\Projects\QLBanHang\backend\src\OrderMgmt.Application
+dotnet build d:\Projects\QLBanHang\backend\src\OrderMgmt.Infrastructure
+dotnet build d:\Projects\QLBanHang\backend\src\OrderMgmt.WebApi
+dotnet test d:\Projects\QLBanHang\backend\tests\OrderMgmt.IntegrationTests\OrderMgmt.IntegrationTests.csproj --filter "FullyQualifiedName~CustomerSearch"
 ```
 
 **Manual** (nếu WebApi đang chạy, không cần restart — chỉ rebuild lib đã đổi theo [[build-skip-when-app-running]]):

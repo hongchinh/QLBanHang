@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { LayoutList } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,16 @@ const PRICING_LABEL: Record<ProductSuggestion['pricingMode'], string> = {
 
 const currency = new Intl.NumberFormat('vi-VN');
 
+// Gap between the input and the list, and between the list and the window edge.
+const DROPDOWN_GAP = 4;
+const WINDOW_MARGIN = 8;
+
+interface Placement {
+  above: boolean;
+  /** Set only when the list does not fit on the side it opens to. */
+  maxHeight?: number;
+}
+
 export function ProductTypeaheadCell({
   value,
   onChange,
@@ -44,6 +54,7 @@ export function ProductTypeaheadCell({
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
+  const [placement, setPlacement] = useState<Placement>({ above: false });
   const containerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -80,6 +91,22 @@ export function ProductTypeaheadCell({
       window.removeEventListener('scroll', syncDropdownRect, true);
     };
   }, [open, syncDropdownRect]);
+
+  const showDropdown = open && dropdownRect && value.trim().length >= 1;
+
+  // Open below the input; flip above it when the list does not fit below and there is more room above, and cap
+  // the height to the side it opens to. Unchanged (below, CSS max-h) when it fits.
+  useLayoutEffect(() => {
+    if (!showDropdown || !dropdownRect || !dropdownRef.current) return;
+    const natural = dropdownRef.current.scrollHeight;
+    const room = DROPDOWN_GAP + WINDOW_MARGIN;
+    const below = window.innerHeight - dropdownRect.bottom - room;
+    const above = dropdownRect.top - room;
+    const flip = natural > below && above > below;
+    const available = flip ? above : below;
+    const next: Placement = { above: flip, maxHeight: natural > available ? Math.max(available, 0) : undefined };
+    setPlacement((prev) => (prev.above === next.above && prev.maxHeight === next.maxHeight ? prev : next));
+  }, [showDropdown, dropdownRect, items.length, isLoading, isError]);
 
   useEffect(() => {
     if (highlightedIndex >= items.length) setHighlightedIndex(0);
@@ -163,8 +190,6 @@ export function ProductTypeaheadCell({
       <Input {...triggerProps} />
     );
 
-  const showDropdown = open && dropdownRect && value.trim().length >= 1;
-
   const dropdown = showDropdown
     ? createPortal(
         <div
@@ -173,7 +198,10 @@ export function ProductTypeaheadCell({
           style={{
             position: 'fixed',
             left: dropdownRect.left,
-            top: dropdownRect.bottom + 4,
+            ...(placement.above
+              ? { bottom: window.innerHeight - dropdownRect.top + DROPDOWN_GAP }
+              : { top: dropdownRect.bottom + DROPDOWN_GAP }),
+            ...(placement.maxHeight != null && { maxHeight: placement.maxHeight }),
           }}
         >
           <div className="flex items-center justify-between border-b bg-muted/30 px-2 py-1.5 text-xs text-muted-foreground">

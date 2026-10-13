@@ -232,7 +232,7 @@ public sealed class ExecutiveLookups
 
 ### Shared lookups and guard rows
 
-- Task 2.1 creates `ExecutiveLookups` by moving the private name lookups of `SalesMetricsService` into it (same queries, same results; the sales tests of Phase 01 must stay green). Every later service resolves branch codes, partner, product and user names through it. A caller reads a name with `TryGetValue`, never with the indexer.
+- Task 2.1 creates `ExecutiveLookups` by moving the private name lookups of `SalesMetricsService` into it (same queries, same results; the sales tests of Phase 01 must stay green). Every later service resolves branch codes, partner, product and user names through it: wherever the rules below say a name comes from `Branches`, `Customers` or `Users` with `IgnoreQueryFilters()`, that means the matching `ExecutiveLookups` method. Cash reason codes and names are specific to cash and are looked up inside `CashMetricsService` (one separate query by id with `IgnoreQueryFilters()`). A caller reads a name with `TryGetValue`, never with the indexer.
 - Every task that adds a route adds its row to the table of `ExecutiveRouteGuardTests` (Phase 01 Task 1.8): the route with its query string, its domain permission, how to read the checked total, and the expected `OwnBranch` and `Company` totals. The four theories of that class then cover the route. This replaces a separate "requires permission" case per test class. The rows of this phase:
 
   | Route | Permission | Checked total | Own branch | Company |

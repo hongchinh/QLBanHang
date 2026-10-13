@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
-import { Plus, Trash2 } from 'lucide-react';
+import { Keyboard, Plus, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CellError } from '@/components/money-cell/money-cell';
 import { createEmptyStockLine } from '@/features/stock-vouchers/payload';
 import type {
@@ -205,6 +207,20 @@ function PercentCell({
       }}
       onBlur={() => setEditing(null)}
     />
+  );
+}
+
+function KeyboardGuideItems() {
+  return (
+    <>
+    <span><span className="kbd">Enter</span> Tiếp</span>
+    <span><span className="kbd">Shift</span>+<span className="kbd">Enter</span> Lùi</span>
+    <span><span className="kbd">↑</span><span className="kbd">↓</span> Dòng trên/dưới</span>
+    <span><span className="kbd">Insert</span> Thêm dòng</span>
+    <span><span className="kbd">Ctrl</span>+<span className="kbd">Del</span> Xóa dòng</span>
+    <span><span className="kbd">Ctrl</span>+<span className="kbd">S</span> Lưu</span>
+    <span><span className="kbd">Alt</span>+<span className="kbd">1…4</span> Chuyển tab</span>
+    </>
   );
 }
 
@@ -599,15 +615,21 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           )}
           <StockGridSettingsPopover prefs={prefs} onToggleColumn={toggleColumn} onToggleEnterStop={toggleEnterStop} onReset={reset} />
         </div>
-        <div className="keyboard-guide">
-          <span><span className="kbd">Enter</span> Tiếp</span>
-          <span><span className="kbd">Shift</span>+<span className="kbd">Enter</span> Lùi</span>
-          <span><span className="kbd">↑</span><span className="kbd">↓</span> Dòng trên/dưới</span>
-          <span><span className="kbd">Insert</span> Thêm dòng</span>
-          <span><span className="kbd">Ctrl</span>+<span className="kbd">Del</span> Xóa dòng</span>
-          <span><span className="kbd">Ctrl</span>+<span className="kbd">S</span> Lưu</span>
-          <span><span className="kbd">Alt</span>+<span className="kbd">1…4</span> Chuyển tab</span>
+        {/* Full guide on wide screens; a compact "Phím tắt" popover below 2xl so the toolbar stays on one line. */}
+        <div className="keyboard-guide keyboard-guide-inline">
+          <KeyboardGuideItems />
         </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button type="button" variant="outline" size="sm" className="keyboard-guide-trigger h-7">
+              <Keyboard className="mr-1.5 h-4 w-4" />
+              Phím tắt
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent align="end" className="keyboard-guide keyboard-guide-popover w-auto">
+            <KeyboardGuideItems />
+          </PopoverContent>
+        </Popover>
       </div>
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
       <div

@@ -568,4 +568,14 @@ describe('StockLineGrid', () => {
     expect(guide).toHaveTextContent('Alt+1…4');
     expect(guide).toHaveTextContent('Dòng trên/dưới');
   });
+
+  it('below 2xl the same keys are reachable from the Phím tắt popover', async () => {
+    renderGrid({ lines: [line()] });
+    fireEvent.click(screen.getByRole('button', { name: /Phím tắt/ }));
+    await waitFor(() => expect(document.querySelector('.keyboard-guide-popover')).not.toBeNull());
+    const popover = document.querySelector('.keyboard-guide-popover')!;
+    expect(popover).toHaveTextContent('Ctrl+Del');
+    expect(popover).toHaveTextContent('Alt+1…4');
+    expect(popover).toHaveTextContent('Dòng trên/dưới');
+  });
 });

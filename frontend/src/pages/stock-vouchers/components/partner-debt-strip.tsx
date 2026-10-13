@@ -30,8 +30,8 @@ export function PartnerDebtStrip({ partnerId, partnerLabel, current, saved, canc
   const after = cancelled ? null : debtAfterVoucher(data, current, saved);
   const available = after?.receivableChanged ? after.availableAfter : data.available ?? null;
   return (
-    <div className="flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-dashed bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
-      <span className="font-semibold text-foreground">{partnerLabel}</span>
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 whitespace-nowrap border-t border-dashed bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
+      <span className="max-w-[28ch] truncate font-semibold text-foreground" title={partnerLabel}>{partnerLabel}</span>
       <span>
         Phải thu <Value testId="partner-debt-receivable" value={data.receivableBalance} />
         {after?.receivableChanged && <> → sau phiếu <Value testId="partner-debt-receivable-after" value={after.receivableAfter} /></>}

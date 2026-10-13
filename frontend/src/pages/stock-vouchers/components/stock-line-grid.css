@@ -96,7 +96,7 @@
   cursor: not-allowed;
 }
 
-.stock-grid-toolbar .keyboard-guide {
+.keyboard-guide {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
@@ -105,7 +105,7 @@
   color: hsl(var(--muted-foreground));
 }
 
-.stock-grid-toolbar .keyboard-guide .kbd {
+.keyboard-guide .kbd {
   min-width: 18px;
   padding: 1px 5px;
   border: 1px solid hsl(var(--border));
@@ -116,4 +116,27 @@
   font-size: 11px;
   font-family: Consolas, monospace;
   margin: 0 2px;
+}
+
+/* The full guide needs a 2xl screen (1536px); below that it lives in the "Phím tắt" popover so the toolbar
+ * stays on one line at 1366px (one more grid row). */
+.stock-grid-toolbar .keyboard-guide-inline {
+  display: none;
+}
+
+@media (min-width: 1536px) {
+  .stock-grid-toolbar .keyboard-guide-inline {
+    display: flex;
+  }
+
+  .stock-grid-toolbar .keyboard-guide-trigger {
+    display: none;
+  }
+}
+
+.keyboard-guide-popover {
+  flex-direction: column;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 8px;
 }

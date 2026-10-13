@@ -22,17 +22,43 @@ public class ExecutiveQueryValidator : AbstractValidator<ExecutiveQuery>
 
         RuleFor(x => x).Custom((query, context) =>
         {
-            // A date outside the accepted range is already reported above and cannot build a period.
-            if (!InRange(query.From) || !InRange(query.To))
+            if (ResolvedPeriod.Of(query, clock) is not { } period)
                 return;
 
-            var period = ExecutivePeriod.Create(query.From, query.To, VnTime.ToVnDate(clock.UtcNow));
             if (period.To < period.From)
                 context.AddFailure("to", "Đến ngày phải sau hoặc bằng từ ngày.");
             else if (period.Days > MaxDays)
                 context.AddFailure("to", "Khoảng thời gian tối đa là 3 năm.");
         });
     }
+}
+
+/// A daily series is capped at one year of days; the validator of the plain query is included.
+public class ExecutiveSeriesQueryValidator : AbstractValidator<ExecutiveSeriesQuery>
+{
+    private const int MaxDailyDays = 366;
+
+    public ExecutiveSeriesQueryValidator(IDateTime clock)
+    {
+        Include(new ExecutiveQueryValidator(clock));
+
+        RuleFor(x => x).Custom((query, context) =>
+        {
+            if (query.Granularity == SeriesGranularity.Day
+                && ResolvedPeriod.Of(query, clock) is { } period && period.Days > MaxDailyDays)
+                context.AddFailure("granularity", "Biểu đồ theo ngày tối đa 366 ngày. Hãy chọn theo tuần hoặc tháng.");
+        });
+    }
+}
+
+internal static class ResolvedPeriod
+{
+    /// The period the query resolves to, or null when From or To is outside the accepted range: the date rules
+    /// report it, and such a date cannot build a period.
+    public static ExecutivePeriod? Of(ExecutiveQuery query, IDateTime clock) =>
+        InRange(query.From) && InRange(query.To)
+            ? ExecutivePeriod.Create(query.From, query.To, VnTime.ToVnDate(clock.UtcNow))
+            : null;
 
     private static bool InRange(DateOnly? date) =>
         date is not { } value || (value >= ReportDates.Min && value <= ReportDates.Max);

@@ -69,6 +69,40 @@ public class SalesMetricsService : ISalesMetricsService
         };
     }
 
+    public Task<SalesSeriesDto> GetSeriesAsync(ExecutiveSeriesQuery query, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildSeriesAsync(query, c), ct);
+
+    private async Task<SalesSeriesDto> BuildSeriesAsync(ExecutiveSeriesQuery query, CancellationToken ct)
+    {
+        var today = VnTime.ToVnDate(_clock.UtcNow);
+        var scope = await _scopes.ResolveAsync(query.BranchId, ct);
+        var period = ExecutivePeriod.Create(query.From, query.To, today);
+        var canViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost);
+
+        var vouchers = await LoadVouchersAsync(scope, period.Start, period.End, canViewCost, ct);
+        var totals = vouchers
+            .GroupBy(v => ExecutiveSeries.BucketOf(VnTime.ToVnDate(v.At), query.Granularity))
+            .ToDictionary(g => g.Key, g => (Revenue: g.Sum(v => v.Revenue), Cost: g.Sum(v => v.Cost)));
+
+        return new SalesSeriesDto
+        {
+            Granularity = query.Granularity,
+            Points = ExecutiveSeries.Buckets(period.From, period.To, query.Granularity)
+                .Select(bucket =>
+                {
+                    totals.TryGetValue(bucket, out var total);
+                    return new SalesPointDto
+                    {
+                        Date = bucket,
+                        Revenue = total.Revenue,
+                        Cost = canViewCost ? total.Cost : null,
+                        GrossProfit = canViewCost ? total.Revenue - total.Cost : null,
+                    };
+                })
+                .ToList(),
+        };
+    }
+
     /// The counted vouchers of the scope with VoucherAt in [from, to): Active, not deleted, reason XBH (+) or NTL (−).
     /// Costs are read only when the user may see them.
     private async Task<List<VoucherRow>> LoadVouchersAsync(

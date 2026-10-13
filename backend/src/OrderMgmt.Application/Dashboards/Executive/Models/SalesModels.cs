@@ -22,3 +22,18 @@ public class SalesSummaryDto
     public decimal? PrevMarginPct { get; set; }
     public bool IsProvisional { get; set; }
 }
+
+public class SalesSeriesDto
+{
+    public SeriesGranularity Granularity { get; set; }
+    public List<SalesPointDto> Points { get; set; } = new();
+}
+
+public class SalesPointDto
+{
+    /// Bucket start.
+    public DateOnly Date { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal? Cost { get; set; }
+    public decimal? GrossProfit { get; set; }
+}

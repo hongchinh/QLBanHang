@@ -50,7 +50,7 @@ export function AuthInit({ children }: Props) {
 
   if (!ready) {
     return (
-      <div className="flex h-screen items-center justify-center text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
         Đang tải...
       </div>
     );

@@ -83,6 +83,7 @@ import { useBeforeInstallPrompt } from '@/hooks/useBeforeInstallPrompt';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { PushPermissionPrompt } from '@/components/PushPermissionPrompt';
+import { AppShell } from '@/components/layout/app-shell';
 
 function RouteErrorBoundary({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
@@ -114,14 +115,14 @@ export function App() {
   return (
     <ErrorBoundary>
       <InstallPrompt canShow={canShow} onInstall={install} onDismiss={dismiss} />
-      {!pushDismissed && (
-        <PushPermissionPrompt
-          state={pushState}
-          onEnable={subscribePush}
-          onDismiss={handlePushDismiss}
-        />
-      )}
       <QueryClientProvider client={queryClient}>
+        <AppShell
+          banner={
+            pushDismissed ? null : (
+              <PushPermissionPrompt state={pushState} onEnable={subscribePush} onDismiss={handlePushDismiss} />
+            )
+          }
+        >
         <BrowserRouter>
           <AuthInit>
             <RouteErrorBoundary>
@@ -722,6 +723,7 @@ export function App() {
             </RouteErrorBoundary>
           </AuthInit>
         </BrowserRouter>
+        </AppShell>
         <Toaster />
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>

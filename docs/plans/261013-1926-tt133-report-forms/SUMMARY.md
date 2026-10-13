@@ -100,7 +100,7 @@ The plan also delivers what the forms need and the software lacks: the company p
 
 ## Phases
 
-- [ ] Phase 00 — Branch and failure baseline (S) — `phase-00-baseline.md`
+- [-] Phase 00 — Branch and failure baseline (S) — `phase-00-baseline.md`
 - [ ] Phase 01 — Company profile, amount in words, PDF converter rename and timeout fix (M) — `phase-01-company-profile.md`
 - [ ] Phase 02 — Form builder, export infrastructure, S04a and S05 (L) — `phase-02-form-builder-cash-forms.md`
 - [ ] Phase 03 — Debt scope, ledger fields, S12, debt summary, reconciliation record (L) — `phase-03-debt-forms.md`

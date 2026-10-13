@@ -1,6 +1,6 @@
 # Phase 00 — Branch and failure baseline
 
-**Status:** [ ] pending
+**Status:** [-] in progress
 **Complexity:** S
 
 ## Objective

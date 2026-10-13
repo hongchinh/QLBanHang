@@ -3,6 +3,10 @@ import { format } from 'date-fns';
 import { useCashBook } from '@/features/cash-reports/hooks';
 import type { CashBookGroup, CashBookRow, FundKindFilter } from '@/features/cash-reports/types';
 import { useFunds } from '@/features/funds/hooks';
+import type { Fund } from '@/features/funds/types';
+import { PeriodPresetSelect } from '@/components/period-preset-select/period-preset-select';
+import { Tt133ExportButton } from '@/components/tt133-export/tt133-export-button';
+import { tt133FileBase, type Tt133ExportForm } from '@/features/tt133-export/types';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,6 +24,20 @@ const KIND_OPTIONS: { value: FundKindFilter; label: string }[] = [
   { value: 'Cash', label: 'Tiền mặt' },
   { value: 'Bank', label: 'Ngân hàng' },
 ];
+
+// S04a covers the cash funds and S05 the bank funds; a selected fund narrows it to its own kind.
+function exportForms(kind: FundKindFilter, fundKind: Fund['kind'] | undefined, fundId: string | undefined, from: string, to: string) {
+  const kinds = fundKind === 'Cash' || fundKind === 'Bank' ? [fundKind] : kind === 'All' ? (['Cash', 'Bank'] as const) : [kind];
+  return kinds.map((k): Tt133ExportForm => {
+    const code = k === 'Cash' ? 'S04a-DNN' : 'S05-DNN';
+    return {
+      code,
+      report: 'cash-book',
+      params: fundId ? { kind: k, fundId, from, to } : { kind: k, from, to },
+      fileBase: tt133FileBase(code, from, to),
+    };
+  });
+}
 
 function CodeLink({ row, code }: { row: CashBookRow; code: string | null | undefined }) {
   if (!code) return null;
@@ -129,6 +147,9 @@ export function CashBookPage() {
     error,
   } = useCashBook({ kind, fundId: fundId === ALL ? undefined : fundId, from, to }, { enabled: !rangeError });
 
+  const selectedFundId = fundId === ALL ? undefined : fundId;
+  const forms = exportForms(kind, funds.find((f) => f.id === selectedFundId)?.kind, selectedFundId, from, to);
+
   // A fund of the other kind would be rejected by the server, so a kind change goes back to all funds.
   const changeKind = (value: string) => {
     setKind(value as FundKindFilter);
@@ -137,10 +158,13 @@ export function CashBookPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Sổ quỹ</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-xl font-semibold">Sổ quỹ</h1>
+        <Tt133ExportButton forms={forms} disabled={!!rangeError} />
+      </div>
 
       <Card>
-        <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-4">
+        <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-5">
           <div className="space-y-1">
             <Label htmlFor="cash-book-kind">Loại quỹ</Label>
             <Select value={kind} onValueChange={changeKind}>
@@ -172,6 +196,13 @@ export function CashBookPage() {
               </SelectContent>
             </Select>
           </div>
+          <PeriodPresetSelect
+            id="cash-book-period"
+            onChange={(range) => {
+              setFrom(range.from);
+              setTo(range.to);
+            }}
+          />
           <div className="space-y-1">
             <Label htmlFor="cash-book-from">Từ ngày</Label>
             <Input id="cash-book-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />

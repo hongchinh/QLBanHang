@@ -6,6 +6,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import { CashBookPage } from './cash-book-page';
 import type { CashBookGroup, CashBookParams, CashBookReport } from '@/features/cash-reports/types';
 import type { Fund, FundListParams } from '@/features/funds/types';
+import type { Tt133ExportForm } from '@/features/tt133-export/types';
+import { periodPreset } from '@/lib/period-presets';
 
 const reportState: { data: CashBookReport | undefined } = { data: undefined };
 const useCashBookMock = vi.fn((params: CashBookParams, options?: { enabled?: boolean }) => {
@@ -16,6 +18,20 @@ const useCashBookMock = vi.fn((params: CashBookParams, options?: { enabled?: boo
 vi.mock('@/features/cash-reports/hooks', () => ({
   useCashBook: (params: CashBookParams, options?: { enabled?: boolean }) => useCashBookMock(params, options),
 }));
+
+const exportButtonProps: { forms: Tt133ExportForm[]; disabled?: boolean } = { forms: [] };
+vi.mock('@/components/tt133-export/tt133-export-button', () => ({
+  Tt133ExportButton: (props: { forms: Tt133ExportForm[]; disabled?: boolean }) => {
+    exportButtonProps.forms = props.forms;
+    exportButtonProps.disabled = props.disabled;
+    return (
+      <div data-testid="tt133-export" data-disabled={String(!!props.disabled)}>
+        {props.forms.map((f) => f.code).join(',')}
+      </div>
+    );
+  },
+}));
+vi.mock('@/features/company-profile/hooks', () => ({ useCompanyProfile: () => ({ data: { name: 'Công ty A' } }) }));
 
 const fund = (over: Partial<Fund>): Fund => ({
   id: 'f1', branchId: 'b1', code: 'QTM', name: 'Quỹ tiền mặt', kind: 'Cash', bankName: null, accountNumber: null,
@@ -187,5 +203,87 @@ describe('CashBookPage', () => {
     await user.click(screen.getByRole('combobox', { name: 'Quỹ' }));
     expect(screen.queryByRole('option', { name: 'QTM – Quỹ tiền mặt' })).not.toBeInTheDocument();
     expect(screen.getByRole('option', { name: 'VCB – Vietcombank' })).toBeInTheDocument();
+  });
+
+  describe('TT133 export', () => {
+    const range = (from: string, to: string) => ({ from, to });
+    const setRange = async (user: ReturnType<typeof userEvent.setup>, from: string, to: string) => {
+      await user.clear(screen.getByLabelText('Từ ngày'));
+      await user.type(screen.getByLabelText('Từ ngày'), from);
+      await user.clear(screen.getByLabelText('Đến ngày'));
+      await user.type(screen.getByLabelText('Đến ngày'), to);
+    };
+
+    it('kind All offers S04a and S05 with their parameters and file names', async () => {
+      const user = userEvent.setup();
+      reportState.data = report([cashGroup]);
+      renderPage();
+      await setRange(user, '2026-10-01', '2026-10-31');
+
+      expect(screen.getByTestId('tt133-export')).toHaveTextContent('S04a-DNN,S05-DNN');
+      expect(exportButtonProps.forms).toEqual([
+        {
+          code: 'S04a-DNN',
+          report: 'cash-book',
+          params: { kind: 'Cash', ...range('2026-10-01', '2026-10-31') },
+          fileBase: 'S04a-DNN_20261001_20261031',
+        },
+        {
+          code: 'S05-DNN',
+          report: 'cash-book',
+          params: { kind: 'Bank', ...range('2026-10-01', '2026-10-31') },
+          fileBase: 'S05-DNN_20261001_20261031',
+        },
+      ]);
+    });
+
+    it('kind Tiền mặt offers only S04a and kind Ngân hàng only S05', async () => {
+      const user = userEvent.setup();
+      reportState.data = report([cashGroup]);
+      renderPage();
+
+      await user.click(screen.getByRole('combobox', { name: 'Loại quỹ' }));
+      await user.click(screen.getByRole('option', { name: 'Tiền mặt' }));
+      expect(screen.getByTestId('tt133-export')).toHaveTextContent(/^S04a-DNN$/);
+
+      await user.click(screen.getByRole('combobox', { name: 'Loại quỹ' }));
+      await user.click(screen.getByRole('option', { name: 'Ngân hàng' }));
+      expect(screen.getByTestId('tt133-export')).toHaveTextContent(/^S05-DNN$/);
+    });
+
+    it('a bank fund selected offers only S05 with its fundId', async () => {
+      const user = userEvent.setup();
+      reportState.data = report([bankGroup]);
+      renderPage();
+
+      await user.click(screen.getByRole('combobox', { name: 'Quỹ' }));
+      await user.click(screen.getByRole('option', { name: 'VCB – Vietcombank' }));
+
+      expect(screen.getByTestId('tt133-export')).toHaveTextContent(/^S05-DNN$/);
+      expect(exportButtonProps.forms[0].params).toEqual(expect.objectContaining({ kind: 'Bank', fundId: 'f2' }));
+    });
+
+    it('an invalid range disables the button', async () => {
+      const user = userEvent.setup();
+      reportState.data = report([cashGroup]);
+      renderPage();
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'false');
+
+      await setRange(user, '2026-10-31', '2026-10-01');
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'true');
+    });
+
+    it('the preset Tháng trước sets the previous month', async () => {
+      const user = userEvent.setup();
+      reportState.data = report([cashGroup]);
+      renderPage();
+
+      await user.click(screen.getByRole('combobox', { name: 'Kỳ' }));
+      await user.click(screen.getByRole('option', { name: 'Tháng trước' }));
+
+      const last = periodPreset('lastMonth');
+      expect(screen.getByLabelText('Từ ngày')).toHaveValue(last.from);
+      expect(screen.getByLabelText('Đến ngày')).toHaveValue(last.to);
+    });
   });
 });

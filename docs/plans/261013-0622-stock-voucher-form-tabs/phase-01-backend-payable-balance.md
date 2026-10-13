@@ -1,6 +1,6 @@
 # Phase 01 — Branch, baseline, backend `PayableBalance`
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** S
 
 ## Objective

@@ -169,6 +169,7 @@ public static class DbSeeder
             (Permissions.Cash.Settings, Permissions.CashModule, "Cấu hình tiền & công nợ"),
             (Permissions.CreditLimits.Manage, Permissions.CashModule, "Hạn mức nợ"),
             (Permissions.Reports.Cash, Permissions.ReportModule, "Sổ quỹ"),
+            (Permissions.Dashboard.Executive, Permissions.ReportModule, "Bảng điều hành"),
         };
 
         var inserted = new HashSet<string>();

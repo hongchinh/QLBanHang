@@ -1,15 +1,11 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useCanAccessRoute } from '@/hooks/useCanAccessRoute';
 import type { CashVoucherType } from '@/features/cash-common/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
-import type { StockTotals } from '@/pages/stock-vouchers/utils/compute-stock-line';
-
-const fmt = new Intl.NumberFormat('vi-VN');
 
 export interface AutoCashVoucherLink {
   id: string;
@@ -22,9 +18,8 @@ const AUTO_VOUCHER_LINKS: Record<CashVoucherType, { label: string; basePath: str
   Payment: { label: 'Phiếu chi tự động', basePath: '/payments' },
 };
 
-export interface StockTotalsPanelProps {
+export interface StockVoucherPaymentTabProps {
   type: StockDirection;
-  totals: StockTotals;
   freight: number;
   orderDiscount: number;
   paidAmount: number;
@@ -32,31 +27,38 @@ export interface StockTotalsPanelProps {
   paidAmountDisabled?: boolean;
   // Server message for the paid amount.
   paidAmountError?: string;
+  // Client validation messages of the two amounts above.
+  freightError?: string;
+  orderDiscountError?: string;
   onFreightChange: (value: number) => void;
   onOrderDiscountChange: (value: number) => void;
   onPaidAmountChange: (value: number) => void;
   // Stock-in only (section-02 #2).
   onApplyVatToAll?: (rate: number) => void;
-  // The automatic receipt/payment of the paid amount (P20), shown under the totals.
+  // The automatic receipt/payment of the paid amount (P20).
   autoVoucher?: AutoCashVoucherLink;
   readOnly: boolean;
+  // The fund and due-date fields the page renders.
+  children?: ReactNode;
 }
 
-export function StockTotalsPanel({
+export function StockVoucherPaymentTab({
   type,
-  totals,
   freight,
   orderDiscount,
   paidAmount,
   paidAmountDisabled = false,
   paidAmountError,
+  freightError,
+  orderDiscountError,
   onFreightChange,
   onOrderDiscountChange,
   onPaidAmountChange,
   onApplyVatToAll,
   autoVoucher,
   readOnly,
-}: StockTotalsPanelProps) {
+  children,
+}: StockVoucherPaymentTabProps) {
   const canAccess = useCanAccessRoute();
   const [vatToAll, setVatToAll] = useState('');
   const vatToAllRate = Number(vatToAll);
@@ -66,39 +68,25 @@ export function StockTotalsPanel({
   const canApplyVat = vatToAll.trim() !== '' && Number.isFinite(vatToAllRate) && vatToAllRate >= 0 && vatToAllRate <= 100;
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-center border-b p-1 px-3 h-9 bg-blue-50">
-        <CardTitle>Tổng cộng</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-1.5 px-3.5 pt-2.5 pb-3">
-        <TotalRow label="Tiền hàng" testId="stock-totals-goods" value={totals.goodsAmount} />
-        <TotalRow label="Tổng chiết khấu" testId="stock-totals-discount" value={totals.discountTotal} />
-        <TotalRow label="Tổng VAT" testId="stock-totals-vat" value={totals.vatTotal} />
-
-        <EditableRow id="stock-freight" label="Phí vận chuyển" value={freight} onChange={onFreightChange} disabled={readOnly} />
+    <div className="grid gap-x-8 gap-y-1.5 p-3 md:grid-cols-2">
+      <div className="space-y-1.5">
+        <EditableRow id="stock-freight" label="Phí vận chuyển" value={freight} onChange={onFreightChange} disabled={readOnly} error={freightError} />
         <EditableRow
           id="stock-order-discount"
           label="CK cả đơn"
           value={orderDiscount}
           onChange={onOrderDiscountChange}
           disabled={readOnly}
+          error={orderDiscountError}
         />
-
-        <div className="flex items-baseline justify-between border-t-2 border-foreground/70 pt-2 mt-1">
-          <span className="text-sm font-bold">Tổng thanh toán</span>
-          <span className="text-base font-extrabold tabular-nums" data-testid="stock-totals-total">
-            {fmt.format(totals.total)}
-          </span>
-        </div>
-
         <EditableRow
           id="stock-paid-amount"
           label="Số tiền thanh toán"
           value={paidAmount}
           onChange={onPaidAmountChange}
           disabled={readOnly || paidAmountDisabled}
+          error={paidAmountError}
         />
-        {paidAmountError && <p className="text-right text-xs text-destructive">{paidAmountError}</p>}
 
         {autoVoucher && (
           <div className="text-right text-sm">
@@ -144,18 +132,8 @@ export function StockTotalsPanel({
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function TotalRow({ label, value, testId }: { label: string; value: number; testId: string }) {
-  return (
-    <div className="flex items-center justify-between">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-semibold tabular-nums" data-testid={testId}>
-        {fmt.format(value)}
-      </span>
+      </div>
+      <div className="space-y-1.5">{children}</div>
     </div>
   );
 }
@@ -166,34 +144,44 @@ interface EditableRowProps {
   value: number;
   onChange: (value: number) => void;
   disabled: boolean;
+  error?: string;
 }
 
 // Same editing behaviour as the quotation totals panel: formatted when idle, raw while focused.
-function EditableRow({ id, label, value, onChange, disabled }: EditableRowProps) {
+function EditableRow({ id, label, value, onChange, disabled, error }: EditableRowProps) {
   const [draft, setDraft] = useState<string | null>(null);
   return (
-    <div className="flex items-center justify-between gap-2">
-      <label htmlFor={id} className="text-sm text-muted-foreground">
-        {label}
-      </label>
-      <Input
-        id={id}
-        type="text"
-        inputMode="decimal"
-        autoComplete="off"
-        disabled={disabled}
-        value={!disabled && draft !== null ? draft : formatMoneyForDisplay(value)}
-        onFocus={(e) => {
-          setDraft(String(value ?? ''));
-          e.currentTarget.select();
-        }}
-        onBlur={() => setDraft(null)}
-        onChange={(e) => {
-          setDraft(e.target.value);
-          onChange(parseMoneyInput(e.target.value) ?? 0);
-        }}
-        className="h-[26px] w-[120px] px-1.5 text-right tabular-nums"
-      />
-    </div>
+    <>
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor={id} className="text-sm text-muted-foreground">
+          {label}
+        </label>
+        <Input
+          id={id}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          disabled={disabled}
+          value={!disabled && draft !== null ? draft : formatMoneyForDisplay(value)}
+          onFocus={(e) => {
+            setDraft(String(value ?? ''));
+            e.currentTarget.select();
+          }}
+          onBlur={() => setDraft(null)}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            onChange(parseMoneyInput(e.target.value) ?? 0);
+          }}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className="h-[26px] w-[120px] px-1.5 text-right tabular-nums"
+        />
+      </div>
+      {error && (
+        <p id={`${id}-error`} className="text-right text-xs text-destructive">
+          {error}
+        </p>
+      )}
+    </>
   );
 }

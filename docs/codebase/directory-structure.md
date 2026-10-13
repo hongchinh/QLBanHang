@@ -187,7 +187,7 @@ frontend/src/
 │   ├── reports/
 │   ├── settings/                # also branches (period lock, opening date), inventory and cash settings, numbering, recalc
 │   ├── stock-reasons/
-│   ├── stock-vouchers/          # /stock-in and /stock-out list + form, customer debt panel
+│   ├── stock-vouchers/          # /stock-in and /stock-out list + form (main fields, tabs, line grid, totals bar, partner debt strip)
 │   ├── suppliers/
 │   └── warehouses/
 ├── hooks/                       # useDocumentActions (shared save flow of the four document forms), route access hooks

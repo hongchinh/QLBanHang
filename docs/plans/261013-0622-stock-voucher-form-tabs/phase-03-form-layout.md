@@ -1,6 +1,6 @@
 # Phase 03 — Form layout T2: main fields, tabs, totals bar, debt strip, full height
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective
@@ -30,10 +30,11 @@ The grid itself does not change in this phase (Phase 04).
 
 ## Files
 
-- `frontend/src/pages/stock-vouchers/components/stock-totals-panel.tsx` → `stock-voucher-payment-tab.tsx` (git mv + modify)
-- `frontend/src/pages/stock-vouchers/components/stock-totals-panel.test.tsx` → `stock-voucher-payment-tab.test.tsx` (git mv + modify)
-- `frontend/src/pages/stock-vouchers/components/customer-debt-panel.tsx` → `partner-debt-strip.tsx` (git mv + rewrite)
-- `frontend/src/pages/stock-vouchers/components/customer-debt-panel.test.tsx` → `partner-debt-strip.test.tsx` (git mv + rewrite)
+- `frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx` (new, adapted from `stock-totals-panel.tsx`, which stays until Task 3.6)
+- `frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.test.tsx` (new, adapted from `stock-totals-panel.test.tsx`)
+- `frontend/src/pages/stock-vouchers/components/partner-debt-strip.tsx` (new, adapted from `customer-debt-panel.tsx`, which stays until Task 3.6)
+- `frontend/src/pages/stock-vouchers/components/partner-debt-strip.test.tsx` (new, adapted from `customer-debt-panel.test.tsx`)
+- `frontend/src/pages/stock-vouchers/components/stock-totals-panel.tsx`, `stock-totals-panel.test.tsx`, `customer-debt-panel.tsx`, `customer-debt-panel.test.tsx` (untouched until Task 3.6, which `git rm`s all four)
 - `frontend/src/pages/stock-vouchers/components/stock-totals-bar.tsx` (new)
 - `frontend/src/pages/stock-vouchers/components/stock-totals-bar.test.tsx` (new)
 - `frontend/src/pages/stock-vouchers/components/stock-voucher-tabs.tsx` (new)
@@ -43,18 +44,14 @@ The grid itself does not change in this phase (Phase 04).
 - `frontend/src/pages/stock-vouchers/stock-voucher-form-page.test.tsx` (modify)
 - `frontend/src/styles/form-inline.css` (modify)
 
+The Thông tin khác tab stays inline in the page (no `stock-voucher-other-tab.tsx`; decision D10 in SUMMARY.md). Tasks 3.1 and 3.3 create new files by copying code and leave the old panels in place, so the page and its test file keep compiling and loading until Task 3.6 swaps the imports and `git rm`s the four old files.
+
 ## Tasks
 
-### Task 3.1 — Payment tab (from `StockTotalsPanel`)
+### Task 3.1 — Payment tab (new file, adapted from `StockTotalsPanel`)
 
-1. **Move the files first:**
-   ```bash
-   git mv frontend/src/pages/stock-vouchers/components/stock-totals-panel.tsx frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx
-   git mv frontend/src/pages/stock-vouchers/components/stock-totals-panel.test.tsx frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.test.tsx
-   ```
-   Then **write the failing test.** Rewrite the test to import `StockVoucherPaymentTab` from `./stock-voucher-payment-tab`, and change `renderPanel` to render `<StockVoucherPaymentTab {...props}><label htmlFor="x">Quỹ</label><select id="x" /></StockVoucherPaymentTab>` with props without `totals`:
-   - Keep the handler assertions for "Phí vận chuyển", "CK cả đơn" and "Số tiền thanh toán", and keep the VAT-to-all test.
-   - Remove the `stock-totals-*` assertions, which move to the bar.
+1. **Write the failing test.** Create `stock-voucher-payment-tab.test.tsx` by copying `stock-totals-panel.test.tsx` (leave the original untouched). Rewrite the copy to import `StockVoucherPaymentTab` from `./stock-voucher-payment-tab`, and change `renderPanel` to render `<StockVoucherPaymentTab {...props}><label htmlFor="x">Quỹ</label><select id="x" /></StockVoucherPaymentTab>` with props without `totals`:
+   - Rename the first test to `'calls handlers for freight, order discount and paid amount'` and remove its `stock-totals-goods/discount/vat/total` assertions (they move to the bar). Keep its handler assertions for "Phí vận chuyển", "CK cả đơn" and "Số tiền thanh toán", and keep the VAT-to-all test.
    - Add:
      ```ts
      it('renders the fund / due date slot and no totals', () => {
@@ -64,16 +61,21 @@ The grid itself does not change in this phase (Phase 04).
        expect(screen.queryByText('Tổng cộng')).not.toBeInTheDocument();
      });
      ```
-2. **Run:** `npx vitest run src/pages/stock-vouchers/components/stock-voucher-payment-tab.test.tsx` → FAIL, `StockVoucherPaymentTab` is not exported.
-3. **Minimal implementation** in `stock-voucher-payment-tab.tsx`:
+2. **Run:** `npx vitest run src/pages/stock-vouchers/components/stock-voucher-payment-tab.test.tsx` → FAIL, module not found (`./stock-voucher-payment-tab` does not exist yet).
+3. **Minimal implementation.** Create `stock-voucher-payment-tab.tsx` by copying `stock-totals-panel.tsx` (leave the original untouched), then:
    - Rename the component to `StockVoucherPaymentTab` and the props interface to `StockVoucherPaymentTabProps`. Remove `totals` from the props and add `children?: React.ReactNode` (the fund and due-date fields the page renders).
    - Drop the `Card`/`CardHeader` wrapper, `TotalRow` and the "Tổng thanh toán" block.
    - Render a two-column grid: `<div className="grid gap-x-8 gap-y-1.5 p-3 md:grid-cols-2">`. The left column holds the three `EditableRow`s, the paid-amount error, the auto voucher link and the VAT-to-all row. The right column is `<div className="space-y-1.5">{children}</div>`.
    - Keep `EditableRow` unchanged. It keeps the ids `stock-freight`, `stock-order-discount` and `stock-paid-amount`.
 4. **Run:** same command → PASS.
-5. **Commit:** `git commit -m "refactor(frontend): stock totals panel becomes the payment tab"` (stage both moved files).
+5. **Commit:**
+   ```bash
+   git add frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx \
+     frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.test.tsx
+   git commit -m "feat(frontend): stock voucher payment tab"
+   ```
 
-The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` fails until Task 3.6. Run only the targeted test here, and do not push between 3.1 and 3.6.
+The page still imports `StockTotalsPanel`, which is untouched, so typecheck and the page tests keep passing.
 
 ### Task 3.2 — Totals bar
 
@@ -92,7 +94,8 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
 
        expect(screen.getByTestId('stock-totals-lines')).toHaveTextContent('15 dòng');
        expect(screen.getByTestId('stock-totals-goods')).toHaveTextContent('1.000.000');
-       expect(screen.getByTestId('stock-totals-discount')).toHaveTextContent('70.000');
+       // "CK" is the line discounts only; the order discount is its own "CK đơn" item (no double count).
+       expect(screen.getByTestId('stock-totals-discount')).toHaveTextContent('50.000');
        expect(screen.getByTestId('stock-totals-vat')).toHaveTextContent('93.000');
        expect(screen.getByTestId('stock-totals-total')).toHaveTextContent('1.053.000');
 
@@ -130,7 +133,7 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
          <div className="flex flex-wrap items-center gap-x-5 gap-y-1 text-muted-foreground">
            <span data-testid="stock-totals-lines">{lineCount} dòng</span>
            <Amount label="Tiền hàng" value={totals.goodsAmount} testId="stock-totals-goods" />
-           <Amount label="CK" value={totals.discountTotal} testId="stock-totals-discount" />
+           <Amount label="CK" value={totals.lineDiscountTotal} testId="stock-totals-discount" />
            <Amount label="VAT" value={totals.vatTotal} testId="stock-totals-vat" />
            <JumpAmount label="Phí VC" value={freight} onClick={() => onJump('freight')} />
            <JumpAmount label="CK đơn" value={orderDiscount} onClick={() => onJump('orderDiscount')} />
@@ -160,16 +163,16 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
    }
    ```
 4. **Run:** same command → PASS.
-5. **Commit:** `git commit -m "feat(frontend): stock voucher totals bar"`.
-
-### Task 3.3 — Partner debt strip (from `CustomerDebtPanel`)
-
-1. **Move the files:**
+5. **Commit:**
    ```bash
-   git mv frontend/src/pages/stock-vouchers/components/customer-debt-panel.tsx frontend/src/pages/stock-vouchers/components/partner-debt-strip.tsx
-   git mv frontend/src/pages/stock-vouchers/components/customer-debt-panel.test.tsx frontend/src/pages/stock-vouchers/components/partner-debt-strip.test.tsx
+   git add frontend/src/pages/stock-vouchers/components/stock-totals-bar.tsx \
+     frontend/src/pages/stock-vouchers/components/stock-totals-bar.test.tsx
+   git commit -m "feat(frontend): stock voucher totals bar"
    ```
-   **Write the failing test.** Rewrite `partner-debt-strip.test.tsx`. Keep the mocks, `render`, `setPermissions` and `result` helpers. Add `payableBalance: 500_000` to `summary()`. Then add these cases:
+
+### Task 3.3 — Partner debt strip (new file, adapted from `CustomerDebtPanel`)
+
+1. **Write the failing test.** Create `partner-debt-strip.test.tsx` by copying `customer-debt-panel.test.tsx` (leave the original untouched). In the copy keep the mocks, `render`, `setPermissions` and `result` helpers, delete the old `customer-debt-*` cases (their testids and the "Xem nợ quá hạn" text no longer exist) and replace them with the cases below. Add `payableBalance: 500_000` to `summary()`. The old overdue-link and unlimited cases are ported here, not dropped:
    ```ts
    const base = { partnerId: P1, partnerLabel: 'KH01 — An Phát', cancelled: false };
 
@@ -191,6 +194,40 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
        'href', `/reports/debt-overdue?side=Receivable&partnerId=${P1}`,
      );
      expect(screen.getByTestId('partner-debt-credit-days')).toHaveTextContent('30');
+     expect(screen.getByText(/Còn được nợ sau phiếu/)).toBeInTheDocument();
+   });
+
+   it('the overdue link opens in a new tab', () => {
+     setPermissions(['reports.debt']);
+     summaryMock.mockReturnValue(result(summary()));
+     render(<PartnerDebtStrip {...base} current={{ effect: 'None', total: 0, paid: 0 }} />);
+     const link = screen.getByRole('link', { name: 'Xem' });
+     expect(link).toHaveAttribute('target', '_blank');
+     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+   });
+
+   it('hides the overdue link when nothing is overdue', () => {
+     setPermissions(['reports.debt']);
+     summaryMock.mockReturnValue(result(summary({ overdueAmount: 0 })));
+     render(<PartnerDebtStrip {...base} current={{ effect: 'None', total: 0, paid: 0 }} />);
+     expect(screen.queryByRole('link', { name: 'Xem' })).not.toBeInTheDocument();
+   });
+
+   it('hides the overdue link without reports.debt', () => {
+     setPermissions(['debt.partner_summary']);
+     summaryMock.mockReturnValue(result(summary()));
+     render(<PartnerDebtStrip {...base} current={{ effect: 'None', total: 0, paid: 0 }} />);
+     expect(screen.queryByRole('link', { name: 'Xem' })).not.toBeInTheDocument();
+   });
+
+   it('a supplier stock-in shows the payable after the voucher and leaves the receivable alone', () => {
+     summaryMock.mockReturnValue(result(summary({ payableBalance: 500_000, creditLimit: null, available: null })));
+     render(<PartnerDebtStrip {...base} current={{ effect: 'PayableIncrease', total: 3_000_000, paid: 1_000_000 }} />);
+     expect(screen.getByTestId('partner-debt-payable-after')).toHaveTextContent('2.500.000');
+     expect(screen.queryByTestId('partner-debt-receivable-after')).not.toBeInTheDocument();
+     // The receivable did not change, so the label stays "Còn được nợ" (no "sau phiếu").
+     expect(screen.queryByText(/Còn được nợ sau phiếu/)).not.toBeInTheDocument();
+     expect(screen.getByText(/Còn được nợ/)).toBeInTheDocument();
    });
 
    it('an edited voucher subtracts its saved impact', () => {
@@ -224,8 +261,8 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
    });
    ```
    `render` wraps the strip in `MemoryRouter`. `toBeEmptyDOMElement` on the router's container still works, because `MemoryRouter` renders no DOM of its own.
-2. **Run:** `npx vitest run src/pages/stock-vouchers/components/partner-debt-strip.test.tsx` → FAIL, `PartnerDebtStrip` is not exported.
-3. **Minimal implementation.** Rewrite `partner-debt-strip.tsx`:
+2. **Run:** `npx vitest run src/pages/stock-vouchers/components/partner-debt-strip.test.tsx` → FAIL, module not found (`./partner-debt-strip` does not exist yet).
+3. **Minimal implementation.** Create `partner-debt-strip.tsx` (the old `customer-debt-panel.tsx` stays untouched):
    ```tsx
    import { Link } from 'react-router-dom';
    import { usePartnerDebtSummary } from '@/features/debt/hooks';
@@ -313,7 +350,12 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
    ```
    Check the selector name for permissions against the deleted panel: it used `useAuthStore((s) => s.hasPermission('reports.debt'))`. Keep the same call.
 4. **Run:** same command → PASS.
-5. **Commit:** `git commit -m "feat(frontend): partner debt strip with after-voucher balances"`.
+5. **Commit:**
+   ```bash
+   git add frontend/src/pages/stock-vouchers/components/partner-debt-strip.tsx \
+     frontend/src/pages/stock-vouchers/components/partner-debt-strip.test.tsx
+   git commit -m "feat(frontend): partner debt strip with after-voucher balances"
+   ```
 
 ### Task 3.4 — Tabs shell
 
@@ -427,7 +469,12 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
    }
    ```
 4. **Run:** same command → PASS.
-5. **Commit:** `git commit -m "feat(frontend): stock voucher tabs shell"`.
+5. **Commit:**
+   ```bash
+   git add frontend/src/pages/stock-vouchers/components/stock-voucher-tabs.tsx \
+     frontend/src/pages/stock-vouchers/components/stock-voucher-tabs.test.tsx
+   git commit -m "feat(frontend): stock voucher tabs shell"
+   ```
 
 ### Task 3.5 — Main fields
 
@@ -450,7 +497,6 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
      expect(document.activeElement).toBe(byId('stock-partner-address'));
      fireEvent.keyDown(byId('stock-partner-address'), { key: 'Enter' });
      await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-0')));
-     expect(screen.getByRole('tab', { name: /Hàng hóa/ })).toHaveAttribute('data-state', 'active');
      expect(createMock).not.toHaveBeenCalled();
    });
 
@@ -462,8 +508,24 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
      expect(event.defaultPrevented).toBe(true);
    });
    ```
+   Add a test for the partner dropdown, which must keep Enter for picking while its list is open (`PartnerAutocomplete` calls `preventDefault()` on Enter only while open):
+   ```ts
+   it('Enter picks a partner from the open list and then moves on to the partner name', async () => {
+     partnerResults.data = [customer];
+     renderPage('In');
+     fireEvent.change(byId('stock-partner'), { target: { value: 'KH' } });
+     await screen.findByRole('listbox');
+     fireEvent.keyDown(byId('stock-partner'), { key: 'Enter' });
+     await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
+     await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
+     fireEvent.keyDown(byId('stock-partner'), { key: 'Enter' });
+     expect(document.activeElement).toBe(byId('stock-partner-name'));
+   });
+   ```
+   Known limitation (accepted): with the list open but empty (a code that matches nothing), `PartnerAutocomplete` still swallows Enter, so the user leaves with Tab or Esc. Do not change the component in this phase.
+
    Add `createEvent` to the `@testing-library/react` import.
-2. **Run:** `npx vitest run src/pages/stock-vouchers/stock-voucher-form-page.test.tsx -t "Enter"` → FAIL (focus stays on `stock-voucher-at`; `defaultPrevented` is false).
+2. **Run:** `npx vitest run src/pages/stock-vouchers/stock-voucher-form-page.test.tsx -t "Enter"` → FAIL on the assertions: focus stays on `stock-voucher-at`, `defaultPrevented` is false and the second Enter does not reach `stock-partner-name`. The page test file loads, because the old panels are still in place.
 3. **Minimal implementation.** Create `stock-voucher-main-fields.tsx`. Move the JSX of rows 1–2 and the address row out of the page into `StockVoucherMainFields`:
    ```tsx
    export interface StockVoucherMainFieldsProps {
@@ -492,8 +554,9 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
      'stock-partner', 'stock-partner-name', 'stock-partner-address',
    ];
    ```
-   Layout: `<fieldset disabled={readOnly} className="m-0 min-w-0 space-y-[6px] rounded-md border bg-card px-3 py-2" onKeyDown={handleKeyDown}>` with two rows:
-   - `<div className="form-inline-grid form-cols-stock-main-1">`: Ngày (`stock-voucher-at`, `type="datetime-local"`, registered), Lý do (`stock-reason`), Kho (`stock-warehouse`), HTTT (`stock-payment-method`). Then `FieldError` for `voucherAt ?? warehouseId ?? reasonId ?? paymentMethodId`.
+   Layout: put `{/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Enter walks the main fields. */}` directly above the fieldset (the rule errors on a keyboard listener on a non-interactive element, and Task 3.6 requires lint at or below baseline):
+   `<fieldset disabled={readOnly} className="m-0 min-w-0 shrink-0 space-y-[6px] rounded-md border bg-card px-3 py-2" onKeyDown={handleKeyDown}>` with two rows:
+   - `<div className="form-inline-grid form-cols-stock-main-1">`: Ngày (`stock-voucher-at`, `type="datetime-local"`, registered), Lý do (`stock-reason`), Kho (`stock-warehouse`), HTTT (`stock-payment-method`). Each control is wrapped with its own `FieldError` (`voucherAt`, `reasonId`, `warehouseId`, `paymentMethodId`, one message per control, no `??` chain), so two missing fields show two messages.
    - `<div className="form-inline-grid form-cols-stock-main-2">`: "Mã đối tượng" (`PartnerAutocomplete inputId="stock-partner"`), "Tên đối tượng" (`stock-partner-name`), "Địa chỉ" (`stock-partner-address`).
 
    The select markup, `SELECT_CLASS` and `FieldError` are moved unchanged; export `FieldError` and `SELECT_CLASS` from this file so the page reuses them. The "Số phiếu" input is removed.
@@ -501,7 +564,8 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
    Key handler:
    ```ts
    function handleKeyDown(e: React.KeyboardEvent<HTMLElement>) {
-     if (e.defaultPrevented || e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey) return;
+     // `isComposing`: the Enter that commits a Telex/VNI composition must not jump to the next field.
+     if (e.defaultPrevented || e.key !== 'Enter' || e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
      const at = MAIN_FIELD_IDS.indexOf((e.target as HTMLElement).id);
      if (at === -1) return;
      e.preventDefault();
@@ -517,7 +581,7 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
    In `frontend/src/styles/form-inline.css`, add after `.form-cols-3`:
    ```css
    .form-inline-grid.form-cols-stock-main-1 {
-     --qldh-form-grid-columns: 90px minmax(170px, 1fr) 90px minmax(180px, 1.2fr) 50px minmax(140px, 1fr) 50px minmax(150px, 1fr);
+     --qldh-form-grid-columns: 90px minmax(150px, 1fr) 90px minmax(150px, 1.2fr) 50px minmax(140px, 1fr) 50px minmax(150px, 1fr);
    }
    .form-inline-grid.form-cols-stock-main-2 {
      --qldh-form-grid-columns: 90px minmax(170px, 1fr) 90px minmax(220px, 1.6fr) 50px minmax(260px, 2.6fr);
@@ -529,11 +593,12 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
      }
    }
    ```
+   The row 1 minimums are 50px lower than the first draft so the row still fits at a 1280px viewport with the sidebar expanded and a scrollbar. Also add `.form-inline-grid.form-cols-stock-main-1` and `.form-inline-grid.form-cols-stock-main-2` to the existing `@media (max-width: 1023px)` selector list (the one that sets `grid-template-columns: 90px 1fr`), so that below 1024px they collapse to a single column pair and do not overflow a narrow window.
+
    Wire it in the page (Task 3.6 completes the page). For this task, render `<StockVoucherMainFields … onEnterGrid={enterGrid} />` in place of the old card rows, and add to the page:
    ```ts
    // Enter from the main area: the first line without a product, or a new one.
    function enterGrid() {
-     setActiveTab('lines');
      const lines = form.getValues('lines');
      let idx = lines.findIndex((l) => !l.productId);
      if (idx === -1) {
@@ -543,17 +608,32 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
      setTimeout(() => document.getElementById(`stock-line-product-code-${idx}`)?.focus(), 0);
    }
    ```
-   Import `createEmptyStockLine` from `@/features/stock-vouchers/payload`. The `activeTab` state is introduced in Task 3.6; for this task add `const [activeTab, setActiveTab] = useState<StockVoucherTab>('lines');` now.
+   Import `createEmptyStockLine` from `@/features/stock-vouchers/payload`. There are no tabs yet in this task, so `enterGrid` does not switch tabs; Task 3.6 adds `setActiveTab('lines')` as its first line.
 
    In `handleFormKeyDown`, after the Ctrl+S branch, add (D7):
    ```ts
    const tag = (e.target as HTMLElement).tagName;
    if (e.key === 'Enter' && (tag === 'INPUT' || tag === 'SELECT')) e.preventDefault();
    ```
-4. **Run:** `npx vitest run src/pages/stock-vouchers/stock-voucher-form-page.test.tsx -t "Enter"` → PASS.
-5. **Commit** together with Task 3.6, because the page does not compile until 3.6 removes the old panel imports.
+   The page still renders `StockTotalsPanel` and `CustomerDebtPanel` in this task, so it compiles and the rest of the page tests keep passing.
+4. **Run:**
+   ```bash
+   npx vitest run src/pages/stock-vouchers/stock-voucher-form-page.test.tsx
+   npm run typecheck
+   ```
+   Expected: PASS (the new Enter tests and every existing page test).
+5. **Commit:**
+   ```bash
+   git add frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx \
+     frontend/src/pages/stock-vouchers/stock-voucher-form-page.test.tsx \
+     frontend/src/pages/stock-vouchers/components/stock-voucher-main-fields.tsx \
+     frontend/src/styles/form-inline.css
+   git commit -m "feat(frontend): stock voucher main fields with Enter navigation"
+   ```
 
 ### Task 3.6 — Page wiring: tabs, bar, strip, error tab, Alt+n, full height
+
+The old panels are still imported by the page at this point, so the page test file loads and every RED below is a real assertion failure.
 
 1. **Write the failing tests.** Add to `stock-voucher-form-page.test.tsx`:
    ```ts
@@ -569,6 +649,15 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
      expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active');
    });
 
+   // Hiding the panel of the focused cell would drop the focus on <body> and kill Ctrl+S / Alt+n.
+   it('Alt+3 from a grid cell keeps the focus inside the page', async () => {
+     renderPage('In');
+     byId('stock-line-product-code-0').focus();
+     fireEvent.keyDown(byId('stock-line-product-code-0'), { key: '3', altKey: true });
+     await waitFor(() => expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active'));
+     await waitFor(() => expect(document.activeElement).toBe(tab(/Thanh toán/)));
+   });
+
    it('clicking Phí VC on the totals bar focuses the freight input in the payment tab', async () => {
      renderPage('In');
      fireEvent.click(screen.getByRole('button', { name: /Phí VC/ }));
@@ -576,25 +665,47 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
      await waitFor(() => expect(document.activeElement).toBe(byId('stock-freight')));
    });
 
-   it('a server error on the fund switches to the payment tab and marks it', async () => {
-     createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION_ERROR', { fundId: ['Quỹ không hợp lệ'] }));
+   it('a server error on the fund switches to the payment tab, marks it and focuses the fund', async () => {
+     createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', { fundId: ['Quỹ không hợp lệ'] }));
      renderPage('In');
      await fillPerUnitLine(3);
      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
      await waitFor(() => expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active'));
      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+     await waitFor(() => expect(document.activeElement).toBe(byId('stock-fund')));
    });
 
-   it('saving without lines switches back to the lines tab', async () => {
+   it('saving an incomplete line from another tab switches back to the lines and focuses the cell', async () => {
      renderPage('In');
      fireEvent.keyDown(byId('stock-voucher-at'), { key: '2', altKey: true });
      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
      await waitFor(() => expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active'));
      expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
+     await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-0')));
+     expect(createMock).not.toHaveBeenCalled();
+   });
+
+   it('a cancelled voucher keeps the fund and due date disabled', () => {
+     routeParams.id = V1;
+     voucherState.data = voucher({ status: 'Cancelled', canEdit: false, reasonId: R_OUT, reasonDebtEffect: 'ReceivableIncrease' });
+     renderPage('Out');
+     expect(byId('stock-due-date')).toBeDisabled();
+   });
+   ```
+   Add one more test for the client-side focus of a field that is not registered with react-hook-form (the payment amounts are plain inputs that call `form.setValue`). `parseMoneyInput('-5')` gives -5 and the schema rejects it with `freight: min(0)`:
+   ```ts
+   it('a client error on Phí VC switches to the payment tab and focuses the input', async () => {
+     renderPage('In');
+     await fillPerUnitLine(3);
+     fireEvent.keyDown(byId('stock-voucher-at'), { key: '3', altKey: true });
+     fireEvent.change(byId('stock-freight'), { target: { value: '-5' } });
+     fireEvent.keyDown(byId('stock-voucher-at'), { key: '1', altKey: true });
+     fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+     await waitFor(() => expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active'));
+     await waitFor(() => expect(document.activeElement).toBe(byId('stock-freight')));
      expect(createMock).not.toHaveBeenCalled();
    });
    ```
-   Check the existing tests `'server field errors show under their fields'` and `'server due date error shows under the due date'`. They show which `apiError` code and status the page maps to field errors. Use the same code in the fund test above.
 
    **Replace** `'debt panel only for stock-out sale with permission'` with:
    ```ts
@@ -642,65 +753,129 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
      expect(partnerSummaryMock).not.toHaveBeenCalled();
    });
    ```
-   Keep the default `partnerSummaryMock.mockReturnValue` in `beforeEach`, adding `payableBalance: 0`.
-2. **Run:** `npx vitest run src/pages/stock-vouchers/stock-voucher-form-page.test.tsx` → FAIL on the new tests (no tabs/bar/strip), plus a compile error for the removed `StockTotalsPanel` / `CustomerDebtPanel` imports.
+   Keep the default `partnerSummaryMock.mockReturnValue` in `beforeEach`, adding `payableBalance: 0`. The debt-strip test is the only existing page test that is replaced. No other existing page test is edited: a failure elsewhere is a page regression, not a test to change.
+2. **Run:** `npx vitest run src/pages/stock-vouchers/stock-voucher-form-page.test.tsx` → FAIL on the new tests (no `role="tab"` elements, no bar, no strip). The old panels are still imported, so the file loads.
 3. **Minimal implementation** in `stock-voucher-form-page.tsx`:
-   - **Imports:** drop `StockTotalsPanel`, `CustomerDebtPanel`, `Card*` (if unused) and `Label`/`Input` (if unused). Add `StockVoucherMainFields`, `FieldError`, `SELECT_CLASS`, `StockVoucherTabs`, `StockVoucherPaymentTab`, `StockTotalsBar` / `TotalsJumpField`, `PartnerDebtStrip`, `firstErrorTab`, `errorTabs` and `StockVoucherTab`.
-   - **State:** `const [activeTab, setActiveTab] = useState<StockVoucherTab>('lines');` (from Task 3.5).
+   - **Imports.** Drop `StockTotalsPanel`, `CustomerDebtPanel`, `PartnerAutocomplete` (it moved into the main fields) and `Card*` (if unused). `Label` and `Input` stay in use by the other tab and the payment tab. **Delete the local `const SELECT_CLASS` and `function FieldError`** from the page and import them from `stock-voucher-main-fields` (otherwise TS reports a duplicate identifier). Add `savedImpactOf` (from `@/pages/stock-vouchers/utils/debt-after-voucher`), `StockVoucherMainFields`, `FieldError`, `SELECT_CLASS`, `StockVoucherTabs`, `StockVoucherPaymentTab`, `StockTotalsBar` / `TotalsJumpField`, `PartnerDebtStrip`, `firstErrorTab`, `errorTabs`, `tabOfField`, `StockVoucherTab`, and the `FieldErrors` type from `react-hook-form`.
+   - **State:** `const [activeTab, setActiveTab] = useState<StockVoucherTab>('lines');`. `enterGrid` (Task 3.5) now starts with `setActiveTab('lines');`.
    - **Debt strip gate** (D9): replace `debtPanelPartnerId` with
      ```ts
      const debtStripPartnerId = canSeePartnerDebt ? selectedPartner?.id : undefined;
-     const savedImpact =
-       voucher && status === 'Active' && voucher.partnerId === selectedPartner?.id
-         ? { effect: voucher.reasonDebtEffect, total: voucher.total, paid: voucher.paidAmount }
-         : undefined;
+     // Stored impact of the voucher being edited (Active, same partner): Phase 02 `savedImpactOf`.
+     const savedImpact = savedImpactOf(voucher, selectedPartner?.id);
      ```
-   - **Server errors:** at the end of `applyServerErrors`, before `return allMapped;`:
-     ```ts
-     const tab = firstErrorTab(Object.keys(details));
-     if (tab) setActiveTab(tab);
-     ```
-   - **Client errors:** in `submitWithIntent`, pass an invalid handler to `form.handleSubmit(onValid, onInvalid)`:
-     ```ts
-     (errors) => {
-       const tab = firstErrorTab(Object.keys(errors));
-       if (!tab) return;
-       setActiveTab(tab);
-       const key = Object.keys(errors).find((k) => k !== 'lines' && tabOfField(k) === tab);
-       if (key) setTimeout(() => form.setFocus(key as FieldPath<StockVoucherFormValues>), 0);
-     },
-     ```
-     Line cells are not registered inputs, so `setFocus` does not apply to them; their `CellError` marks them. Import `tabOfField`.
-   - **Alt+n** in `handleFormKeyDown`, before the Enter guard:
+   - **One focus helper for client and server errors (D2, D3).** Module constants and helpers in the page:
      ```ts
      const ALT_TABS: Record<string, StockVoucherTab> = { '1': 'lines', '2': 'other', '3': 'payment', '4': 'history' };
+
+     const JUMP_IDS: Record<TotalsJumpField, string> = {
+       freight: 'stock-freight',
+       orderDiscount: 'stock-order-discount',
+       paidAmount: 'stock-paid-amount',
+     };
+
+     // Form key -> element id for the fields that live in a tab.
+     const FIELD_FOCUS_IDS: Record<string, string> = {
+       partnerTaxCode: 'stock-partner-tax-code',
+       handlerName: 'stock-handler-name',
+       note: 'stock-voucher-note',
+       freight: 'stock-freight',
+       orderDiscount: 'stock-order-discount',
+       paidAmount: 'stock-paid-amount',
+       fundId: 'stock-fund',
+       dueDate: 'stock-due-date',
+     };
+     // Line form field -> cell id part; cell ids are `stock-line-<cell>-<row>` (`cellId` in stock-line-grid.tsx).
+     const LINE_CELL_IDS: Record<string, string> = {
+       productId: 'product-code',
+       warehouseId: 'warehouse',
+       sheetCount: 'sheet-count',
+       length: 'length',
+       width: 'width',
+       thickness: 'thickness',
+       quantity: 'quantity',
+       unitPrice: 'unit-price',
+       discountRate: 'discount-rate',
+       discountAmount: 'discount-amount',
+       vatRate: 'vat-rate',
+       note: 'note',
+     };
+
+     // Flattens react-hook-form errors into keys (`note`, `lines.2.width`); a non-array `lines` error (min 1 line) stays `lines`.
+     function errorKeysOf(errors: FieldErrors<StockVoucherFormValues>): string[] {
+       const keys: string[] = [];
+       for (const [key, value] of Object.entries(errors)) {
+         if (key === 'lines' && Array.isArray(value)) {
+           value.forEach((row, i) => {
+             for (const field of Object.keys(row ?? {})) keys.push(`lines.${i}.${field}`);
+           });
+         } else {
+           keys.push(key);
+         }
+       }
+       return keys;
+     }
+
+     // Accepts form keys and server keys (`lines[3].width`).
+     function focusIdOf(key: string): string | undefined {
+       const line = /^lines(?:\.|\[)(\d+)(?:\]\.|\.)(\w+)$/.exec(key);
+       if (line) {
+         const cell = LINE_CELL_IDS[line[2]];
+         return cell ? `stock-line-${cell}-${line[1]}` : undefined;
+       }
+       return key === 'lines' ? 'stock-line-product-code-0' : FIELD_FOCUS_IDS[key];
+     }
+     ```
+     Inside the component:
+     ```ts
+     // Switches to the first tab with an error and focuses its first erroring field.
+     function focusFirstError(keys: string[]) {
+       const tab = firstErrorTab(keys);
+       if (!tab) return;
+       setActiveTab(tab);
+       const id = keys.filter((k) => tabOfField(k) === tab).map(focusIdOf).find((v) => !!v);
+       // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
+       if (id) setTimeout(() => document.getElementById(id)?.focus(), 0);
+     }
+     ```
+   - **Server errors:** in `applyServerErrors` collect the keys that were really passed to `setError` (`mappedKeys.push(key)` in both mapped branches) and, before `return allMapped;`, call `focusFirstError(mappedKeys);`. Unmapped keys fall back to the toast and must not switch tabs.
+   - **Client errors:** in `submitWithIntent`, pass an invalid handler to `form.handleSubmit(onValid, onInvalid)`: `(errors) => focusFirstError(errorKeysOf(errors))`. The `errorTabs` prop of the tabs is `errorTabs(errorKeysOf(errors))`.
+   - **Alt+n** in `handleFormKeyDown`, before the Enter guard:
+     ```ts
      const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[e.key] : undefined;
      if (altTab && (altTab !== 'history' || isEdit)) {
        e.preventDefault();
        setActiveTab(altTab);
+       // The focused cell may sit in a panel that is about to be hidden; keep the focus in the form so Ctrl+S / Alt+n keep working.
+       setTimeout(() => document.querySelector<HTMLElement>('[role="tab"][data-state="active"]')?.focus(), 0);
        return;
      }
      ```
-     (`ALT_TABS` is a module constant.)
    - **Jump from the bar:**
      ```ts
-     const JUMP_IDS: Record<TotalsJumpField, string> = { freight: 'stock-freight', orderDiscount: 'stock-order-discount', paidAmount: 'stock-paid-amount' };
      function jumpTo(field: TotalsJumpField) {
        setActiveTab('payment');
        setTimeout(() => document.getElementById(JUMP_IDS[field])?.focus(), 0);
      }
      ```
-   - **Layout.** The page root becomes `<div className="flex h-full min-h-0 flex-col gap-2">`. The sticky title bar keeps its markup plus `shrink-0`, and the save buttons get `title="Ctrl+S"`. The read-only banner gets `shrink-0`. The form becomes `className="flex min-h-0 flex-1 flex-col gap-2"` and contains, in order:
-     1. `<StockVoucherMainFields … />` (`shrink-0`).
-     2. `<StockVoucherTabs value={activeTab} onValueChange={setActiveTab} lineCount={watchedLines.filter((l) => !!l.productId).length} errorTabs={errorTabs(Object.keys(errors))} lines={…} other={…} payment={…} history={isEdit ? <ActivityHistory … /> : undefined} />`:
-        - `lines` = the existing `<StockLineGrid …/>` plus the `linesRootMessage` paragraph.
-        - `other` = a `fieldset disabled={readOnly}` with a `form-inline-grid form-cols-2 p-3` holding MST (`stock-partner-tax-code`) and `labels.handlerLabel` (`stock-handler-name`), and a `form-inline-grid px-3 pb-3` with Ghi chú (`stock-voucher-note`). The markup is moved from the old card.
-        - `payment` = `<StockVoucherPaymentTab …same props as the old panel minus totals…>` with the moved Quỹ select (`stock-fund`, only when `fundShown`), Hạn thanh toán (`stock-due-date`, only when `dueDateShown`, label followed by `({creditDays} ngày)` when `creditDays != null`) and the fund/due-date `FieldError`. Wrap them in `<div className="form-inline-grid">` rows.
+   - **Layout.** The page root becomes `<div className="flex h-full min-h-[560px] flex-col gap-2">`. The `min-h-[560px]` floor makes a short window scroll the page instead of squeezing the grid under the sticky bar; keep `min-h-0` on the form and on the tabs root, and tune the value in the browser (Task 5.3 checks it). The sticky title bar keeps its markup plus `shrink-0`, and the save buttons get `title="Ctrl+S"`. The read-only banner gets `shrink-0`. The form becomes `className="flex min-h-0 flex-1 flex-col gap-2"` and contains, in order:
+     1. `<StockVoucherMainFields … />` (its fieldset already has `shrink-0`).
+     2. `<StockVoucherTabs value={activeTab} onValueChange={setActiveTab} lineCount={watchedLines.filter((l) => !!l.productId).length} errorTabs={errorTabs(errorKeysOf(errors))} lines={…} other={…} payment={…} history={isEdit ? <ActivityHistory … /> : undefined} />`:
+        - `lines` = the existing `<StockLineGrid …/>` plus the `linesRootMessage` paragraph, which gets `shrink-0` so the grid box cannot squeeze it out (Phase 04 Task 4.2).
+        - `other` = a `fieldset disabled={readOnly}` with a `form-inline-grid form-cols-2 p-3` holding MST (`stock-partner-tax-code`) and `labels.handlerLabel` (`stock-handler-name`), and a `form-inline-grid px-3 pb-3` with Ghi chú (`stock-voucher-note`). The markup is moved from the old card; this tab stays inline in the page (D10).
+        - `payment` = `<StockVoucherPaymentTab …same props as the old panel minus totals…>`. Its children are a `<fieldset disabled={readOnly} className="m-0 min-w-0 space-y-[6px] border-0 p-0">` (the payment tab disables its own rows through its `readOnly` prop, but the children slot is not covered by that) holding the moved Quỹ select (`stock-fund`, only when `fundShown`), Hạn thanh toán (`stock-due-date`, only when `dueDateShown`) and the fund/due-date `FieldError`s, each in a `<div className="form-inline-grid">` row. The Hạn thanh toán label keeps the text `Hạn thanh toán` (the 90px label track cannot hold a suffix); when `creditDays != null` render `<span className="text-xs text-muted-foreground">({creditDays} ngày)</span>` after the date input, with the input and the span in one `<div className="flex items-center gap-2">`.
      3. `<div className="sticky bottom-0 z-20 shrink-0 rounded-md border bg-card shadow-[0_-2px_6px_rgba(0,0,0,0.06)]">` containing:
         - `<StockTotalsBar totals={computed.totals} freight={freight} orderDiscount={orderDiscount} paidAmount={effectivePaid} lineCount={…same count…} onJump={jumpTo} />`
         - `{debtStripPartnerId && selectedPartner && <PartnerDebtStrip partnerId={debtStripPartnerId} partnerLabel={`${selectedPartner.code} — ${selectedPartner.name}`} current={{ effect: selectedReason?.debtEffect ?? 'None', total, paid: effectivePaid }} saved={savedImpact} cancelled={status === 'Cancelled'} />}`
    - Remove the separate "Lịch sử" card below the form, and the "Thông tin chung" card and its grid wrapper. The dialogs stay outside the form.
-   - **Existing tests.** Update any that relied on the removed card titles or the old panel testids (`customer-debt-*` → `partner-debt-*`). Assertions on values and payloads must not change. `'edit shows the activity history'` should still pass, because the history panel is force-mounted. If `getByText('Lịch sử')` now matches both the tab label and a heading, use `getByRole('tab', { name: /Lịch sử/ })`.
+   - **Delete the old panels** (nothing imports them any more):
+     ```bash
+     git rm frontend/src/pages/stock-vouchers/components/stock-totals-panel.tsx \
+       frontend/src/pages/stock-vouchers/components/stock-totals-panel.test.tsx \
+       frontend/src/pages/stock-vouchers/components/customer-debt-panel.tsx \
+       frontend/src/pages/stock-vouchers/components/customer-debt-panel.test.tsx
+     ```
+   - **Existing tests.** Only the debt-strip test above changes. If `getByText('Lịch sử')` now matches both the tab label and something else, use `getByRole('tab', { name: /Lịch sử/ })`.
 4. **Run:**
    ```bash
    npx vitest run src/pages/stock-vouchers
@@ -708,13 +883,22 @@ The page still imports `StockTotalsPanel` at this point, so `npm run typecheck` 
    npm run lint
    ```
    Expected: PASS; lint counts ≤ baseline.
-5. **Commit** (Tasks 3.5 + 3.6):
+5. **Commit:**
    ```bash
    git add frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx \
-     frontend/src/pages/stock-vouchers/stock-voucher-form-page.test.tsx \
-     frontend/src/pages/stock-vouchers/components/stock-voucher-main-fields.tsx \
-     frontend/src/styles/form-inline.css
+     frontend/src/pages/stock-vouchers/stock-voucher-form-page.test.tsx
    git commit -m "feat(frontend): stock voucher form T2 layout with tabs, totals bar and debt strip"
+   ```
+   The four `git rm` deletions are already staged, so this commit holds the two page files and the four deleted panel files.
+
+### Task 3.7 — Close the phase
+
+1. Set `**Status:** [x] complete` at the top of this file, and tick `- [x] Phase 03` in `docs/plans/261013-0622-stock-voucher-form-tabs/SUMMARY.md`.
+2. **Commit:**
+   ```bash
+   git add docs/plans/261013-0622-stock-voucher-form-tabs/phase-03-form-layout.md \
+     docs/plans/261013-0622-stock-voucher-form-tabs/SUMMARY.md
+   git commit -m "chore(plan): stock voucher form phase 03 complete"
    ```
 
 ## Verification
@@ -726,8 +910,9 @@ From `frontend/`:
 - `npm run typecheck` → PASS
 - `npm run lint` → counts ≤ `BASELINE.md`
 - `npm run build && git checkout -- tsconfig.app.tsbuildinfo tsconfig.node.tsbuildinfo` → PASS
+- `git status` shows no leftover `stock-totals-panel.*` / `customer-debt-panel.*` files.
 - Quick look (`npm run dev`):
-  - the new stock-out page fills the window;
+  - the new stock-out page fills the window, and at a window height of about 500px it scrolls instead of letting the bar cover grid rows;
   - Enter walks the main fields into the grid;
   - the tabs switch;
   - the bar and the strip show.
@@ -738,4 +923,5 @@ From `frontend/`:
 - The page shows the main fields, 4 tabs (Lịch sử only when editing), the totals bar and the debt strip, as in mockup-02.
 - Enter never submits; Alt+1…4, the error dots, auto-switching to the tab with an error, and the bar jumps all work and are tested.
 - All element ids used by the existing tests are unchanged, except the removed `stock-voucher-code`.
+- Every task commit stages explicit paths, and the phase closes with the Task 3.7 commit.
 - A team chat summary is posted.

@@ -1,0 +1,142 @@
+/* stock-line-grid.css — stock voucher grid on top of the shared accounting-grid styles:
+ * the grid scrolls inside its tab, the header row and the #/Mã/Tên and Số còn lại/delete columns stick. */
+.stock-grid-wrap {
+  overflow: auto;
+  /* The rows must not size the page: the lines panel (min-h-[280px]) is the minimum that propagates upward. */
+  contain: size;
+}
+
+.stock-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  height: 36px; /* fixed so scroll-margin-top below is exact */
+}
+
+.stock-grid .sticky-left,
+.stock-grid .sticky-right {
+  position: sticky;
+  z-index: 1;
+}
+
+.stock-grid thead th.sticky-left,
+.stock-grid thead th.sticky-right {
+  z-index: 4;
+}
+
+/* Sticky cells need an opaque background (the hover tint of the shared grid is translucent). */
+.stock-grid td.sticky-left,
+.stock-grid td.sticky-right {
+  background: hsl(var(--card));
+}
+
+.stock-grid tr:hover td.sticky-left,
+.stock-grid tr:hover td.sticky-right {
+  background: hsl(var(--accent));
+}
+
+/* border-collapse drops borders on sticky cells while scrolling: draw the edges as shadows. */
+.stock-grid .sticky-left {
+  box-shadow: inset -1px 0 0 hsl(var(--border));
+}
+
+.stock-grid .sticky-right {
+  box-shadow: inset 1px 0 0 hsl(var(--border));
+}
+
+/* The pinned # cell keeps its muted tint (same specificity as .accounting-grid td.row-no, so restate it). */
+.stock-grid td.row-no.sticky-left {
+  background: hsl(var(--muted));
+}
+
+/* Disabled cells: the shared grid hard-codes a light grey that glares in dark mode. */
+.stock-grid .cell-input:disabled {
+  background: hsl(var(--muted));
+}
+
+/* A focused cell scrolls into view clear of the sticky header and of the pinned columns.
+ * Cells inside a pinned column are always visible, so only the scrolling cells get side margins. */
+.stock-grid .cell-input {
+  scroll-margin-top: 36px;
+}
+
+.stock-grid td:not(.sticky-left):not(.sticky-right) .cell-input {
+  scroll-margin-left: var(--stock-grid-left, 0px);
+  scroll-margin-right: var(--stock-grid-right, 0px);
+}
+
+/* Toolbar: the shared .line-items-toolbar / .line-items-footer wrappers no longer exist, so restate the
+ * button and key-cap look under .stock-grid-toolbar. */
+.stock-grid-toolbar .lib-btn {
+  height: 30px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 4px;
+  background: hsl(var(--card));
+  padding: 0 10px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  color: hsl(var(--foreground));
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: border-color .15s, color .15s, background .15s;
+}
+
+.stock-grid-toolbar .lib-btn:hover,
+.stock-grid-toolbar .lib-btn:focus-visible {
+  border-color: hsl(var(--ring));
+  color: hsl(var(--primary));
+  background: hsl(var(--accent) / 0.5);
+  outline: none;
+}
+
+.stock-grid-toolbar .lib-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.keyboard-guide {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+}
+
+.keyboard-guide .kbd {
+  min-width: 18px;
+  padding: 1px 5px;
+  border: 1px solid hsl(var(--border));
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  font-size: 11px;
+  font-family: Consolas, monospace;
+  margin: 0 2px;
+}
+
+/* The full guide needs a 2xl screen (1536px); below that it lives in the "Phím tắt" popover so the toolbar
+ * stays on one line at 1366px (one more grid row). */
+.stock-grid-toolbar .keyboard-guide-inline {
+  display: none;
+}
+
+@media (min-width: 1536px) {
+  .stock-grid-toolbar .keyboard-guide-inline {
+    display: flex;
+  }
+
+  .stock-grid-toolbar .keyboard-guide-trigger {
+    display: none;
+  }
+}
+
+.keyboard-guide-popover {
+  flex-direction: column;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 8px;
+}

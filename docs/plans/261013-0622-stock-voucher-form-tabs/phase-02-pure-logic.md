@@ -1,6 +1,6 @@
 # Phase 02 — Pure logic: line navigation, grid prefs, debt after voucher, error tabs
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective
@@ -9,7 +9,7 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
 
 1. **`line-navigation.ts`**: focus fields, the per-pricing-mode Enter path, previous/next stop and the ↑/↓ target. `isFieldDisabled` and `LINE_FOCUS_FIELDS` move here from the grid.
 2. **`use-stock-grid-prefs.ts`**: optional columns, default prefs, a validated localStorage read/write per user and direction, the React hook, and `forcedColumns`.
-3. **`debt-after-voucher.ts`**: the partner's receivable/payable after this voucher (brainstorm §3).
+3. **`debt-after-voucher.ts`**: the partner's receivable/payable after this voucher (brainstorm §3), and `savedImpactOf`, the stored impact of the voucher being edited.
 4. **`voucher-tabs.ts`**: the form-field → tab mapping for error dots and for switching to the first tab with an error.
 
 ## Files
@@ -18,7 +18,7 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
 - `frontend/src/pages/stock-vouchers/utils/line-navigation.test.ts` (new)
 - `frontend/src/pages/stock-vouchers/utils/use-stock-grid-prefs.ts` (new)
 - `frontend/src/pages/stock-vouchers/utils/use-stock-grid-prefs.test.ts` (new)
-- `frontend/src/pages/stock-vouchers/utils/debt-after-voucher.ts` (new)
+- `frontend/src/pages/stock-vouchers/utils/debt-after-voucher.ts` (new; `debtAfterVoucher` and `savedImpactOf`)
 - `frontend/src/pages/stock-vouchers/utils/debt-after-voucher.test.ts` (new)
 - `frontend/src/pages/stock-vouchers/utils/voucher-tabs.ts` (new)
 - `frontend/src/pages/stock-vouchers/utils/voucher-tabs.test.ts` (new)
@@ -178,7 +178,13 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
    ```
    In `stock-line-grid.tsx`, delete the local `LINE_FOCUS_FIELDS`, `LineFocusField` and `isFieldDisabled`, and import them from `@/pages/stock-vouchers/utils/line-navigation`. Grid behavior is unchanged.
 4. **Run tests to verify they pass:** `npx vitest run src/pages/stock-vouchers/utils/line-navigation.test.ts src/pages/stock-vouchers/components/stock-line-grid.test.tsx` → PASS.
-5. **Commit:** `git add` the two new files and `stock-line-grid.tsx`; `git commit -m "feat(frontend): per-pricing-mode enter path helpers"`.
+5. **Commit:**
+   ```bash
+   git add frontend/src/pages/stock-vouchers/utils/line-navigation.ts \
+     frontend/src/pages/stock-vouchers/utils/line-navigation.test.ts \
+     frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx
+   git commit -m "feat(frontend): per-pricing-mode enter path helpers"
+   ```
 
 ### Task 2.2 — `use-stock-grid-prefs.ts`
 
@@ -203,7 +209,7 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
      });
 
      it('keys by user and direction', () => {
-       expect(stockGridPrefsKey('u1', 'Out')).toBe('qldh.stock-grid-prefs.u1.Out');
+       expect(stockGridPrefsKey('u1', 'Out')).toBe('qldh:stock-grid-prefs:u1:Out');
        localStorage.setItem(
          stockGridPrefsKey('u1', 'Out'),
          JSON.stringify({ version: 1, hiddenColumns: ['note'], enterStops: {} }),
@@ -235,6 +241,16 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
        expect(prefs.enterStops.PerSquareMeter).toEqual(DEFAULT_STOCK_GRID_PREFS.enterStops.PerSquareMeter);
      });
 
+     it('puts stored stops in column order and falls back to the defaults for a non-array hiddenColumns', () => {
+       localStorage.setItem(
+         stockGridPrefsKey('u1', 'In'),
+         JSON.stringify({ version: 1, hiddenColumns: 'x', enterStops: { PerSquareMeter: ['unit-price', 'sheet-count'] } }),
+       );
+       const prefs = readStockGridPrefs('u1', 'In');
+       expect(prefs.enterStops.PerSquareMeter).toEqual(['sheet-count', 'unit-price']);
+       expect(prefs.hiddenColumns).toEqual(DEFAULT_STOCK_GRID_PREFS.hiddenColumns);
+     });
+
      it('survives a throwing localStorage', () => {
        const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
          throw new Error('blocked');
@@ -263,6 +279,27 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
        expect(result.current.prefs).toEqual(DEFAULT_STOCK_GRID_PREFS);
        expect(localStorage.getItem(stockGridPrefsKey('u1', 'In'))).toBeNull();
      });
+
+     it('inserts a toggled stop and a re-shown column in column order, not at the end', () => {
+       const { result } = renderHook(() => useStockGridPrefs('u1', 'In'));
+       act(() => result.current.toggleEnterStop('PerUnit', 'warehouse'));
+       expect(result.current.prefs.enterStops.PerUnit).toEqual(['warehouse', 'quantity', 'unit-price']);
+       // Show Kho, then hide it again: the stored list keeps the column order of OPTIONAL_COLUMNS.
+       act(() => result.current.toggleColumn('warehouse'));
+       act(() => result.current.toggleColumn('warehouse'));
+       expect(result.current.prefs.hiddenColumns).toEqual(['warehouse', 'discount-amount', 'vat-amount', 'note']);
+     });
+
+     it('keeps working when localStorage cannot be written', () => {
+       const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+         throw new Error('quota');
+       });
+       const { result } = renderHook(() => useStockGridPrefs('u1', 'In'));
+       expect(() => act(() => result.current.toggleColumn('note'))).not.toThrow();
+       // The change still applies for this page.
+       expect(result.current.prefs.hiddenColumns).not.toContain('note');
+       spy.mockRestore();
+     });
    });
 
    describe('forcedColumns', () => {
@@ -270,8 +307,16 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
        const lines = [{ warehouseId: 'w1' }, { warehouseId: 'w2' }, { warehouseId: '' }];
        expect([...forcedColumns(lines, 'w1', undefined)]).toEqual(['warehouse']);
        expect([...forcedColumns([{ warehouseId: 'w1' }], 'w1', undefined)]).toEqual([]);
+       // A line without a warehouse yet is not "another warehouse".
+       expect([...forcedColumns([{ warehouseId: '' }], 'w1', undefined)]).toEqual([]);
        const errors = [undefined, { note: { message: 'x' }, discountAmount: { message: 'y' }, quantity: { message: 'z' } }];
        expect([...forcedColumns([{ warehouseId: 'w1' }], 'w1', errors)].sort()).toEqual(['discount-amount', 'note']);
+     });
+
+     it('ignores an array-level error, which react-hook-form gives as an object, not an array', () => {
+       // Empty grid submitted: zod `min(1)` sets errors.lines to { root: ... } or { message, type }.
+       expect([...forcedColumns([], 'w1', { root: { message: 'x' } })]).toEqual([]);
+       expect([...forcedColumns([], 'w1', { message: 'x', type: 'too_small' })]).toEqual([]);
      });
    });
    ```
@@ -313,7 +358,8 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
    };
 
    export function stockGridPrefsKey(userId: string, type: StockDirection): string {
-     return `qldh.stock-grid-prefs.${userId}.${type}`;
+     // Colon style, like `qldh:col-sizes:<table>` in lib/use-column-sizing-persist.ts.
+     return `qldh:stock-grid-prefs:${userId}:${type}`;
    }
 
    function cleanStops(mode: PricingMode, value: unknown): EnterStopField[] {
@@ -399,29 +445,38 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
    export function forcedColumns(
      lines: readonly { warehouseId?: string }[],
      headerWarehouseId: string,
-     lineErrors: readonly (Record<string, unknown> | undefined)[] | undefined,
+     // `form.formState.errors.lines`: an array of per-line errors, but an object when the array itself is
+     // rejected (for example no line), so it is checked here instead of trusting the type.
+     lineErrors: unknown,
    ): Set<OptionalColumn> {
      const forced = new Set<OptionalColumn>();
      if (lines.some((l) => !!l.warehouseId && l.warehouseId !== headerWarehouseId)) forced.add('warehouse');
-     for (const lineError of lineErrors ?? []) {
-       for (const key of Object.keys(lineError ?? {})) {
-         const column = ERROR_COLUMNS[key];
-         if (column) forced.add(column);
+     if (Array.isArray(lineErrors)) {
+       for (const lineError of lineErrors as (Record<string, unknown> | undefined)[]) {
+         for (const key of Object.keys(lineError ?? {})) {
+           const column = ERROR_COLUMNS[key];
+           if (column) forced.add(column);
+         }
        }
      }
      return forced;
    }
    ```
-   `readStockGridPrefs` returns `DEFAULT_STOCK_GRID_PREFS` itself only when nothing valid is stored. The hook never mutates `prefs`; it always builds new arrays.
+   `readStockGridPrefs` returns `DEFAULT_STOCK_GRID_PREFS` itself only when nothing valid is stored. The hook never mutates `prefs`; it always builds new arrays. Invalid entries inside a valid list are dropped and the rest is kept (see the test "falls back per part"); a whole part of the wrong type falls back to its default. This refines the brainstorm's "that part uses the defaults".
 4. **Run tests to verify they pass:** `npx vitest run src/pages/stock-vouchers/utils/use-stock-grid-prefs.test.ts` → PASS.
-5. **Commit:** `git commit -m "feat(frontend): per-user stock grid preferences"` (stage the two files).
+5. **Commit:**
+   ```bash
+   git add frontend/src/pages/stock-vouchers/utils/use-stock-grid-prefs.ts \
+     frontend/src/pages/stock-vouchers/utils/use-stock-grid-prefs.test.ts
+   git commit -m "feat(frontend): per-user stock grid preferences"
+   ```
 
 ### Task 2.3 — `debt-after-voucher.ts`
 
 1. **Write the failing test** in `debt-after-voucher.test.ts`:
    ```ts
    import { describe, expect, it } from 'vitest';
-   import { debtAfterVoucher } from './debt-after-voucher';
+   import { debtAfterVoucher, savedImpactOf } from './debt-after-voucher';
 
    const summary = { receivableBalance: 7_000_000, payableBalance: 500_000, creditLimit: 10_000_000 };
 
@@ -461,9 +516,49 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
        expect(none.receivableChanged).toBe(true);
      });
 
+     it('an edited purchase subtracts the saved payable impact, including its paid part', () => {
+       const saved = { effect: 'PayableIncrease' as const, total: 3_000_000, paid: 1_000_000 };
+       const r = debtAfterVoucher(summary, { effect: 'PayableIncrease', total: 4_000_000, paid: 1_000_000 }, saved);
+       // 500.000 + 3.000.000 (new net) - 2.000.000 (saved net)
+       expect(r.payableAfter).toBe(1_500_000);
+       expect(r.payableChanged).toBe(true);
+       // Reason changed to one without debt: the saved payable impact goes away and the side still counts as changed.
+       const none = debtAfterVoucher(summary, { effect: 'None', total: 0, paid: 0 }, saved);
+       expect(none.payableAfter).toBe(-1_500_000);
+       expect(none.payableChanged).toBe(true);
+     });
+
+     it('a saved paid amount reduces the saved impact that is taken back', () => {
+       const saved = { effect: 'ReceivableIncrease' as const, total: 4_000_000, paid: 1_000_000 };
+       // Saved net 3.000.000 is taken out of 7.000.000 when the reason loses its debt effect.
+       expect(debtAfterVoucher(summary, { effect: 'None', total: 0, paid: 0 }, saved).receivableAfter).toBe(4_000_000);
+     });
+
      it('no credit limit gives no available amount', () => {
        const r = debtAfterVoucher({ ...summary, creditLimit: null }, { effect: 'ReceivableIncrease', total: 1, paid: 0 });
        expect(r.availableAfter).toBeNull();
+     });
+   });
+
+   describe('savedImpactOf', () => {
+     const voucher = {
+       status: 'Active',
+       partnerId: 'p1',
+       reasonDebtEffect: 'ReceivableIncrease',
+       total: 4_000_000,
+       paidAmount: 500_000,
+     } as const;
+
+     it('gives the stored impact of an Active voucher whose partner is still selected', () => {
+       expect(savedImpactOf(voucher, 'p1')).toEqual({ effect: 'ReceivableIncrease', total: 4_000_000, paid: 500_000 });
+     });
+
+     it('gives nothing for a new voucher, another partner, a cancelled voucher or no partner', () => {
+       expect(savedImpactOf(undefined, 'p1')).toBeUndefined();
+       // Partner changed while editing: the other partner's balance never held this voucher.
+       expect(savedImpactOf(voucher, 'p2')).toBeUndefined();
+       expect(savedImpactOf({ ...voucher, status: 'Cancelled' }, 'p1')).toBeUndefined();
+       expect(savedImpactOf(voucher, undefined)).toBeUndefined();
      });
    });
    ```
@@ -522,9 +617,34 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
        payableChanged: touchesPayable(current.effect) || touchesPayable(saved?.effect),
      };
    }
+
+   interface SavedVoucher {
+     status: string;
+     partnerId?: string | null;
+     reasonDebtEffect: DebtEffect;
+     total: number;
+     paidAmount: number;
+   }
+
+   // The impact the server balance already holds: only an Active voucher counts, and only for its own partner.
+   export function savedImpactOf(
+     voucher: SavedVoucher | undefined,
+     selectedPartnerId: string | undefined,
+   ): VoucherDebtImpact | undefined {
+     if (!voucher || voucher.status !== 'Active' || !selectedPartnerId || voucher.partnerId !== selectedPartnerId) {
+       return undefined;
+     }
+     return { effect: voucher.reasonDebtEffect, total: voucher.total, paid: voucher.paidAmount };
+   }
    ```
+   The form page (Phase 03 Task 3.6) calls `savedImpactOf(voucher, selectedPartner?.id)` instead of an inline condition.
 4. **Run tests to verify they pass:** same command → PASS.
-5. **Commit:** `git commit -m "feat(frontend): partner debt after the voucher"`.
+5. **Commit:**
+   ```bash
+   git add frontend/src/pages/stock-vouchers/utils/debt-after-voucher.ts \
+     frontend/src/pages/stock-vouchers/utils/debt-after-voucher.test.ts
+   git commit -m "feat(frontend): partner debt after the voucher"
+   ```
 
 ### Task 2.4 — `voucher-tabs.ts`
 
@@ -598,7 +718,23 @@ Write the four logic units that the UI phases consume, each unit-tested in isola
    }
    ```
 4. **Run tests to verify they pass:** same command → PASS.
-5. **Commit:** `git commit -m "feat(frontend): stock voucher field to tab mapping"`.
+5. **Commit:**
+   ```bash
+   git add frontend/src/pages/stock-vouchers/utils/voucher-tabs.ts \
+     frontend/src/pages/stock-vouchers/utils/voucher-tabs.test.ts
+   git commit -m "feat(frontend): stock voucher field to tab mapping"
+   ```
+
+### Task 2.5 — Close the phase
+
+1. Run the Verification commands below. All must pass.
+2. In this file, change `**Status:** [ ] pending` to `**Status:** [x] complete`. In `SUMMARY.md`, tick `- [x] Phase 02`.
+3. Commit:
+   ```bash
+   git add docs/plans/261013-0622-stock-voucher-form-tabs/phase-02-pure-logic.md \
+     docs/plans/261013-0622-stock-voucher-form-tabs/SUMMARY.md
+   git commit -m "chore(plan): stock voucher form phase 02 complete"
+   ```
 
 ## Verification
 
@@ -610,7 +746,8 @@ From `frontend/`:
 
 ## Exit Criteria
 
-- The four utils exist with their tests green.
+- The four utils exist with their tests green (including `forcedColumns` with a non-array `lineErrors`, the throwing `setItem`, and `savedImpactOf`).
 - `stock-line-grid.tsx` imports `LINE_FOCUS_FIELDS`, `LineFocusField` and `isFieldDisabled` from `line-navigation.ts`, with no behavior change.
 - No visible UI change.
+- The phase-complete commit exists (Task 2.5).
 - A team chat summary is posted.

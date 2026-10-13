@@ -2,13 +2,16 @@ using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.CashDebt.Debt.Models;
 
-/// Debt panel of the stock-out form (P6): the partner's receivable position in the working branch.
+/// Debt line of the stock in/out form (P6): the partner's receivable and payable position in the working branch.
 public sealed class PartnerDebtSummaryDto
 {
     public Guid PartnerId { get; set; }
 
     /// Σ Increase − Σ Decrease of the receivable side, all dates, working branch.
     public decimal ReceivableBalance { get; set; }
+
+    /// Σ Increase − Σ Decrease of the payable side, all dates, working branch.
+    public decimal PayableBalance { get; set; }
 
     public decimal? CreditLimit { get; set; }
 

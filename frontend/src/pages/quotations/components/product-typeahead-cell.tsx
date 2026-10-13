@@ -17,6 +17,8 @@ interface Props {
   inputId?: string;
   /** ID của input cần focus ngay sau khi commit. */
   nextFocusId?: string;
+  /** Mở danh sách gợi ý khi ô nhận focus. Mặc định true (báo giá giữ nguyên). */
+  openOnFocus?: boolean;
 }
 
 const PRICING_LABEL: Record<ProductSuggestion['pricingMode'], string> = {
@@ -36,6 +38,7 @@ export function ProductTypeaheadCell({
   variant = 'default',
   inputId,
   nextFocusId,
+  openOnFocus = true,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
@@ -136,7 +139,7 @@ export function ProductTypeaheadCell({
     value,
     onFocus: () => {
       syncDropdownRect();
-      setOpen(true);
+      if (openOnFocus) setOpen(true);
     },
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange(e.target.value);

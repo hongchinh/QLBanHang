@@ -495,6 +495,30 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(focused()).toBe('stock-line-quantity-0'));
   });
 
+  it('Ctrl+Delete on a middle or last line keeps the column, on the next line or else the previous one', async () => {
+    const { values } = renderGrid({
+      lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' }), line({ _uiKey: 'c', productCode: 'C' })],
+    });
+    fireEvent.keyDown(byId('stock-line-quantity-1'), { key: 'Delete', ctrlKey: true });
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['A', 'C']));
+    await waitFor(() => expect(focused()).toBe('stock-line-quantity-1'));
+    // The last line: there is no next line, so focus goes to the previous one.
+    byId('stock-line-product-code-0').focus();
+    fireEvent.keyDown(byId('stock-line-quantity-1'), { key: 'Delete', ctrlKey: true });
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['A']));
+    await waitFor(() => expect(focused()).toBe('stock-line-quantity-0'));
+  });
+
+  it('Ctrl+Delete does nothing on a read-only grid', async () => {
+    const { values } = renderGrid({
+      lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' })],
+      readOnly: true,
+    });
+    fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 'Delete', ctrlKey: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(values().lines.map((l) => l.productCode)).toEqual(['A', 'B']);
+  });
+
   it('the keyboard guide lists the new keys', () => {
     renderGrid({ lines: [line()] });
     const guide = document.querySelector('.keyboard-guide')!;

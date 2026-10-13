@@ -54,7 +54,7 @@ The scope is being expanded (approved 2026-10-06) to replace the stock voucher w
   - Biên bản đối chiếu: the partner's receivable and payable ledgers of the period with the net balance, on screen (its print form is one of the TT133 report forms below).
   - The stock-out customer debt panel links to the Nợ quá hạn report (new tab, filtered to the customer) when the customer is overdue and the user holds `reports.debt` (B2: that report is the overdue warning list; there is no dashboard widget or save-time warning).
   - The documents, aging and by-employee totals equal the Số dư công nợ closing balance (B4).
-- **TT133 report forms** (implemented; goes live after Round 3 and after the accountant's sign-off). Design: [TT133 report forms brainstorm](../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md); plan: [TT133 report forms plan](../plans/261013-1926-tt133-report-forms/SUMMARY.md); rules: [Mẫu biểu TT133](#mẫu-biểu-tt133):
+- **TT133 report forms** (implemented; goes live after Round 3 and after the accountant's sign-off). Design: [TT133 report forms brainstorm](../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md); plan: [TT133 report forms plan](../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md); rules: [Mẫu biểu TT133](#mẫu-biểu-tt133):
   - Excel and PDF exports of eight forms in the layout of Circular 133/2016/TT-BTC (Phụ lục 4), from the "Xuất theo mẫu TT133" button of the report pages: S04a-DNN Sổ quỹ tiền mặt and S05-DNN Sổ tiền gửi ngân hàng (on Sổ quỹ), S06-DNN Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa and S08-DNN Thẻ kho (on Thẻ kho), S07-DNN Bảng tổng hợp chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa (on Tổng hợp nhập xuất tồn), S12-DNN Sổ chi tiết thanh toán với người mua (người bán) (on Sổ chi tiết công nợ), Bảng tổng hợp chi tiết thanh toán (on Số dư công nợ) and Biên bản đối chiếu công nợ.
   - S06, S08 and S12 export one, several or all partners / products with activity in the period, one sheet each.
   - Thông tin đơn vị (Cài đặt): company name, address, tax code, chief accountant, legal representative and an optional accounting-service note, printed in the header and signature blocks.
@@ -126,7 +126,7 @@ Approved but not yet implemented. Go-live happens after Round 3. Design: [stock 
 - An export without any partner or product is refused, and so is one with more than 300 books in one file (configurable). When the PDF conversion fails the user is told to use Excel.
 - An empty company profile does not block an export: the header stays empty and the page shows "Chưa có thông tin đơn vị". Editing the profile needs `settings.company` (ADMIN, MANAGER and ACCOUNTANT by default).
 - The reconciliation record ends with the balance in digits and in words. A company-specific template ("căn cứ" and reply clauses) is not written yet (chờ kế toán/BA xác nhận).
-- Go-live gate: the accountant compares a printed sample of each form with the original Phụ lục 4 and signs it off ([go-live checklist](../plans/261013-1926-tt133-report-forms/GO-LIVE-CHECKLIST.md)).
+- Go-live gate: the accountant compares a printed sample of each form with the original Phụ lục 4 and signs it off ([go-live checklist](../plans/archived/261013-1926-tt133-report-forms/GO-LIVE-CHECKLIST.md)).
 
 ## Non-Goals
 

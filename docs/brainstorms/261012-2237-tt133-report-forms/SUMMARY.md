@@ -183,7 +183,7 @@ Không làm: S13-DNN / S14-DNN (ngoại tệ, là non-goal) và Sổ nhật ký 
 - Xác nhận chi nhánh **không** có MST riêng, theo giả định của review B1. Nếu có thì `CompanyProfile` phải theo chi nhánh và bỏ scope Company.
 - Xác nhận đổi `CostingScope` sang **Warehouse** (review B2): giá vốn bình quân theo từng kho.
 
-**Kỹ thuật (đã đo ở Phase 05 của [plan](../../plans/261013-1926-tt133-report-forms/SUMMARY.md), 2026-10-14):**
+**Kỹ thuật (đã đo ở Phase 05 của [plan](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md), 2026-10-14):**
 - Ngưỡng sheet giữ **300** (`Tt133Export:MaxSheets`); timeout chuyển PDF tăng từ 60 lên **130 giây** (`QuotationExport:ConversionTimeoutSeconds`).
 - Số đo với 300 sheet, mỗi sheet 20 dòng. Đây là dữ liệu sinh ra để đo, không phải dữ liệu thật; chứng từ nguồn không tồn tại nên bước tra "Lý do" có chạy nhưng không tìm thấy gì.
 
@@ -212,8 +212,8 @@ Ghi nhận từ review; không đổi thiết kế. Chi tiết ở [section-02](
 
 1. ~~Hoàn tất Round 2B (phase 04–06).~~ Xong.
 2. Gửi kế toán các câu hỏi Kế toán/PO ở trên và bản mô tả cột trong [section-01](section-01-form-specs.md). Đối chiếu bố cục với bản gốc Phụ lục 4 TT133.
-3. ~~`write-plan` cho 5 phase ở trên.~~ Xong: [plan TT133 report forms](../../plans/261013-1926-tt133-report-forms/SUMMARY.md) (Phase 00–05).
-4. ~~Cập nhật `docs/project-pdr/product-goals.md` khi plan được duyệt.~~ Xong trong Phase 05 của [plan](../../plans/261013-1926-tt133-report-forms/SUMMARY.md).
+3. ~~`write-plan` cho 5 phase ở trên.~~ Xong: [plan TT133 report forms](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md) (Phase 00–05).
+4. ~~Cập nhật `docs/project-pdr/product-goals.md` khi plan được duyệt.~~ Xong trong Phase 05 của [plan](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md).
 
 ## Nguồn tham khảo
 

@@ -35,7 +35,7 @@ Frontend:
 
 ## Reference files (read-only)
 
-- [section-01](../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md) — S06, S07, S08; [section-02 B2](../../brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md)
+- [section-01](../../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md) — S06, S07, S08; [section-02 B2](../../../brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md)
 - Phases 02 and 03 of this plan — builder, export helpers, `ReportScopeGuard`, `Tt133ExportButton`, `ExportTargetsDialog`, `ReportScopeSelect`, `PeriodPresetSelect`
 - `backend/src/OrderMgmt.Application/Inventory/Reports/Services/InventoryReportService.cs` — `BuildStockCardAsync` (window, values, cost masking)
 - `backend/tests/OrderMgmt.IntegrationTests/Inventory/StockCardReportTests.cs` — data setup (`SaveOpeningAsync`, `GetCardAsync` are private there: copy them), cost-masking and Branch-scope tests

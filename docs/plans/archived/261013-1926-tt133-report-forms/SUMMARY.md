@@ -1,6 +1,6 @@
 # TT133 report forms — Excel/PDF exports for funds, inventory and debt (Báo cáo theo mẫu biểu TT133)
 
-> Created: 2026-10-13 19:26:58 · Source design: [brainstorm SUMMARY](../../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md), [section-01 form specs](../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md), [section-02 review decisions](../../brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md) · Builds on: [Round 2B plan](../archived/261012-1709-cash-debt-round2b/SUMMARY.md) (its "Print/Excel stays in Round 3" item)
+> Created: 2026-10-13 19:26:58 · Source design: [brainstorm SUMMARY](../../../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md), [section-01 form specs](../../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md), [section-02 review decisions](../../../brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md) · Builds on: [Round 2B plan](../261012-1709-cash-debt-round2b/SUMMARY.md) (its "Print/Excel stays in Round 3" item)
 
 ## Goal
 

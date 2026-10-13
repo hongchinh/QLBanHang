@@ -49,7 +49,7 @@ Frontend:
 
 ## Reference files (read-only)
 
-- [section-01 form specs](../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md) — "Khung chung", S04a, S05
+- [section-01 form specs](../../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md) — "Khung chung", S04a, S05
 - `backend/src/OrderMgmt.Infrastructure/Excel/RevenueReportExcelRenderer.cs` — ClosedXML built in code
 - `backend/tests/OrderMgmt.IntegrationTests/Reports/RevenueLineItemsExportTests.cs` — reading a workbook from a response
 - `backend/tests/OrderMgmt.IntegrationTests/Quotations/QuotationExportTests.cs` (the `WebAppFactoryWithFakePdfConverter` at the end of the file and the test that uses it) — replacing the converter in a factory

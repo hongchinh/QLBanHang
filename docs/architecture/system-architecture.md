@@ -228,7 +228,7 @@ Other read endpoints: `GET /api/debt/partner-summary` (receivable and payable ba
 
 ### TT133 Report Forms
 
-Eight forms in the layout of Circular 133/2016/TT-BTC (Phụ lục 4), as Excel and PDF. Each is a presentation of a report the screens already show, so the file equals the screen. There is no chart of accounts: the "TK đối ứng" column of the official forms is replaced by "Lý do". Decisions and layouts: [TT133 report forms plan](../plans/261013-1926-tt133-report-forms/SUMMARY.md).
+Eight forms in the layout of Circular 133/2016/TT-BTC (Phụ lục 4), as Excel and PDF. Each is a presentation of a report the screens already show, so the file equals the screen. There is no chart of accounts: the "TK đối ứng" column of the official forms is replaced by "Lý do". Decisions and layouts: [TT133 report forms plan](../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md).
 
 | Form | Source report | Export route (`/api/reports/…`) | Permission |
 |---|---|---|---|

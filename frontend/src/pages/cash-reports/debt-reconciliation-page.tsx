@@ -3,11 +3,14 @@ import { useSearchParams } from 'react-router-dom';
 import { useDebtReconciliation } from '@/features/cash-reports/hooks';
 import type { DebtPartnerSearchItem } from '@/features/debt/types';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
+import { ReportScopeSelect } from '@/components/report-scope-select/report-scope-select';
+import { useReportScope } from '@/components/report-scope-select/use-report-scope';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { getErrorMessage } from '@/lib/api-client';
 import { formatDateOnly } from '@/lib/date-only';
+import { REPORT_SCOPE_LABELS } from '@/lib/report-scope';
 import { formatCurrencyVnd } from '@/lib/utils';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
 import { DebtLedgerTable } from './debt-ledger-table';
@@ -26,12 +29,13 @@ export function DebtReconciliationPage() {
   const partnerId = searchParams.get('partnerId') ?? '';
   const from = searchParams.get('from') || firstDayOfMonthYmd();
   const to = searchParams.get('to') || todayYmd();
+  const [scope, setScope] = useReportScope();
   const [picked, setPicked] = useState<{ id: string; label: string } | null>(null);
 
   const rangeError = from > to ? 'Từ ngày không được sau Đến ngày' : null;
 
   const { data: report, isLoading, isError, error } = useDebtReconciliation(
-    { partnerId, from, to },
+    { partnerId, from, to, scope },
     { enabled: !rangeError },
   );
 
@@ -69,7 +73,7 @@ export function DebtReconciliationPage() {
       <h1 className="text-xl font-semibold">Biên bản đối chiếu công nợ</h1>
 
       <Card>
-        <CardContent className="grid gap-4 pt-6 sm:grid-cols-3">
+        <CardContent className="grid gap-4 pt-6 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1">
             <Label htmlFor="debt-reconciliation-partner">Đối tượng</Label>
             <ReportPartnerPicker
@@ -96,6 +100,7 @@ export function DebtReconciliationPage() {
               onChange={(e) => updateParams({ to: e.target.value })}
             />
           </div>
+          <ReportScopeSelect id="debt-reconciliation-scope" value={scope} onChange={setScope} />
         </CardContent>
       </Card>
 
@@ -110,7 +115,7 @@ export function DebtReconciliationPage() {
           <Card>
             <CardContent className="space-y-1 pt-6 text-center">
               <p className="text-lg font-bold">BIÊN BẢN ĐỐI CHIẾU CÔNG NỢ</p>
-              <p className="text-sm">{report.branchName}</p>
+              <p className="text-sm">{report.branchName ?? REPORT_SCOPE_LABELS.Company}</p>
               <p className="text-sm">
                 Từ ngày {formatDateOnly(report.from)} đến ngày {formatDateOnly(report.to)}
               </p>

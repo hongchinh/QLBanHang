@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth-store';
 import { DebtBalancePage } from './debt-balance-page';
 import type { DebtBalanceParams, DebtBalanceReport } from '@/features/cash-reports/types';
 
@@ -17,6 +18,7 @@ vi.mock('@/features/cash-reports/hooks', () => ({
 
 const report = (over: Partial<DebtBalanceReport> = {}): DebtBalanceReport => ({
   side: 'Payable',
+  scope: 'Branch',
   from: '2026-10-01',
   to: '2026-10-31',
   rows: [
@@ -60,13 +62,16 @@ describe('DebtBalancePage', () => {
   beforeEach(() => {
     useDebtBalanceMock.mockClear();
     reportState.data = report();
+    useAuthStore.setState({
+      user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions: ['branches.access_all'] },
+    });
   });
 
   it('renders rows and totals with debit/credit columns', () => {
     renderAt('/reports/debt-balance?side=Payable&from=2026-10-01&to=2026-10-31&search=NCC');
 
     expect(useDebtBalanceMock).toHaveBeenLastCalledWith(
-      { side: 'Payable', from: '2026-10-01', to: '2026-10-31', search: 'NCC' },
+      { side: 'Payable', from: '2026-10-01', to: '2026-10-31', search: 'NCC', scope: 'Branch' },
       { enabled: true },
     );
     expect(screen.getByRole('combobox', { name: 'Phía' })).toHaveTextContent('Phải trả');
@@ -114,5 +119,26 @@ describe('DebtBalancePage', () => {
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31',
     );
+  });
+
+  it('choosing Toàn công ty puts scope=Company in the url and the hook params', async () => {
+    const user = userEvent.setup();
+    renderAt('/reports/debt-balance?side=Payable&from=2026-10-01&to=2026-10-31');
+
+    await user.click(screen.getByRole('combobox', { name: 'Phạm vi' }));
+    await user.click(screen.getByRole('option', { name: 'Toàn công ty' }));
+
+    expect(useDebtBalanceMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Company' }), { enabled: true });
+    expect(screen.getByTestId('location')).toHaveTextContent('scope=Company');
+  });
+
+  it('has no scope select and stays on Branch without branches.access_all', () => {
+    useAuthStore.setState({
+      user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions: [] },
+    });
+    renderAt('/reports/debt-balance?side=Payable&scope=Company');
+
+    expect(screen.queryByRole('combobox', { name: 'Phạm vi' })).not.toBeInTheDocument();
+    expect(useDebtBalanceMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Branch' }), { enabled: true });
   });
 });

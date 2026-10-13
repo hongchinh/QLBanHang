@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { DebtLedgerPage } from './debt-ledger-page';
 import type { DebtLedgerParams, DebtLedgerReport } from '@/features/cash-reports/types';
@@ -28,6 +29,7 @@ vi.mock('@/features/debt/hooks', () => ({
 
 const ledger = (over: Partial<DebtLedgerReport> = {}): DebtLedgerReport => ({
   side: 'Payable',
+  scope: 'Branch',
   partnerId: 's1',
   partnerCode: 'NCC01',
   partnerName: 'Thép Hòa Phát',
@@ -71,10 +73,16 @@ function setPermissions(permissions: string[]) {
   });
 }
 
+function LocationDisplay() {
+  const loc = useLocation();
+  return <div data-testid="location">{loc.pathname + loc.search}</div>;
+}
+
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <DebtLedgerPage />
+      <LocationDisplay />
     </MemoryRouter>,
   );
 }
@@ -91,7 +99,7 @@ describe('DebtLedgerPage', () => {
     renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31');
 
     expect(useDebtLedgerMock).toHaveBeenLastCalledWith(
-      { side: 'Payable', partnerId: 's1', from: '2026-10-01', to: '2026-10-31' },
+      { side: 'Payable', partnerId: 's1', from: '2026-10-01', to: '2026-10-31', scope: 'Branch' },
       { enabled: true },
     );
     // The ledger of a partner made inactive since must stay reachable.
@@ -101,7 +109,7 @@ describe('DebtLedgerPage', () => {
     expect(screen.getByLabelText('Từ ngày')).toHaveValue('2026-10-01');
     expect(screen.getByLabelText('Đến ngày')).toHaveValue('2026-10-31');
 
-    for (const name of ['Ngày', 'Số CT', 'Loại CT', 'Diễn giải', 'Tăng', 'Giảm', 'Số dư']) {
+    for (const name of ['Ngày', 'Số CT', 'Loại CT', 'Diễn giải', 'Lý do', 'Hạn TT', 'Tăng', 'Giảm', 'Số dư']) {
       expect(screen.getByRole('columnheader', { name })).toBeInTheDocument();
     }
 
@@ -110,14 +118,14 @@ describe('DebtLedgerPage', () => {
 
     const stockIn = screen.getByRole('link', { name: 'PN00001' }).closest('tr')!;
     expect(within(stockIn).getAllByRole('cell').map((c) => c.textContent)).toEqual([
-      '02/10/2026', 'PN00001', 'Phiếu nhập', 'Nhập mua tôn', '2.500.000', '', 'Có 3.500.000',
+      '02/10/2026', 'PN00001', 'Phiếu nhập', 'Nhập mua tôn', '', '', '2.500.000', '', 'Có 3.500.000',
     ]);
     const payment = screen.getByRole('link', { name: 'PC00001' }).closest('tr')!;
     const paymentCells = within(payment).getAllByRole('cell');
-    expect(paymentCells[5]).toHaveTextContent('4.000.000');
+    expect(paymentCells[7]).toHaveTextContent('4.000.000');
     // Payable: positive is Dư Có, negative is Dư Nợ (P24), like the opening and closing balances.
-    expect(paymentCells[6]).toHaveTextContent('Nợ 500.000');
-    expect(paymentCells[6]).toHaveClass('text-right', 'tabular-nums');
+    expect(paymentCells[8]).toHaveTextContent('Nợ 500.000');
+    expect(paymentCells[8]).toHaveClass('text-right', 'tabular-nums');
 
     const totals = screen.getByText('Cộng phát sinh').closest('tr')!;
     expect(within(totals).getByText('2.500.000')).toBeInTheDocument();
@@ -145,8 +153,8 @@ describe('DebtLedgerPage', () => {
     renderAt('/reports/debt-ledger?side=Receivable&partnerId=s1&from=2026-10-01&to=2026-10-31');
 
     const cells = (code: string) => within(screen.getByText(code).closest('tr')!).getAllByRole('cell');
-    expect(cells('PX00001')[6]).toHaveTextContent('Nợ 700.000');
-    expect(cells('PT00001')[6]).toHaveTextContent('Có 200.000');
+    expect(cells('PX00001')[8]).toHaveTextContent('Nợ 700.000');
+    expect(cells('PT00001')[8]).toHaveTextContent('Có 200.000');
   });
 
   it('asks for a partner when none is in the url', () => {
@@ -206,5 +214,59 @@ describe('DebtLedgerPage', () => {
       expect(screen.getByText(code)).toBeInTheDocument();
       expect(screen.queryByRole('link', { name: code })).not.toBeInTheDocument();
     }
+  });
+
+  it('shows the reason, the due date and the branch code of a row', () => {
+    ledgerState.data = ledger({
+      scope: 'Company',
+      rows: [
+        {
+          entryId: 'e1', postedAt: '2026-10-02T02:00:00Z', docDate: '2026-10-02', docCode: 'PN00001',
+          sourceType: 'StockIn', sourceId: 'v1', description: 'Bán hàng tháng 10', reasonName: 'Bán hàng',
+          dueDate: '2026-10-20', branchCode: 'HN', increase: 2_500_000, decrease: 0, runningBalance: 3_500_000,
+        },
+        {
+          entryId: 'e2', postedAt: '2026-10-05T02:00:00Z', docDate: '2026-10-05', docCode: 'PC00001',
+          sourceType: 'Payment', sourceId: 'c1', description: 'Trả tiền NCC',
+          increase: 0, decrease: 4_000_000, runningBalance: -500_000,
+        },
+      ],
+    });
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31');
+
+    const withBranch = within(screen.getByText('PN00001').closest('tr')!).getAllByRole('cell');
+    expect(withBranch[3]).toHaveTextContent('[HN] Bán hàng tháng 10');
+    expect(withBranch[4]).toHaveTextContent('Bán hàng');
+    expect(withBranch[5]).toHaveTextContent('20/10/2026');
+    const without = within(screen.getByText('PC00001').closest('tr')!).getAllByRole('cell');
+    expect(without[3].textContent).toBe('Trả tiền NCC');
+    expect(without[5].textContent).toBe('');
+  });
+
+  it('passes scope=Company to the hook only for holders of branches.access_all', () => {
+    setPermissions([...ALL_LINK_PERMISSIONS, 'branches.access_all']);
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31&scope=Company');
+
+    expect(useDebtLedgerMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Company' }), { enabled: true });
+    expect(screen.getByRole('combobox', { name: 'Phạm vi' })).toHaveTextContent('Toàn công ty');
+  });
+
+  it('ignores scope=Company in the url without the permission', () => {
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31&scope=Company');
+
+    expect(useDebtLedgerMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Branch' }), { enabled: true });
+    expect(screen.queryByRole('combobox', { name: 'Phạm vi' })).not.toBeInTheDocument();
+  });
+
+  it('choosing Toàn công ty puts scope=Company in the url and the hook params', async () => {
+    setPermissions([...ALL_LINK_PERMISSIONS, 'branches.access_all']);
+    const user = userEvent.setup();
+    renderAt('/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31');
+
+    await user.click(screen.getByRole('combobox', { name: 'Phạm vi' }));
+    await user.click(screen.getByRole('option', { name: 'Toàn công ty' }));
+
+    expect(useDebtLedgerMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Company' }), { enabled: true });
+    expect(screen.getByTestId('location')).toHaveTextContent('scope=Company');
   });
 });

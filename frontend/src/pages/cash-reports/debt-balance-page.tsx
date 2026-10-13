@@ -3,6 +3,8 @@ import { useDebtBalance } from '@/features/cash-reports/hooks';
 import type { DebtBalanceRow } from '@/features/cash-reports/types';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide } from '@/features/cash-common/types';
+import { ReportScopeSelect } from '@/components/report-scope-select/report-scope-select';
+import { useReportScope } from '@/components/report-scope-select/use-report-scope';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,6 +37,7 @@ export function DebtBalancePage() {
   const [from, setFrom] = useSearchParamString('from', firstDayOfMonthYmd());
   const [to, setTo] = useSearchParamString('to', todayYmd());
   const [search, setSearch] = useSearchParamString('search');
+  const [scope, setScope] = useReportScope();
   const debouncedSearch = useDebouncedValue(search, 300);
   const side = parseDebtSide(sideParam);
 
@@ -42,7 +45,7 @@ export function DebtBalancePage() {
   const rangeError = from > to ? 'Từ ngày không được sau Đến ngày' : null;
 
   const { data: report, isLoading, isError, error } = useDebtBalance(
-    { side, from, to, search: debouncedSearch.trim() || undefined },
+    { side, from, to, search: debouncedSearch.trim() || undefined, scope },
     { enabled: !rangeError },
   );
   const rows = report?.rows ?? [];
@@ -50,6 +53,7 @@ export function DebtBalancePage() {
   const openLedger = (row: DebtBalanceRow) => {
     if (!row.partnerId) return;
     const params = new URLSearchParams({ side, partnerId: row.partnerId, from, to });
+    if (scope === 'Company') params.set('scope', scope);
     navigate(`/reports/debt-ledger?${params.toString()}`);
   };
 
@@ -91,6 +95,7 @@ export function DebtBalancePage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <ReportScopeSelect id="debt-balance-scope" value={scope} onChange={setScope} />
         </CardContent>
       </Card>
 

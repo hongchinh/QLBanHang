@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
 import { DebtReconciliationPage } from './debt-reconciliation-page';
 import type {
@@ -35,6 +36,7 @@ vi.mock('@/features/debt/hooks', () => ({
 
 const ledger = (side: 'Receivable' | 'Payable', code: string): DebtLedgerReport => ({
   side,
+  scope: 'Branch',
   partnerId: 'p1',
   partnerCode: 'KH01',
   partnerName: 'Công ty ABC',
@@ -58,6 +60,7 @@ const ledger = (side: 'Receivable' | 'Payable', code: string): DebtLedgerReport 
 });
 
 const report = (over: Partial<DebtReconciliationReport> = {}): DebtReconciliationReport => ({
+  scope: 'Branch',
   partnerId: 'p1',
   partnerCode: 'KH01',
   partnerName: 'Công ty ABC',
@@ -77,10 +80,16 @@ function setPermissions(permissions: string[]) {
   });
 }
 
+function LocationDisplay() {
+  const loc = useLocation();
+  return <div data-testid="location">{loc.pathname + loc.search}</div>;
+}
+
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
       <DebtReconciliationPage />
+      <LocationDisplay />
     </MemoryRouter>,
   );
 }
@@ -110,7 +119,7 @@ describe('DebtReconciliationPage', () => {
     renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
 
     expect(useDebtReconciliationMock).toHaveBeenLastCalledWith(
-      { partnerId: 'p1', from: '2026-10-01', to: '2026-10-31' },
+      { partnerId: 'p1', from: '2026-10-01', to: '2026-10-31', scope: 'Branch' },
       { enabled: true },
     );
     expect(screen.getByText('BIÊN BẢN ĐỐI CHIẾU CÔNG NỢ')).toBeInTheDocument();
@@ -155,5 +164,27 @@ describe('DebtReconciliationPage', () => {
     renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
 
     expect(screen.getByText('Bù trừ hai bên: Hai bên không còn nợ')).toBeInTheDocument();
+  });
+
+  it('choosing Toàn công ty puts scope=Company in the url and the hook params', async () => {
+    setPermissions(['stock_out.view', 'stock_in.view', 'branches.access_all']);
+    const user = userEvent.setup();
+    renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
+
+    await user.click(screen.getByRole('combobox', { name: 'Phạm vi' }));
+    await user.click(screen.getByRole('option', { name: 'Toàn công ty' }));
+
+    expect(useDebtReconciliationMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ scope: 'Company' }),
+      { enabled: true },
+    );
+    expect(screen.getByTestId('location')).toHaveTextContent('scope=Company');
+  });
+
+  it('shows Toàn công ty in place of the branch name when it is null', () => {
+    reportState.data = report({ scope: 'Company', branchName: null });
+    renderAt('/reports/debt-reconciliation?partnerId=p1&from=2026-10-01&to=2026-10-31');
+
+    expect(screen.getByText('Toàn công ty', { selector: 'p' })).toBeInTheDocument();
   });
 });

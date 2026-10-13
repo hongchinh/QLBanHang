@@ -4,6 +4,8 @@ import { useDebtLedger } from '@/features/cash-reports/hooks';
 import type { DebtPartnerSearchItem } from '@/features/debt/types';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide } from '@/features/cash-common/types';
+import { ReportScopeSelect } from '@/components/report-scope-select/report-scope-select';
+import { useReportScope } from '@/components/report-scope-select/use-report-scope';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,12 +26,13 @@ export function DebtLedgerPage() {
   const partnerId = searchParams.get('partnerId') ?? '';
   const from = searchParams.get('from') || firstDayOfMonthYmd();
   const to = searchParams.get('to') || todayYmd();
+  const [scope, setScope] = useReportScope();
   const [picked, setPicked] = useState<{ id: string; label: string } | null>(null);
 
   const rangeError = from > to ? 'Từ ngày không được sau Đến ngày' : null;
 
   const { data: ledger, isLoading, isError, error } = useDebtLedger(
-    { side, partnerId, from, to },
+    { side, partnerId, from, to, scope },
     { enabled: !rangeError },
   );
 
@@ -101,6 +104,7 @@ export function DebtLedgerPage() {
             <Label htmlFor="debt-ledger-to">Đến ngày</Label>
             <Input id="debt-ledger-to" type="date" value={to} onChange={(e) => updateParams({ to: e.target.value })} />
           </div>
+          <ReportScopeSelect id="debt-ledger-scope" value={scope} onChange={setScope} />
         </CardContent>
       </Card>
 

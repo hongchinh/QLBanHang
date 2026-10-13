@@ -57,4 +57,14 @@ describe('StockVoucherTabs', () => {
     );
     expect(screen.getByTestId('stock-lines-toolbar-slot')).toHaveClass('hidden');
   });
+
+  it('the tab row wraps instead of overlaying the toolbar on the tabs in a narrow window', () => {
+    render(
+      <StockVoucherTabs value="lines" onValueChange={vi.fn()} lineCount={1} errorTabs={new Set()} toolbarRef={vi.fn()}
+        lines={<i />} other={<i />} payment={<i />} />,
+    );
+    const slot = screen.getByTestId('stock-lines-toolbar-slot');
+    expect(slot).not.toHaveClass('absolute');
+    expect(slot.parentElement).toHaveClass('flex', 'flex-wrap');
+  });
 });

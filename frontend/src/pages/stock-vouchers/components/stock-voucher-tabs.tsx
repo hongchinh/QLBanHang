@@ -25,8 +25,8 @@ export function StockVoucherTabs(props: StockVoucherTabsProps) {
   const { value, onValueChange, lineCount, errorTabs, lines, other, payment, history, toolbarRef } = props;
   return (
     <Tabs value={value} onValueChange={(v) => onValueChange(v as StockVoucherTab)} className="flex flex-1 flex-col">
-      <div className="relative shrink-0">
-      <TabsList className="h-auto w-full justify-start gap-0.5 rounded-none border-b bg-transparent p-0">
+      <div className="flex shrink-0 flex-wrap items-end justify-between border-b">
+      <TabsList className="h-auto justify-start gap-0.5 rounded-none bg-transparent p-0">
         <Trigger value="lines" label="Hàng hóa" hotkey="Alt+1" error={errorTabs.has('lines')}>
           <span className="ml-1.5 rounded-full bg-primary/10 px-1.5 text-xs text-primary">{lineCount}</span>
         </Trigger>
@@ -38,7 +38,7 @@ export function StockVoucherTabs(props: StockVoucherTabsProps) {
         <div
           ref={toolbarRef}
           data-testid="stock-lines-toolbar-slot"
-          className={`absolute inset-y-0 right-1 flex items-center ${value === 'lines' ? '' : 'hidden'}`}
+          className={`ml-auto flex items-center self-center py-0.5 pl-2 pr-1 ${value === 'lines' ? '' : 'hidden'}`}
         />
       )}
       </div>

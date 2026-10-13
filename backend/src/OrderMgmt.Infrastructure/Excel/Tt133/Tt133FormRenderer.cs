@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Tt133.Interfaces;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Domain.Enums;
@@ -20,6 +21,9 @@ public class Tt133FormRenderer : ITt133FormRenderer
 
     public byte[] RenderDebtReconciliation(Tt133FormContext context, DebtReconciliationReportDto report) =>
         Render(workbook => DebtReconciliationForm.Write(workbook, context, report));
+
+    public byte[] RenderStockSummary(Tt133FormContext context, StockSummaryReportDto report, string warehouseLabel, string? productGroupName, string? search) =>
+        Render(workbook => StockSummaryForm.Write(workbook, context, report, warehouseLabel, productGroupName, search));
 
     private static byte[] Render(Action<XLWorkbook> write)
     {

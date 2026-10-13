@@ -1,6 +1,7 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Tt133.Interfaces;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Domain.Constants;
@@ -18,19 +19,22 @@ public class Tt133ExportController : ApiControllerBase
     private readonly IValidator<DebtLedgerExportRequest> _debtLedgerValidator;
     private readonly IValidator<DebtBalanceReportRequest> _debtBalanceValidator;
     private readonly IValidator<DebtReconciliationReportRequest> _debtReconciliationValidator;
+    private readonly IValidator<StockSummaryRequest> _stockSummaryValidator;
 
     public Tt133ExportController(
         ITt133ExportService exports,
         IValidator<CashBookReportRequest> cashBookValidator,
         IValidator<DebtLedgerExportRequest> debtLedgerValidator,
         IValidator<DebtBalanceReportRequest> debtBalanceValidator,
-        IValidator<DebtReconciliationReportRequest> debtReconciliationValidator)
+        IValidator<DebtReconciliationReportRequest> debtReconciliationValidator,
+        IValidator<StockSummaryRequest> stockSummaryValidator)
     {
         _exports = exports;
         _cashBookValidator = cashBookValidator;
         _debtLedgerValidator = debtLedgerValidator;
         _debtBalanceValidator = debtBalanceValidator;
         _debtReconciliationValidator = debtReconciliationValidator;
+        _stockSummaryValidator = stockSummaryValidator;
     }
 
     /// S04a-DNN (kind=Cash) or S05-DNN (kind=Bank).
@@ -74,6 +78,17 @@ public class Tt133ExportController : ApiControllerBase
     {
         await _debtReconciliationValidator.ValidateAndThrowAsync(request, ct);
         var file = await _exports.ExportDebtReconciliationAsync(request, format, ct);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
+
+    /// S07-DNN: the stock in-out-balance summary with the screen's filters.
+    [HttpGet("stock-summary/export")]
+    [HasPermission(Permissions.Reports.Inventory)]
+    public async Task<IActionResult> StockSummary(
+        [FromQuery] StockSummaryRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
+    {
+        await _stockSummaryValidator.ValidateAndThrowAsync(request, ct);
+        var file = await _exports.ExportStockSummaryAsync(request, format, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 }

@@ -1,4 +1,5 @@
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Domain.Enums;
 
@@ -18,4 +19,8 @@ public interface ITt133FormRenderer
 
     /// Biên bản đối chiếu công nợ: one portrait sheet.
     byte[] RenderDebtReconciliation(Tt133FormContext context, DebtReconciliationReportDto report);
+
+    /// S07-DNN: one landscape sheet. warehouseLabel is "Tất cả kho" or "{Code} – {Name}"; productGroupName and search
+    /// (trimmed, null when blank; T22) print their parameter lines only when given.
+    byte[] RenderStockSummary(Tt133FormContext context, StockSummaryReportDto report, string warehouseLabel, string? productGroupName, string? search);
 }

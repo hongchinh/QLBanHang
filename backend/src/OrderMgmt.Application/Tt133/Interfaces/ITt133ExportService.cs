@@ -1,4 +1,5 @@
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Tt133.Models;
 
 namespace OrderMgmt.Application.Tt133.Interfaces;
@@ -17,4 +18,7 @@ public interface ITt133ExportService
 
     /// Biên bản đối chiếu công nợ of one partner.
     Task<ExportFile> ExportDebtReconciliationAsync(DebtReconciliationReportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// S07-DNN, the stock in-out-balance summary as the screen shows it (same filters, same cost masking).
+    Task<ExportFile> ExportStockSummaryAsync(StockSummaryRequest request, ExportFormat format, CancellationToken ct = default);
 }

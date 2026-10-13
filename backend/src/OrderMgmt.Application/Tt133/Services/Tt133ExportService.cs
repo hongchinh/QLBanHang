@@ -7,6 +7,8 @@ using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.Reports.Interfaces;
+using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Tt133.Interfaces;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Domain.Common;
@@ -25,6 +27,7 @@ public class Tt133ExportService : ITt133ExportService
     private readonly IDateTime _clock;
     private readonly ITransactionRunner _transaction;
     private readonly ICashDebtReportService _cashDebtReports;
+    private readonly IInventoryReportService _inventoryReports;
     private readonly ITt133FormRenderer _renderer;
     private readonly ISpreadsheetPdfConverter _pdfConverter;
     private readonly IOptions<Tt133ExportOptions> _options;
@@ -37,6 +40,7 @@ public class Tt133ExportService : ITt133ExportService
         IDateTime clock,
         ITransactionRunner transaction,
         ICashDebtReportService cashDebtReports,
+        IInventoryReportService inventoryReports,
         ITt133FormRenderer renderer,
         ISpreadsheetPdfConverter pdfConverter,
         IOptions<Tt133ExportOptions> options,
@@ -48,6 +52,7 @@ public class Tt133ExportService : ITt133ExportService
         _clock = clock;
         _transaction = transaction;
         _cashDebtReports = cashDebtReports;
+        _inventoryReports = inventoryReports;
         _renderer = renderer;
         _pdfConverter = pdfConverter;
         _options = options;
@@ -144,6 +149,39 @@ public class Tt133ExportService : ITt133ExportService
 
         var xlsx = _renderer.RenderDebtReconciliation(context, report);
         return await ToFileAsync(xlsx, BaseName($"DoiChieuCongNo_{report.PartnerCode}", request.From, request.To), format, ct);
+    }
+
+    public async Task<ExportFile> ExportStockSummaryAsync(StockSummaryRequest request, ExportFormat format, CancellationToken ct = default)
+    {
+        ReportScopeGuard.EnsureAllowed(_currentUser, request.Scope);
+
+        var (context, report, warehouseLabel, groupName) = await _transaction.RunSnapshotAsync(async token =>
+        {
+            var formContext = await BuildContextAsync(request.Scope, token);
+            var data = await _inventoryReports.GetStockSummaryAsync(request, token);
+
+            var label = "Tất cả kho";
+            if (request.WarehouseId is { } warehouseId)
+            {
+                var warehouse = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+                    .Where(w => w.Id == warehouseId)
+                    .Select(w => new { w.Code, w.Name })
+                    .SingleAsync(token);
+                label = $"{warehouse.Code} – {warehouse.Name}";
+            }
+
+            string? group = null;
+            if (request.ProductGroupId is { } groupId)
+                group = await _db.ProductGroups.IgnoreQueryFilters().AsNoTracking()
+                    .Where(g => g.Id == groupId)
+                    .Select(g => g.Name)
+                    .SingleOrDefaultAsync(token);
+            return (formContext, data, label, group);
+        }, ct);
+
+        var search = string.IsNullOrWhiteSpace(request.Search) ? null : request.Search.Trim();
+        var xlsx = _renderer.RenderStockSummary(context, report, warehouseLabel, groupName, search);
+        return await ToFileAsync(xlsx, BaseName("S07-DNN", report.From, report.To), format, ct);
     }
 
     /// All: every partner the balance report lists (a non-zero opening balance or movement); otherwise the distinct ids.

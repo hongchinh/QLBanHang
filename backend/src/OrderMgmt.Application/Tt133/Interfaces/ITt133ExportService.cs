@@ -8,4 +8,7 @@ public interface ITt133ExportService
 {
     /// S04a-DNN for kind Cash, S05-DNN for kind Bank.
     Task<ExportFile> ExportCashBookAsync(CashBookReportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// S12-DNN: one sheet per partner of the request.
+    Task<ExportFile> ExportDebtLedgerAsync(DebtLedgerExportRequest request, ExportFormat format, CancellationToken ct = default);
 }

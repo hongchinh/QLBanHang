@@ -9,4 +9,7 @@ public interface ITt133FormRenderer
 {
     /// S04a-DNN (kind Cash) or S05-DNN (kind Bank): one sheet per fund of the report.
     byte[] RenderCashBook(Tt133FormContext context, CashBookReportDto report, FundKind kind);
+
+    /// S12-DNN: one sheet per ledger (partner × side), in the order given.
+    byte[] RenderDebtLedgers(Tt133FormContext context, IReadOnlyList<DebtLedgerReportDto> ledgers);
 }

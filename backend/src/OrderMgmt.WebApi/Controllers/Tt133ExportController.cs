@@ -15,11 +15,16 @@ public class Tt133ExportController : ApiControllerBase
 {
     private readonly ITt133ExportService _exports;
     private readonly IValidator<CashBookReportRequest> _cashBookValidator;
+    private readonly IValidator<DebtLedgerExportRequest> _debtLedgerValidator;
 
-    public Tt133ExportController(ITt133ExportService exports, IValidator<CashBookReportRequest> cashBookValidator)
+    public Tt133ExportController(
+        ITt133ExportService exports,
+        IValidator<CashBookReportRequest> cashBookValidator,
+        IValidator<DebtLedgerExportRequest> debtLedgerValidator)
     {
         _exports = exports;
         _cashBookValidator = cashBookValidator;
+        _debtLedgerValidator = debtLedgerValidator;
     }
 
     /// S04a-DNN (kind=Cash) or S05-DNN (kind=Bank).
@@ -30,6 +35,17 @@ public class Tt133ExportController : ApiControllerBase
     {
         await _cashBookValidator.ValidateAndThrowAsync(request, ct);
         var file = await _exports.ExportCashBookAsync(request, format, ct);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
+
+    /// S12-DNN: the body names the partners (a POST, because a list of ids does not fit a URL).
+    [HttpPost("debt-ledger/export")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<IActionResult> DebtLedger(
+        [FromBody] DebtLedgerExportRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
+    {
+        await _debtLedgerValidator.ValidateAndThrowAsync(request, ct);
+        var file = await _exports.ExportDebtLedgerAsync(request, format, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 }

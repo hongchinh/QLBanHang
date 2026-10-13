@@ -79,6 +79,35 @@ public class Tt133ExportService : ITt133ExportService
         return await ToFileAsync(xlsx, BaseName(code, request.From, request.To), format, ct);
     }
 
+    public async Task<ExportFile> ExportDebtLedgerAsync(DebtLedgerExportRequest request, ExportFormat format, CancellationToken ct = default)
+    {
+        ReportScopeGuard.EnsureAllowed(_currentUser, request.Scope);
+
+        var (context, ledgers) = await _transaction.RunSnapshotAsync(async token =>
+        {
+            var formContext = await BuildContextAsync(request.Scope, token);
+            var targets = request.PartnerIds;
+            EnsureSheetCount(targets.Count);
+
+            var data = new List<DebtLedgerReportDto>(targets.Count);
+            foreach (var partnerId in targets)
+            {
+                data.Add(await _cashDebtReports.GetDebtLedgerAsync(new DebtLedgerReportRequest
+                {
+                    Side = request.Side,
+                    PartnerId = partnerId,
+                    From = request.From,
+                    To = request.To,
+                    Scope = request.Scope,
+                }, token));
+            }
+            return (formContext, data);
+        }, ct);
+
+        var xlsx = _renderer.RenderDebtLedgers(context, ledgers);
+        return await ToFileAsync(xlsx, BaseName("S12-DNN", request.From, request.To), format, ct);
+    }
+
     /// Company profile, working branch and signer of the form. Scope Company prints no branch.
     private async Task<Tt133FormContext> BuildContextAsync(ReportScope scope, CancellationToken ct)
     {

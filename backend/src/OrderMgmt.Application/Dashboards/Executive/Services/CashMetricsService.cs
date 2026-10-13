@@ -14,6 +14,8 @@ namespace OrderMgmt.Application.Dashboards.Executive.Services;
 /// and opening amounts are neither. Balances are as at a date and count every fund of the scope, inactive ones too.
 public class CashMetricsService : ICashMetricsService
 {
+    private const int LargestCount = 10;
+
     private readonly IAppDbContext _db;
     private readonly IExecutiveScopeResolver _scopes;
     private readonly ExecutiveLookups _lookups;
@@ -121,6 +123,103 @@ public class CashMetricsService : ICashMetricsService
                 .ToList(),
         };
     }
+
+    public Task<CashBreakdownDto> GetBreakdownAsync(ExecutiveQuery query, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildBreakdownAsync(query, c), ct);
+
+    private async Task<CashBreakdownDto> BuildBreakdownAsync(ExecutiveQuery query, CancellationToken ct)
+    {
+        var today = VnTime.ToVnDate(_clock.UtcNow);
+        var scope = await _scopes.ResolveAsync(query.BranchId, ct);
+        var period = ExecutivePeriod.Create(query.From, query.To, today);
+
+        var funds = await LoadFundsAsync(scope, ct);
+        var movements = await LoadMovementsAsync(funds, ct);
+        var branchCodes = await _lookups.BranchCodesAsync(scope.BranchIds, ct);
+
+        return new CashBreakdownDto
+        {
+            ByReason = await ReasonTotalsAsync(funds, period, ct),
+            Largest = LargestDocuments(InWindow(movements, period.Start, period.End), funds, branchCodes),
+        };
+    }
+
+    /// The vouchers of the period by reason, read from the voucher table: Active, not deleted, in a fund of the scope.
+    /// Receipts come first, then payments; inside each the largest total first.
+    private async Task<List<CashReasonTotalDto>> ReasonTotalsAsync(
+        IReadOnlyCollection<FundRow> funds, ExecutivePeriod period, CancellationToken ct)
+    {
+        var fundIds = funds.Select(f => f.Id).ToList();
+        var totals = await _db.CashVouchers.AsNoTracking()
+            .Where(v => v.Status == DocumentStatus.Active && fundIds.Contains(v.FundId)
+                && v.VoucherAt >= period.Start && v.VoucherAt < period.End)
+            .GroupBy(v => new { v.ReasonId, v.Type })
+            .Select(g => new { g.Key.ReasonId, g.Key.Type, Total = g.Sum(v => v.Total), Count = g.Count() })
+            .ToListAsync(ct);
+
+        // The names come from their own query: IgnoreQueryFilters would also reveal deleted vouchers in the one above,
+        // and a reason deleted after use keeps its name in the history.
+        var reasonIds = totals.Select(t => t.ReasonId).ToList();
+        var reasons = await _db.CashReasons.IgnoreQueryFilters().AsNoTracking()
+            .Where(r => reasonIds.Contains(r.Id))
+            .Select(r => new { r.Id, r.Code, r.Name })
+            .ToDictionaryAsync(r => r.Id, ct);
+
+        return totals
+            .Select(t =>
+            {
+                reasons.TryGetValue(t.ReasonId, out var reason);
+                return new CashReasonTotalDto
+                {
+                    ReasonId = t.ReasonId,
+                    ReasonCode = reason?.Code,
+                    ReasonName = reason?.Name,
+                    Type = t.Type,
+                    Total = t.Total,
+                    Count = t.Count,
+                };
+            })
+            .OrderBy(r => r.Type == CashVoucherType.Receipt ? 0 : 1)
+            .ThenByDescending(r => r.Total)
+            .ThenBy(r => r.ReasonCode, StringComparer.Ordinal)
+            .ThenBy(r => r.ReasonId)
+            .ToList();
+    }
+
+    /// The largest receipts and payments by amount, then date, then code. The id ends the order, so two documents of
+    /// different branches with the same code, date and amount still come back in the same order.
+    private static List<CashDocumentDto> LargestDocuments(IEnumerable<FundMovement> movements,
+        IReadOnlyCollection<FundRow> funds, IReadOnlyDictionary<Guid, string> branchCodes)
+    {
+        var branchOfFund = funds.ToDictionary(f => f.Id, f => f.BranchId);
+        return movements
+            .Where(m => m.Kind is FundMovementKind.Receipt or FundMovementKind.Payment)
+            .OrderByDescending(m => Math.Abs(m.Delta))
+            .ThenBy(m => m.At)
+            .ThenBy(m => m.Code, StringComparer.Ordinal)
+            .ThenBy(m => m.SourceId)
+            .Take(LargestCount)
+            .Select(m => new CashDocumentDto
+            {
+                Id = m.SourceId,
+                Type = TypeOf(m.Kind),
+                Code = m.Code,
+                At = m.At,
+                BranchCode = branchOfFund.TryGetValue(m.FundId, out var branchId)
+                    && branchCodes.TryGetValue(branchId, out var branchCode) ? branchCode : string.Empty,
+                PartnerOrPerson = m.PartnerOrPerson,
+                Description = m.Description,
+                Total = Math.Abs(m.Delta),
+            })
+            .ToList();
+    }
+
+    private static CashVoucherType TypeOf(FundMovementKind kind) => kind switch
+    {
+        FundMovementKind.Receipt => CashVoucherType.Receipt,
+        FundMovementKind.Payment => CashVoucherType.Payment,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Only receipts and payments are documents."),
+    };
 
     /// The funds of the scope, active or not: an inactive fund keeps its history and its balance.
     private async Task<List<FundRow>> LoadFundsAsync(ExecutiveScope scope, CancellationToken ct)

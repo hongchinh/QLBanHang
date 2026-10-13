@@ -6,4 +6,5 @@ public interface ICashMetricsService
 {
     Task<CashSummaryDto> GetSummaryAsync(ExecutiveQuery query, CancellationToken ct = default);
     Task<CashSeriesDto> GetSeriesAsync(ExecutiveSeriesQuery query, CancellationToken ct = default);
+    Task<CashBreakdownDto> GetBreakdownAsync(ExecutiveQuery query, CancellationToken ct = default);
 }

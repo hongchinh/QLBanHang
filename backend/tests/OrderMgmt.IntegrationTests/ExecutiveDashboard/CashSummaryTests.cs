@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Dashboards.Executive.Models;
+using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -165,6 +166,18 @@ public class CashSummaryTests : ExecutiveDashboardTestBase
             ("QTM", true, 19_300m), ("NH00", false, 7_000m), ("NH01", true, 10_000m));
         summary.BankBalance.Should().Be(17_000m);
         summary.Balance.Should().Be(36_300m);
+    }
+
+    [Fact]
+    public async Task Balance_date_defaults_to_today_in_vn_time()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var before = VnTime.ToVnDate(DateTimeOffset.UtcNow);
+
+        var summary = await GetCashSummaryAsync(branch.Client, $"branchId={branch.BranchId}");
+
+        // The request may straddle midnight in Vietnam; either day is "today" then.
+        summary.At.Should().BeOneOf(before, VnTime.ToVnDate(DateTimeOffset.UtcNow));
     }
 
     [Fact]

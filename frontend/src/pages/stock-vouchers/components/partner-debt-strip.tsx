@@ -31,7 +31,7 @@ export function PartnerDebtStrip({ partnerId, partnerLabel, current, saved, canc
   const available = after?.receivableChanged ? after.availableAfter : data.available ?? null;
   return (
     <div className="flex flex-nowrap items-center gap-x-2.5 overflow-x-auto whitespace-nowrap border-t border-dashed bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
-      <span className="min-w-[8ch] max-w-[28ch] truncate font-semibold text-foreground" title={partnerLabel}>{partnerLabel}</span>
+      <span className="min-w-0 max-w-[28ch] truncate font-semibold text-foreground" title={partnerLabel}>{partnerLabel}</span>
       <span className="shrink-0">
         Phải thu <Value testId="partner-debt-receivable" value={data.receivableBalance} />
         {after?.receivableChanged && <> → sau phiếu <Value testId="partner-debt-receivable-after" value={after.receivableAfter} /></>}

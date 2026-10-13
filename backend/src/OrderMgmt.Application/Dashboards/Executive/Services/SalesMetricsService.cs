@@ -118,13 +118,7 @@ public class SalesMetricsService : ISalesMetricsService
         var canViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost);
 
         var counted = await BuildCountedQueryAsync(scope, period.Start, period.End, ct);
-        var totals = query.By switch
-        {
-            SalesTopBy.Customer => TotalsByKey(await LoadVouchersAsync(counted, canViewCost, ct), v => v.PartnerId),
-            SalesTopBy.Employee => TotalsByKey(await LoadVouchersAsync(counted, canViewCost, ct), v => v.OwnerUserId),
-            SalesTopBy.Product => await TotalsByProductAsync(counted, canViewCost, ct),
-            _ => throw new ArgumentOutOfRangeException(nameof(query), query.By, "Unknown top list."),
-        };
+        var totals = await TotalsAsync(query.By, counted, canViewCost, ct);
         var names = await LoadNamesAsync(query.By, totals.Keys.ToList(), ct);
 
         var rows = totals.Select(t => new SalesTopRowDto
@@ -210,8 +204,26 @@ public class SalesMetricsService : ISalesMetricsService
         }).ToList();
     }
 
+    /// The totals of each customer, employee or product of the counted vouchers, by the grouping of the top list.
+    private async Task<Dictionary<Guid, Totals>> TotalsAsync(
+        SalesTopBy by, Counted counted, bool canViewCost, CancellationToken ct)
+    {
+        if (by == SalesTopBy.Product)
+            return await TotalsByProductAsync(counted, canViewCost, ct);
+
+        Func<VoucherRow, Guid?> key = by switch
+        {
+            SalesTopBy.Customer => v => v.PartnerId,
+            SalesTopBy.Employee => v => v.OwnerUserId,
+            _ => throw new ArgumentOutOfRangeException(nameof(by), by, "Unknown top list."),
+        };
+        // One read of the vouchers for both groupings, so the cost flag is decided here and nowhere else.
+        return TotalsByKey(await LoadVouchersAsync(counted, canViewCost, ct), key);
+    }
+
     /// Customers (the voucher's partner) or employees (the voucher's owner), grouped in memory by `key`.
     private static Dictionary<Guid, Totals> TotalsByKey(List<VoucherRow> vouchers, Func<VoucherRow, Guid?> key) =>
+        // XBH and NTL require a customer, so no counted voucher lacks a partner; the filter only drops a null key.
         vouchers.Where(v => key(v) is not null)
             .GroupBy(v => key(v)!.Value)
             .ToDictionary(g => g.Key, g => new Totals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));

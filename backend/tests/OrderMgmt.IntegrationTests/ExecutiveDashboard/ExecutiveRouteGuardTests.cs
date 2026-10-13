@@ -9,25 +9,31 @@ using Xunit;
 namespace OrderMgmt.IntegrationTests.ExecutiveDashboard;
 
 /// The guards every executive route must keep: the report permission of its domain, the branch scope of a user
-/// without branches.access_all, and the own-branch default. One row of `Routes` per route: a phase that adds a
-/// route adds its row here and the three guards run on it.
+/// without branches.access_all, the own-branch default, and the company-wide default of a user with it. One row of
+/// `Routes` per route carries the route's own expectations: a phase that adds a route adds its row here (and its
+/// documents to `ArrangeAsync`) and the four guards run on it.
 [Collection(nameof(PostgresCollection))]
 public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
 {
     /// Route: the path under api/dashboard/executive. Extra: the query string after the period (starts with `&`).
     /// Permission: the report permission the route needs besides dashboard.executive. ReadTotal: the figure of the
-    /// response that must cover the own branch only (2,500 for the main branch of the report dataset).
+    /// response that the two expectations are about. OwnBranch: that figure for the main branch of the arranged data
+    /// alone. Company: that figure for every branch of it.
     private sealed record GuardedRoute(
-        string Route, string Extra, string Permission, Func<HttpResponseMessage, Task<decimal>> ReadTotal);
+        string Route, string Extra, string Permission, Func<HttpResponseMessage, Task<decimal>> ReadTotal,
+        decimal OwnBranch, decimal Company);
 
     private static readonly GuardedRoute[] Routes =
     {
         new("sales/summary", "", Permissions.Reports.Profit,
-            async response => (await ReadDataAsync<SalesSummaryDto>(response)).Revenue),
+            async response => (await ReadDataAsync<SalesSummaryDto>(response)).Revenue,
+            OwnBranch: 2_500m, Company: 12_499m),
         new("sales/series", "&granularity=Day", Permissions.Reports.Profit,
-            async response => (await ReadDataAsync<SalesSeriesDto>(response)).Points.Sum(point => point.Revenue)),
+            async response => (await ReadDataAsync<SalesSeriesDto>(response)).Points.Sum(point => point.Revenue),
+            OwnBranch: 2_500m, Company: 12_499m),
         new("sales/top", "&by=Customer", Permissions.Reports.Profit,
-            async response => (await ReadDataAsync<List<SalesTopRowDto>>(response)).Sum(row => row.Revenue)),
+            async response => (await ReadDataAsync<List<SalesTopRowDto>>(response)).Sum(row => row.Revenue),
+            OwnBranch: 2_500m, Company: 12_499m),
     };
 
     public ExecutiveRouteGuardTests(PostgresFixture pg) : base(pg) { }
@@ -49,7 +55,7 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
     public async Task Foreign_branch_is_refused(string routeName)
     {
         var route = RouteOf(routeName);
-        var ids = await ReportDataset.SeedAsync(this);
+        var ids = await ArrangeAsync();
         var user = await BranchUserAsync(ids, route);
 
         (await GetExecRawAsync(user, UrlOf(route, $"&branchId={ids.BranchBId}")))
@@ -61,20 +67,36 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
     public async Task Own_branch_by_default(string routeName)
     {
         var route = RouteOf(routeName);
-        var ids = await ReportDataset.SeedAsync(this);
+        var ids = await ArrangeAsync();
         var user = await BranchUserAsync(ids, route);
 
         var total = await route.ReadTotal(await GetExecRawAsync(user, UrlOf(route)));
 
-        // The user may read the main branch only: the 9,999 sold in branch B would make it 12,499.
-        total.Should().Be(2_500m);
+        // The user may read the main branch only: what branch B sold must not be in it.
+        total.Should().Be(route.OwnBranch);
     }
+
+    [Theory]
+    [MemberData(nameof(RouteNames))]
+    public async Task Company_wide_for_access_all(string routeName)
+    {
+        var route = RouteOf(routeName);
+        await ArrangeAsync();
+
+        var total = await route.ReadTotal(await GetExecRawAsync(CloneAdminClient(), UrlOf(route)));
+
+        // An admin without branchId reads every branch.
+        total.Should().Be(route.Company);
+    }
+
+    /// The documents the cases read. Today the report dataset; a phase that adds routes adds its documents here.
+    private Task<ReportIds> ArrangeAsync() => ReportDataset.SeedAsync(this);
 
     private static GuardedRoute RouteOf(string routeName) => Routes.Single(route => route.Route == routeName);
 
     private static string UrlOf(GuardedRoute route, string more = "") => $"{route.Route}?{OctoberRange}{route.Extra}{more}";
 
-    /// A user without branches.access_all whose default branch is the dataset's main branch.
+    /// A user without branches.access_all whose default branch is the main branch of the arranged data.
     private Task<HttpClient> BranchUserAsync(ReportIds ids, GuardedRoute route) =>
         CreateClientWithPermissionsAsync("branch_user", ids.MainBranchId, Permissions.Dashboard.Executive, route.Permission);
 }

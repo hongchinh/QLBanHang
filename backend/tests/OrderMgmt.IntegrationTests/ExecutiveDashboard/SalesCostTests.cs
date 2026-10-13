@@ -1,4 +1,5 @@
 using FluentAssertions;
+using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -63,17 +64,18 @@ public class SalesCostTests : ExecutiveDashboardTestBase
         var product = await CreateInventoryProductAsync("COST-02");
         await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-01 09:00", branch.SupplierId, product, 20, 100);
         await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-04 09:00", branch.CustomerId, product, 4, 150);
-        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-07 09:00", branch.CustomerId, product, 2, 200);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-07 09:00", branch.CustomerId, product, 2, 180);
 
         // The period 10-06 .. 10-08 holds the second sale; the 3 days before it (10-03 .. 10-05) hold the first.
+        // Their gross profits differ (160 and 200), so a margin taken from the wrong period shows.
         var summary = await GetSummaryAsync(branch.Client, $"from=2026-10-06&to=2026-10-08&branchId={branch.BranchId}");
 
-        summary.Revenue.Should().Be(400m);
+        summary.Revenue.Should().Be(360m);
         summary.PrevRevenue.Should().Be(600m);
-        summary.RevenueDeltaPct.Should().Be(-33.33m);
+        summary.RevenueDeltaPct.Should().Be(-40m);
         summary.Cost.Should().Be(200m);
-        summary.GrossProfit.Should().Be(200m);
-        summary.MarginPct.Should().Be(50m);
+        summary.GrossProfit.Should().Be(160m);
+        summary.MarginPct.Should().Be(44.44m);
         summary.PrevMarginPct.Should().Be(33.33m);
     }
 
@@ -98,8 +100,15 @@ public class SalesCostTests : ExecutiveDashboardTestBase
     public async Task Provisional_follows_the_costing_period()
     {
         var client = CloneAdminClient();
+        var today = VnTime.ToVnDate(DateTimeOffset.UtcNow);
+        var lastMonth = today.AddMonths(-1);
+        var startOfLastMonth = new DateOnly(lastMonth.Year, lastMonth.Month, 1);
 
         (await GetSummaryAsync(client, "from=2020-01-01&to=2020-01-31")).IsProvisional.Should().BeFalse();
         (await GetSummaryAsync(client, "from=2099-12-01&to=2099-12-31")).IsProvisional.Should().BeTrue();
+
+        // The last day decides: a range that starts in a finished month and ends in the current one is provisional.
+        (await GetSummaryAsync(client, $"from={startOfLastMonth:yyyy-MM-dd}&to={today:yyyy-MM-dd}"))
+            .IsProvisional.Should().BeTrue();
     }
 }

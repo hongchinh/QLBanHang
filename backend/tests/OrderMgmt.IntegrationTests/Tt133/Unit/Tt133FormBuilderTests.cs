@@ -431,4 +431,53 @@ public class Tt133FormBuilderTests
         Tt133FormBuilder.SheetName("QTM", used);
         Tt133FormBuilder.SheetName("qtm", used).Should().Be("qtm (2)");
     }
+
+    [Fact]
+    public void A_row_whose_text_wraps_gets_a_height_for_all_its_lines()
+    {
+        // LibreOffice keeps the default height of a row without one, so wrapped text would print over its neighbours.
+        var (b, ws) = NewBuilder(Context());
+        b.WriteTableHeader();
+
+        var shortRow = b.Row;
+        b.WriteRow(new DateOnly(2026, 10, 5), "Thu tiền", 4_000m, null);
+        var longRow = b.Row;
+        b.WriteRow(new DateOnly(2026, 10, 6),
+            "Thu tiền hàng đợt 1 theo hợp đồng số 25/2026/HĐMB – Công ty Cổ phần Đầu tư Xây dựng Đông Á", 4_000m, null);
+
+        ws.Row(shortRow).Height.Should().Be(ws.RowHeight);
+        ws.Row(longRow).Height.Should().Be(3 * ws.RowHeight); // 90 characters in a column of 30
+    }
+
+    [Fact]
+    public void A_text_line_longer_than_the_page_wraps()
+    {
+        var (b, ws) = NewBuilder(Context());
+
+        var shortRow = b.Row;
+        b.WriteText("Hai bên cùng đối chiếu công nợ như sau:");
+        var longRow = b.Row;
+        var text = "Tính đến ngày 31/10/2026, Bên B còn nợ Bên A số tiền: 368.775.000 đồng "
+            + "(Bằng chữ: Ba trăm sáu mươi tám triệu bảy trăm bảy mươi lăm nghìn đồng).";
+        b.WriteText(text);
+
+        ws.Cell(shortRow, 1).Style.Alignment.WrapText.Should().BeFalse();
+        ws.Row(shortRow).Height.Should().Be(ws.RowHeight);
+        ws.Cell(longRow, 1).Style.Alignment.WrapText.Should().BeTrue();
+        ws.Row(longRow).Height.Should().Be(2 * ws.RowHeight); // 143 characters over 70 column units
+    }
+
+    [Fact]
+    public void A_long_unit_line_of_the_header_block_wraps()
+    {
+        var context = Context();
+        context.CompanyName = "Công ty TNHH Thương mại và Sản xuất Vật liệu Xây dựng Hoàng Phương";
+        var (b, ws) = NewBuilder(context);
+
+        b.WriteHeaderBlock("S04a-DNN");
+
+        ws.Cell(1, 1).Style.Alignment.WrapText.Should().BeTrue();
+        ws.Row(1).Height.Should().Be(2 * ws.RowHeight); // 89 characters over the 42 units of columns A and B
+        ws.Row(2).Height.Should().Be(ws.RowHeight);
+    }
 }

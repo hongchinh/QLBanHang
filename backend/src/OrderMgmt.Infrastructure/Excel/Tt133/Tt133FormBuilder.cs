@@ -12,6 +12,9 @@ public sealed class Tt133FormBuilder
     private const string QuantityFormat = "#,##0.###;(#,##0.###)";
     private const string DateFormat = "dd/MM/yyyy";
     private const int MaxSheetNameLength = 31;
+    // Times New Roman 11 fits about 1.28 characters of running text per column width unit in LibreOffice (measured on
+    // the PDF samples); the estimate stays below that, because a missing line is cut off and a spare one only costs space.
+    private const double CharactersPerWidthUnit = 1.2;
     private static readonly char[] InvalidSheetChars = ['[', ']', ':', '*', '?', '/', '\\'];
 
     private readonly Tt133FormContext _context;
@@ -83,6 +86,7 @@ public sealed class Tt133FormBuilder
             var cell = Merged(Row, 1, leftEnd);
             cell.Value = left[i];
             cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            WrapMerged(cell, left[i], 1, leftEnd, bold: false);
 
             if (right != null)
             {
@@ -123,6 +127,7 @@ public sealed class Tt133FormBuilder
         cell.Style.Alignment.Horizontal = centered
             ? XLAlignmentHorizontalValues.Center
             : XLAlignmentHorizontalValues.Left;
+        WrapMerged(cell, text, 1, _columns.Count, bold);
         Row++;
         _gapAfterTitle = false;
     }
@@ -192,13 +197,17 @@ public sealed class Tt133FormBuilder
     /// One value per column; null = empty.
     public void WriteRow(params object?[] cells)
     {
+        var lines = 1;
         for (var i = 0; i < _columns.Count; i++)
         {
             var cell = Sheet.Cell(Row, i + 1);
             var value = i < cells.Length ? cells[i] : null;
             if (value != null) SetValue(cell, value);
             FormatCell(cell, _columns[i].Kind);
+            if (value is string text && _columns[i].Kind == Tt133CellKind.Text)
+                lines = Math.Max(lines, LineCount(text, _columns[i].Width, bold: false));
         }
+        SetRowLines(lines);
         Bordered(Sheet.Range(Row, 1, Row, _columns.Count));
         Row++;
         _gapAfterTitle = false;
@@ -213,6 +222,8 @@ public sealed class Tt133FormBuilder
         var labelCell = Sheet.Cell(Row, _labelColumn);
         labelCell.Value = label;
         labelCell.Style.Font.Bold = true;
+        if (_columns[_labelColumn - 1].Kind == Tt133CellKind.Text)
+            SetRowLines(LineCount(label, _columns[_labelColumn - 1].Width, bold: true));
 
         foreach (var (column, value) in values)
         {
@@ -370,6 +381,41 @@ public sealed class Tt133FormBuilder
                 cell.Style.Alignment.WrapText = true;
                 break;
         }
+    }
+
+    /// Wraps a text that is longer than its merged columns and makes the row tall enough for it.
+    private void WrapMerged(IXLCell cell, string text, int firstColumn, int lastColumn, bool bold)
+    {
+        var width = 0d;
+        for (var i = firstColumn; i <= lastColumn; i++) width += _columns[i - 1].Width;
+        var lines = LineCount(text, width, bold);
+        if (lines == 1) return;
+        cell.Style.Alignment.WrapText = true;
+        SetRowLines(lines);
+    }
+
+    /// LibreOffice (the PDF conversion) keeps the default height of a row that has none and prints wrapped text over
+    /// the neighbouring rows, so a row with more than one line of text gets an explicit height.
+    private void SetRowLines(int lines)
+    {
+        if (lines > 1) Sheet.Row(Row).Height = lines * Sheet.RowHeight;
+    }
+
+    /// An estimate of the lines a wrapped text takes in a column of the given width (in characters of the default
+    /// font). Capital letters are about one and a half times as wide as the rest, a space about 0.6; bold text is a
+    /// tenth wider.
+    internal static int LineCount(string? text, double width, bool bold)
+    {
+        if (string.IsNullOrEmpty(text) || width <= 0) return 1;
+        var capacity = width * CharactersPerWidthUnit / (bold ? 1.1 : 1.0);
+        var lines = 0;
+        foreach (var segment in text.Split('\n'))
+        {
+            var units = 0d;
+            foreach (var c in segment) units += char.IsUpper(c) ? 1.5 : c == ' ' ? 0.6 : 1.0;
+            lines += Math.Max(1, (int)Math.Ceiling(units / capacity));
+        }
+        return lines;
     }
 
     private IXLCell Merged(int row, int firstColumn, int lastColumn)

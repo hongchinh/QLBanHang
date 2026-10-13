@@ -75,6 +75,9 @@
   - Warehouse pickers use `selectableWarehouses` (active ones, plus the current inactive selection). Quantity inputs parse with `parseQuantityInput` (`lib/stock-quantity.ts`), money with `parseMoneyInput`.
   - Long synchronous calls (cost recalculation, costing settings) pass an explicit `timeout` and treat `isRequestTimeout` as "may still be running".
   - The service worker caches only allow-listed reference data that is the same for every signed-in user (`CACHEABLE_API_PREFIXES` in `lib/sw-routes.ts`); never add a branch-, user- or permission-scoped path there.
+  - The stock voucher form keeps every tab panel mounted (`forceMount`, hidden with `data-[state=inactive]:hidden`), so form fields keep their refs and ids. A field's tab comes from `tabOfField` (`pages/stock-vouchers/utils/voucher-tabs.ts`). Map any new header field there. The Thông tin khác tab is inline JSX in `stock-voucher-form-page.tsx`.
+  - Grid keyboard rules live in pure functions in `pages/stock-vouchers/utils/line-navigation.ts`: the Enter path per pricing mode, previous/next stop, ↑/↓ target. Per-user grid settings live in `use-stock-grid-prefs.ts` (localStorage `qldh:stock-grid-prefs:{userId}:{In|Out}`, versioned, validated on read). A new grid input field must be added to `LINE_FOCUS_FIELDS` and, if hideable, to `OPTIONAL_COLUMNS`. The grid, its cells and the column array all live in `components/stock-line-grid.tsx`; the settings popover is `components/stock-grid-settings-popover.tsx`.
+  - Enter never submits the stock voucher form. Save is Ctrl+S or the buttons.
 
 ## Cash & Debt Patterns (Round 2A)
 

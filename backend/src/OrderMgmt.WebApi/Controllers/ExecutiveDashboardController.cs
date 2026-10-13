@@ -66,4 +66,13 @@ public class ExecutiveDashboardController : ApiControllerBase
         await _queryValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _cash.GetSummaryAsync(query, ct));
     }
+
+    [HttpGet("cash/series")]
+    [HasPermission(Permissions.Reports.Cash)]
+    public async Task<ActionResult<ApiResponse<CashSeriesDto>>> CashSeries(
+        [FromQuery] ExecutiveSeriesQuery query, CancellationToken ct)
+    {
+        await _seriesValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _cash.GetSeriesAsync(query, ct));
+    }
 }

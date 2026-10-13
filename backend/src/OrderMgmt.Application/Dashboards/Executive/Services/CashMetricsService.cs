@@ -93,6 +93,35 @@ public class CashMetricsService : ICashMetricsService
         };
     }
 
+    public Task<CashSeriesDto> GetSeriesAsync(ExecutiveSeriesQuery query, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildSeriesAsync(query, c), ct);
+
+    private async Task<CashSeriesDto> BuildSeriesAsync(ExecutiveSeriesQuery query, CancellationToken ct)
+    {
+        var today = VnTime.ToVnDate(_clock.UtcNow);
+        var scope = await _scopes.ResolveAsync(query.BranchId, ct);
+        var period = ExecutivePeriod.Create(query.From, query.To, today);
+
+        var funds = await LoadFundsAsync(scope, ct);
+        var movements = await LoadMovementsAsync(funds, ct);
+        // Only the period's movements are grouped: a week or a month may reach past the period's first or last day.
+        var totals = InWindow(movements, period.Start, period.End)
+            .GroupBy(m => ExecutiveSeries.BucketOf(VnTime.ToVnDate(m.At), query.Granularity))
+            .ToDictionary(g => g.Key, g => (Receipts: ReceiptTotal(g), Payments: PaymentTotal(g)));
+
+        return new CashSeriesDto
+        {
+            Granularity = query.Granularity,
+            Points = ExecutiveSeries.Buckets(period.From, period.To, query.Granularity)
+                .Select(bucket =>
+                {
+                    totals.TryGetValue(bucket, out var total);
+                    return new CashPointDto { Date = bucket, Receipts = total.Receipts, Payments = total.Payments };
+                })
+                .ToList(),
+        };
+    }
+
     /// The funds of the scope, active or not: an inactive fund keeps its history and its balance.
     private async Task<List<FundRow>> LoadFundsAsync(ExecutiveScope scope, CancellationToken ct)
     {

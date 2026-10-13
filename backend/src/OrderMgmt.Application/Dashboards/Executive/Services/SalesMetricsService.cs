@@ -11,8 +11,9 @@ using OrderMgmt.Domain.Enums;
 namespace OrderMgmt.Application.Dashboards.Executive.Services;
 
 /// Sales of the executive dashboard. A sale is a stock-out voucher with the system reason XBH and a return is a
-/// stock-in voucher with NTL (P3); revenue is before VAT and freight is not revenue (P4). The cost of a sale is the
-/// cost of the goods it took out of stock and a return gives back the value at which the goods re-enter it (P5).
+/// stock-in voucher with NTL; reasons a user created never count. Revenue is before VAT and freight is not revenue.
+/// The cost of a sale is the cost of the goods it took out of stock and a return gives back the value at which the
+/// goods re-enter it.
 public class SalesMetricsService : ISalesMetricsService
 {
     private readonly IAppDbContext _db;
@@ -43,7 +44,8 @@ public class SalesMetricsService : ISalesMetricsService
         var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, ct);
 
         // One read for the period and the one before it; they are adjacent, so an instant tells them apart.
-        var vouchers = await LoadVouchersAsync(await FindCountedAsync(scope, period.PrevStart, period.End, ct), canViewCost, ct);
+        var vouchers = await LoadVouchersAsync(
+            await BuildCountedQueryAsync(scope, period.PrevStart, period.End, ct), canViewCost, ct);
         var current = vouchers.Where(v => v.At >= period.Start).ToList();
         var previous = vouchers.Where(v => v.At < period.Start).ToList();
         var revenue = current.Sum(v => v.Revenue);
@@ -80,7 +82,8 @@ public class SalesMetricsService : ISalesMetricsService
         var period = ExecutivePeriod.Create(query.From, query.To, today);
         var canViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost);
 
-        var vouchers = await LoadVouchersAsync(await FindCountedAsync(scope, period.Start, period.End, ct), canViewCost, ct);
+        var vouchers = await LoadVouchersAsync(
+            await BuildCountedQueryAsync(scope, period.Start, period.End, ct), canViewCost, ct);
         var totals = vouchers
             .GroupBy(v => ExecutiveSeries.BucketOf(VnTime.ToVnDate(v.At), query.Granularity))
             .ToDictionary(g => g.Key, g => new Totals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
@@ -114,10 +117,14 @@ public class SalesMetricsService : ISalesMetricsService
         var period = ExecutivePeriod.Create(query.From, query.To, today);
         var canViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost);
 
-        var counted = await FindCountedAsync(scope, period.Start, period.End, ct);
-        var totals = query.By == SalesTopBy.Product
-            ? await TotalsByProductAsync(counted, canViewCost, ct)
-            : TotalsByVoucherKey(await LoadVouchersAsync(counted, canViewCost, ct), query.By);
+        var counted = await BuildCountedQueryAsync(scope, period.Start, period.End, ct);
+        var totals = query.By switch
+        {
+            SalesTopBy.Customer => TotalsByKey(await LoadVouchersAsync(counted, canViewCost, ct), v => v.PartnerId),
+            SalesTopBy.Employee => TotalsByKey(await LoadVouchersAsync(counted, canViewCost, ct), v => v.OwnerUserId),
+            SalesTopBy.Product => await TotalsByProductAsync(counted, canViewCost, ct),
+            _ => throw new ArgumentOutOfRangeException(nameof(query), query.By, "Unknown top list."),
+        };
         var names = await LoadNamesAsync(query.By, totals.Keys.ToList(), ct);
 
         var rows = totals.Select(t => new SalesTopRowDto
@@ -129,15 +136,18 @@ public class SalesMetricsService : ISalesMetricsService
             GrossProfit = canViewCost ? t.Value.Revenue - t.Value.Cost : null,
         });
         var byGrossProfit = query.Sort == SalesTopSort.GrossProfit && canViewCost;
+        // A total order: equal figures and equal names still come back in the same order, so Take(Limit) is stable.
         return rows
             .OrderByDescending(r => byGrossProfit ? r.GrossProfit!.Value : r.Revenue)
             .ThenBy(r => r.Name, StringComparer.Ordinal)
+            .ThenBy(r => r.Id)
             .Take(query.Limit)
             .ToList();
     }
 
-    /// The counted vouchers of the scope with VoucherAt in [from, to): Active, not deleted, reason XBH or NTL.
-    private async Task<Counted> FindCountedAsync(ExecutiveScope scope, DateTimeOffset from, DateTimeOffset to,
+    /// The query of the counted vouchers of the scope with VoucherAt in [from, to): Active, not deleted, reason XBH or
+    /// NTL. Only the reason ids are read here; the vouchers are read when the query is run.
+    private async Task<Counted> BuildCountedQueryAsync(ExecutiveScope scope, DateTimeOffset from, DateTimeOffset to,
         CancellationToken ct)
     {
         // The reason ids come from their own query: IgnoreQueryFilters would also reveal deleted vouchers here.
@@ -200,14 +210,11 @@ public class SalesMetricsService : ISalesMetricsService
         }).ToList();
     }
 
-    /// Customers (the voucher's partner) or employees (the voucher's owner), grouped in memory.
-    private static Dictionary<Guid, Totals> TotalsByVoucherKey(List<VoucherRow> vouchers, SalesTopBy by)
-    {
-        var groups = by == SalesTopBy.Customer
-            ? vouchers.Where(v => v.PartnerId is not null).GroupBy(v => v.PartnerId!.Value)
-            : vouchers.GroupBy(v => v.OwnerUserId);
-        return groups.ToDictionary(g => g.Key, g => new Totals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
-    }
+    /// Customers (the voucher's partner) or employees (the voucher's owner), grouped in memory by `key`.
+    private static Dictionary<Guid, Totals> TotalsByKey(List<VoucherRow> vouchers, Func<VoucherRow, Guid?> key) =>
+        vouchers.Where(v => key(v) is not null)
+            .GroupBy(v => key(v)!.Value)
+            .ToDictionary(g => g.Key, g => new Totals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
 
     /// Products: revenue from the voucher lines and cost from the ledger rows, each grouped by product in the database.
     private async Task<Dictionary<Guid, Totals>> TotalsByProductAsync(Counted counted, bool withCost, CancellationToken ct)
@@ -258,12 +265,14 @@ public class SalesMetricsService : ISalesMetricsService
                         .Select(p => new { p.Id, p.Code, p.Name })
                         .ToListAsync(ct))
                     .ToDictionary(p => p.Id, p => ((string?)p.Code, p.Name));
-            default:
+            case SalesTopBy.Employee:
                 return (await _db.Users.IgnoreQueryFilters().AsNoTracking()
                         .Where(u => ids.Contains(u.Id))
                         .Select(u => new { u.Id, u.FullName })
                         .ToListAsync(ct))
                     .ToDictionary(u => u.Id, u => ((string?)null, u.FullName));
+            default:
+                throw new ArgumentOutOfRangeException(nameof(by), by, "Unknown top list.");
         }
     }
 

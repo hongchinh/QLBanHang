@@ -168,6 +168,48 @@ public class SalesTopTests : ExecutiveDashboardTestBase
         await AssertBadRequestKeyAsync(client, $"sales/top?{October}&by=Product&limit=51", "limit", "Số dòng từ 1 đến 50.");
     }
 
+    [Fact]
+    public async Task Limit_keeps_the_first_row_of_the_order()
+    {
+        var branch = await CreateFreshBranchAsync();
+        // Created in reverse name order, so the order by name is not the order of creation.
+        var second = await CreateInventoryProductAsync("LIM-B", track: false);
+        var first = await CreateInventoryProductAsync("LIM-A", track: false);
+        foreach (var product in new[] { second, first })
+            await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-20 09:00", branch.CustomerId, product, 1, 500);
+        var query = $"{October}&by=Product&branchId={branch.BranchId}&limit=1";
+
+        // The same revenue: the name decides (ordinal).
+        (await GetTopAsync(branch.Client, query)).Select(r => r.Id).Should().Equal(first);
+
+        // The same revenue and the same name: the smaller Id decides, on every call.
+        await InDbAsync(db => db.Products.Where(p => p.Id == first || p.Id == second)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.Name, "Cùng tên")));
+        var smaller = new[] { first, second }.Min();
+        (await GetTopAsync(branch.Client, query)).Select(r => r.Id).Should().Equal(smaller);
+        (await GetTopAsync(branch.Client, query)).Select(r => r.Id).Should().Equal(smaller);
+    }
+
+    [Fact]
+    public async Task Customers_with_the_same_name_and_revenue_are_ordered_by_id()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var product = await CreateInventoryProductAsync("TIE-01", track: false);
+        var other = await CreatePartnerAsync("FKH3" + Guid.NewGuid().ToString("N")[..8], isCustomer: true,
+            isSupplier: false);
+        await InDbAsync(db => db.Customers.Where(c => c.Id == branch.CustomerId || c.Id == other)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.Name, "Cùng tên")));
+        var smaller = new[] { branch.CustomerId, other }.Min();
+        var larger = new[] { branch.CustomerId, other }.Max();
+        // The customer with the larger Id is sold to first, so that is the order the vouchers come back from the database.
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-20 09:00", larger, product, 1, 500);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-21 09:00", smaller, product, 1, 500);
+
+        var rows = await GetTopAsync(branch.Client, $"{October}&by=Customer&branchId={branch.BranchId}&limit=1");
+
+        rows.Select(r => r.Id).Should().Equal(smaller);
+    }
+
     /// Pins the framework: model binding refuses a number outside the enum by itself, before any validator runs.
     /// The body is a ValidationProblemDetails, not the app envelope, so only the status is asserted.
     [Fact]

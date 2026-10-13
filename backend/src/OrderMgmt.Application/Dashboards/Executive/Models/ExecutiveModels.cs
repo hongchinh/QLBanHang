@@ -8,10 +8,10 @@ public class ExecutiveQuery
     /// Default: VN today.
     public DateOnly? To { get; set; }
 
-    /// Omitted: every branch the user may see (P7).
+    /// Omitted: every branch the user may see (only the own branch without branches.access_all).
     public Guid? BranchId { get; set; }
 
-    /// As-at date of the balance figures, default VN today (P6).
+    /// As-at date of the balance figures (not of the period figures), default VN today.
     public DateOnly? At { get; set; }
 }
 

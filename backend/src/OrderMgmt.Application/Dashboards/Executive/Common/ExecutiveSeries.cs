@@ -9,7 +9,8 @@ public static class ExecutiveSeries
     {
         SeriesGranularity.Day => date,
         SeriesGranularity.Week => date.AddDays(-(((int)date.DayOfWeek + 6) % 7)),
-        _ => new DateOnly(date.Year, date.Month, 1),
+        SeriesGranularity.Month => new DateOnly(date.Year, date.Month, 1),
+        _ => throw UnknownGranularity(granularity),
     };
 
     /// Every bucket that holds a day of [from, to]: distinct, ascending.
@@ -25,6 +26,10 @@ public static class ExecutiveSeries
     {
         SeriesGranularity.Day => bucket.AddDays(1),
         SeriesGranularity.Week => bucket.AddDays(7),
-        _ => bucket.AddMonths(1),
+        SeriesGranularity.Month => bucket.AddMonths(1),
+        _ => throw UnknownGranularity(granularity),
     };
+
+    private static ArgumentOutOfRangeException UnknownGranularity(SeriesGranularity granularity) =>
+        new(nameof(granularity), granularity, "Unknown series granularity.");
 }

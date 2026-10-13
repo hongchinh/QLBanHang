@@ -41,4 +41,16 @@ public class ExecutiveSeriesTests
     public void Monthly_buckets_start_with_the_month_of_the_first_day()
         => ExecutiveSeries.Buckets(D(8, 15), D(10, 13), SeriesGranularity.Month)
             .Should().Equal(D(8, 1), D(9, 1), D(10, 1));
+
+    [Fact]
+    public void Undefined_granularity_is_refused()
+    {
+        var undefined = (SeriesGranularity)7;
+
+        Action bucketOf = () => ExecutiveSeries.BucketOf(D(10, 14), undefined);
+        Action buckets = () => ExecutiveSeries.Buckets(D(10, 1), D(10, 3), undefined);
+
+        bucketOf.Should().Throw<ArgumentOutOfRangeException>();
+        buckets.Should().Throw<ArgumentOutOfRangeException>();
+    }
 }

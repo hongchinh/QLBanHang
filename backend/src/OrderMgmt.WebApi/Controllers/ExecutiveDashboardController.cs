@@ -8,7 +8,8 @@ using OrderMgmt.WebApi.Authorization;
 
 namespace OrderMgmt.WebApi.Controllers;
 
-/// Executive dashboard (Bảng điều hành): read-only. Each action also needs the report permission of its domain (P9).
+/// Executive dashboard (Bảng điều hành): read-only. Each action needs dashboard.executive and the report permission
+/// of its domain.
 [Route("api/dashboard/executive")]
 [HasPermission(Permissions.Dashboard.Executive)]
 public class ExecutiveDashboardController : ApiControllerBase

@@ -1,8 +1,11 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { computePreset } from '@/lib/date-range-presets';
+import type { RangePreset } from '@/lib/date-range-presets';
 import { formatDateYmd } from './format';
 
-export type RangePreset = 'today' | '7d' | '30d' | 'this-month' | 'last-month';
+// The presets live in lib/date-range-presets.ts; the type is re-exported for the modules that import it from here.
+export type { RangePreset };
 
 export interface UseDashboardParams {
   from: string;
@@ -58,33 +61,8 @@ export function useDashboardParams(): UseDashboardParams {
 
   const setPreset = useCallback(
     (preset: RangePreset) => {
-      const today = new Date();
-      let start: Date;
-      let end: Date = today;
-      switch (preset) {
-        case 'today':
-          start = new Date(today);
-          break;
-        case '7d':
-          start = new Date(today);
-          start.setDate(start.getDate() - 6);
-          break;
-        case '30d':
-          start = new Date(today);
-          start.setDate(start.getDate() - 29);
-          break;
-        case 'this-month':
-          start = new Date(today.getFullYear(), today.getMonth(), 1);
-          break;
-        case 'last-month': {
-          start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-          end = new Date(today.getFullYear(), today.getMonth(), 0);
-          break;
-        }
-        default:
-          start = new Date(today.getFullYear(), today.getMonth(), 1);
-      }
-      setRange(formatDateYmd(start), formatDateYmd(end));
+      const range = computePreset(preset);
+      setRange(range.from, range.to);
     },
     [setRange],
   );

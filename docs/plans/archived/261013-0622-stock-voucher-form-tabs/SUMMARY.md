@@ -1,6 +1,6 @@
 # Stock voucher form redesign (Thiết kế lại form phiếu nhập/xuất kho)
 
-> Created: 2026-10-13 06:22:28 · Source design: [brainstorm SUMMARY](../../brainstorms/261013-0615-stock-voucher-form-tabs/SUMMARY.md) (source of truth for UI and behavior) · Mockups: [mockup-02-t2-detail.html](../../brainstorms/261013-0615-stock-voucher-form-tabs/mockup-02-t2-detail.html)
+> Created: 2026-10-13 06:22:28 · Source design: [brainstorm SUMMARY](../../../brainstorms/261013-0615-stock-voucher-form-tabs/SUMMARY.md) (source of truth for UI and behavior) · Mockups: [mockup-02-t2-detail.html](../../../brainstorms/261013-0615-stock-voucher-form-tabs/mockup-02-t2-detail.html)
 
 ## Goal
 

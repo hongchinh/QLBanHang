@@ -1,8 +1,17 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using ClosedXML.Excel;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using OrderMgmt.Application.CashDebt.Funds.Models;
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Identity.Models;
+using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -174,10 +183,87 @@ public class CashBookExportTests : CashDebtTestBase
         wb.Worksheets.Should().ContainSingle().Which.Name.Should().Be("NH01");
     }
 
+    [Fact]
+    public async Task Validation_permission_and_limits()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+        var nh01 = await InDbAsync(db => db.Funds.Where(f => f.Code == "NH01" && f.BranchId == ids.MainBranchId).Select(f => f.Id).SingleAsync());
+
+        // The form needs one kind: All (the default) is refused.
+        foreach (var query in new[] { $"kind=All&{October}", October })
+        {
+            var all = await client.GetAsync($"/api/reports/cash-book/export?{query}");
+            all.StatusCode.Should().Be(HttpStatusCode.BadRequest, await all.Content.ReadAsStringAsync());
+            (await all.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey("kind");
+        }
+
+        var inverted = await client.GetAsync("/api/reports/cash-book/export?kind=Cash&from=2026-10-31&to=2026-10-01");
+        inverted.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await inverted.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey("to");
+
+        var mismatch = await client.GetAsync($"/api/reports/cash-book/export?kind=Cash&fundId={nh01}&{October}");
+        mismatch.StatusCode.Should().Be(HttpStatusCode.BadRequest, await mismatch.Content.ReadAsStringAsync());
+        (await mismatch.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Details.Should().ContainKey("fundId");
+
+        var debtOnly = await CreateClientWithPermissionsAsync("tt133_nc_" + Guid.NewGuid().ToString("N")[..8], ids.MainBranchId,
+            Permissions.Reports.Debt);
+        (await debtOnly.GetAsync($"/api/reports/cash-book/export?kind=Cash&{October}"))
+            .StatusCode.Should().Be(HttpStatusCode.Forbidden);
+
+        // A branch without a bank fund has nothing to export.
+        var freshBranch = await CreateBranchAsync("X" + Guid.NewGuid().ToString("N")[..8]);
+        var fresh = CloneAdminClient();
+        UseBranch(fresh, freshBranch);
+        var none = await fresh.GetAsync($"/api/reports/cash-book/export?kind=Bank&{October}");
+        none.StatusCode.Should().Be((HttpStatusCode)422, await none.Content.ReadAsStringAsync());
+        (await none.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Code.Should().Be("EXPORT_NO_TARGETS");
+
+        // MaxSheets = 1 and two cash funds.
+        var limited = new WebAppFactoryWithOneSheet(_pg);
+        await ((IAsyncLifetime)limited).InitializeAsync();
+        try
+        {
+            using var limitedClient = limited.CreateClient();
+            var login = await limitedClient.PostAsJsonAsync("/api/auth/login",
+                new LoginRequest { Username = "admin", Password = "Admin@123" });
+            login.EnsureSuccessStatusCode();
+            var body = await login.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(TestJson.Options);
+            limitedClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.Data!.AccessToken);
+
+            var create = await limitedClient.PostAsJsonAsync("/api/funds", new CreateFundRequest
+            {
+                Code = "QTM2", Name = "Quỹ QTM2", Kind = FundKind.Cash, IsDefault = false, IsActive = true,
+            });
+            create.EnsureSuccessStatusCode();
+
+            var tooMany = await limitedClient.GetAsync($"/api/reports/cash-book/export?kind=Cash&{October}");
+            tooMany.StatusCode.Should().Be((HttpStatusCode)422, await tooMany.Content.ReadAsStringAsync());
+            (await tooMany.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Code.Should().Be("EXPORT_TOO_MANY_SHEETS");
+        }
+        finally
+        {
+            await ((IAsyncLifetime)limited).DisposeAsync();
+        }
+    }
+
     private HttpClient MainBranchClient(ReportIds ids)
     {
         var client = CloneAdminClient();
         UseBranch(client, ids.MainBranchId);
         return client;
+    }
+}
+
+/// Tt133Export:MaxSheets = 1, so a second fund is one sheet too many.
+file sealed class WebAppFactoryWithOneSheet : WebAppFactory
+{
+    public WebAppFactoryWithOneSheet(PostgresFixture pg) : base(pg) { }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureAppConfiguration((_, config) =>
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Tt133Export:MaxSheets"] = "1" }));
     }
 }

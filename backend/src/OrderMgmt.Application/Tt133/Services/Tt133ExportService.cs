@@ -56,7 +56,15 @@ public class Tt133ExportService : ITt133ExportService
 
     public async Task<ExportFile> ExportCashBookAsync(CashBookReportRequest request, ExportFormat format, CancellationToken ct = default)
     {
-        var kind = request.Kind == FundKindFilter.Bank ? FundKind.Bank : FundKind.Cash;
+        var kind = request.Kind switch
+        {
+            FundKindFilter.Cash => FundKind.Cash,
+            FundKindFilter.Bank => FundKind.Bank,
+            _ => throw new ValidationDomainException(new Dictionary<string, string[]>
+            {
+                ["kind"] = ["Chọn loại quỹ Tiền mặt hoặc Ngân hàng để xuất theo mẫu."],
+            }, null),
+        };
 
         var (context, report) = await _transaction.RunSnapshotAsync(async token =>
         {

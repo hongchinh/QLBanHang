@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { DEFAULT_PUSH_TITLE, notificationTag, parsePushPayload, resolveTargetUrl } from './sw-push'
+import { describe, expect, it, vi } from 'vitest'
+import { DEFAULT_PUSH_TITLE, focusOrOpenWindow, NAVIGATE_MESSAGE, notificationTag, parsePushPayload, resolveTargetUrl } from './sw-push'
 
 describe('parsePushPayload', () => {
   it('reads title, body and url from the backend payload', () => {
@@ -64,5 +64,37 @@ describe('resolveTargetUrl', () => {
     undefined,
   ])('falls back to / for %s', (url) => {
     expect(resolveTargetUrl(url, origin)).toBe('/')
+  })
+})
+
+describe('focusOrOpenWindow', () => {
+  function fakeClients(windowCount: number) {
+    const windows = Array.from({ length: windowCount }, () => ({
+      focus: vi.fn().mockResolvedValue(undefined),
+      postMessage: vi.fn(),
+    }))
+    return {
+      windows,
+      clients: {
+        matchAll: vi.fn().mockResolvedValue(windows),
+        openWindow: vi.fn().mockResolvedValue(null),
+      },
+    }
+  }
+
+  it('focuses the first open window and asks it to navigate', async () => {
+    const { windows, clients } = fakeClients(2)
+    await focusOrOpenWindow(clients, '/quotations/1')
+    expect(clients.matchAll).toHaveBeenCalledWith({ type: 'window', includeUncontrolled: true })
+    expect(windows[0].focus).toHaveBeenCalledOnce()
+    expect(windows[0].postMessage).toHaveBeenCalledWith({ type: NAVIGATE_MESSAGE, url: '/quotations/1' })
+    expect(windows[1].focus).not.toHaveBeenCalled()
+    expect(clients.openWindow).not.toHaveBeenCalled()
+  })
+
+  it('opens a new window when the app is not open', async () => {
+    const { clients } = fakeClients(0)
+    await focusOrOpenWindow(clients, '/quotations/1')
+    expect(clients.openWindow).toHaveBeenCalledWith('/quotations/1')
   })
 })

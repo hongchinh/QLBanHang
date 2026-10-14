@@ -43,3 +43,29 @@ export function resolveTargetUrl(url: string | undefined, origin: string): strin
     return '/'
   }
 }
+
+export const NAVIGATE_MESSAGE = 'NAVIGATE'
+
+export interface NavigateMessage { type: typeof NAVIGATE_MESSAGE; url: string }
+
+export interface WindowClientLike {
+  focus(): Promise<unknown>
+  postMessage(message: NavigateMessage): void
+}
+
+export interface ClientsLike {
+  matchAll(options: { type: 'window'; includeUncontrolled: boolean }): Promise<readonly WindowClientLike[]>
+  openWindow(url: string): Promise<unknown>
+}
+
+// Open app window → focus the first and send NAVIGATE (SPA navigation, no reload). None → open a new window.
+export async function focusOrOpenWindow(clients: ClientsLike, url: string): Promise<void> {
+  const windows = await clients.matchAll({ type: 'window', includeUncontrolled: true })
+  const client = windows[0]
+  if (client) {
+    await client.focus()
+    client.postMessage({ type: NAVIGATE_MESSAGE, url })
+    return
+  }
+  await clients.openWindow(url)
+}

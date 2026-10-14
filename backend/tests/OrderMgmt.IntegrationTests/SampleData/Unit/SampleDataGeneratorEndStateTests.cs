@@ -21,6 +21,22 @@ public class SampleDataGeneratorEndStateTests
         { "DEMO03", "2026-06-15" },
     };
 
+    /// The end-state inputs plus inputs that exercise a rule the ranges miss (chosen against the current random stream):
+    /// H001 and H002 have a short till on a deposit day inside the end hold (early collection there must stay within
+    /// 5 days of the due date); Y081 and Y011 need clearance to end with 3 low products.
+    public static TheoryData<string, string> MechanismInputs
+    {
+        get
+        {
+            var data = Inputs;
+            data.Add("H001", "2026-10-14");
+            data.Add("H002", "2026-12-31");
+            data.Add("Y081", "2026-01-05");
+            data.Add("Y011", "2026-05-01");
+            return data;
+        }
+    }
+
     private static (SampleDataPlan Plan, PlanReplay End, DateOnly T) Replay(string code, string today)
     {
         var t = SampleDataGeneratorTests.ParseDate(today);
@@ -153,6 +169,75 @@ public class SampleDataGeneratorEndStateTests
         var (plan, _, _) = Replay(code, today);
 
         plan.Steps.Count.Should().BeInRange(200, 320);
+    }
+
+    // ---- Mechanisms behind the end state: each pins one rule that the ranges above do not catch on their own ----
+
+    [Theory]
+    [MemberData(nameof(MechanismInputs))]
+    public void The_late_payer_and_the_bad_debt_customer_hold_credit_sales_placed_relative_to_T(string code, string today)
+    {
+        var (_, end, t) = Replay(code, today);
+
+        foreach (var (habit, overdueDays) in new[]
+                 {
+                     (PaymentHabit.Late, SampleDataVolumes.LateSaleOverdueDays),
+                     (PaymentHabit.BadDebt, SampleDataVolumes.BadDebtSaleOverdueDays),
+                 })
+        {
+            var customer = SampleCatalog.CustomerProfiles.First(p => p.Habit == habit).Code;
+            // A sale placed on a Sunday moves to the Monday, one day less overdue.
+            end.DebtList.Where(d => d.PartnerCode == customer && d.Source == "XBH" && d.Open > 0)
+                .Select(d => t.DayNumber - d.DueDate!.Value.DayNumber)
+                .Should().Contain(days => days == overdueDays || days == overdueDays - 1,
+                    $"{customer} keeps a sale due {overdueDays} days before T open");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(MechanismInputs))]
+    public void The_end_hold_settles_nothing_early(string code, string today)
+    {
+        var (plan, end, _) = Replay(code, today);
+        var holdStart = plan.LastDocumentDate.AddDays(1 - SampleDataVolumes.EndHoldDays);
+        var dueDates = end.DebtList.ToDictionary(d => d.Key, d => d.DueDate);
+
+        foreach (var receipt in plan.Steps.OfType<SampleCashVoucherStep>()
+                     .Where(c => c.ReasonCode == "TKH" && SampleDataGeneratorTests.VnDate(c) >= holdStart))
+        {
+            var date = SampleDataGeneratorTests.VnDate(receipt);
+            // On-time customers pay up to 5 days before the due date; nothing later than that is settled during the hold.
+            receipt.Targets.Should().OnlyContain(target => dueDates[target.TargetKey] <= date.AddDays(5),
+                $"{receipt.Key} on {date:yyyy-MM-dd} settles only invoices due by then");
+        }
+    }
+
+    /// The end-low rule (no purchase in the last EndLowDays days) together with clearance (those products go with the
+    /// sales until they run out). Y081 / 2026-01-05 and Y011 / 2026-05-01 end with fewer than 3 such products without
+    /// clearance.
+    [Theory]
+    [MemberData(nameof(MechanismInputs))]
+    public void A_few_products_are_no_longer_bought_and_end_low(string code, string today)
+    {
+        var (plan, end, _) = Replay(code, today);
+
+        EndLowProducts(plan, end).Should().HaveCountGreaterThanOrEqualTo(3,
+            $"a few products get no purchase in the last {SampleDataVolumes.EndLowDays} days and end below a week of sales");
+    }
+
+    /// Products with no purchase line in the last EndLowDays days that end the window below a week of sales.
+    private static HashSet<string> EndLowProducts(SampleDataPlan plan, PlanReplay end)
+    {
+        var from = plan.LastDocumentDate.AddDays(-SampleDataVolumes.EndLowDays);
+        var bought = plan.Steps.OfType<SampleStockVoucherStep>()
+            .Where(s => s.ReasonCode == "NMH" && SampleDataGeneratorTests.VnDate(s) >= from)
+            .SelectMany(s => s.Lines.Select(l => l.ProductCode))
+            .ToHashSet();
+        return SampleCatalog.ProductPlans
+            .Where(p => !bought.Contains(p.ProductCode)
+                && end.Stock.GetValueOrDefault(("K1", p.ProductCode)) + end.Stock.GetValueOrDefault(("K2", p.ProductCode)) < p.WeeklySales)
+            .Select(p => p.ProductCode)
+            .ToHashSet();
     }
 
     private static DateOnly Max(DateOnly a, DateOnly b) => a > b ? a : b;

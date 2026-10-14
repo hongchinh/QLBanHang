@@ -76,27 +76,25 @@ public static class SampleDataVolumes
     /// A credit sale to a customer with a limit keeps its open receivables at or below this share of the limit.
     public const int CreditLimitUsePercent = 80;
 
-    /// Credit stop: a customer with an invoice more than this many days past its due date (0: any overdue invoice) buys
-    /// only with payment at once (by bank). It keeps the late payers' and the bad debt customer's open debt from growing.
-    public const int CreditStopOverdueDays = 0;
-
     /// Credit control of the sales desk: while the company's open receivables are below ReceivableFloor (once they have
     /// reached it), a sale that would be paid at once goes on credit; when a credit sale would take them above
     /// ReceivableCeiling, it is paid at once.
-    /// Without it the open receivables at T swing by ±150 million with the last weeks' sales; with it they stay near the
-    /// band (the spec wants 400–600 million at T).
-    public const decimal ReceivableFloor = 555_000_000m;
-    public const decimal ReceivableCeiling = 595_000_000m;
+    /// Without it the open receivables at T swing by ±150 million with the last weeks' sales (the spec wants 400–600
+    /// million at T). The band sits high in that range on purpose: invoices falling due in the last days can take the
+    /// receivables up to ~150 million under the floor, while only the small planned sales go above the ceiling.
+    public const decimal ReceivableFloor = 540_000_000m;
+    public const decimal ReceivableCeiling = 580_000_000m;
 
     /// Two credit sales are placed relative to T so the overdue report at T fills every bucket on any date: one to the
     /// first late payer due LateSaleOverdueDays before T (1–30 bucket) and one to the bad debt customer due
-    /// BadDebtSaleOverdueDays before T (31–60 bucket). The opening items fill the 61–90 and > 90 buckets.
+    /// BadDebtSaleOverdueDays before T (31–60 bucket). The opening items fill the 61–90 and > 90 buckets. A planned
+    /// credit sale has a single line and its invoice is held (never settled early).
     public const int LateSaleOverdueDays = 15;
     public const int BadDebtSaleOverdueDays = 40;
 
-    /// End hold: in the last EndHoldDays days customers pay only what is due (no early settlement), and every owner keeps
-    /// an open invoice at T (an owner without one gets a planned credit sale), so the debt by salesperson report has a
-    /// balance for each of them.
+    /// End hold: in the last EndHoldDays days customers pay only invoices that are due or due within
+    /// OnTimeDaysBeforeDueMax days (also when a short till collects early), and every owner keeps an open invoice at T
+    /// (an owner without one gets a planned credit sale), so the debt by salesperson report has a balance for each.
     public const int EndHoldDays = 10;
 
     // ---- Purchases (NMH) ----
@@ -177,17 +175,16 @@ public static class SampleDataVolumes
     public const int BadDebtDaysAfterDueMax = 90;
 
     /// A customer who pays also settles its invoices due within this many days (not during the end hold), so receipts
-    /// often gather several documents; it settles one early only while the company's open receivables stay at or above
-    /// GatherFloor, so one large receipt cannot drain them.
+    /// often gather several documents.
     public const int ReceiptGatherDays = 28;
-    public const decimal GatherFloor = 450_000_000m;
 
     /// Share of the receipts into a bank fund; the rest into cash.
     public const int ReceiptBankPercent = 60;
 
     /// On the deposit day, while the till holds less than CashKeep + CashDepositMin + CashFloat, that day's sales (but the
-    /// dual-role partner's planned credit sale) and receipts are taken in cash, and customers with an invoice to collect
-    /// within EarlyCollectionDays pay it early, so every week ends with a deposit.
+    /// planned credit sales) and receipts are taken in cash, and customers with an invoice to collect within
+    /// EarlyCollectionDays pay it early, only up to the till's shortfall (during the end hold, only invoices due within
+    /// OnTimeDaysBeforeDueMax days), so every week ends with a deposit.
     public const int EarlyCollectionDays = 30;
 
     /// Deliberate partial payments: on or after these days of the window, the next receipt of an on-time customer pays

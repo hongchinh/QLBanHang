@@ -89,6 +89,28 @@ public class SampleDataGeneratorTests
     public void Receipts_gather_several_documents_and_one_or_two_pay_part() => AssertReceiptRules(Generate());
 
     [Fact]
+    public void Sales_placed_relative_to_T_fall_inside_the_shortest_window()
+    {
+        // T − OpeningDate is 89 days at least (T on 1 May after a 28-day February); a sale placed CreditDays + overdue days
+        // before T must not fall before the opening date.
+        var shortest = Enumerable.Range(0, 4 * 366)
+            .Select(d => new DateOnly(2025, 1, 1).AddDays(d))
+            .Min(t => t.DayNumber - SampleCalendar.OpeningDate(t).DayNumber);
+        var creditDays = SampleCatalog.BuildPartners(1).ToDictionary(p => p.Code, p => p.CreditDays ?? 0);
+
+        shortest.Should().Be(89);
+        foreach (var (habit, overdueDays) in new[]
+                 {
+                     (PaymentHabit.Late, SampleDataVolumes.LateSaleOverdueDays),
+                     (PaymentHabit.BadDebt, SampleDataVolumes.BadDebtSaleOverdueDays),
+                 })
+        {
+            var customer = SampleCatalog.CustomerProfiles.First(p => p.Habit == habit && p.CreditLimit == null).Code;
+            (creditDays[customer] + overdueDays).Should().BeLessThanOrEqualTo(shortest, customer);
+        }
+    }
+
+    [Fact]
     public void Is_deterministic()
     {
         var first = Serialize(Generate());

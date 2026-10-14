@@ -13,8 +13,9 @@ public static class SampleOpeningBalances
     private const int PrepaymentAgeMin = 5;
     private const int PrepaymentAgeMax = 30;
 
-    /// Every opening amount varies from its base by up to this much, in 500,000 steps.
+    /// Every opening amount varies from its base by up to AmountSpread, in AmountStep steps.
     private const decimal AmountSpread = 5_000_000m;
+    private const decimal AmountStep = 500_000m;
 
     /// One opening item: invoice aged MinAge..MaxAge days before the opening date.
     /// OverdueAtToday instead ages it from Today, so the item is that many days overdue at Today (kept inside MinAge..MaxAge).
@@ -118,7 +119,7 @@ public static class SampleOpeningBalances
             : random.Between(row.MinAge, row.MaxAge);
 
     private static decimal Amount(SampleRandom random, OpeningRow row) =>
-        row.BaseAmount + random.NextAmount(-AmountSpread, AmountSpread, 500_000m);
+        row.BaseAmount + random.NextAmount(-AmountSpread, AmountSpread, AmountStep);
 
     private static SampleOpeningDebtSpec OpeningItem(int number, SamplePartnerSpec partner, DebtSide side, OpeningDebtKind kind,
         string docNo, DateOnly docDate, decimal amount)

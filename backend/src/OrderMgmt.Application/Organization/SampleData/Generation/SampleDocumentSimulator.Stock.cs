@@ -4,7 +4,7 @@ using static OrderMgmt.Application.Organization.SampleData.Generation.SampleData
 
 namespace OrderMgmt.Application.Organization.SampleData.Generation;
 
-/// Stock vouchers: sales (XBH), purchases (NMH), returns (NTL, XTL) and damaged goods (XKH).
+/// Stock vouchers other than sales: purchases (NMH) with the end-low rule, returns (NTL, XTL) and damaged goods (XKH).
 internal sealed partial class SampleDocumentSimulator
 {
     private const decimal VatRate = 10m;
@@ -12,162 +12,9 @@ internal sealed partial class SampleDocumentSimulator
     /// Working days in a year (Monday to Saturday), to turn the monthly purchasing pace into a daily one.
     private const decimal WorkingDaysPerYear = 313m;
 
-    /// Planned product picks per week over all sales: sales per week × average goods lines per sale.
-    private static readonly decimal PicksPerWeek =
-        (SalesPerMonthMin + SalesPerMonthMax) / 2m * 12m / 52m * (SaleLinesMin + SaleLinesMax) / 2m;
-
-    private readonly List<(DateOnly Date, SampleStockVoucherStep Step)> _sales = new();
     private readonly List<(DateOnly Date, SampleStockVoucherStep Step)> _purchases = new();
     private decimal _purchaseTokens = 1m;
-    private HashSet<string>? _runDown;
-    private bool _receivablesReachedFloor;
-
-    private void Sale()
-    {
-        // Planned credit sales come first (placed relative to T for the overdue buckets, or for an owner's open invoice at
-        // T), then, shortly before the debt offset, one to the dual-role partner if it has no open one.
-        var plannedSale = TakePlannedSale();
-        var customer = plannedSale?.Customer ?? (OffsetNeedsSale() ? _profiles[DualRolePartner] : PickCustomer());
-        var plannedCredit = plannedSale != null || customer.Code == DualRolePartner && OffsetNeedsSale();
-        var warehouse = _random.Chance(K1SalePercent) ? K1 : K2;
-        var available = InStock(warehouse);
-        if (available.Count == 0)
-        {
-            warehouse = warehouse == K1 ? K2 : K1;
-            available = InStock(warehouse);
-            if (available.Count == 0)
-                return;
-        }
-
-        // A line sells about a week of the product's demand in this warehouse divided by how often the product is picked
-        // there (picks per week × warehouse share / products in stock), so planned and simulated sales agree. The month's
-        // revenue pacing then scales every line of the sale alike, which keeps the tiers' proportions.
-        var discount = DiscountRate(customer.Group);
-        var tier = customer.Tier switch
-        {
-            SalesTier.Large => LargeQuantityPercent,
-            SalesTier.Small => SmallQuantityPercent,
-            _ => MediumQuantityPercent,
-        };
-        var pace = RevenuePace();
-        var lines = new List<SampleStockLine>();
-        foreach (var product in PickSaleProducts(available))
-        {
-            var planned = product.WeeklySales * DemandPercent / 100m * available.Count / PicksPerWeek * tier / 100m;
-            var spread = 1m + ((decimal)_random.NextDouble() * 2m - 1m) * SaleQuantitySpreadPercent / 100m;
-            var quantity = Math.Clamp(Math.Round(planned * spread * pace, MidpointRounding.AwayFromZero), 1m,
-                _ledger.Stock(warehouse, product.ProductCode));
-            lines.Add(new SampleStockLine(product.ProductCode, quantity, _products[product.ProductCode].DefaultPrice, discount,
-                VatRate));
-        }
-        if (_random.Chance(TransportLinePercent))
-        {
-            var transport = _products[SampleCatalog.TransportProductCode];
-            lines.Add(new SampleStockLine(transport.Code, 1m, transport.DefaultPrice, discount, VatRate));
-        }
-
-        var total = _ledger.Total(StockDirection.Out, lines);
-        var (method, fund) = SalePayment(customer, total, plannedCredit);
-        var step = new SampleStockVoucherStep(_ledger.NextKey("XBH"), default, OwnerOf(customer.Code), StockDirection.Out, "XBH",
-            warehouse, customer.Code, method, fund, null, lines);
-        Write(step);
-        foreach (var line in lines)
-            _ledger.AddStock(warehouse, line.ProductCode, -line.Quantity);
-        _sales.Add((_date, step));
-        Month.SalesDone++;
-        Month.Revenue += total;
-
-        if (fund != null)
-        {
-            _ledger.MoveFund(fund, total);
-            return;
-        }
-        var due = _date.AddDays(_partners[customer.Code].CreditDays ?? 0);
-        var payDate = CollectionDate(customer, due, opening: false)!.Value;
-        _ledger.Items.Add(new SampleOpenItem(step.Key, customer.Code, DebtSide.Receivable, "XBH", false, total, due,
-            payDate > _date ? payDate : _date.AddDays(1)));
-        if (plannedSale?.Hold == true)
-            _heldKeys.Add(step.Key);
-    }
-
-    /// 1–6 distinct products in stock. While products are run down at the end of the window, a sale that can includes one
-    /// of them (clearance), as an extra line when the sale has room for one, so they really sell out.
-    private List<SampleProductPlan> PickSaleProducts(List<SampleProductPlan> available)
-    {
-        var picked = PickDistinct(available, Math.Min(_random.Between(SaleLinesMin, SaleLinesMax), available.Count));
-        var runDown = available.Where(IsRunDown).ToList();
-        if (runDown.Count == 0 || picked.Any(IsRunDown))
-            return picked;
-        var clearance = _random.Pick(runDown);
-        if (picked.Count < SaleLinesMax)
-            picked.Add(clearance);
-        else
-            picked[0] = clearance;
-        return picked;
-    }
-
-    /// Scale of the next sale's quantities: 1, corrected in proportion to how far the month's revenue is behind (or ahead
-    /// of) its target for the sales made so far.
-    private decimal RevenuePace()
-    {
-        var month = Month;
-        var expected = month.RevenueTarget * month.SalesDone / month.PlannedSales;
-        var pace = 1m + RevenueGain * (expected - month.Revenue) / month.RevenueTarget;
-        return Math.Clamp(pace, SalePaceMinPercent / 100m, SalePaceMaxPercent / 100m);
-    }
-
-    private SampleCustomerProfile PickCustomer()
-    {
-        var roll = _random.Between(1, 100);
-        var tier = roll <= LargeTierPercent ? SalesTier.Large
-            : roll <= LargeTierPercent + SmallTierPercent ? SalesTier.Small
-            : SalesTier.Medium;
-        return _random.Pick(SampleCatalog.CustomerProfiles.Where(p => p.Tier == tier).ToList());
-    }
-
-    /// Retail pays cash at once; others pay at once by chance, else buy on credit. A planned credit sale is on credit.
-    /// On the deposit day, while the till is short, sales are paid in cash, so the week ends with a deposit. A customer
-    /// with an overdue invoice, or whose credit would pass 80% of its limit, pays by bank. The sales desk keeps the
-    /// company's open receivables in [ReceivableFloor, ReceivableCeiling]: above the ceiling it asks for payment at once;
-    /// below the floor (once the receivables have reached it, so not while they build up after the opening) it sells on
-    /// credit.
-    private (string? Method, string? Fund) SalePayment(SampleCustomerProfile customer, decimal total, bool plannedCredit)
-    {
-        if (customer.Group == CustomerGroup.Retail)
-            return ("TM", CashFund);
-
-        var paidAtOnce = _random.Chance(PaidSalePercent);
-        var byBank = _random.Chance(PaidSaleBankPercent);
-        if (plannedCredit)
-            return (null, null);
-        if (DepositIsShort())
-            return ("TM", CashFund);
-
-        var overdue = _ledger.Items.Any(i => i.PartnerCode == customer.Code && i.Side == DebtSide.Receivable && i.Open > 0
-            && i.DueDate < _date.AddDays(-CreditStopOverdueDays));
-        var overLimit = customer.CreditLimit is { } limit
-            && _ledger.OpenReceivable(customer.Code) + total > limit * CreditLimitUsePercent / 100m;
-        if (overdue || overLimit)
-            return ("CK", _random.Pick(BankFunds));
-
-        var open = OpenReceivables();
-        _receivablesReachedFloor |= open >= ReceivableFloor;
-        if (paidAtOnce && (open >= ReceivableFloor || !_receivablesReachedFloor) || open + total > ReceivableCeiling)
-            return byBank ? ("CK", _random.Pick(BankFunds)) : ("TM", CashFund);
-        return (null, null);
-    }
-
-    /// Open receivable invoices of all customers.
-    private decimal OpenReceivables() =>
-        _ledger.Items.Where(i => i.Side == DebtSide.Receivable && !i.IsPrepayment).Sum(i => i.Open);
-
-    private static decimal DiscountRate(CustomerGroup group) => group switch
-    {
-        CustomerGroup.Agent => 5m,
-        CustomerGroup.Project => 3m,
-        CustomerGroup.Company => 2m,
-        _ => 0m,
-    };
+    private HashSet<string>? _endLow;
 
     /// Demand of a product in a warehouse, per week.
     private static decimal Demand(string warehouse, SampleProductPlan product) =>
@@ -196,8 +43,8 @@ internal sealed partial class SampleDocumentSimulator
     /// purchasing pace. A product is due when it is stocked in the warehouse and fell under its reorder threshold.
     private void Purchases()
     {
-        if (_runDown is null && _date >= _plan.LastDocumentDate.AddDays(-EndLowDays))
-            _runDown = PickRunDownProducts();
+        if (_endLow is null && _date >= _plan.LastDocumentDate.AddDays(-EndLowDays))
+            _endLow = PickEndLowProducts();
         _purchaseTokens = Math.Min(PurchaseBurst, _purchaseTokens + PurchasesPerMonth * 12m / WorkingDaysPerYear);
         for (var done = 0; done < PurchasesPerDayMax && _purchaseTokens >= 1m; done++)
         {
@@ -207,7 +54,7 @@ internal sealed partial class SampleDocumentSimulator
             {
                 foreach (var product in SampleCatalog.ProductPlans)
                 {
-                    if (!_ledger.IsStocked(warehouse, product.ProductCode) || IsRunDown(product)
+                    if (!_ledger.IsStocked(warehouse, product.ProductCode) || IsEndLow(product)
                         || Cover(warehouse, product) >= lowest)
                         continue;
                     lowest = Cover(warehouse, product);
@@ -221,12 +68,12 @@ internal sealed partial class SampleDocumentSimulator
         }
     }
 
-    private bool IsRunDown(SampleProductPlan product) => _runDown?.Contains(product.ProductCode) == true;
+    private bool IsEndLow(SampleProductPlan product) => _endLow?.Contains(product.ProductCode) == true;
 
     /// The EndLowProducts products expected to end lowest after the last EndLowDays days of sales, taking from a product
     /// group only as many as leave it PurchaseLinesMin products to buy. They are no longer bought, so they end the window
     /// below a week of sales.
-    private HashSet<string> PickRunDownProducts()
+    private HashSet<string> PickEndLowProducts()
     {
         var weeksLeft = (_plan.LastDocumentDate.DayNumber - _date.DayNumber + 1) / 7m;
         var plans = SampleCatalog.ProductPlans;
@@ -257,7 +104,7 @@ internal sealed partial class SampleDocumentSimulator
         var (restockMin, restockMax) = warehouse == K1 ? (RestockWeeksK1Min, RestockWeeksK1Max) : (RestockWeeksK2Min, RestockWeeksK2Max);
 
         var candidates = SampleCatalog.ProductPlans
-            .Where(p => p.PrimarySupplier == trigger.PrimarySupplier && !IsRunDown(p))
+            .Where(p => p.PrimarySupplier == trigger.PrimarySupplier && !IsEndLow(p))
             .ToList();
         var stocked = candidates
             .Where(p => _ledger.IsStocked(warehouse, p.ProductCode))

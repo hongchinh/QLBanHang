@@ -251,30 +251,22 @@ internal sealed partial class SampleDocumentSimulator
     /// Credit sales placed relative to T (the day after the last document), so the overdue report at T has an item in the
     /// 1–30 and the 31–60 day buckets whatever the window: a sale to the first late payer due LateSaleOverdueDays before T,
     /// and one to the bad debt customer due BadDebtSaleOverdueDays before T. Neither customer pays them before T (their
-    /// habits pay later, and the invoices are held: never settled early).
+    /// habits pay later, and the invoices are held: never settled early). CreditDays + overdue days (at most 45 + 40 = 85)
+    /// stay within the shortest window (89 days before T), so the sale date is never before the opening date; a unit test
+    /// checks it.
     private void PlanBucketSales()
     {
         var t = _plan.LastDocumentDate.AddDays(1);
         foreach (var (habit, overdueDays) in new[] { (PaymentHabit.Late, LateSaleOverdueDays), (PaymentHabit.BadDebt, BadDebtSaleOverdueDays) })
         {
-            var customer = SampleCatalog.CustomerProfiles.First(p => p.Habit == habit);
+            // A planned sale skips the 80% credit check, so it goes to a customer without a limit.
+            var customer = SampleCatalog.CustomerProfiles.First(p => p.Habit == habit && p.CreditLimit == null);
             var date = t.AddDays(-(_partners[customer.Code].CreditDays ?? 0) - overdueDays);
             if (date.DayOfWeek == DayOfWeek.Sunday)
                 date = date.AddDays(1);
             _plannedSales.Add((date, customer, true));
         }
         _plannedSales.Sort((a, b) => a.Date.CompareTo(b.Date));
-    }
-
-    /// The planned credit sale for today, if one is still to be made; Hold means its invoice must stay open until T.
-    private (SampleCustomerProfile Customer, bool Hold)? TakePlannedSale()
-    {
-        var index = _plannedSales.FindIndex(s => s.Date <= _date);
-        if (index < 0)
-            return null;
-        var (_, customer, hold) = _plannedSales[index];
-        _plannedSales.RemoveAt(index);
-        return (customer, hold);
     }
 
     /// From EndHoldDays before T: customers pay only what is due (no early settlement), and every owner keeps an open

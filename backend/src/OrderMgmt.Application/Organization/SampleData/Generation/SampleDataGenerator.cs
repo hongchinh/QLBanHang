@@ -14,18 +14,23 @@ public sealed class SampleDataGenerator : ISampleDataGenerator
 
         var random = SampleRandom.ForBranch(input.BranchCode);
         var openingDate = SampleCalendar.OpeningDate(input.Today);
+        var partners = SampleCatalog.BuildPartners(input.OwnerCount);
+
+        // One random stream, drawn in this order: opening stock, opening debts.
+        var openingStocks = SampleOpeningBalances.BuildStocks(random);
+        var openingDebts = SampleOpeningBalances.BuildDebts(random, openingDate, input.Today, partners);
 
         return new SampleDataPlan
         {
             OpeningDate = openingDate,
             LastDocumentDate = SampleCalendar.LastDocumentDate(input.Today),
             Products = SampleCatalog.Products.ToList(),
-            Partners = SampleCatalog.BuildPartners(input.OwnerCount),
+            Partners = partners,
             Warehouses = SampleCatalog.Warehouses.ToList(),
             Funds = SampleCatalog.Funds.ToList(),
             CreditLimits = SampleCatalog.CreditLimits.ToList(),
-            OpeningStocks = SampleOpeningBalances.BuildStocks(random),
-            OpeningDebts = SampleOpeningBalances.BuildDebts(random, openingDate, input.OwnerCount),
+            OpeningStocks = openingStocks,
+            OpeningDebts = openingDebts,
         };
     }
 }

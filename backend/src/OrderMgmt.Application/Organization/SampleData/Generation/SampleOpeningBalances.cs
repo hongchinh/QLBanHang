@@ -9,11 +9,41 @@ public static class SampleOpeningBalances
     private const decimal ReceivablePrepayment = 20_000_000m;
     private const decimal PayablePrepayment = 30_000_000m;
 
-    // Base invoice totals (sum 350 million / 200 million); each is varied by up to 5 million in 500,000 steps.
-    private static readonly decimal[] ReceivableBases =
-        { 60_000_000m, 25_000_000m, 45_000_000m, 30_000_000m, 20_000_000m, 35_000_000m, 40_000_000m, 30_000_000m, 35_000_000m, 30_000_000m };
+    /// Every opening amount varies from its base by up to this much, in 500,000 steps.
+    private const decimal AmountSpread = 5_000_000m;
 
-    private static readonly decimal[] PayableBases = { 70_000_000m, 50_000_000m, 45_000_000m, 35_000_000m };
+    /// One opening item: invoice aged MinAge..MaxAge days before the opening date.
+    /// OverdueAtToday instead ages it from Today, so the item is that many days overdue at Today (kept inside MinAge..MaxAge).
+    private sealed record OpeningRow(string Code, int MinAge, int MaxAge, decimal BaseAmount, int? OverdueAtToday = null);
+
+    // Ages follow the payment habit, so receipts fall inside the window: on time ≤ CreditDays, late ≤ CreditDays + 30.
+    // KH20 (bad debt, 45 days) is never collected: one old item and one item 75 days (up to 87) overdue at Today.
+    // Bases sum to 350 million.
+    private static readonly OpeningRow[] ReceivableRows =
+    {
+        new("DM-KH20", 100, 120, 60_000_000m),
+        new("DM-KH20", 10, 120, 25_000_000m, OverdueAtToday: 75),
+        new("DM-KH06", 40, 60, 45_000_000m),
+        new("DM-KH11", 55, 75, 30_000_000m),
+        new("DM-KH01", 10, 30, 20_000_000m),
+        new("DM-KH02", 10, 30, 35_000_000m),
+        new("DM-KH03", 10, 30, 40_000_000m),
+        new("DM-KH08", 10, 30, 30_000_000m),
+        new("DM-KH10", 10, 45, 35_000_000m),
+        new("DM-KH01", 10, 30, 30_000_000m),
+    };
+
+    // Payables are paid near their due date, so they are not yet due at opening: age ≤ CreditDays. Bases sum to 200 million.
+    private static readonly OpeningRow[] PayableRows =
+    {
+        new("DM-NCC01", 10, 30, 70_000_000m),
+        new("DM-NCC01", 10, 30, 50_000_000m),
+        new("DM-NCC02", 10, 30, 45_000_000m),
+        new("DM-NCC03", 10, 15, 35_000_000m),
+    };
+
+    private const string ReceivablePrepaymentCustomer = "DM-KH12";
+    private const string PayablePrepaymentSupplier = "DM-NCC04";
 
     public static List<SampleOpeningStockSpec> BuildStocks(SampleRandom random)
     {
@@ -31,7 +61,8 @@ public static class SampleOpeningBalances
                     : plan.InK1
                         ? (SampleDataVolumes.OpeningWeeksK2SharedMin, SampleDataVolumes.OpeningWeeksK2SharedMax)
                         : (SampleDataVolumes.OpeningWeeksK2OnlyMin, SampleDataVolumes.OpeningWeeksK2OnlyMax);
-                var quantity = Math.Max(1m, Math.Round(plan.WeeklySales * random.Between(minWeeks, maxWeeks), MidpointRounding.AwayFromZero));
+                var weeks = minWeeks + (decimal)random.NextDouble() * (maxWeeks - minWeeks);
+                var quantity = Math.Max(1m, Math.Round(plan.WeeklySales * weeks, MidpointRounding.AwayFromZero));
                 lines.Add(new SampleOpeningStockLine(plan.ProductCode, quantity, quantity * costs[plan.ProductCode]));
             }
             stocks.Add(new SampleOpeningStockSpec(key, lines));
@@ -39,68 +70,55 @@ public static class SampleOpeningBalances
         return stocks;
     }
 
-    public static List<SampleOpeningDebtSpec> BuildDebts(SampleRandom random, DateOnly openingDate, int ownerCount)
+    public static List<SampleOpeningDebtSpec> BuildDebts(SampleRandom random, DateOnly openingDate, DateOnly today,
+        IReadOnlyList<SamplePartnerSpec> partnerList)
     {
-        var partners = SampleCatalog.BuildPartners(ownerCount).ToDictionary(p => p.Code);
-        var profiles = SampleCatalog.CustomerProfiles;
+        var partners = partnerList.ToDictionary(p => p.Code);
+        var daysToToday = today.DayNumber - openingDate.DayNumber;
         var debts = new List<SampleOpeningDebtSpec>();
-
-        // Customers in profile order: the bad debt one, the late payers, then the large on-time non-retail customers.
-        var badDebt = profiles.First(p => p.Habit == PaymentHabit.BadDebt);
-        var late = profiles.Where(p => p.Habit == PaymentHabit.Late).ToList();
-        var large = profiles.Where(p => p.Habit == PaymentHabit.OnTime && p.Tier == SalesTier.Large && p.Group != CustomerGroup.Retail).ToList();
-
-        // (customer, how many days old the invoice may be): old items for the bad debt and the late payers.
-        var receivableItems = new List<(string Code, int MinAge, int MaxAge)>
-        {
-            (badDebt.Code, 100, 120),
-            (late[0].Code, 80, 120),
-            (late[0].Code, 40, 79),
-            (late[1].Code, 60, 110),
-        };
-        for (var i = 0; i < large.Count; i++)
-        {
-            receivableItems.Add((large[i].Code, 10, 70));
-        }
-        receivableItems.Add((large[0].Code, 71, 100));
-
         var number = 0;
-        for (var i = 0; i < receivableItems.Count; i++)
+
+        for (var i = 0; i < ReceivableRows.Length; i++)
         {
-            var (code, minAge, maxAge) = receivableItems[i];
-            var docDate = openingDate.AddDays(-random.Between(minAge, maxAge));
-            var amount = ReceivableBases[i] + random.NextAmount(-5_000_000m, 5_000_000m, 500_000m);
-            debts.Add(Debt(++number, code, DebtSide.Receivable, OpeningDebtKind.Debt, $"HD-DK-{i + 1:000}", docDate,
-                partners[code], amount));
+            var row = ReceivableRows[i];
+            var partner = partners[row.Code];
+            var docDate = openingDate.AddDays(-Age(random, row, partner, daysToToday));
+            debts.Add(OpeningItem(++number, partner, DebtSide.Receivable, OpeningDebtKind.Debt, $"HD-DK-{i + 1:000}", docDate,
+                Amount(random, row)));
         }
 
-        var retailPrepay = profiles.First(p => p.HasPrepayment);
-        debts.Add(Debt(++number, retailPrepay.Code, DebtSide.Receivable, OpeningDebtKind.Prepayment, "PT-DK-001",
-            openingDate.AddDays(-random.Between(5, 30)), partners[retailPrepay.Code], ReceivablePrepayment));
+        debts.Add(OpeningItem(++number, partners[ReceivablePrepaymentCustomer], DebtSide.Receivable, OpeningDebtKind.Prepayment,
+            "PT-DK-001", openingDate.AddDays(-random.Between(5, 30)), ReceivablePrepayment));
 
-        // Suppliers in the order the product plans first name them.
-        var suppliers = SampleCatalog.ProductPlans.Select(p => p.PrimarySupplier).Distinct().ToList();
-        var payableSuppliers = new[] { suppliers[0], suppliers[0], suppliers[1], suppliers[2] };
-        for (var i = 0; i < payableSuppliers.Length; i++)
+        for (var i = 0; i < PayableRows.Length; i++)
         {
-            var code = payableSuppliers[i];
-            var docDate = openingDate.AddDays(-random.Between(10, 90));
-            var amount = PayableBases[i] + random.NextAmount(-5_000_000m, 5_000_000m, 500_000m);
-            debts.Add(Debt(++number, code, DebtSide.Payable, OpeningDebtKind.Debt, $"PN-DK-{i + 1:000}", docDate,
-                partners[code], amount));
+            var row = PayableRows[i];
+            var partner = partners[row.Code];
+            var docDate = openingDate.AddDays(-Age(random, row, partner, daysToToday));
+            debts.Add(OpeningItem(++number, partner, DebtSide.Payable, OpeningDebtKind.Debt, $"PN-DK-{i + 1:000}", docDate,
+                Amount(random, row)));
         }
 
-        debts.Add(Debt(++number, suppliers[3], DebtSide.Payable, OpeningDebtKind.Prepayment, "TU-DK-001",
-            openingDate.AddDays(-random.Between(5, 30)), partners[suppliers[3]], PayablePrepayment));
+        debts.Add(OpeningItem(++number, partners[PayablePrepaymentSupplier], DebtSide.Payable, OpeningDebtKind.Prepayment,
+            "TU-DK-001", openingDate.AddDays(-random.Between(5, 30)), PayablePrepayment));
 
         return debts;
     }
 
-    private static SampleOpeningDebtSpec Debt(int number, string partnerCode, DebtSide side, OpeningDebtKind kind, string docNo,
-        DateOnly docDate, SamplePartnerSpec partner, decimal amount)
+    // overdue at Today = daysToToday + age - CreditDays, so age = overdue - daysToToday + CreditDays.
+    private static int Age(SampleRandom random, OpeningRow row, SamplePartnerSpec partner, int daysToToday) =>
+        row.OverdueAtToday is { } overdue
+            ? Math.Clamp(overdue - daysToToday + (partner.CreditDays ?? 0), row.MinAge, row.MaxAge)
+            : random.Between(row.MinAge, row.MaxAge);
+
+    private static decimal Amount(SampleRandom random, OpeningRow row) =>
+        row.BaseAmount + random.NextAmount(-AmountSpread, AmountSpread, 500_000m);
+
+    private static SampleOpeningDebtSpec OpeningItem(int number, SamplePartnerSpec partner, DebtSide side, OpeningDebtKind kind,
+        string docNo, DateOnly docDate, decimal amount)
     {
         var dueDate = kind == OpeningDebtKind.Debt ? docDate.AddDays(partner.CreditDays ?? 0) : (DateOnly?)null;
         var ownerIndex = side == DebtSide.Receivable ? partner.OwnerIndex : null;
-        return new SampleOpeningDebtSpec($"OD-{number:00}", partnerCode, side, kind, docNo, docDate, dueDate, amount, ownerIndex);
+        return new SampleOpeningDebtSpec($"OD-{number:00}", partner.Code, side, kind, docNo, docDate, dueDate, amount, ownerIndex);
     }
 }

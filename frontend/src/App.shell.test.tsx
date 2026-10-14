@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { App } from './App';
+import type { PushState } from '@/hooks/usePushNotification';
+
+// What the push hook reports; a test sets it before rendering.
+const push = vi.hoisted(() => ({ state: 'idle' as PushState }));
 
 vi.mock('@/hooks/useBeforeInstallPrompt', () => ({
   useBeforeInstallPrompt: () => ({ canShow: false, install: vi.fn(), dismiss: vi.fn() }),
 }));
 vi.mock('@/hooks/usePushNotification', () => ({
-  usePushNotification: () => ({ state: 'idle', subscribe: vi.fn() }),
+  usePushNotification: () => ({ state: push.state, subscribe: vi.fn() }),
 }));
 vi.mock('@/routes/auth-init', () => ({ AuthInit: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
 vi.mock('@/routes/protected-route', () => ({
@@ -22,6 +26,7 @@ describe('App shell', () => {
   afterEach(() => {
     window.history.pushState({}, '', '/');
     localStorage.clear();
+    push.state = 'idle';
   });
 
   it('puts the push banner and the routed page in one shell', () => {
@@ -39,5 +44,32 @@ describe('App shell', () => {
     render(<App />);
 
     expect(screen.getByTestId('app-shell').children).toHaveLength(1);
+  });
+
+  // In these states the prompt renders nothing. Its element is truthy all the same, so App has to ask the
+  // prompt's own question before it hands a banner to the shell, or the shell keeps an empty slot.
+  it.each(['granted', 'denied', 'unsupported'] as const)(
+    'has no banner slot while the prompt has nothing to show (%s)',
+    (state) => {
+      push.state = state;
+      window.history.pushState({}, '', '/404');
+      render(<App />);
+
+      expect(screen.getByTestId('app-shell').children).toHaveLength(1);
+    },
+  );
+
+  it.each([
+    ['idle', 'Bật thông báo'],
+    ['loading', 'Đang xử lý...'],
+    ['error', 'Thử lại'],
+  ] as const)('keeps the banner slot while the prompt shows (%s)', (state, button) => {
+    push.state = state;
+    window.history.pushState({}, '', '/404');
+    render(<App />);
+
+    const shell = screen.getByTestId('app-shell');
+    expect(shell.children).toHaveLength(2);
+    expect(shell.firstElementChild).toContainElement(screen.getByRole('button', { name: button }));
   });
 });

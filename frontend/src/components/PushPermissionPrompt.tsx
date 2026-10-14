@@ -1,4 +1,5 @@
 import type { PushState } from '@/hooks/usePushNotification'
+import { isPushPromptVisible } from './push-prompt-visibility'
 
 interface Props {
   state: PushState
@@ -7,7 +8,7 @@ interface Props {
 }
 
 export function PushPermissionPrompt({ state, onEnable, onDismiss }: Props) {
-  if (state === 'denied' || state === 'granted' || state === 'unsupported') return null
+  if (!isPushPromptVisible(state)) return null
 
   const isError = state === 'error'
   const isLoading = state === 'loading'

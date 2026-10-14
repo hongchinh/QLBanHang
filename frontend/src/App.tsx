@@ -83,6 +83,7 @@ import { useBeforeInstallPrompt } from '@/hooks/useBeforeInstallPrompt';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { usePushNotification } from '@/hooks/usePushNotification';
 import { PushPermissionPrompt } from '@/components/PushPermissionPrompt';
+import { isPushPromptVisible } from '@/components/push-prompt-visibility';
 import { AppShell } from '@/components/layout/app-shell';
 
 function RouteErrorBoundary({ children }: { children: ReactNode }) {
@@ -118,7 +119,9 @@ export function App() {
       <QueryClientProvider client={queryClient}>
         <AppShell
           banner={
-            pushDismissed ? null : (
+            // An element is truthy even when the prompt would render nothing, and the shell would keep an empty
+            // slot for it: ask the prompt's own rule first.
+            pushDismissed || !isPushPromptVisible(pushState) ? null : (
               <PushPermissionPrompt state={pushState} onEnable={subscribePush} onDismiss={handlePushDismiss} />
             )
           }

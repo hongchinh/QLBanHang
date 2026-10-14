@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
 
 interface Props {
-  /** Sticky notice above the app (the push permission prompt); takes its own height. */
+  /**
+   * Sticky notice above the app (the push permission prompt); takes its own height. Pass null when there is
+   * nothing to show: an element that renders nothing still gets a slot.
+   */
   banner?: ReactNode;
   children: ReactNode;
 }

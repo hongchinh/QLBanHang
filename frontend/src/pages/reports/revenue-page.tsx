@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
+import { ButtonLoader } from '@/components/ui/button-loader';
 import { useSearchParams } from 'react-router-dom';
 import {
   Select,
@@ -166,7 +167,7 @@ export function RevenuePage() {
             onClick={handleExportExcel}
             disabled={isExporting || !from || !to}
           >
-            {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isExporting ? <ButtonLoader className="mr-2" /> : <AppIcon name="exportExcel" className="mr-2" />}
             Xuất Excel
           </Button>
         </div>

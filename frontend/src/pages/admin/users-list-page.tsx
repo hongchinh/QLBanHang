@@ -5,7 +5,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table';
-import { Search, UserPlus } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useAdminUsers } from '@/features/admin-users/hooks';
 import type { AdminUserListItem } from '@/features/admin-users/types';
 import { useSearchParamString } from '@/lib/use-search-param-state';
@@ -92,7 +92,7 @@ export function UsersListPage() {
         </div>
         <Can permission="users.create">
           <Button onClick={() => setCreateOpen(true)}>
-            <UserPlus className="mr-2 h-4 w-4" />
+            <AppIcon name="addUser" className="mr-2" />
             Thêm user
           </Button>
         </Can>
@@ -102,7 +102,7 @@ export function UsersListPage() {
         <CardContent className="p-4">
           <div className="mb-4 flex items-center gap-3">
             <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Tìm theo username / họ tên..."
                 value={search}

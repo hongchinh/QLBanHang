@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { RangePicker } from '@/features/dashboard/components/range-picker';
 import { useLeaderboard } from '@/features/dashboard/hooks';
@@ -48,7 +48,7 @@ export function SalesPerformancePage() {
   };
 
   const sortIcon = (key: SortKey) =>
-    sortKey === key ? (sortDesc ? <ArrowDown className="ml-1 inline h-3 w-3" /> : <ArrowUp className="ml-1 inline h-3 w-3" />) : null;
+    sortKey === key ? (sortDesc ? <AppIcon name="sortDesc" size={12} className="ml-1 inline" /> : <AppIcon name="sortAsc" size={12} className="ml-1 inline" />) : null;
 
   return (
     <div className="space-y-6">

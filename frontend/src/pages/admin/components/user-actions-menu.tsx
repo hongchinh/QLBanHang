@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreHorizontal } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -82,7 +82,7 @@ export function UserActionsMenu({ user }: Props) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" aria-label="Thao tác">
-            <MoreHorizontal className="h-4 w-4" />
+            <AppIcon name="more" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

@@ -71,6 +71,9 @@ describe('RecalcCostPage', () => {
     await user.click(screen.getByText('Chọn hàng'));
     expect(screen.getByText('SP01 — Tôn lạnh')).toBeInTheDocument();
 
+    const recalcIcon = screen.getByRole('button', { name: 'Tính lại giá vốn' }).querySelector('[data-icon="recalcCost"]');
+    expect(recalcIcon).not.toBeNull();
+    expect(recalcIcon).toHaveClass('text-icon-edit');
     await user.click(screen.getByRole('button', { name: 'Tính lại giá vốn' }));
     expect(recalcMock).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Tính lại' }));

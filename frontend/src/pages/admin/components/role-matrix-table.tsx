@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { MoreVertical } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import type { PermissionDto, PermissionModule, RoleDetail, RoleListItem } from '@/features/admin-roles/types';
 import {
   DropdownMenu,
@@ -95,7 +95,7 @@ export function RoleMatrixTable({
                             className="h-7 w-7"
                             aria-label={`Hành động cho role ${role.code}`}
                           >
-                            <MoreVertical className="h-4 w-4" />
+                            <AppIcon name="moreVertical" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">

@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Can } from '@/components/auth/can';
 import { useSalesRevenueDetail } from '@/features/reports/sales-revenue-detail/hooks';
 import type { SalesRevenueLineItemDto } from '@/features/reports/sales-revenue-detail/types';
-import { ArrowLeft } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 
 const moneyFmt = new Intl.NumberFormat('vi-VN');
 
@@ -115,7 +115,7 @@ export function SalesRevenueDetailPage() {
       <div className="flex h-full min-h-0 flex-col gap-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-            <ArrowLeft className="mr-1 h-4 w-4" />
+            <AppIcon name="back" tone="none" className="mr-1" />
             Quay lại
           </Button>
           <div>

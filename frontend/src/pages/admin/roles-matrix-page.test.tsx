@@ -149,13 +149,13 @@ describe('RolesMatrixPage', () => {
     expect(screen.getByRole('button', { name: /Hủy/i }).querySelector('[data-icon="discardChanges"]')).not.toBeNull();
   });
 
-  it('add-role button uses the create-tone add icon', async () => {
+  it('add-role button keeps a white (untoned) add icon on the filled button', async () => {
     renderPage();
     await waitForMatrix();
 
     const icon = screen.getByRole('button', { name: /Thêm role/i }).querySelector('[data-icon="add"]');
     expect(icon).not.toBeNull();
-    expect(icon).toHaveClass('text-icon-create');
+    expect([...icon!.classList].some((c) => c.startsWith('text-icon-'))).toBe(false);
   });
 
   it('saves only dirty role via updatePermissions and clears dirty state', async () => {

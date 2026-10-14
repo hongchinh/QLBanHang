@@ -190,7 +190,7 @@ function QuotationActionsCell({
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" aria-label="Thao tác khác">
             {busy
-              ? <AppIcon name="loading" />
+              ? <ButtonLoader />
               : <AppIcon name="more" tone="muted" />
             }
           </Button>

@@ -212,7 +212,7 @@ export function RolesMatrixPage() {
           )}
           <Can permission="roles.manage">
             <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <AppIcon name="add" className="mr-1" /> Thêm role
+              <AppIcon name="add" tone="none" className="mr-1" /> Thêm role
             </Button>
           </Can>
         </div>

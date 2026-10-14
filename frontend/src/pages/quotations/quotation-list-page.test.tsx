@@ -230,5 +230,8 @@ describe('QuotationListPage row action icons', () => {
     const busyMenu = await screen.findByRole('menu');
     const item = within(busyMenu).getAllByRole('menuitem', { name: /Báo giá/ })[0];
     expect(item.querySelector('.button-loader')).not.toBeNull();
+    const trigger = screen.getByRole('button', { name: 'Thao tác khác', hidden: true });
+    expect(trigger.querySelector('.button-loader')).not.toBeNull();
+    expect(trigger.querySelector('[data-icon="loading"]')).toBeNull();
   });
 });

@@ -590,7 +590,7 @@ function QuotationFormInner({
                   disabled={isSubmitBusy}
                   aria-busy={pendingButtonAction === 'accounting-confirm'}
                 >
-                  {pendingButtonAction === 'accounting-confirm' ? <ButtonLoader className="mr-2" /> : <AppIcon name="accountingConfirm" className="mr-2" />}
+                  {pendingButtonAction === 'accounting-confirm' ? <ButtonLoader className="mr-2" /> : <AppIcon name="accountingConfirm" tone="none" className="mr-2" />}
                   {pendingButtonAction === 'accounting-confirm' ? 'Đang xác nhận...' : 'KT xác nhận'}
                 </Button>
               </Can>

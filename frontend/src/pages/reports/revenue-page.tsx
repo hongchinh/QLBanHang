@@ -132,8 +132,8 @@ export function RevenuePage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
+      <header className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
+        <div className="lg:shrink-0 lg:whitespace-nowrap">
           <h1 className="text-2xl font-semibold tracking-tight">
             {!isAdmin && currentUser ? `Báo cáo doanh thu của ${currentUser.fullName}` : 'Báo cáo doanh thu'}
           </h1>
@@ -141,13 +141,13 @@ export function RevenuePage() {
             {summary.data ? `Từ ${summary.data.from} đến ${summary.data.to}` : 'Báo giá xác nhận trong khoảng đang xem.'}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
             <Select
               value={saleUserId ?? ALL_SALES}
               onValueChange={(v) => setSaleUserId(v === ALL_SALES ? undefined : v)}
             >
-              <SelectTrigger className="w-56">
+              <SelectTrigger className="w-48">
                 <SelectValue placeholder="Tất cả sale" />
               </SelectTrigger>
               <SelectContent>

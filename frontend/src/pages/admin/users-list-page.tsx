@@ -92,7 +92,7 @@ export function UsersListPage() {
         </div>
         <Can permission="users.create">
           <Button onClick={() => setCreateOpen(true)}>
-            <AppIcon name="addUser" className="mr-2" />
+            <AppIcon name="addUser" tone="none" className="mr-2" />
             Thêm user
           </Button>
         </Can>

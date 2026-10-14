@@ -10,10 +10,12 @@ const START_RETRY_MS = 5_000
 
 export function useNotificationHub() {
   const queryClient = useQueryClient()
-  const hasToken = useAuthStore((s) => !!s.accessToken)
+  // The connection belongs to the signed-in user: another user signing in rebuilds it (the server put the
+  // old one in the groups of the old user). null: signed out, or the user is not loaded yet.
+  const sessionUser = useAuthStore((s) => (s.accessToken && s.user ? s.user.id : null))
 
   useEffect(() => {
-    if (!hasToken) return
+    if (sessionUser === null) return
 
     const apiBase = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_BASE ?? ''
     const hubUrl = apiBase
@@ -90,5 +92,5 @@ export function useNotificationHub() {
     }
     // The token itself is not a dependency: a refreshed token must not rebuild the connection, and
     // accessTokenFactory reads the current one whenever the connection needs it.
-  }, [hasToken, queryClient])
+  }, [sessionUser, queryClient])
 }

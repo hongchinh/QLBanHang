@@ -43,4 +43,20 @@ describe('AppLayout grid', () => {
     expect(grid).not.toHaveClass('h-screen');
     expect(grid).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden');
   });
+
+  // The drawer is fixed to the viewport, outside the shell's padding.
+  it('keeps the mobile drawer inside the safe area', () => {
+    vi.mocked(useBranchContext).mockReturnValue({ myBranches: undefined, workingBranch: null, ready: true });
+    const { container } = render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<div>Page content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+    const drawer = container.querySelector('aside.fixed');
+    expect(drawer).toHaveClass('pt-safe', 'pb-safe', 'pl-safe');
+  });
 });

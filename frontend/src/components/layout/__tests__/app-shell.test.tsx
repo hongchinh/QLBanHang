@@ -40,4 +40,12 @@ describe('AppShell', () => {
     expect(shell.children).toHaveLength(1);
     expect(shell.firstElementChild).toHaveClass(...CONTENT_CLASSES);
   });
+
+  // Everything in the app lives in this column, so its padding keeps the header, the push banner, the sticky
+  // form bars and the page clear of the home indicator and (landscape) the notch.
+  it('pads the column by the left, right and bottom safe-area insets', () => {
+    render(<AppShell banner={null}><div>app</div></AppShell>);
+    expect(screen.getByTestId('app-shell')).toHaveClass('pl-safe', 'pr-safe', 'pb-safe');
+    expect(screen.getByTestId('app-shell')).not.toHaveClass('pt-safe');
+  });
 });

@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sáu màn hình mobile của nhà quản trị</title>
+  <style>
+    /*
+     * BRAINSTORM COMPANION FRAME TEMPLATE
+     *
+     * This template provides a consistent frame with:
+     * - OS-aware light/dark theming
+     * - Fixed header and selection indicator bar
+     * - Scrollable main content area
+     * - CSS helpers for common UI patterns
+     *
+     * Content is injected via placeholder comment in #claude-content.
+     */
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ===== THEME VARIABLES ===== */
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    /* ===== FRAME STRUCTURE ===== */
+    .header {
+      background: var(--bg-secondary);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
+    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; }
+    .header .status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+    .main { flex: 1; overflow-y: auto; }
+    #claude-content { padding: 2rem; min-height: 100%; }
+
+    .indicator-bar {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1.5rem;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .indicator-bar span {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .indicator-bar .selected-text {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+    /* ===== OPTIONS (for A/B/C choices) ===== */
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .option:hover { border-color: var(--accent); }
+    .option.selected { background: var(--selected-bg); border-color: var(--selected-border); }
+    .option .letter {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      width: 1.75rem; height: 1.75rem;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .option.selected .letter { background: var(--accent); color: white; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+
+    /* ===== CARDS (for showing designs/mockups) ===== */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .card.selected { border-color: var(--selected-border); border-width: 2px; }
+    .card-image { background: var(--bg-tertiary); aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+
+    /* ===== MOCKUP CONTAINER ===== */
+    .mockup {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .mockup-header {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-body { padding: 1.5rem; }
+
+    /* ===== SPLIT VIEW (side-by-side comparison) ===== */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+    /* ===== PROS/CONS ===== */
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+
+    /* ===== PLACEHOLDER (for mockup areas) ===== */
+    .placeholder {
+      background: var(--bg-tertiary);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-tertiary);
+    }
+
+    /* ===== INLINE MOCKUP ELEMENTS ===== */
+    .mock-nav { background: var(--accent); color: white; padding: 0.75rem 1rem; display: flex; gap: 1.5rem; font-size: 0.9rem; }
+    .mock-sidebar { background: var(--bg-tertiary); padding: 1rem; min-width: 180px; }
+    .mock-content { padding: 1.5rem; flex: 1; }
+    .mock-button { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; }
+    .mock-input { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><a href="https://github.com/obra/superpowers" style="color: inherit; text-decoration: none;">Superpowers Brainstorming</a></h1>
+    <div class="status">Connected</div>
+  </div>
+
+  <div class="main">
+    <div id="claude-content">
+      <style>
+  .mq-cards{grid-template-columns:repeat(auto-fit,minmax(310px,1fr))}
+  .mq-cards .card-image{aspect-ratio:auto;padding:18px 10px;display:block}
+  .mq-cards .card-body ul{margin:.4rem 0 0 1.1rem;font-size:.82rem;color:var(--text-secondary)}
+  .mq-cards .card-body li{margin-bottom:.15rem}
+  .mq-step{display:inline-block;background:var(--bg-tertiary);color:var(--text-secondary);border-radius:6px;font-size:.68rem;padding:1px 7px;margin-left:.4rem;vertical-align:middle;font-weight:600}
+  .mq-phone{width:278px;height:590px;margin:0 auto;border:7px solid #111827;border-radius:32px;background:#f1f5f9;color:#0f172a;overflow:hidden;position:relative;display:flex;flex-direction:column;font-size:11px;line-height:1.35;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.18)}
+  .mq-top{background:#1e40af;color:#fff;padding:9px 12px;display:flex;align-items:center;justify-content:space-between;font-weight:600;font-size:12.5px;flex-shrink:0}
+  .mq-top small{font-weight:400;opacity:.85;font-size:10.5px}
+  .mq-top sup{background:#dc2626;border-radius:8px;padding:0 4px;font-size:8.5px;margin-left:1px}
+  .mq-body{flex:1;overflow:hidden;padding:8px;display:flex;flex-direction:column;gap:6px}
+  .mq-tile{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:6px 8px}
+  .mq-kpis{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+  .mq-kpi b{display:block;font-size:13.5px;font-variant-numeric:tabular-nums;line-height:1.25}
+  .mq-kpi span{color:#64748b;font-size:9.5px}
+  .mq-kpi em{font-style:normal;font-size:9.5px}
+  .mq-red{color:#dc2626}.mq-green{color:#15803d}.mq-muted{color:#64748b}.mq-amber{color:#b45309}
+  .mq-h{display:flex;justify-content:space-between;align-items:center;font-weight:600;margin-bottom:3px}
+  .mq-h a{color:#1e40af;font-weight:500;font-size:10px}
+  .mq-row{display:flex;justify-content:space-between;gap:6px;padding:4px 0;border-top:1px solid #f1f5f9}
+  .mq-row:first-of-type{border-top:0}
+  .mq-row>div:last-child{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+  .mq-row small{display:block;color:#64748b;font-weight:400;font-size:9.5px}
+  .mq-tabs{display:grid;grid-template-columns:repeat(5,1fr);background:#fff;border-top:1px solid #e2e8f0;flex-shrink:0;text-align:center;font-size:9.5px;color:#64748b;padding:5px 0 7px}
+  .mq-tabs div{position:relative}
+  .mq-tabs i{display:block;font-style:normal;font-size:15px;line-height:1.2}
+  .mq-tabs .on{color:#1e40af;font-weight:600}
+  .mq-badge{position:absolute;top:-2px;left:55%;background:#dc2626;color:#fff;border-radius:9px;font-size:8.5px;padding:0 4px;font-weight:600}
+  .mq-seg{display:grid;grid-template-columns:repeat(3,1fr);background:#e2e8f0;border-radius:8px;padding:2px;font-size:10px;text-align:center}
+  .mq-seg div{padding:4px 2px;border-radius:6px;color:#475569}
+  .mq-seg .on{background:#fff;color:#0f172a;font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+  .mq-chips{display:flex;gap:4px;overflow:hidden;white-space:nowrap}
+  .mq-chip{border:1px solid #cbd5e1;border-radius:11px;padding:1px 8px;font-size:9.5px;background:#fff;color:#334155}
+  .mq-chip.on{background:#1e40af;border-color:#1e40af;color:#fff}
+  .mq-tag{display:inline-block;border-radius:5px;padding:0 5px;font-size:9px;font-weight:600;vertical-align:1px}
+  .mq-tag.new{background:#e0e7ff;color:#3730a3}.mq-tag.edit{background:#fef3c7;color:#92400e}.mq-tag.void{background:#fee2e2;color:#991b1b}
+  .mq-tag.book{background:#e2e8f0;color:#334155}.mq-tag.bank{background:#dcfce7;color:#166534}
+  .mq-doc{display:grid;grid-template-columns:16px 1fr auto;gap:6px;align-items:start}
+  .mq-cb{width:13px;height:13px;border:1.5px solid #94a3b8;border-radius:3px;margin-top:2px;background:#fff}
+  .mq-cb.on{background:#1e40af;border-color:#1e40af;color:#fff;font-size:9px;line-height:11px;text-align:center}
+  .mq-doc b{font-variant-numeric:tabular-nums;white-space:nowrap}
+  .mq-doc small{display:block;color:#64748b;font-size:9.5px}
+  .mq-bar{background:#fff;border-top:1px solid #e2e8f0;padding:6px 8px;display:flex;gap:6px;align-items:center;justify-content:space-between;flex-shrink:0;font-size:10.5px}
+  .mq-btn{background:#1e40af;color:#fff;border-radius:8px;padding:6px 12px;font-weight:600;text-align:center}
+  .mq-btn.ghost{background:#fff;color:#b45309;border:1px solid #f59e0b}
+  .mq-kv{display:grid;grid-template-columns:auto 1fr;gap:1px 8px}
+  .mq-kv span{color:#64748b}.mq-kv b{text-align:right;font-variant-numeric:tabular-nums}
+  .mq-day{font-size:9.5px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.04em;padding:1px 2px}
+  .mq-acc{display:grid;grid-template-columns:repeat(3,1fr);gap:4px}
+  .mq-acc .mq-tile{padding:5px 6px}
+  .mq-acc span{display:block;font-size:9px;color:#64748b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mq-acc b{font-size:10.5px;font-variant-numeric:tabular-nums}
+  .mq-rep{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-top:1px solid #f1f5f9}
+  .mq-rep:first-of-type{border-top:0}
+  .mq-dot{width:7px;height:7px;border-radius:50%;background:#1e40af;display:inline-block;margin-right:4px}
+  .mq-bkt{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;margin-top:4px;text-align:center;font-size:9px;color:#64748b}
+  .mq-bkt b{display:block;color:#0f172a;font-size:10px;font-variant-numeric:tabular-nums}
+  .mq-notes{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:1rem 1.25rem;margin-top:1.5rem}
+  .mq-notes ul{margin-left:1.2rem;font-size:.9rem}
+  .mq-notes li{margin-bottom:.3rem}
+</style>
+
+<h2>Phần 2 — Các màn hình mobile của nhà quản trị</h2>
+<p class="subtitle">Sáu màn hình chính. Bấm vào màn hình nào bạn muốn chỉnh (bấm được nhiều), rồi trả lời ở terminal. Nhãn "đợt n" cho biết đợt nào giao phần đó.</p>
+
+<div class="cards mq-cards" data-multiselect>
+
+  <!-- 1. Tổng quan -->
+  <div class="card" data-choice="tong-quan" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mq-phone">
+        <div class="mq-top"><span>Tổng quan <small>· CN Hà Nội ▾</small></span><span>🔔<sup>3</sup></span></div>
+        <div class="mq-body">
+          <div class="mq-kpis">
+            <div class="mq-tile mq-kpi"><span>Tồn quỹ (sổ sách)</span><b>1,82 tỷ</b><em class="mq-muted">TM 320tr · NH 1,50 tỷ</em></div>
+            <div class="mq-tile mq-kpi"><span>Doanh thu tháng 10</span><b>3,20 tỷ</b><em class="mq-green">▲ 12% so tháng 9</em></div>
+            <div class="mq-tile mq-kpi"><span>Phải thu</span><b>2,45 tỷ</b><em class="mq-red">Quá hạn 310tr</em></div>
+            <div class="mq-tile mq-kpi"><span>Phải trả</span><b>1,10 tỷ</b><em class="mq-muted">Đến hạn 7 ngày: 240tr</em></div>
+            <div class="mq-tile mq-kpi"><span>Giá trị tồn kho</span><b>4,10 tỷ</b><em class="mq-muted">tạm tính tháng 10</em></div>
+            <div class="mq-tile mq-kpi"><span>Ngân hàng (thực tế)</span><b>1,53 tỷ</b><em class="mq-muted">TK VCB · 10:42</em></div>
+          </div>
+          <div class="mq-tile">
+            <div class="mq-h">Chờ soát xét (7) <a>Xem tất cả</a></div>
+            <div class="mq-row"><div>PC00045 · Phiếu chi<small>Cty Xốp Việt · Lan lập 10:05</small></div><div>25.000.000</div></div>
+            <div class="mq-row"><div>PX00212 · Xuất bán <span class="mq-tag edit">Sửa sau duyệt</span><small>Cty Hòa Phát · Minh 09:40</small></div><div>86.400.000</div></div>
+          </div>
+          <div class="mq-tile">
+            <div class="mq-h">Biến động gần đây <a>Xem tất cả</a></div>
+            <div class="mq-row"><div><span class="mq-tag bank">NH</span> TK VCB ··6789<small>CTY HOA PHAT CK BG00123 · 10:42</small></div><div class="mq-green">+50.000.000</div></div>
+            <div class="mq-row"><div><span class="mq-tag book">Sổ</span> Quỹ tiền mặt<small>PC00045 · Lan · 10:05</small></div><div class="mq-red">−25.000.000</div></div>
+          </div>
+        </div>
+        <div class="mq-tabs">
+          <div class="on"><i>▦</i>Tổng quan</div><div><i>☑</i>Soát xét<span class="mq-badge">7</span></div><div><i>⇅</i>Biến động</div><div><i>▤</i>Báo cáo</div><div><i>⋯</i>Thêm</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>1. Tổng quan <span class="mq-step">đợt 2</span></h3>
+      <ul>
+        <li>Mỗi ô chỉ hiện khi người dùng có quyền xem báo cáo tương ứng; chạm vào ô mở báo cáo đó</li>
+        <li>Số liệu theo chi nhánh đang làm việc, khớp với báo cáo cùng tên</li>
+        <li>Ô "Ngân hàng (thực tế)" có từ đợt 5; hai khối dưới có từ đợt 3 và 4</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 2. Soát xét -->
+  <div class="card" data-choice="soat-xet" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mq-phone">
+        <div class="mq-top"><span>Soát xét</span><span>⚲</span></div>
+        <div class="mq-body">
+          <div class="mq-seg"><div class="on">Chờ soát xét 7</div><div>Yêu cầu sửa 2</div><div>Đã duyệt</div></div>
+          <div class="mq-chips"><span class="mq-chip on">Tất cả</span><span class="mq-chip">Phiếu chi 3</span><span class="mq-chip">Xuất kho 2</span><span class="mq-chip">Phiếu thu 1</span><span class="mq-chip">Nhập 1</span></div>
+          <div class="mq-tile mq-doc"><div class="mq-cb on">✓</div><div>PC00045 · Phiếu chi <span class="mq-tag new">Tạo mới</span><small>Cty Xốp Việt · Trả tiền hàng</small><small>Lan · hôm nay 10:05</small></div><b class="mq-red">−25.000.000</b></div>
+          <div class="mq-tile mq-doc"><div class="mq-cb"></div><div>PX00212 · Xuất bán <span class="mq-tag edit">Sửa sau duyệt</span><small>Cty Hòa Phát · trước: 79.200.000</small><small>Minh · hôm nay 09:40</small></div><b>86.400.000</b></div>
+          <div class="mq-tile mq-doc"><div class="mq-cb on">✓</div><div>PT00123 · Phiếu thu <span class="mq-tag new">Tạo mới</span><small>Cty Hòa Phát · Thu tiền hàng</small><small>Lan · hôm nay 09:12</small></div><b class="mq-green">+50.000.000</b></div>
+          <div class="mq-tile mq-doc"><div class="mq-cb"></div><div>PN00098 · Nhập mua <span class="mq-tag void">Hủy sau duyệt</span><small>NCC Bông Khoáng</small><small>Tuấn · hôm qua 16:30</small></div><b>118.000.000</b></div>
+          <div class="mq-tile mq-doc"><div class="mq-cb"></div><div>CQ00007 · Chuyển quỹ <span class="mq-tag new">Tạo mới</span><small>Tiền mặt → VCB</small><small>Lan · hôm qua 15:02</small></div><b>200.000.000</b></div>
+        </div>
+        <div class="mq-bar"><span>Đã chọn 2 phiếu</span><span class="mq-btn">✓ Duyệt 2 phiếu</span></div>
+        <div class="mq-tabs">
+          <div><i>▦</i>Tổng quan</div><div class="on"><i>☑</i>Soát xét<span class="mq-badge">7</span></div><div><i>⇅</i>Biến động</div><div><i>▤</i>Báo cáo</div><div><i>⋯</i>Thêm</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>2. Soát xét — danh sách <span class="mq-step">đợt 4</span></h3>
+      <ul>
+        <li>Phiếu đã ghi sổ; đây chỉ là dấu soát xét, không ảnh hưởng sổ sách</li>
+        <li>Nhãn cho biết lý do nằm trong hộp: tạo mới, sửa sau duyệt, hủy sau duyệt</li>
+        <li>Chọn nhiều để duyệt một lần; lọc theo loại phiếu</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 3. Xem phiếu -->
+  <div class="card" data-choice="xem-phieu" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mq-phone">
+        <div class="mq-top"><span>‹ &nbsp;PX00212</span><span class="mq-tag edit">Sửa sau duyệt</span></div>
+        <div class="mq-body">
+          <div class="mq-tile">
+            <b>Phiếu xuất kho · Xuất bán hàng</b>
+            <div class="mq-muted">13/10/2026 09:40 · Kho chính · Minh lập</div>
+            <div>Khách: Cty TNHH Hòa Phát</div>
+          </div>
+          <div class="mq-tile mq-kv">
+            <span>Tổng tiền</span><b>86.400.000</b>
+            <span></span><b class="mq-amber" style="font-weight:500;font-size:9.5px">trước 79.200.000 · tăng 7.200.000</b>
+            <span>Đã thu (Quỹ tiền mặt)</span><b>10.000.000</b>
+            <span>Còn nợ · hạn 12/11</span><b>76.400.000</b>
+            <span>Nợ KH sau phiếu / hạn mức</span><b>412tr / 500tr</b>
+          </div>
+          <div class="mq-tile">
+            <div class="mq-h">Hàng hóa (6 dòng)</div>
+            <div class="mq-row"><div>Xốp EPS 20kg 1000×2000×50<small>120 tấm × 250.000</small></div><div>30.000.000</div></div>
+            <div class="mq-row"><div>Bông khoáng 60kg 50mm<small>80 m² × 185.000</small></div><div>14.800.000</div></div>
+            <div class="mq-muted" style="text-align:center;padding-top:3px">Xem 4 dòng nữa</div>
+          </div>
+          <div class="mq-tile">
+            <div class="mq-h">Lịch sử</div>
+            <div class="mq-row"><div>Minh sửa phiếu<small>Hôm nay 09:40 · tổng 79,2tr → 86,4tr</small></div><div></div></div>
+            <div class="mq-row"><div>Giám đốc duyệt<small>Hôm qua 15:20</small></div><div></div></div>
+          </div>
+        </div>
+        <div class="mq-bar"><span class="mq-btn ghost" style="flex:1">Yêu cầu sửa</span><span class="mq-btn" style="flex:1">✓ Duyệt</span></div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>3. Xem phiếu và quyết định <span class="mq-step">đợt 4</span></h3>
+      <ul>
+        <li>Màn hình chỉ đọc, gọn cho điện thoại; có lối "Mở bản đầy đủ"</li>
+        <li>Phiếu sửa sau duyệt hiện số trước và sau</li>
+        <li>"Yêu cầu sửa" bắt buộc ghi chú; người lập nhận thông báo kèm ghi chú</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 4. Biến động -->
+  <div class="card" data-choice="bien-dong" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mq-phone">
+        <div class="mq-top"><span>Biến động</span><span>⚙</span></div>
+        <div class="mq-body">
+          <div class="mq-acc">
+            <div class="mq-tile"><span>Quỹ tiền mặt · sổ</span><b>320.450.000</b></div>
+            <div class="mq-tile"><span>Quỹ VCB · sổ</span><b>1.500.000.000</b></div>
+            <div class="mq-tile"><span>TK VCB ··6789 · NH</span><b>1.530.200.000</b></div>
+          </div>
+          <div class="mq-chips"><span class="mq-chip on">Tất cả</span><span class="mq-chip">Sổ quỹ</span><span class="mq-chip">Ngân hàng</span><span class="mq-chip">Từ 10 triệu</span></div>
+          <div class="mq-day">Hôm nay</div>
+          <div class="mq-tile">
+            <div class="mq-row"><div><span class="mq-tag book">Sổ</span> Quỹ VCB<small>PT00123 · Cty Hòa Phát · Lan lập 10:50</small><small>Số dư 1.500.000.000</small></div><div class="mq-green">+50.000.000</div></div>
+            <div class="mq-row"><div><span class="mq-tag bank">NH</span> TK VCB ··6789<small>CTY HOA PHAT CK BG00123 · 10:42</small><small>Số dư 1.530.200.000</small></div><div class="mq-green">+50.000.000</div></div>
+            <div class="mq-row"><div><span class="mq-tag book">Sổ</span> Quỹ tiền mặt<small>PC00045 · Cty Xốp Việt · Lan lập 10:05</small></div><div class="mq-red">−25.000.000</div></div>
+            <div class="mq-row"><div><span class="mq-tag book">Sổ</span> Quỹ tiền mặt <span class="mq-tag edit">Sửa</span><small>PC00041: 12.000.000 → 17.000.000 · Tuấn 09:20</small></div><div class="mq-red">−5.000.000</div></div>
+            <div class="mq-row"><div><span class="mq-tag book">Sổ</span> Quỹ tiền mặt <span class="mq-tag void">Hủy</span><small>PC00039 · Lan 08:55</small></div><div class="mq-green">+8.000.000</div></div>
+          </div>
+          <div class="mq-day">Hôm qua</div>
+          <div class="mq-tile">
+            <div class="mq-row"><div><span class="mq-tag bank">NH</span> TK VCB ··6789<small>PHI QUAN LY TK · 23:10</small></div><div class="mq-red">−22.000</div></div>
+          </div>
+        </div>
+        <div class="mq-tabs">
+          <div><i>▦</i>Tổng quan</div><div><i>☑</i>Soát xét<span class="mq-badge">7</span></div><div class="on"><i>⇅</i>Biến động</div><div><i>▤</i>Báo cáo</div><div><i>⋯</i>Thêm</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>4. Biến động số dư <span class="mq-step">đợt 3 + 5</span></h3>
+      <ul>
+        <li>"Sổ" là quỹ trong phần mềm (đợt 3); "NH" là giao dịch ngân hàng thật (đợt 5)</li>
+        <li>Sửa và hủy phiếu cũng là biến động, có nhãn riêng</li>
+        <li>Nút ⚙ mở tùy chọn nhận tin: bật/tắt theo loại, ngưỡng tiền tối thiểu</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 5. Báo cáo -->
+  <div class="card" data-choice="bao-cao" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mq-phone">
+        <div class="mq-top"><span>Báo cáo</span><span>⚲</span></div>
+        <div class="mq-body">
+          <div class="mq-tile"><div class="mq-h">Quỹ</div>
+            <div class="mq-rep"><span><i class="mq-dot"></i>Sổ quỹ</span><span class="mq-muted">›</span></div>
+          </div>
+          <div class="mq-tile"><div class="mq-h">Công nợ</div>
+            <div class="mq-rep"><span><i class="mq-dot"></i>Số dư công nợ</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span><i class="mq-dot"></i>Nợ quá hạn</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span>Tuổi nợ</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span>Công nợ theo chứng từ</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span>Sổ chi tiết công nợ</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span>Công nợ theo nhân viên</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span>Biên bản đối chiếu</span><span class="mq-muted">›</span></div>
+          </div>
+          <div class="mq-tile"><div class="mq-h">Doanh thu</div>
+            <div class="mq-rep"><span>Doanh thu</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span><i class="mq-dot"></i>Doanh thu sale</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span>Doanh thu xe · Hiệu suất sale</span><span class="mq-muted">›</span></div>
+          </div>
+          <div class="mq-tile"><div class="mq-h">Kho</div>
+            <div class="mq-rep"><span><i class="mq-dot"></i>Tồn kho</span><span class="mq-muted">›</span></div>
+            <div class="mq-rep"><span>Thẻ kho</span><span class="mq-muted">›</span></div>
+          </div>
+        </div>
+        <div class="mq-tabs">
+          <div><i>▦</i>Tổng quan</div><div><i>☑</i>Soát xét<span class="mq-badge">7</span></div><div><i>⇅</i>Biến động</div><div class="on"><i>▤</i>Báo cáo</div><div><i>⋯</i>Thêm</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>5. Báo cáo — mục lục <span class="mq-step">đợt 2</span></h3>
+      <ul>
+        <li>Chấm xanh: 5 báo cáo có giao diện thẻ cho điện thoại ngay trong đợt 2</li>
+        <li>Các báo cáo còn lại vẫn mở được, hiển thị bảng cuộn ngang như hiện nay</li>
+        <li>Chỉ hiện báo cáo người dùng có quyền xem</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 6. Báo cáo dạng thẻ -->
+  <div class="card" data-choice="bao-cao-the" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div class="mq-phone">
+        <div class="mq-top"><span>‹ &nbsp;Nợ quá hạn</span><span>⚲</span></div>
+        <div class="mq-body">
+          <div class="mq-chips"><span class="mq-chip on">Phải thu</span><span class="mq-chip">Phải trả</span><span class="mq-chip">Đến 13/10/2026</span></div>
+          <div class="mq-tile" style="background:#eff6ff;border-color:#bfdbfe">
+            <div class="mq-h">Tổng quá hạn · 9 khách <span class="mq-red">310.400.000</span></div>
+            <div class="mq-bkt"><div><b>148,0tr</b>1–30 ngày</div><div><b>92,4tr</b>31–60</div><div><b>40,0tr</b>61–90</div><div><b>30,0tr</b>trên 90</div></div>
+          </div>
+          <div class="mq-tile">
+            <div class="mq-h">Cty TNHH Hòa Phát <span class="mq-red">120.000.000</span></div>
+            <div class="mq-muted">Tổng nợ 412.000.000 · chưa phân bổ 0</div>
+            <div class="mq-bkt"><div><b>80,0tr</b>1–30</div><div><b>40,0tr</b>31–60</div><div><b>0</b>61–90</div><div><b>0</b>trên 90</div></div>
+          </div>
+          <div class="mq-tile">
+            <div class="mq-h">Cty CP Xây dựng An Bình <span class="mq-red">72.400.000</span></div>
+            <div class="mq-muted">Tổng nợ 190.000.000 · chưa phân bổ 5.000.000</div>
+            <div class="mq-bkt"><div><b>20,0tr</b>1–30</div><div><b>52,4tr</b>31–60</div><div><b>0</b>61–90</div><div><b>0</b>trên 90</div></div>
+          </div>
+          <div class="mq-tile">
+            <div class="mq-h">Đại lý Minh Tâm <span class="mq-red">48.000.000</span></div>
+            <div class="mq-muted">Tổng nợ 48.000.000 · chưa phân bổ 0</div>
+            <div class="mq-bkt"><div><b>48,0tr</b>1–30</div><div><b>0</b>31–60</div><div><b>0</b>61–90</div><div><b>0</b>trên 90</div></div>
+          </div>
+        </div>
+        <div class="mq-tabs">
+          <div><i>▦</i>Tổng quan</div><div><i>☑</i>Soát xét<span class="mq-badge">7</span></div><div><i>⇅</i>Biến động</div><div class="on"><i>▤</i>Báo cáo</div><div><i>⋯</i>Thêm</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>6. Báo cáo dạng thẻ — ví dụ Nợ quá hạn <span class="mq-step">đợt 2</span></h3>
+      <ul>
+        <li>Cùng trang, cùng API với desktop: màn hình rộng hiện bảng, màn hình hẹp hiện thẻ (<code>ResponsiveTable</code>)</li>
+        <li>Thẻ tổng ở đầu thay cho dòng tổng cuối bảng</li>
+        <li>Báo giá, Khách hàng, Hàng hóa, Phiếu nhập/xuất cũng theo cách này, nội dung thẻ như brainstorm 261007</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+
+<div class="mq-notes">
+  <h3>Quy tắc chung</h3>
+  <ul>
+    <li><b>Thanh 5 tab</b> chỉ hiện dưới 768px và chỉ với người có quyền quản trị (soát xét, xem biến động hoặc xem báo cáo). Người khác giữ menu ☰ như hiện nay.</li>
+    <li><b>"Thêm"</b> mở menu đầy đủ hiện có, nên mọi chức năng vẫn tới được từ điện thoại.</li>
+    <li><b>Desktop</b>: các trang hiện có không đổi. Ba trang mới (Soát xét, Biến động, mục lục Báo cáo) có thêm trong sidebar và hiển thị dạng bảng.</li>
+    <li><b>Điện thoại là để xem và quyết định</b>: không thiết kế lại các form nhập phiếu cho màn hình hẹp.</li>
+  </ul>
+</div>
+
+    </div>
+  </div>
+
+  <div class="indicator-bar">
+    <span id="indicator-text">Click an option above, then return to the terminal</span>
+  </div>
+
+<script>window.toggleSelect=function(el){el.classList.toggle('selected')}</script>
+</body>
+</html>

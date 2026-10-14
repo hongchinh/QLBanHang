@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { pushApi } from '@/features/push/api'
+import { needsIosInstall, readIosEnv } from '@/lib/ios-pwa'
 
-export type PushState = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported' | 'error'
+export type PushState = 'idle' | 'loading' | 'granted' | 'denied' | 'unsupported' | 'error' | 'ios-needs-install'
 
 export function usePushNotification(vapidPublicKey: string) {
   const [state, setState] = useState<PushState>(() => {
+    if (needsIosInstall(readIosEnv())) return 'ios-needs-install'
     if (!('Notification' in window)) return 'unsupported'
     if (Notification.permission === 'denied') return 'denied'
     if (Notification.permission === 'granted') return 'granted'
@@ -23,6 +25,7 @@ export function usePushNotification(vapidPublicKey: string) {
   }, [state])
 
   const subscribe = useCallback(async () => {
+    if (state === 'ios-needs-install') return
     if (!('Notification' in window) || !('serviceWorker' in navigator)) {
       setState('unsupported')
       return
@@ -60,7 +63,7 @@ export function usePushNotification(vapidPublicKey: string) {
       console.error('push subscribe failed', e)
       setState('error')
     }
-  }, [vapidPublicKey])
+  }, [state, vapidPublicKey])
 
   const unsubscribe = useCallback(async () => {
     try {

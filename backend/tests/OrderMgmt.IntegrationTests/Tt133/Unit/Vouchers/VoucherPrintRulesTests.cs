@@ -1,5 +1,6 @@
 using FluentAssertions;
 using OrderMgmt.Application.Tt133.Vouchers;
+using OrderMgmt.Domain.Enums;
 using Xunit;
 
 namespace OrderMgmt.IntegrationTests.Tt133.Unit.Vouchers;
@@ -46,4 +47,55 @@ public class VoucherPrintRulesTests
     [Fact]
     public void Dots_is_the_frozen_literal()
         => VoucherPrintRules.Dots.Should().Be("……………………");
+
+    public static TheoryData<string, PricingMode, double?, double?, double?, double?, string> LineNameCases => new()
+    {
+        { "Kính", PricingMode.PerUnit, 1200, 2400, 5, 10, "Kính" },
+        { "Kính", PricingMode.PerSquareMeter, 1200, 2400, null, 10, "Kính (1200×2400 mm, 10 tấm)" },
+        { "Xốp", PricingMode.PerCubicMeter, 2000, 1000, 50, 10, "Xốp (2000×1000×50 mm, 10 tấm)" },
+        { "Thép", PricingMode.PerLinearMeter, 6000, null, null, 4, "Thép (6000 mm, 4 tấm)" },
+        { "Kính", PricingMode.PerSquareMeter, 1200.5, 0, null, 2, "Kính (1200,5 mm, 2 tấm)" },
+        { "Kính", PricingMode.PerSquareMeter, null, null, null, 3, "Kính (3 tấm)" },
+        { "Kính", PricingMode.PerSquareMeter, null, null, null, null, "Kính" },
+    };
+
+    [Theory]
+    [MemberData(nameof(LineNameCases))]
+    public void LineName_adds_dimensions_for_dimensional_modes(string name, PricingMode mode, double? length,
+        double? width, double? thickness, double? sheets, string expected)
+        => VoucherPrintRules.LineName(name, mode, (decimal?)length, (decimal?)width, (decimal?)thickness, (decimal?)sheets)
+            .Should().Be(expected);
+
+    [Fact]
+    public void VoucherTotals_single_cong_row_when_nothing_extra()
+    {
+        VoucherPrintRules.VoucherTotals(1_000_000, 0, 0, 0, 1_000_000)
+            .Should().Equal(new StockVoucherPrintTotal("Cộng", 1_000_000));
+        VoucherPrintRules.VoucherTotals(2_200_000, 0, 0, 0, 2_200_000)
+            .Should().Equal(new StockVoucherPrintTotal("Cộng", 2_200_000));
+    }
+
+    [Fact]
+    public void VoucherTotals_lists_discount_vat_and_freight()
+    {
+        var rows = VoucherPrintRules.VoucherTotals(1_500_000, 50_000, 10_000, 20_000, 1_604_000);
+        rows.Should().Equal(
+            new StockVoucherPrintTotal("Cộng tiền hàng", 1_500_000),
+            new StockVoucherPrintTotal("Chiết khấu", 60_000),
+            new StockVoucherPrintTotal("Thuế GTGT", 144_000),
+            new StockVoucherPrintTotal("Cước vận chuyển", 20_000),
+            new StockVoucherPrintTotal("Tổng cộng", 1_604_000));
+        (rows[0].Amount - rows[1].Amount + rows[2].Amount + rows[3].Amount).Should().Be(rows[^1].Amount);
+    }
+
+    [Fact]
+    public void VoucherTotals_freight_only()
+    {
+        var rows = VoucherPrintRules.VoucherTotals(500_000, 0, 0, 30_000, 530_000);
+        rows.Should().Equal(
+            new StockVoucherPrintTotal("Cộng tiền hàng", 500_000),
+            new StockVoucherPrintTotal("Cước vận chuyển", 30_000),
+            new StockVoucherPrintTotal("Tổng cộng", 530_000));
+        (rows[0].Amount + rows[1].Amount).Should().Be(rows[^1].Amount);
+    }
 }

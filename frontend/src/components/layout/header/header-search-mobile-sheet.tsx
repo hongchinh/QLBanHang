@@ -58,7 +58,12 @@ export function HeaderSearchMobileSheet() {
           <Search className="h-5 w-5" />
         </button>
       </SheetTrigger>
-      <SheetContent side="top" className="p-3">
+      {/* At least the old 12px, more where the notch (landscape) or status bar needs it. pt-safe would replace
+          the 12px with env() = 0 on desktop and Android. */}
+      <SheetContent
+        side="top"
+        className="pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]"
+      >
         <SheetTitle className="sr-only">Tìm kiếm</SheetTitle>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

@@ -334,6 +334,24 @@ describe('StockLineGrid', () => {
     expect(vat).toHaveValue(0);
   });
 
+  // Unlike %VAT, an emptied Số tấm / Dài / Rộng / Dày means "no value": the line keeps '', not 0.
+  it.each([
+    ['Số tấm', 'sheet-count', 'sheetCount'],
+    ['Dài', 'length', 'length'],
+    ['Rộng', 'width', 'width'],
+    ['Dày', 'thickness', 'thickness'],
+  ] as const)('an emptied %s leaves the line without that value, not with 0', (_label, cell, field) => {
+    const { values } = renderGrid({
+      lines: [line({ pricingMode: 'PerCubicMeter', sheetCount: 2, length: 3000, width: 100, thickness: 50 })],
+    });
+    const input = byId(`stock-line-${cell}-0`);
+
+    fireEvent.change(input, { target: { value: '' } });
+
+    expect(values().lines[0][field]).toBe('');
+    expect(input).toHaveValue(null);
+  });
+
   it('hides Kho, Tiền CK, Tiền VAT and Ghi chú by default', () => {
     renderGrid({ lines: [line()] });
     expect(headers()).toEqual([

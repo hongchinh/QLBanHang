@@ -8,14 +8,6 @@ const LUCIDE_IMPORT = /(?:from\s+|import\s*\(?\s*)['"]lucide-react(?:\/[^'"]*)?[
 
 // Files not yet moved to AppIcon. Each migration task removes its files; Phase 04 deletes this list.
 const LEGACY: string[] = [
-  'components/activity-history/activity-history.tsx',
-  'components/confirm-required-dialog/confirm-required-dialog.tsx',
-  'components/customer-autocomplete/customer-autocomplete.tsx',
-  'components/partner-autocomplete/partner-autocomplete.tsx',
-  'components/search-combobox/search-combobox.tsx',
-  'components/tt133-export/export-targets-dialog.tsx',
-  'components/tt133-export/tt133-export-button.tsx',
-  'components/voucher-print/voucher-print-button.tsx',
   'features/customers/components/customer-catalog-list.tsx',
   'features/products/components/product-catalog-list.tsx',
   'pages/admin/components/role-matrix-table.tsx',

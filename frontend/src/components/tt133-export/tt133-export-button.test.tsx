@@ -98,6 +98,19 @@ describe('Tt133ExportButton', () => {
     expect(screen.getByRole('button', { name: TRIGGER })).toBeDisabled();
   });
 
+  it('shows the spinner button while exporting and the Excel icon when idle', async () => {
+    downloadTt133.mockReturnValue(new Promise(() => {}));
+    const user = userEvent.setup();
+    renderButton({ forms: [S04A] });
+    const trigger = screen.getByRole('button', { name: TRIGGER });
+    expect(trigger.querySelector('[data-icon="exportExcel"]')).not.toBeNull();
+    await user.click(trigger);
+    await user.click(screen.getByRole('menuitem', { name: 'Excel' }));
+    const busy = screen.getByRole('button', { name: TRIGGER });
+    expect(busy.querySelector('.button-loader')).not.toBeNull();
+    expect(busy.querySelector('svg.animate-spin')).toBeNull();
+  });
+
   it('shows a destructive toast with the server message when the download fails', async () => {
     downloadTt133.mockRejectedValue(new Error('Xuất PDF thất bại, hãy dùng Excel.'));
     const user = userEvent.setup();

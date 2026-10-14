@@ -1,4 +1,5 @@
-import { FileSpreadsheet, FileText, Loader2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
+import { ButtonLoader } from '@/components/ui/button-loader';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -36,9 +37,9 @@ export function Tt133ExportButton({ forms, onSelect, disabled }: Props) {
         <DropdownMenuTrigger asChild>
           <Button variant="outline" disabled={disabled || forms.length === 0 || isPending}>
             {isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <ButtonLoader />
             ) : (
-              <FileSpreadsheet className="h-4 w-4 text-emerald-700" />
+              <AppIcon name="exportExcel" />
             )}
             Xuất theo mẫu TT133
           </Button>
@@ -48,9 +49,9 @@ export function Tt133ExportButton({ forms, onSelect, disabled }: Props) {
             FORMATS.map(({ format, label }) => (
               <DropdownMenuItem key={`${form.code}-${format}`} onSelect={() => choose(form, format)}>
                 {format === 'xlsx' ? (
-                  <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-700" />
+                  <AppIcon name="exportExcel" className="mr-2" />
                 ) : (
-                  <FileText className="mr-2 h-4 w-4 text-indigo-600" />
+                  <AppIcon name="exportPdf" className="mr-2" />
                 )}
                 {forms.length > 1 ? `${form.code} · ${label}` : label}
               </DropdownMenuItem>

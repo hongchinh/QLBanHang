@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -74,7 +74,7 @@ function Body({ current, renderPicker, onConfirm, onCancel }: Omit<Props, 'open'
                     className="rounded-full hover:text-destructive"
                     onClick={() => remove(item.id)}
                   >
-                    <X className="h-3 w-3" />
+                    <AppIcon name="close" size={12} />
                   </button>
                 </li>
               ))}

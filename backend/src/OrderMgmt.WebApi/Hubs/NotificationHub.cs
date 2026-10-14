@@ -12,13 +12,8 @@ namespace OrderMgmt.WebApi.Hubs;
 public class NotificationHub : Hub
 {
     private readonly IAppDbContext _db;
-    private readonly ILogger<NotificationHub> _logger;
 
-    public NotificationHub(IAppDbContext db, ILogger<NotificationHub> logger)
-    {
-        _db = db;
-        _logger = logger;
-    }
+    public NotificationHub(IAppDbContext db) => _db = db;
 
     public override async Task OnConnectedAsync()
     {
@@ -47,8 +42,9 @@ public class NotificationHub : Hub
         return DashboardGroups.GroupFor(hasDashboard, accessAll, defaultBranchId);
     }
 
-    /// The user's default branch; null when the user is not found, the database cannot be read or the client has
-    /// gone away.
+    /// The user's default branch; null when the user is not found or the client has gone away.
+    /// A failed read is not caught: a connection left without its dashboard group would look live to the client and
+    /// never get a signal. SignalR logs the error and ends the connection, and the client starts it again.
     private async Task<Guid?> DefaultBranchIdAsync(Guid userId)
     {
         try
@@ -61,14 +57,6 @@ public class NotificationHub : Hub
         catch (OperationCanceledException) when (Context.ConnectionAborted.IsCancellationRequested)
         {
             // The client left while connecting: nothing went wrong, and there is no connection to put in a group.
-            return null;
-        }
-        catch (Exception ex)
-        {
-            // A failed lookup must not refuse the connection: the user keeps the notifications, and the dashboard
-            // catches up with its periodic refresh.
-            _logger.LogWarning(ex,
-                "Could not read the default branch of user {UserId}; the connection gets no dashboard signal.", userId);
             return null;
         }
     }

@@ -15,6 +15,16 @@ export function canTakeFocus(el: HTMLElement | null | undefined): el is HTMLElem
   return !!el && el.isConnected && !el.matches(':disabled');
 }
 
+/**
+ * onKeyDown for the buttons of a dialog that a key press may open: the auto-repeats of a held Enter or Space do not
+ * press them, a single press does. Enter held on the save button opens the 422 dialog, whose first button takes the
+ * focus: its repeats would close the dialog before it could be read, give the focus back to the save button and save
+ * again. Other keys repeat as usual (a held Tab still walks through the buttons).
+ */
+export function ignoreKeyRepeat(event: { key: string; repeat: boolean; preventDefault(): void }): void {
+  if (event.repeat && (event.key === 'Enter' || event.key === ' ')) event.preventDefault();
+}
+
 /** Ends the watch of the last `giveFocusBack`, while it is still on. */
 let endHeldKeyWatch: (() => void) | null = null;
 

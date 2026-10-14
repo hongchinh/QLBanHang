@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { isFocusLost } from '@/lib/focus';
+import { ignoreKeyRepeat, isFocusLost } from '@/lib/focus';
 import type { ConfirmationRequest } from '@/lib/confirm-required';
 
 interface Props {
@@ -56,7 +56,8 @@ export function ConfirmRequiredDialog({ request, confirmLabel = 'Vẫn tiếp t�
             ))}
           </ul>
         )}
-        <DialogFooter>
+        {/* The press that opened the dialog may still be down: its repeats must not press a button here. */}
+        <DialogFooter onKeyDown={ignoreKeyRepeat}>
           {blocked ? (
             <Button variant="outline" onClick={onClose}>
               Đóng

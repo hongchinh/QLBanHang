@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent } from '@testing-library/react';
-import { canTakeFocus, currentFocus, giveFocusBack, isFocusLost } from './focus';
+import { canTakeFocus, currentFocus, giveFocusBack, ignoreKeyRepeat, isFocusLost } from './focus';
 
 function add<K extends keyof HTMLElementTagNameMap>(tag: K, parent: HTMLElement = document.body) {
   return parent.appendChild(document.createElement(tag));
@@ -160,5 +160,29 @@ describe('giveFocusBack', () => {
 
     expect(first.onClick).toHaveBeenCalledTimes(1);
     expect(second.onClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('ignoreKeyRepeat', () => {
+  function keyDown(init: { key: string; repeat?: boolean }) {
+    const button = add('button');
+    button.addEventListener('keydown', ignoreKeyRepeat);
+    return fireEvent.keyDown(button, init);
+  }
+
+  it('cancels the repeats of a held Enter or Space, so they do not press the button', () => {
+    expect(keyDown({ key: 'Enter', repeat: true })).toBe(false);
+    expect(keyDown({ key: ' ', repeat: true })).toBe(false);
+  });
+
+  it('leaves a single press alone', () => {
+    expect(keyDown({ key: 'Enter' })).toBe(true);
+    expect(keyDown({ key: ' ' })).toBe(true);
+  });
+
+  // A held Tab still walks through the buttons of the dialog.
+  it('leaves the repeats of any other key alone', () => {
+    expect(keyDown({ key: 'Tab', repeat: true })).toBe(true);
+    expect(keyDown({ key: 'Escape', repeat: true })).toBe(true);
   });
 });

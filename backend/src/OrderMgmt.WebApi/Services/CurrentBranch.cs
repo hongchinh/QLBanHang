@@ -11,17 +11,21 @@ public class CurrentBranch : ICurrentBranch
     private readonly IHttpContextAccessor _accessor;
     private readonly ICurrentUser _currentUser;
     private readonly IAppDbContext _db;
+    private readonly IActingIdentity _acting;
     private Guid? _resolved;
 
-    public CurrentBranch(IHttpContextAccessor accessor, ICurrentUser currentUser, IAppDbContext db)
+    public CurrentBranch(IHttpContextAccessor accessor, ICurrentUser currentUser, IAppDbContext db, IActingIdentity acting)
     {
         _accessor = accessor;
         _currentUser = currentUser;
         _db = db;
+        _acting = acting;
     }
 
     public async Task<Guid> GetIdAsync(CancellationToken ct = default)
     {
+        if (_acting.Current is { } a) return a.BranchId;
+
         if (_resolved.HasValue) return _resolved.Value;
 
         var userId = _currentUser.UserId ?? throw new UnauthorizedAccessException();

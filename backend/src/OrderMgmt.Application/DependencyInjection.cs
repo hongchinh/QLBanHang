@@ -48,6 +48,7 @@ using OrderMgmt.Application.CashDebt.Reports.Interfaces;
 using OrderMgmt.Application.CashDebt.Reports.Services;
 using OrderMgmt.Application.CashDebt.Settings.Interfaces;
 using OrderMgmt.Application.CashDebt.Settings.Services;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.References;
 using OrderMgmt.Application.Dashboards.Executive.Interfaces;
@@ -102,6 +103,7 @@ public static class DependencyInjection
         ValidatorOptions.Global.PropertyNameResolver = (_, member, _) =>
             member is null ? null : JsonNamingPolicy.CamelCase.ConvertName(member.Name);
 
+        services.AddScoped<IActingIdentity, ActingIdentityHolder>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<IProductService, ProductService>();

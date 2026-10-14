@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useCanOpenLink } from '@/hooks/useCanOpenLink';
 import { getErrorMessage } from '@/lib/api-client';
@@ -35,7 +36,7 @@ interface TileCardProps {
   children: ReactNode;
 }
 
-const ACTION_CLASS = 'shrink-0 text-xs font-normal text-primary hover:underline';
+const ACTION_CLASS = 'inline-flex shrink-0 items-center gap-1 text-xs font-normal text-primary hover:underline';
 
 // A dashboard tile: title, optional action, and the loading / error / empty states of its query.
 export function TileCard({ title, action, query, isEmpty, emptyText, className, children }: TileCardProps) {
@@ -72,6 +73,7 @@ function TileActionControl({ action }: { action: TileAction }) {
     return (
       <Link to={to} title={title} className={ACTION_CLASS}>
         {label}
+        <AppIcon name="arrowRight" size={14} tone="none" />
       </Link>
     );
   }
@@ -79,6 +81,7 @@ function TileActionControl({ action }: { action: TileAction }) {
   return (
     <button type="button" title={title} onClick={() => onClick()} className={ACTION_CLASS}>
       {label}
+      <AppIcon name="arrowRight" size={14} tone="none" />
     </button>
   );
 }

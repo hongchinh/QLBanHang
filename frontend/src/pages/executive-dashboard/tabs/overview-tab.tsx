@@ -94,7 +94,7 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
               className="lg:col-span-2"
               query={salesSeries}
               isEmpty={isSalesSeriesEmpty(salesPoints)}
-              action={openSales('Chi tiết →')}
+              action={openSales('Chi tiết')}
             >
               <ProfitChart
                 points={salesPoints}
@@ -112,7 +112,7 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
               query={cashQuery}
               // A period without movement still shows the fund balances, or why they are missing.
               isEmpty={noCashMovement && funds.length === 0 && !fundsFailed}
-              action={{ label: 'Sổ quỹ →', to: executiveLinks.cashBook(), title: linkTitle }}
+              action={{ label: 'Sổ quỹ', to: executiveLinks.cashBook(), title: linkTitle }}
             >
               <div className="space-y-3">
                 {/* Above the fund table "Chưa có dữ liệu." would read as "no data" right above data. */}
@@ -136,7 +136,7 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
             <TileCard
               title="Cơ cấu nợ phải thu"
               query={debtSummary}
-              action={{ label: 'Nợ quá hạn →', to: executiveLinks.debtOverdue('Receivable', today), title: linkTitle }}
+              action={{ label: 'Nợ quá hạn', to: executiveLinks.debtOverdue('Receivable', today), title: linkTitle }}
             >
               {debtSummary.data && (
                 <DebtTermBar side={debtSummary.data.receivable} buckets={debtSummary.data.overdueBuckets} />
@@ -148,7 +148,7 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
               title="So sánh chi nhánh"
               query={branches}
               isEmpty={(branches.data ?? []).length === 0}
-              action={openSales('Kinh doanh →')}
+              action={openSales('Kinh doanh')}
             >
               <BranchComparisonTable rows={branches.data ?? []} onSelectBranch={scope.selectBranch} />
             </TileCard>
@@ -158,7 +158,7 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
               title="Top khách hàng theo doanh thu"
               query={top}
               isEmpty={(top.data ?? []).length === 0}
-              action={openSales('Xem thêm →')}
+              action={openSales('Xem thêm')}
             >
               <TopListCard
                 items={(top.data ?? []).map((row) => ({

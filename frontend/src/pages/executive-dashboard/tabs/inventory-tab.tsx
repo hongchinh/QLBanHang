@@ -53,7 +53,7 @@ export function InventoryTab({ params }: InventoryTabProps) {
   const byProductGroup = breakdown.data?.byProductGroup ?? [];
   const topByValue = breakdown.data?.topByValue ?? [];
   const negative = breakdown.data?.negative ?? [];
-  const stockOnHand = { label: 'Tồn kho →', to: executiveLinks.stockOnHand(), title: linkTitle };
+  const stockOnHand = { label: 'Tồn kho', to: executiveLinks.stockOnHand(), title: linkTitle };
 
   const warehouseColumns: DataColumn<StockGroup>[] = [
     { key: 'warehouse', header: 'Kho', cell: (row) => withBranch(branchOf(row.branchCode), codeName(row.code, row.name)) },

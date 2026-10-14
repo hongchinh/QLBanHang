@@ -206,31 +206,32 @@ describe('TileCard', () => {
   describe('action', () => {
     it('is a link when the user may open the route', () => {
       signIn(['reports.cash']);
-      renderTile({ action: { label: 'Sổ quỹ →', to: '/reports/cash-book', title: 'Báo cáo mở theo chi nhánh đang làm việc (CN01)' } });
+      renderTile({ action: { label: 'Sổ quỹ', to: '/reports/cash-book', title: 'Báo cáo mở theo chi nhánh đang làm việc (CN01)' } });
 
-      const link = screen.getByRole('link', { name: 'Sổ quỹ →' });
+      const link = screen.getByRole('link', { name: 'Sổ quỹ' });
+      expect(link.querySelector('[data-icon="arrowRight"]')).not.toBeNull();
       expect(link).toHaveAttribute('href', '/reports/cash-book');
       expect(link).toHaveAttribute('title', 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
     });
 
     it('is not rendered when the user may not open the route', () => {
       signIn(['reports.debt']);
-      renderTile({ action: { label: 'Sổ quỹ →', to: '/reports/cash-book' } });
+      renderTile({ action: { label: 'Sổ quỹ', to: '/reports/cash-book' } });
 
       expect(screen.queryByRole('link')).not.toBeInTheDocument();
-      expect(screen.queryByText('Sổ quỹ →')).not.toBeInTheDocument();
+      expect(screen.queryByText('Sổ quỹ')).not.toBeInTheDocument();
     });
 
     it('checks the path of a link with a query string', () => {
-      const action = { label: 'Nợ quá hạn →', to: '/reports/debt-overdue?side=Receivable&at=2026-10-13' };
+      const action = { label: 'Nợ quá hạn', to: '/reports/debt-overdue?side=Receivable&at=2026-10-13' };
       signIn(['reports.cash']);
       const { unmount } = renderTile({ action });
-      expect(screen.queryByText('Nợ quá hạn →')).not.toBeInTheDocument();
+      expect(screen.queryByText('Nợ quá hạn')).not.toBeInTheDocument();
       unmount();
 
       signIn(['reports.debt']);
       renderTile({ action });
-      expect(screen.getByRole('link', { name: 'Nợ quá hạn →' })).toHaveAttribute(
+      expect(screen.getByRole('link', { name: 'Nợ quá hạn' })).toHaveAttribute(
         'href',
         '/reports/debt-overdue?side=Receivable&at=2026-10-13',
       );
@@ -238,18 +239,18 @@ describe('TileCard', () => {
 
     it('is a button that calls onClick', () => {
       const onClick = vi.fn();
-      renderTile({ action: { label: 'Chi tiết →', onClick } });
+      renderTile({ action: { label: 'Chi tiết', onClick } });
 
       expect(screen.queryByRole('link')).not.toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: 'Chi tiết →' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Chi tiết' }));
       expect(onClick).toHaveBeenCalledTimes(1);
     });
 
     it('stays while the tile loads', () => {
       const onClick = vi.fn();
-      renderTile({ action: { label: 'Chi tiết →', onClick }, query: query({ isLoading: true, data: undefined }) });
+      renderTile({ action: { label: 'Chi tiết', onClick }, query: query({ isLoading: true, data: undefined }) });
 
-      expect(screen.getByRole('button', { name: 'Chi tiết →' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Chi tiết' })).toBeInTheDocument();
     });
   });
 });

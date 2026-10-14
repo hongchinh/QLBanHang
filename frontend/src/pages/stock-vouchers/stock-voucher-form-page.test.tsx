@@ -1739,6 +1739,51 @@ describe('StockVoucherFormPage', () => {
       expect(cancelMock).not.toHaveBeenCalled();
     });
 
+    // The product catalog of a Mã cell is a modal dialog inside the form in the React tree, so its keys reach the
+    // form's handler. They are the dialog's, as on any other dialog: left to the browser, no save, no tab switched
+    // behind the dialog.
+    it('keys typed in the product catalog dialog neither save nor switch tabs', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      updateMock.mockResolvedValue(voucher());
+      renderInMain();
+      fireEvent.change(byId('stock-line-product-code-0'), { target: { value: 'S' } });
+      fireEvent.mouseDown(await screen.findByText('Xem danh mục đầy đủ'));
+      const catalog = await screen.findByRole('dialog', { name: 'Danh mục hàng hóa' });
+      const search = within(catalog).getAllByRole('textbox')[0];
+      act(() => search.focus());
+
+      const save = createEvent.keyDown(search, { key: 's', ctrlKey: true });
+      fireEvent(search, save);
+      const altTab = createEvent.keyDown(search, { key: '3', altKey: true });
+      fireEvent(search, altTab);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(save.defaultPrevented).toBe(false);
+      expect(altTab.defaultPrevented).toBe(false);
+      expect(updateMock).not.toHaveBeenCalled();
+      // The modal dialog hides the rest of the page from the accessibility tree.
+      expect(screen.getByRole('tab', { name: /Hàng hóa/, hidden: true })).toHaveAttribute('data-state', 'active');
+      expect(document.activeElement).toBe(search);
+    });
+
+    // The popovers of the grid ("Cột & phím Enter", "Phím tắt") are role="dialog" too, but they do not block the page.
+    it('Ctrl+S in a popover of the grid still saves', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      updateMock.mockResolvedValue(voucher({ version: 8 }));
+      renderInMain();
+      fireEvent.click(screen.getByRole('button', { name: /Cột & phím Enter/ }));
+      const checkbox = within(await screen.findByRole('dialog')).getByRole('checkbox', { name: 'Kho' });
+      act(() => checkbox.focus());
+
+      const save = createEvent.keyDown(checkbox, { key: 's', ctrlKey: true });
+      fireEvent(checkbox, save);
+
+      expect(save.defaultPrevented).toBe(true);
+      await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+    });
+
     // The listener hears every key pressed anywhere, each one typed in the grid too. Only a shortcut that it would take
     // is worth a search of the whole page for an open dialog.
     it('searches the page for an open dialog only for a shortcut that it would take', async () => {

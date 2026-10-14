@@ -104,7 +104,7 @@ const ALT_TABS: Record<string, StockVoucherTab> = { '1': 'lines', '2': 'other', 
 // What the shortcuts read of a key event, React's or the DOM's.
 type ShortcutKeyEvent = Pick<
   KeyboardEvent,
-  'key' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'repeat' | 'preventDefault'
+  'key' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'repeat' | 'target' | 'preventDefault'
 >;
 
 // Ctrl+S saves (with Caps Lock too, not with Shift); Alt+1..4 switch tabs, Alt+4 only on a saved voucher.
@@ -115,6 +115,15 @@ function shortcutOf(e: ShortcutKeyEvent, isEdit: boolean): 'save' | StockVoucher
 }
 
 const OPEN_DIALOG = '[role="dialog"], [role="alertdialog"]';
+// Radix wraps the content of a popover in it. The grid's popovers are role="dialog" too, but they do not block the page.
+const POPOVER = '[data-radix-popper-content-wrapper]';
+
+// A modal dialog owns its keys, also one that sits inside the form in the React tree (the product catalog of a Mã
+// cell), whose keys reach the form's handler.
+function inModalDialog(target: EventTarget | null): boolean {
+  const dialog = target instanceof Element ? target.closest(OPEN_DIALOG) : null;
+  return !!dialog && !dialog.closest(POPOVER);
+}
 
 const JUMP_IDS: Record<TotalsJumpField, string> = {
   freight: 'stock-freight',
@@ -547,12 +556,12 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       });
   }
 
-  // Runs the shortcut of the key (shortcutOf). Returns true when the key was one: it is taken from the browser then.
-  // A key held down repeats: the repeats are taken too but run nothing, or a held Ctrl+S would save again each time
-  // the save before it ended.
+  // Takes a shortcut key (shortcutOf) from the browser and runs its shortcut, unless the key was typed in a modal
+  // dialog; returns whether it took the key. A key held down repeats: the repeats are taken too but run nothing, or a
+  // held Ctrl+S would save again each time the save before it ended.
   function runShortcut(e: ShortcutKeyEvent): boolean {
     const shortcut = shortcutOf(e, isEdit);
-    if (!shortcut) return false;
+    if (!shortcut || inModalDialog(e.target)) return false;
     e.preventDefault();
     if (e.repeat) return true;
     if (shortcut === 'save') {

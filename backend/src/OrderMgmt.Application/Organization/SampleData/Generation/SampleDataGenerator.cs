@@ -12,15 +12,20 @@ public sealed class SampleDataGenerator : ISampleDataGenerator
             throw new ArgumentOutOfRangeException(nameof(input), input.OwnerCount, "OwnerCount must be at least 1.");
         }
 
+        var random = SampleRandom.ForBranch(input.BranchCode);
+        var openingDate = SampleCalendar.OpeningDate(input.Today);
+
         return new SampleDataPlan
         {
-            OpeningDate = SampleCalendar.OpeningDate(input.Today),
+            OpeningDate = openingDate,
             LastDocumentDate = SampleCalendar.LastDocumentDate(input.Today),
             Products = SampleCatalog.Products.ToList(),
             Partners = SampleCatalog.BuildPartners(input.OwnerCount),
             Warehouses = SampleCatalog.Warehouses.ToList(),
             Funds = SampleCatalog.Funds.ToList(),
             CreditLimits = SampleCatalog.CreditLimits.ToList(),
+            OpeningStocks = SampleOpeningBalances.BuildStocks(random),
+            OpeningDebts = SampleOpeningBalances.BuildDebts(random, openingDate, input.OwnerCount),
         };
     }
 }

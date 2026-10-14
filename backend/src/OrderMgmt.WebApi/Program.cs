@@ -13,6 +13,7 @@ using OrderMgmt.Infrastructure.Identity;
 using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.Infrastructure.Persistence.Seed;
 using OrderMgmt.WebApi.Authorization;
+using OrderMgmt.WebApi.BackgroundJobs;
 using OrderMgmt.WebApi.Configuration;
 using OrderMgmt.WebApi.Middleware;
 using OrderMgmt.WebApi.Services;
@@ -53,6 +54,7 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ICurrentUser, CurrentUser>();
 builder.Services.AddScoped<ICurrentBranch, CurrentBranch>();
 builder.Services.AddScoped<IRealtimeNotifier, SignalRNotifier>();
+builder.Services.AddHostedService<SampleDataHostedService>();
 builder.Services.Configure<AuthCookieOptions>(builder.Configuration.GetSection(AuthCookieOptions.SectionName));
 
 // Fail fast if cross-site cookie config is inconsistent. SameSite=None requires Secure=true,

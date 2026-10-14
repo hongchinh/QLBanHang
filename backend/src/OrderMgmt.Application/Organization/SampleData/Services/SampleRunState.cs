@@ -1,10 +1,21 @@
+using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Organization.SampleData.Services;
 
 /// A debt entry posted by a plan item: what an allocation or an offset needs to read its open amount.
-internal sealed record SampleDebtEntryRef(Guid Id, DebtSide Side, Guid PartnerId);
+internal sealed record SampleDebtEntryRef(Guid Id, DebtSide Side, Guid PartnerId)
+{
+    /// The entry the document posted, or null when it posted none (a sale without partner, a reason without debt
+    /// effect). Opening debts, stock vouchers and cash vouchers post at most one.
+    public static Task<SampleDebtEntryRef?> OfSourceAsync(IAppDbContext db, DebtSourceType sourceType, Guid sourceId,
+        CancellationToken ct) =>
+        db.DebtEntries
+            .Where(e => e.SourceType == sourceType && e.SourceId == sourceId)
+            .Select(e => new SampleDebtEntryRef(e.Id, e.Side, e.PartnerId))
+            .SingleOrDefaultAsync(ct);
+}
 
 /// What one run has learned so far: people, ids by plan code or key, counters and the item being run.
 internal sealed class SampleRunState

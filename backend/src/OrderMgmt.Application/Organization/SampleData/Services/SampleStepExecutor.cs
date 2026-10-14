@@ -1,5 +1,11 @@
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
+using OrderMgmt.Application.CashDebt.CashVouchers.Models;
+using OrderMgmt.Application.CashDebt.DebtOffsets.Interfaces;
+using OrderMgmt.Application.CashDebt.DebtOffsets.Models;
+using OrderMgmt.Application.CashDebt.FundTransfers.Interfaces;
+using OrderMgmt.Application.CashDebt.FundTransfers.Models;
+using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
@@ -31,7 +37,10 @@ internal sealed class SampleStepExecutor
     public Task<SampleStepOutcome> ExecuteAsync(SampleStep step, CancellationToken ct) => step switch
     {
         SampleStockVoucherStep s => StockVoucherAsync(s, ct),
-        // One arm per step type (stock voucher, cash voucher, fund transfer, debt offset, cancel).
+        SampleCashVoucherStep s => CashVoucherAsync(s, ct),
+        SampleFundTransferStep s => FundTransferAsync(s, ct),
+        SampleDebtOffsetStep s => DebtOffsetAsync(s, ct),
+        SampleCancelStep s => CancelAsync(s, ct),
         _ => throw new SampleDataPlanException($"Loại bước {step.GetType().Name} chưa được hỗ trợ."),
     };
 
@@ -67,12 +76,145 @@ internal sealed class SampleStepExecutor
         var voucher = await _services.GetRequiredService<IStockVoucherService>().CreateAsync(request, ct);
 
         var sourceType = step.Type == StockDirection.In ? DebtSourceType.StockIn : DebtSourceType.StockOut;
-        var entry = await _services.GetRequiredService<IAppDbContext>().DebtEntries
-            .Where(e => e.SourceType == sourceType && e.SourceId == voucher.Id)
-            .Select(e => new SampleDebtEntryRef(e.Id, e.Side, e.PartnerId))
-            .SingleOrDefaultAsync(ct);
-        if (entry is not null)
-            _run.Entries[step.Key] = entry;
+        await MapEntryAsync(step.Key, sourceType, voucher.Id, ct);
         return SampleStepOutcome.Executed;
+    }
+
+    /// A receipt or payment with one line. A fixed amount allocates nothing; targets allocate what is open on each of
+    /// them now, capped by MaxAmount, and a step with nothing left to allocate is skipped (S11). The key then names the
+    /// voucher and its own debt entry, when it posted one.
+    private async Task<SampleStepOutcome> CashVoucherAsync(SampleCashVoucherStep step, CancellationToken ct)
+    {
+        var request = new UpsertCashVoucherRequest
+        {
+            Type = step.Type,
+            VoucherAt = step.At,
+            FundId = SampleRunState.Lookup(_run.Funds, step.FundCode),
+            ReasonId = SampleRunState.Lookup(_run.CashReasons, step.ReasonCode),
+            PartnerId = step.PartnerCode is { } partner ? SampleRunState.Lookup(_run.Partners, partner) : null,
+            PersonName = step.PersonName,
+            Description = step.Description,
+            AcknowledgeNegativeFund = true,
+        };
+
+        decimal amount;
+        if (step.FixedAmount is { } fixedAmount)
+        {
+            amount = fixedAmount;
+        }
+        else
+        {
+            var targets = step.Targets
+                .Select(t => (Entry: SampleRunState.Lookup(_run.Entries, t.TargetKey), t.MaxAmount))
+                .ToList();
+            var open = await OpenAmountsAsync(targets.Select(t => t.Entry), ct);
+            request.Allocations = targets
+                .Select(t => new AllocationRequest
+                {
+                    EntryId = t.Entry.Id,
+                    Amount = Math.Min(open[t.Entry.Id], t.MaxAmount ?? open[t.Entry.Id]),
+                })
+                .Where(a => a.Amount > 0)
+                .ToList();
+            amount = request.Allocations.Sum(a => a.Amount);
+            if (amount <= 0)
+                return SampleStepOutcome.Skipped;
+        }
+
+        request.Lines.Add(new UpsertCashVoucherLineRequest { Description = step.Description, Amount = amount });
+        await SampleDataRunner.ValidateAsync(_services, request, ct);
+        var voucher = await _services.GetRequiredService<ICashVoucherService>().CreateAsync(request, ct);
+
+        _run.CashVouchers[step.Key] = voucher.Id;
+        var sourceType = step.Type == CashVoucherType.Receipt ? DebtSourceType.Receipt : DebtSourceType.Payment;
+        await MapEntryAsync(step.Key, sourceType, voucher.Id, ct);
+        return SampleStepOutcome.Executed;
+    }
+
+    private async Task<SampleStepOutcome> FundTransferAsync(SampleFundTransferStep step, CancellationToken ct)
+    {
+        var request = new UpsertFundTransferRequest
+        {
+            VoucherAt = step.At,
+            FromFundId = SampleRunState.Lookup(_run.Funds, step.FromFundCode),
+            ToFundId = SampleRunState.Lookup(_run.Funds, step.ToFundCode),
+            Amount = step.Amount,
+            Description = step.Description,
+            AcknowledgeNegativeFund = true,
+        };
+        await SampleDataRunner.ValidateAsync(_services, request, ct);
+        await _services.GetRequiredService<IFundTransferService>().CreateAsync(request, ct);
+        return SampleStepOutcome.Executed;
+    }
+
+    /// Offsets what is open on both entries now: min(open receivable, open payable); 0 skips the step (S11).
+    private async Task<SampleStepOutcome> DebtOffsetAsync(SampleDebtOffsetStep step, CancellationToken ct)
+    {
+        var partnerId = SampleRunState.Lookup(_run.Partners, step.PartnerCode);
+        var receivable = SampleRunState.Lookup(_run.Entries, step.ReceivableTargetKey);
+        var payable = SampleRunState.Lookup(_run.Entries, step.PayableTargetKey);
+        var open = await OpenAmountsAsync(new[] { receivable, payable }, ct);
+        var amount = Math.Min(open[receivable.Id], open[payable.Id]);
+        if (amount <= 0)
+            return SampleStepOutcome.Skipped;
+
+        var request = new CreateDebtOffsetRequest
+        {
+            VoucherAt = step.At,
+            PartnerId = partnerId,
+            Receivables = { new AllocationRequest { EntryId = receivable.Id, Amount = amount } },
+            Payables = { new AllocationRequest { EntryId = payable.Id, Amount = amount } },
+        };
+        await SampleDataRunner.ValidateAsync(_services, request, ct);
+        await _services.GetRequiredService<IDebtOffsetService>().CreateAsync(request, ct);
+        return SampleStepOutcome.Executed;
+    }
+
+    /// Cancels the cash voucher of step TargetKey at its current version; its settlements go with it.
+    private async Task<SampleStepOutcome> CancelAsync(SampleCancelStep step, CancellationToken ct)
+    {
+        var voucherId = SampleRunState.Lookup(_run.CashVouchers, step.TargetKey);
+        var service = _services.GetRequiredService<ICashVoucherService>();
+        var voucher = await service.GetAsync(voucherId, ct);
+        var request = new CashDocumentActionRequest
+        {
+            Version = voucher.Version,
+            ConfirmRemoveSettlements = true,
+            AcknowledgeNegativeFund = true,
+        };
+        await SampleDataRunner.ValidateAsync(_services, request, ct);
+        await service.CancelAsync(voucherId, request, ct);
+        return SampleStepOutcome.Executed;
+    }
+
+    /// Lets later steps name the document's debt entry by the step key.
+    private async Task MapEntryAsync(string key, DebtSourceType sourceType, Guid sourceId, CancellationToken ct)
+    {
+        var db = _services.GetRequiredService<IAppDbContext>();
+        if (await SampleDebtEntryRef.OfSourceAsync(db, sourceType, sourceId, ct) is { } entry)
+            _run.Entries[key] = entry;
+    }
+
+    /// Each entry's open amount now. OpenItemsAsync leaves out an entry with nothing open (a cash sale's entry is
+    /// settled by its automatic receipt; a cancelled voucher's entry is gone), so a missing entry counts as 0.
+    private async Task<Dictionary<Guid, decimal>> OpenAmountsAsync(IEnumerable<SampleDebtEntryRef> entries,
+        CancellationToken ct)
+    {
+        var debtQuery = _services.GetRequiredService<IDebtQueryService>();
+        var open = new Dictionary<Guid, decimal>();
+        foreach (var group in entries.GroupBy(e => (e.PartnerId, e.Side)))
+        {
+            var items = await debtQuery.OpenItemsAsync(new OpenItemsQuery
+            {
+                BranchId = _run.BranchId,
+                PartnerId = group.Key.PartnerId,
+                Side = group.Key.Side,
+                Direction = null,
+            }, ct);
+            var openById = items.ToDictionary(i => i.EntryId, i => i.Open);
+            foreach (var entry in group)
+                open[entry.Id] = openById.GetValueOrDefault(entry.Id);
+        }
+        return open;
     }
 }

@@ -274,10 +274,9 @@ public sealed class SampleDataRunner : ISampleDataRunner
                 };
                 await ValidateAsync(sp, request, c);
                 var debt = await sp.GetRequiredService<IOpeningDebtService>().CreateAsync(request, c);
-                run.Entries[spec.Key] = await sp.GetRequiredService<IAppDbContext>().DebtEntries
-                    .Where(e => e.SourceType == DebtSourceType.Opening && e.SourceId == debt.Id)
-                    .Select(e => new SampleDebtEntryRef(e.Id, e.Side, e.PartnerId))
-                    .SingleAsync(c);
+                run.Entries[spec.Key] = await SampleDebtEntryRef.OfSourceAsync(sp.GetRequiredService<IAppDbContext>(),
+                        DebtSourceType.Opening, debt.Id, c)
+                    ?? throw new InvalidOperationException($"Opening debt {debt.Id} posted no debt entry.");
             }, ct);
 
         foreach (var spec in plan.CreditLimits)

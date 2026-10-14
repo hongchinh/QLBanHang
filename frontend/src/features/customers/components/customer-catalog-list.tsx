@@ -134,19 +134,19 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
         <div className="flex gap-1">
           <button
             type="button"
-            className="rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
             disabled={page <= 1}
             onClick={() => setPage((p) => p - 1)}
           >
-            ← Trước
+            <AppIcon name="chevronLeft" size={14} /> Trước
           </button>
           <button
             type="button"
-            className="rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
             disabled={page >= totalPages}
             onClick={() => setPage((p) => p + 1)}
           >
-            Sau →
+            Sau <AppIcon name="chevronRight" size={14} />
           </button>
         </div>
       </div>

@@ -748,7 +748,7 @@ function QuotationFormInner({
                     onClick={() => setActiveTab(activeTab === 'general' ? 'history' : 'general')}
                   >
                     <AppIcon name="time" size={14} />
-                    {activeTab === 'general' ? 'Lịch sử' : '← Thông tin chung'}
+                    {activeTab === 'general' ? 'Lịch sử' : <><AppIcon name="arrowLeft" size={14} /> Thông tin chung</>}
                   </Button>
                 )}
               </CardHeader>

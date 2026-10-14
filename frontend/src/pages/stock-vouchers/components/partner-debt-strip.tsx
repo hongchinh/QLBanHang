@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { AppIcon } from '@/components/icons';
 import { usePartnerDebtSummary } from '@/features/debt/hooks';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/stores/auth-store';
@@ -34,11 +35,11 @@ export function PartnerDebtStrip({ partnerId, partnerLabel, current, saved, canc
       <span className="min-w-0 max-w-[28ch] truncate font-semibold text-foreground" title={partnerLabel}>{partnerLabel}</span>
       <span className="shrink-0">
         Phải thu <Value testId="partner-debt-receivable" value={data.receivableBalance} />
-        {after?.receivableChanged && <> → sau phiếu <Value testId="partner-debt-receivable-after" value={after.receivableAfter} /></>}
+        {after?.receivableChanged && <> <AppIcon name="arrowRight" size={12} className="inline align-middle" /> sau phiếu <Value testId="partner-debt-receivable-after" value={after.receivableAfter} /></>}
       </span>
       <span className="shrink-0">
         Phải trả <Value testId="partner-debt-payable" value={data.payableBalance} />
-        {after?.payableChanged && <> → sau phiếu <Value testId="partner-debt-payable-after" value={after.payableAfter} /></>}
+        {after?.payableChanged && <> <AppIcon name="arrowRight" size={12} className="inline align-middle" /> sau phiếu <Value testId="partner-debt-payable-after" value={after.payableAfter} /></>}
       </span>
       <span className="shrink-0">
         Hạn mức <b className="text-foreground" data-testid="partner-debt-limit">{data.creditLimit == null ? UNLIMITED : fmt.format(data.creditLimit)}</b>

@@ -1,4 +1,5 @@
 import { useProduct } from '@/features/products/hooks';
+import { AppIcon } from '@/components/icons';
 import { formatMoneyForDisplay } from '@/lib/money-input';
 import { useAuthStore } from '@/stores/auth-store';
 import type { ProductSuggestion } from '@/features/products/types';
@@ -47,7 +48,7 @@ export function ProductCatalogDetail({ productId, onSelect }: Props) {
   if (productId === null) {
     return (
       <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
-        ← Chọn sản phẩm để xem chi tiết
+        <AppIcon name="arrowLeft" size={14} /> Chọn sản phẩm để xem chi tiết
       </div>
     );
   }

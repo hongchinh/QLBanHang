@@ -32,25 +32,29 @@ export function DemoBranchDeleteDialog({ branch, onClose, onDeleted }: DemoBranc
   }, [branch?.id]);
 
   const data = preview.data;
-  const canConfirm = !!branch && !!data && !preview.isLoading && code.trim() === branch.code;
+  // A cached preview is not trusted until the refetch lands, and a failed refetch blocks it.
+  const canConfirm =
+    !!branch && !!data && !preview.isFetching && !preview.isError && code.trim() === branch.code;
 
   async function handleDelete() {
     if (!branch || !canConfirm) return;
+    let result: Awaited<ReturnType<typeof deleteBranch.mutateAsync>>;
     try {
-      const result = await deleteBranch.mutateAsync(branch.id);
-      const kept = result.keptSampleProductCount + result.keptSamplePartnerCount;
-      toast({
-        variant: 'success',
-        title: 'Đã xóa chi nhánh demo',
-        ...(kept > 0 && {
-          description: `Giữ lại ${result.keptSampleProductCount} hàng hóa và ${result.keptSamplePartnerCount} đối tượng mẫu vì đang được dùng ở nơi khác.`,
-        }),
-      });
-      onClose();
-      onDeleted(branch.id);
+      result = await deleteBranch.mutateAsync(branch.id);
     } catch (err) {
       toast({ variant: 'destructive', title: 'Không thể xóa', description: formatApiErrorDetails(err) });
+      return;
     }
+    const kept = result.keptSampleProductCount + result.keptSamplePartnerCount;
+    toast({
+      variant: 'success',
+      title: 'Đã xóa chi nhánh demo',
+      ...(kept > 0 && {
+        description: `Giữ lại ${result.keptSampleProductCount} hàng hóa và ${result.keptSamplePartnerCount} đối tượng mẫu vì đang được dùng ở nơi khác.`,
+      }),
+    });
+    onClose();
+    onDeleted(branch.id);
   }
 
   return (
@@ -59,7 +63,7 @@ export function DemoBranchDeleteDialog({ branch, onClose, onDeleted }: DemoBranc
         <DialogHeader>
           <DialogTitle>Xóa chi nhánh demo?</DialogTitle>
           <DialogDescription asChild>
-            <div className="space-y-2">
+            <div className="space-y-2" aria-live="polite">
               {preview.isLoading && <p>Đang kiểm tra dữ liệu...</p>}
               {preview.isError && (
                 <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
@@ -87,26 +91,36 @@ export function DemoBranchDeleteDialog({ branch, onClose, onDeleted }: DemoBranc
             </div>
           </DialogDescription>
         </DialogHeader>
-        {branch && (
-          <div className="space-y-2">
-            <Label htmlFor="demo-delete-code">Nhập mã chi nhánh ({branch.code}) để xác nhận</Label>
-            <Input
-              id="demo-delete-code"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              disabled={deleteBranch.isPending}
-              autoComplete="off"
-            />
-          </div>
-        )}
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={deleteBranch.isPending}>
-            Hủy
-          </Button>
-          <Button variant="destructive" onClick={() => void handleDelete()} disabled={!canConfirm || deleteBranch.isPending}>
-            {deleteBranch.isPending ? 'Đang xóa...' : 'Xóa vĩnh viễn'}
-          </Button>
-        </DialogFooter>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void handleDelete();
+          }}
+        >
+          {branch && (
+            <div className="space-y-2">
+              <Label htmlFor="demo-delete-code">Nhập mã chi nhánh ({branch.code}) để xác nhận</Label>
+              <Input
+                id="demo-delete-code"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                disabled={deleteBranch.isPending}
+                autoComplete="off"
+                autoCapitalize="none"
+                spellCheck={false}
+              />
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onClose} disabled={deleteBranch.isPending}>
+              Hủy
+            </Button>
+            <Button type="submit" variant="destructive" disabled={!canConfirm || deleteBranch.isPending}>
+              {deleteBranch.isPending ? 'Đang xóa...' : 'Xóa vĩnh viễn'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

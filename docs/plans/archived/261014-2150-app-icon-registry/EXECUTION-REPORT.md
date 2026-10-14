@@ -1,6 +1,6 @@
 # Execution Report — AppIcon registry (step 1 of option D)
 
-> Plan: [SUMMARY.md](SUMMARY.md) · Branch: `feat/app-icon-registry` (from `main` `9d3e407`, not pushed) · Executed 2026-10-15 · Brainstorm: [261014-2115-notch-icon-analysis](../../brainstorms/261014-2115-notch-icon-analysis/SUMMARY.md)
+> Plan: [SUMMARY.md](SUMMARY.md) · Branch: `feat/app-icon-registry` (from `main` `9d3e407`, not pushed) · Executed 2026-10-15 · Brainstorm: [261014-2115-notch-icon-analysis](../../../brainstorms/261014-2115-notch-icon-analysis/SUMMARY.md)
 
 ## Outcome
 

@@ -1,6 +1,6 @@
 # AppIcon registry — bước 1 của phương án D
 
-> Nguồn: [brainstorm 261014-2115-notch-icon-analysis](../../brainstorms/261014-2115-notch-icon-analysis/SUMMARY.md) (mục "Bước 1 — làm ngay"). Mockup: [mockup-01-home.html](../../brainstorms/261014-2115-notch-icon-analysis/mockup-01-home.html), [mockup-02-stock-out.html](../../brainstorms/261014-2115-notch-icon-analysis/mockup-02-stock-out.html) (chế độ "Bước 1").
+> Nguồn: [brainstorm 261014-2115-notch-icon-analysis](../../../brainstorms/261014-2115-notch-icon-analysis/SUMMARY.md) (mục "Bước 1 — làm ngay"). Mockup: [mockup-01-home.html](../../../brainstorms/261014-2115-notch-icon-analysis/mockup-01-home.html), [mockup-02-stock-out.html](../../../brainstorms/261014-2115-notch-icon-analysis/mockup-02-stock-out.html) (chế độ "Bước 1").
 
 ## Goal
 

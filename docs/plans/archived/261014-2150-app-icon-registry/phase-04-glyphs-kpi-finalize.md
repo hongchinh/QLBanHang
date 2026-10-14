@@ -152,5 +152,5 @@ Chạy toàn bộ mục "Final Verification" trong [SUMMARY.md](SUMMARY.md#final
 ## Exit Criteria
 
 - Không còn ký tự ▲ ▼ ▾ ✕ làm icon; mũi tên ← → chỉ còn trong câu chỉ đường menu.
-- Trang chủ có icon ở nhãn 4 ô KPI, khớp chế độ "Bước 1" của [mockup-01-home.html](../../brainstorms/261014-2115-notch-icon-analysis/mockup-01-home.html).
+- Trang chủ có icon ở nhãn 4 ô KPI, khớp chế độ "Bước 1" của [mockup-01-home.html](../../../brainstorms/261014-2115-notch-icon-analysis/mockup-01-home.html).
 - `npm run lint` báo `error` nếu có ai import `lucide-react` ngoài registry; tài liệu quy ước mô tả cách dùng.

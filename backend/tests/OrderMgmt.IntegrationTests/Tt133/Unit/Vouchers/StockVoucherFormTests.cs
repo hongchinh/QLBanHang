@@ -263,6 +263,35 @@ public class StockVoucherFormTests
         note.Address.RowNumber.Should().BeLessThan(RowOf(ws, "- Họ và tên người giao: Trần Giao"));
     }
 
+    private static StockVoucherPrintModel StockInWithLines(int count)
+    {
+        var m = StockIn();
+        m.Lines = Enumerable.Range(1, count).Select(i => new StockVoucherPrintLine
+        {
+            Number = i, Name = $"Hàng {i}", Code = $"M{i}", UnitName = "Tấm", Quantity = i, UnitPrice = 1_000, Amount = 1_000 * i,
+        }).ToList();
+        return m;
+    }
+
+    [Fact]
+    public void Signature_block_that_would_cross_a_page_starts_a_new_page()
+    {
+        using var wb = Render(StockInWithLines(40));
+        var ws = wb.Worksheet(1);
+
+        var dateRow = RowOf(ws, "Người lập phiếu") - 1;
+        ws.Cell(dateRow, 6).GetString().Should().Be("Ngày 05 tháng 10 năm 2026");
+        ws.PageSetup.RowBreaks.Should().Equal(dateRow - 1);
+    }
+
+    [Fact]
+    public void Short_voucher_has_no_page_break()
+    {
+        using var wb = Render(StockIn());
+
+        wb.Worksheet(1).PageSetup.RowBreaks.Should().BeEmpty();
+    }
+
     [Fact]
     public void One_sheet_per_voucher()
     {

@@ -134,6 +134,16 @@ public class CashVoucherFormTests
     }
 
     [Fact]
+    public void Cash_voucher_has_no_page_break()
+    {
+        var model = Receipt();
+        model.Reason = string.Join(" ", Enumerable.Repeat("Thu tiền hàng theo hợp đồng", 20));
+        using var wb = Render(model);
+
+        wb.Worksheet(1).PageSetup.RowBreaks.Should().BeEmpty();
+    }
+
+    [Fact]
     public void One_sheet_per_voucher_in_the_given_order()
     {
         using var wb = Render(Receipt("PT00002"), Receipt("PT00001"), Receipt("PT00001"));

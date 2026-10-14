@@ -979,6 +979,56 @@ describe('StockLineGrid', () => {
         select.mockRestore();
       }
     });
+
+    // Alt-tab away and back: the window's blur leaves the cell the page's active element, and the focus the window
+    // gives back when it returns comes with no mouse press. It is no keyboard visit: what the user was typing stays,
+    // and the next digit goes after it (12 -> 125), not over it.
+    it.each(cells)('the focus %s gets back when the window returns does not select what was typed', (_label, field) => {
+      const { values } = renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const from = byId(`stock-line-${field}-0`);
+      act(() => from.focus());
+      fireEvent.keyDown(from, { key: 'ArrowDown' });
+      const cell = byId(`stock-line-${field}-1`);
+      fireEvent.change(cell, { target: { value: '12' } });
+
+      // The window loses the focus: blur (and focusout, which fireEvent adds) on the cell, which stays the active
+      // element. It comes back: focus and focusin.
+      fireEvent.blur(cell);
+      expect(document.activeElement).toBe(cell);
+      const selected = selectedBy(() => fireEvent.focus(cell));
+      fireEvent.change(cell, { target: { value: '125' } });
+
+      expect(selected).toEqual([]);
+      const key = { 'discount-rate': 'discountRate', 'vat-rate': 'vatRate', 'sheet-count': 'sheetCount' }[field] ?? field;
+      expect(values().lines[1][key as keyof StockLineFormValues]).toBe(125);
+    });
+
+    // The window came back with a click on another cell, and this one never got its focus back: the next visit, which
+    // comes from another element, is a keyboard visit like any other.
+    it('a keyboard visit from another cell after the window went away selects', () => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const cell = byId('stock-line-discount-rate-0');
+      const other = byId('stock-line-discount-rate-1');
+      act(() => cell.focus());
+      fireEvent.blur(cell);
+
+      expect(selectedBy(() => fireEvent.focus(cell, { relatedTarget: other }))).toEqual([cell]);
+    });
+
+    // The window's return is used up by that one focus: the next keyboard visit selects as usual.
+    it('a keyboard visit after the window has returned selects again', () => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const cell = byId('stock-line-discount-rate-0');
+      act(() => cell.focus());
+      fireEvent.blur(cell);
+      fireEvent.focus(cell);
+      fireEvent.keyDown(cell, { key: 'ArrowDown' });
+
+      const selected = selectedBy(() => fireEvent.keyDown(byId('stock-line-discount-rate-1'), { key: 'ArrowUp' }));
+
+      expect(focused()).toBe('stock-line-discount-rate-0');
+      expect(selected).toEqual([cell]);
+    });
   });
 
   it('arrows leave the warehouse select alone', () => {

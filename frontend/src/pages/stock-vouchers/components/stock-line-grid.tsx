@@ -135,23 +135,33 @@ function parseQuantityInput(text: string): number | undefined {
  * focus is keyboard navigation (Enter / arrows / Ctrl+Delete through focusCell, or Tab). After keyboard navigation a
  * numeric cell selects its whole value at once, so a digit typed right away replaces the value instead of being
  * appended. What a mouse focus does is up to the cell: a type=number cell selects nothing, so the caret stays where
- * the browser put it; a NumberCell selects its whole text one frame later, as it always did. Returns the props to
- * spread on the <input>.
+ * the browser put it; a NumberCell selects its whole text one frame later, as it always did. The focus a cell gets
+ * back when the window comes to the front again (alt-tab) is no navigation: it counts as a mouse focus, so what the
+ * user was typing is not selected and replaced by the next digit. Returns the props to spread on the <input>.
  */
 function useFocusOrigin(onFocus: (el: HTMLInputElement, byKeyboard: boolean) => void, onBlur?: () => void) {
   const pressed = useRef(false);
+  // Up while the window is in the background with this cell as the page's focused element.
+  const windowAway = useRef(false);
   return {
     onMouseDown: () => {
       pressed.current = true;
     },
     onFocus: (e: FocusEvent<HTMLInputElement>) => {
-      const byKeyboard = !pressed.current;
+      // The window's return brings the focus from outside the page. A focus from another element is a visit, also
+      // when the window came back with a click elsewhere and this cell never got its focus back.
+      const windowReturn = windowAway.current && e.relatedTarget === null;
+      const byKeyboard = !pressed.current && !windowReturn;
       pressed.current = false;
+      windowAway.current = false;
       onFocus(e.currentTarget, byKeyboard);
     },
-    onBlur: () => {
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
       // A press on the cell that already had the focus is followed by no focus event: forget it here.
       pressed.current = false;
+      // When the focus moves inside the page, the cell is no longer the active element by now; when the window
+      // loses the focus, it still is.
+      windowAway.current = e.currentTarget === document.activeElement;
       onBlur?.();
     },
   };

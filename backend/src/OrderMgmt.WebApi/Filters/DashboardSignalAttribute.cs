@@ -30,6 +30,9 @@ public sealed class SkipDashboardSignalAttribute : Attribute
 
 public sealed class DashboardSignalFilter : IAsyncActionFilter
 {
+    /// How long the signal may hold the answer to a saved write before it is given up.
+    private static readonly TimeSpan SendLimit = TimeSpan.FromSeconds(3);
+
     private readonly IRealtimeNotifier _notifier;
     private readonly ICurrentBranch _branch;
     private readonly ILogger<DashboardSignalFilter> _logger;
@@ -54,15 +57,19 @@ public sealed class DashboardSignalFilter : IAsyncActionFilter
         try
         {
             // The request's cancellation token is left out on purpose: the document is saved, so the dashboards are
-            // told even when the caller has gone away.
-            var branchId = await _branch.GetIdAsync();
-            await _notifier.NotifyDashboardChangedAsync(branchId, _domains);
+            // told even when the caller has gone away. A time limit of its own keeps a client that has stopped
+            // reading from holding the answer to the write.
+            using var limit = new CancellationTokenSource(SendLimit);
+            var branchId = await _branch.GetIdAsync(limit.Token);
+            await _notifier.NotifyDashboardChangedAsync(branchId, _domains, limit.Token);
         }
         catch (Exception ex)
         {
             // A signal that cannot be sent must not turn a saved document into an error answer; the dashboards
-            // catch up with their periodic refresh.
-            _logger.LogWarning(ex, "Could not send the dashboard signal for {Domains}.", _domains);
+            // catch up with their periodic refresh. The write is named so that a missing signal can be traced to it.
+            var request = context.HttpContext.Request;
+            _logger.LogWarning(ex, "Could not send the dashboard signal of {Method} {Path} for {Domains}.",
+                request.Method, request.Path, _domains);
         }
     }
 

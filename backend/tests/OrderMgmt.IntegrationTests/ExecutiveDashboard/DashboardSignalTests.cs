@@ -167,6 +167,7 @@ public class DashboardSignalTests : ExecutiveDashboardTestBase
     public class WithoutHost
     {
         private static readonly Guid BranchId = Guid.Parse("3f2504e0-4f89-11d3-9a0c-0305e82c3301");
+        private const string WritePath = "/api/cash-vouchers";
 
         [Fact]
         public void Every_document_controller_is_tagged()
@@ -187,7 +188,11 @@ public class DashboardSignalTests : ExecutiveDashboardTestBase
             var webApi = typeof(StockVouchersController).Assembly.GetTypes();
 
             foreach (var (controller, domains) in expected)
-                controller.GetCustomAttribute<DashboardSignalAttribute>()?.Domains.Should().Be(domains, controller.Name);
+            {
+                var attribute = controller.GetCustomAttribute<DashboardSignalAttribute>();
+                attribute.Should().NotBeNull(controller.Name);
+                attribute!.Domains.Should().Be(domains, controller.Name);
+            }
             webApi.Where(t => t.GetCustomAttribute<DashboardSignalAttribute>() is not null)
                 .Should().BeEquivalentTo(expected.Keys, "no other controller sends the signal");
 
@@ -244,6 +249,25 @@ public class DashboardSignalTests : ExecutiveDashboardTestBase
             var entry = logger.Entries.Should().ContainSingle().Subject;
             entry.Level.Should().Be(LogLevel.Warning);
             entry.Exception.Should().BeOfType<InvalidOperationException>();
+            // The write the signal belonged to, so that a missing signal can be traced to it.
+            entry.Message.Should().Contain($"POST {WritePath}");
+        }
+
+        [Fact]
+        public async Task Filter_gives_up_on_a_stalled_send()
+        {
+            var notifier = new RecordingRealtimeNotifier { StallOnDashboardSignal = true };
+            var logger = new RecordingLogger();
+
+            // The document is saved: a client that has stopped reading must not hold the answer to the write.
+            var run = RunFilterAsync("POST", new OkResult(), notifier: notifier, logger: logger);
+            var first = await Task.WhenAny(run, Task.Delay(TimeSpan.FromSeconds(10)));
+
+            first.Should().BeSameAs(run, "the send gives up after its time limit");
+            (await run).Should().BeEmpty();
+            var entry = logger.Entries.Should().ContainSingle().Subject;
+            entry.Level.Should().Be(LogLevel.Warning);
+            entry.Exception.Should().BeAssignableTo<OperationCanceledException>();
         }
 
         /// Runs the filter of a Cash controller around an action that ended as described and returns the signals
@@ -257,6 +281,7 @@ public class DashboardSignalTests : ExecutiveDashboardTestBase
                 logger ?? NullLogger<DashboardSignalFilter>.Instance, DashboardDomains.Cash);
             var http = new DefaultHttpContext();
             http.Request.Method = method;
+            http.Request.Path = WritePath;
             var action = new ActionContext(http, new RouteData(), new ActionDescriptor());
             var filters = new List<IFilterMetadata>();
             var controller = new object();
@@ -284,14 +309,14 @@ public class DashboardSignalTests : ExecutiveDashboardTestBase
 
         private sealed class RecordingLogger : ILogger<DashboardSignalFilter>
         {
-            public List<(LogLevel Level, Exception? Exception)> Entries { get; } = new();
+            public List<(LogLevel Level, Exception? Exception, string Message)> Entries { get; } = new();
 
             public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
             public bool IsEnabled(LogLevel logLevel) => true;
 
             public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-                Func<TState, Exception?, string> formatter) => Entries.Add((logLevel, exception));
+                Func<TState, Exception?, string> formatter) => Entries.Add((logLevel, exception, formatter(state, exception)));
         }
     }
 }

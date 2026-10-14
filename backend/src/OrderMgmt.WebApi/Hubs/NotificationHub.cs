@@ -47,7 +47,8 @@ public class NotificationHub : Hub
         return DashboardGroups.GroupFor(hasDashboard, accessAll, defaultBranchId);
     }
 
-    /// The user's default branch; null when the user is not found or the database cannot be read.
+    /// The user's default branch; null when the user is not found, the database cannot be read or the client has
+    /// gone away.
     private async Task<Guid?> DefaultBranchIdAsync(Guid userId)
     {
         try
@@ -56,6 +57,11 @@ public class NotificationHub : Hub
                 .Where(u => u.Id == userId)
                 .Select(u => (Guid?)u.DefaultBranchId)
                 .SingleOrDefaultAsync(Context.ConnectionAborted);
+        }
+        catch (OperationCanceledException) when (Context.ConnectionAborted.IsCancellationRequested)
+        {
+            // The client left while connecting: nothing went wrong, and there is no connection to put in a group.
+            return null;
         }
         catch (Exception ex)
         {

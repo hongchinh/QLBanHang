@@ -121,7 +121,15 @@ public class DashboardHubTests : ExecutiveDashboardTestBase
             })
             .Build();
         var listener = new DashboardListener(connection);
-        await connection.StartAsync();
+        try
+        {
+            await connection.StartAsync();
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
         return listener;
     }
 
@@ -182,6 +190,17 @@ public class DashboardHubTests : ExecutiveDashboardTestBase
         }
 
         [Fact]
+        public async Task Client_gone_during_the_lookup_logs_nothing()
+        {
+            var connect = await ConnectAsync(aborted: true, Permissions.Dashboard.Executive);
+
+            // A client that has left is no fault to warn about; it joins no dashboard group.
+            connect.Groups.Should().Equal((ConnectionId, UserGroup));
+            connect.DatabaseCalls.Should().Be(1);
+            connect.Log.Should().BeEmpty();
+        }
+
+        [Fact]
         public async Task Access_all_user_joins_the_all_group_without_reading_the_database()
         {
             var connect = await ConnectAsync(Permissions.Dashboard.Executive, Permissions.Branches.AccessAll);
@@ -217,22 +236,34 @@ public class DashboardHubTests : ExecutiveDashboardTestBase
             IReadOnlyList<(LogLevel Level, Exception? Exception)> Log);
 
         /// Connects a user with these permissions to a hub whose database fails on every call.
-        private static async Task<Connect> ConnectAsync(params string[] permissions)
+        private static Task<Connect> ConnectAsync(params string[] permissions) => ConnectAsync(false, permissions);
+
+        /// Connects a user with these permissions to a hub whose database fails on every call. When `aborted`, the
+        /// client has gone away during the connect: the call fails as cancelled by the connection's token.
+        private static async Task<Connect> ConnectAsync(bool aborted, params string[] permissions)
         {
             var claims = permissions.Select(p => new Claim(JwtTokenGenerator.PermissionClaimType, p))
                 .Prepend(new Claim(ClaimTypes.NameIdentifier, UserId.ToString()));
+            using var connectionAborted = new CancellationTokenSource();
             var database = DispatchProxy.Create<IAppDbContext, UnreachableDatabase>();
+            var unreachable = (UnreachableDatabase)(object)database;
+            if (aborted)
+            {
+                connectionAborted.Cancel();
+                unreachable.Failure = new OperationCanceledException(connectionAborted.Token);
+            }
             var groups = new RecordingGroups();
             var logger = new RecordingLogger();
             using var hub = new NotificationHub(database, logger)
             {
-                Context = new FakeCallerContext(new ClaimsPrincipal(new ClaimsIdentity(claims, "Test"))),
+                Context = new FakeCallerContext(new ClaimsPrincipal(new ClaimsIdentity(claims, "Test")),
+                    connectionAborted.Token),
                 Groups = groups,
             };
 
             await hub.OnConnectedAsync();
 
-            return new Connect(groups.Joined, ((UnreachableDatabase)(object)database).Calls, logger.Entries);
+            return new Connect(groups.Joined, unreachable.Calls, logger.Entries);
         }
 
         /// Stands in for the database: every member fails, as when the server cannot be reached.
@@ -240,23 +271,30 @@ public class DashboardHubTests : ExecutiveDashboardTestBase
         {
             public int Calls { get; private set; }
 
+            /// What every member throws.
+            public Exception Failure { get; set; } = new InvalidOperationException("The database is down.");
+
             protected override object? Invoke(MethodInfo? targetMethod, object?[]? args)
             {
                 Calls++;
-                throw new InvalidOperationException("The database is down.");
+                throw Failure;
             }
         }
 
         private sealed class FakeCallerContext : HubCallerContext
         {
-            public FakeCallerContext(ClaimsPrincipal user) => User = user;
+            public FakeCallerContext(ClaimsPrincipal user, CancellationToken connectionAborted)
+            {
+                User = user;
+                ConnectionAborted = connectionAborted;
+            }
 
             public override string ConnectionId => WithoutHost.ConnectionId;
             public override string? UserIdentifier => User?.FindFirstValue(ClaimTypes.NameIdentifier);
             public override ClaimsPrincipal? User { get; }
             public override IDictionary<object, object?> Items { get; } = new Dictionary<object, object?>();
             public override IFeatureCollection Features { get; } = new FeatureCollection();
-            public override CancellationToken ConnectionAborted => CancellationToken.None;
+            public override CancellationToken ConnectionAborted { get; }
 
             public override void Abort() => throw new NotSupportedException();
         }

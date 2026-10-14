@@ -167,26 +167,70 @@ public class DemoBranchDeleteTests : DemoBranchFixture
     }
 
     [Fact]
-    public async Task A_foreign_key_hit_by_a_write_outside_the_gate_gives_409_and_deletes_nothing()
+    public async Task A_foreign_key_hit_at_the_branch_delete_gives_409_and_rolls_everything_back()
     {
         var branch = await CreateDemoBranchAsync("DD09");
+        await FillAsync(branch);
+        var stockVouchers = await BranchRowCountAsync("stock_vouchers", branch.BranchId);
+        var creditLimits = await BranchRowCountAsync("credit_limits", branch.BranchId);
+        stockVouchers.Should().BePositive();
+        creditLimits.Should().BePositive();
+        var numberings = await BranchRowCountAsync("document_numberings", branch.BranchId);
+        var warehouses = await BranchRowCountAsync("warehouses", branch.BranchId);
+        var funds = await BranchRowCountAsync("funds", branch.BranchId);
+        // A write outside the gate, standing in for a fund created for the branch after the funds step: the trigger
+        // inserts one when the branch row is about to go, so only the branch delete (step 15) fails on a foreign key.
+        await InDbAsync(async db =>
+        {
+            await db.Database.ExecuteSqlRawAsync(
+                "create function demo_race() returns trigger language plpgsql as $$ declare f funds; begin"
+                + " select * into f from funds where branch_id <> old.id limit 1;"
+                + " f.id := gen_random_uuid(); f.code := 'RACE'; f.branch_id := old.id; insert into funds select f.*;"
+                + " return old; end $$");
+            await db.Database.ExecuteSqlRawAsync(
+                "create trigger demo_race before delete on branches for each row execute function demo_race()");
+        });
+        try
+        {
+            await AssertErrorAsync(await _client.DeleteAsync(DeleteUrl(branch.BranchId)), HttpStatusCode.Conflict,
+                "DEMO_BRANCH_BUSY");
+        }
+        finally
+        {
+            await InDbAsync(async db =>
+            {
+                await db.Database.ExecuteSqlRawAsync("drop trigger if exists demo_race on branches");
+                await db.Database.ExecuteSqlRawAsync("drop function if exists demo_race()");
+            });
+        }
+
+        (await InDbAsync(db => db.Branches.AnyAsync(b => b.Id == branch.BranchId))).Should().BeTrue();
+        (await BranchRowCountAsync("stock_vouchers", branch.BranchId)).Should().Be(stockVouchers, "step 7 is rolled back");
+        (await BranchRowCountAsync("credit_limits", branch.BranchId)).Should().Be(creditLimits, "step 10 is rolled back");
+        (await BranchRowCountAsync("funds", branch.BranchId)).Should().Be(funds, "step 11 is rolled back");
+        (await BranchRowCountAsync("warehouses", branch.BranchId)).Should().Be(warehouses, "step 12 is rolled back");
+        (await BranchRowCountAsync("document_numberings", branch.BranchId)).Should().Be(numberings, "step 13 is rolled back");
+        (await InDbAsync(db => db.Funds.AnyAsync(f => f.Id == branch.CashFundId))).Should().BeTrue();
+        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Id == branch.WarehouseId))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_permanent_foreign_key_corruption_is_not_reported_as_busy()
+    {
+        var branch = await CreateDemoBranchAsync("DD10");
         await ReportDataset.SetFundOpeningAsync(branch.Client, branch.CashFundId, 10_000m);
         var expense = CashRequest(CashVoucherType.Payment, await CashReasonIdAsync("CK"), branch.CashFundId,
             "2026-10-09 09:00", partnerId: null, 100m);
         expense.PersonName = "Nguyễn C";
         var cash = await CreateCashAsync(branch.Client, expense);
-        // A test-only corruption standing in for a document written to the branch's fund between two steps.
+        // A test-only corruption: a main-branch document on the demo branch's fund. A bug, not a race.
         await InDbAsync(db => db.CashVouchers.Where(v => v.Id == cash.Id)
             .ExecuteUpdateAsync(s => s.SetProperty(v => v.BranchId, MainBranchId)));
 
-        await AssertErrorAsync(await _client.DeleteAsync(DeleteUrl(branch.BranchId)), HttpStatusCode.Conflict,
-            "DEMO_BRANCH_BUSY");
+        var response = await _client.DeleteAsync(DeleteUrl(branch.BranchId));
 
+        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
         (await InDbAsync(db => db.Branches.AnyAsync(b => b.Id == branch.BranchId))).Should().BeTrue();
-        (await InDbAsync(db => db.Funds.AnyAsync(f => f.Id == branch.CashFundId))).Should().BeTrue();
-        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Id == branch.WarehouseId))).Should().BeTrue();
-        (await InDbAsync(db => db.DocumentNumberings.IgnoreQueryFilters().AnyAsync(n => n.BranchId == branch.BranchId)))
-            .Should().BeTrue("the rows deleted before the failing statement are rolled back");
     }
 
     /// The foreign keys into the branch and into every parent the delete removes, as "child.column -> parent". A new
@@ -196,10 +240,15 @@ public class DemoBranchDeleteTests : DemoBranchFixture
         "cash_voucher_lines.cash_voucher_id -> cash_vouchers",
         "cash_vouchers.branch_id -> branches",
         "cash_vouchers.fund_id -> funds",
+        "cash_vouchers.partner_id -> customers",
         "cash_vouchers.source_stock_voucher_id -> stock_vouchers",
         "credit_limits.branch_id -> branches",
+        "credit_limits.customer_id -> customers",
+        "customer_addresses.customer_id -> customers",
         "debt_entries.branch_id -> branches",
+        "debt_entries.partner_id -> customers",
         "debt_offset_vouchers.branch_id -> branches",
+        "debt_offset_vouchers.partner_id -> customers",
         "debt_settlements.decrease_entry_id -> debt_entries",
         "debt_settlements.increase_entry_id -> debt_entries",
         "document_numberings.branch_id -> branches",
@@ -208,13 +257,20 @@ public class DemoBranchDeleteTests : DemoBranchFixture
         "fund_transfers.to_fund_id -> funds",
         "funds.branch_id -> branches",
         "opening_debts.branch_id -> branches",
+        "opening_debts.partner_id -> customers",
         "opening_stocks.branch_id -> branches",
+        "opening_stocks.product_id -> products",
         "opening_stocks.warehouse_id -> warehouses",
+        "products.product_group_id -> product_groups",
+        "quotation_lines.product_id -> products",
+        "quotations.customer_id -> customers",
         "stock_voucher_activities.stock_voucher_id -> stock_vouchers",
+        "stock_voucher_lines.product_id -> products",
         "stock_voucher_lines.stock_voucher_id -> stock_vouchers",
         "stock_voucher_lines.warehouse_id -> warehouses",
         "stock_vouchers.branch_id -> branches",
         "stock_vouchers.fund_id -> funds",
+        "stock_vouchers.partner_id -> customers",
         "stock_vouchers.warehouse_id -> warehouses",
         "users.default_branch_id -> branches",
         "warehouses.branch_id -> branches",
@@ -225,7 +281,8 @@ public class DemoBranchDeleteTests : DemoBranchFixture
         var rows = await QueryAsync("select c.conrelid::regclass::text || '.' || a.attname || ' -> ' || c.confrelid::regclass::text"
             + " from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)"
             + " where c.contype = 'f' and c.confrelid::regclass::text in ('branches', 'stock_vouchers', 'cash_vouchers',"
-            + " 'fund_transfers', 'debt_offset_vouchers', 'debt_entries', 'funds', 'warehouses') order by 1");
+            + " 'fund_transfers', 'debt_offset_vouchers', 'debt_entries', 'funds', 'warehouses', 'products', 'customers',"
+            + " 'customer_addresses', 'product_groups') order by 1");
         rows.Select(r => r[0]).Should().Equal(KnownForeignKeys,
             "DemoBranchService.DeleteAsync must delete the rows of every table that refers to the branch or its parents");
     }

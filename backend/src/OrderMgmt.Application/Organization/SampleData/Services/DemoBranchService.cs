@@ -1,5 +1,7 @@
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Npgsql;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Services;
@@ -24,15 +26,17 @@ public sealed class DemoBranchService : IDemoBranchService
     private readonly ICurrentUser _currentUser;
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryLock _inventoryLock;
+    private readonly ILogger<DemoBranchService> _logger;
 
     public DemoBranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ITransactionRunner transaction,
-        IInventoryLock inventoryLock)
+        IInventoryLock inventoryLock, ILogger<DemoBranchService> logger)
     {
         _db = db;
         _clock = clock;
         _currentUser = currentUser;
         _transaction = transaction;
         _inventoryLock = inventoryLock;
+        _logger = logger;
     }
 
     public async Task<DemoBranchDeletionPreviewDto> PreviewDeletionAsync(Guid branchId, CancellationToken ct = default)
@@ -59,44 +63,56 @@ public sealed class DemoBranchService : IDemoBranchService
     public Task<DemoBranchDeletionResultDto> DeleteAsync(Guid branchId, CancellationToken ct = default) =>
         _transaction.RunAsync(async c =>
         {
-            try
+            // 0. The exclusive gate, the guards and the product locks.
+            var stockInProducts = await AcquireLocksAsync(branchId, c);
+            await EnsureWarehousesNotSharedAsync(branchId, c);
+
+            // 1–13. Every row of the branch.
+            await DeleteBranchRowsAsync(branchId, c);
+
+            // 14. Users (soft-deleted ones too) move to the main branch.
+            var reassignedUserCount = await ReassignUsersAsync(branchId, c);
+
+            // 15. The branch. A write that does not take the branch gate (a new fund, warehouse, credit limit or a
+            // user's default branch) may have landed since its table was cleared: the only place a race hits here, so
+            // the only foreign key error mapped to "busy". Nothing is deleted: the transaction rolls back.
+            await MapBusyAsync(() => _db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId).ExecuteDeleteAsync(c));
+
+            // 16. The products priced by the branch's stock-ins follow their latest remaining stock-in.
+            await ProductCostPrices.RecomputeAsync(_db, stockInProducts, c);
+            await _db.SaveChangesAsync(c);
+
+            // 17. The last demo branch takes the sample catalog it no longer needs along (soft-deleted branches do
+            // not count). The rows still used by something stay, and are counted.
+            var keptProducts = 0;
+            var keptPartners = 0;
+            if (!await _db.Branches.AnyAsync(b => b.IsDemo, c))
+                (keptProducts, keptPartners) = await CleanSampleCatalogAsync(c);
+
+            return new DemoBranchDeletionResultDto
             {
-                // 0. The exclusive gate, the guards and the product locks.
-                var stockInProducts = await AcquireLocksAsync(branchId, c);
-                await EnsureWarehousesNotSharedAsync(branchId, c);
-
-                // 1–13, 15. Every row of the branch, then the branch.
-                await DeleteBranchRowsAsync(branchId, c);
-
-                // 14. Users (soft-deleted ones too) move to the main branch.
-                var reassignedUserCount = await ReassignUsersAsync(branchId, c);
-                await _db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId).ExecuteDeleteAsync(c);
-
-                // 16. The products priced by the branch's stock-ins follow their latest remaining stock-in.
-                await ProductCostPrices.RecomputeAsync(_db, stockInProducts, c);
-                await _db.SaveChangesAsync(c);
-
-                // 17. The last demo branch takes the sample catalog it no longer needs along (soft-deleted branches do
-                // not count). The rows still used by something stay, and are counted.
-                var keptProducts = 0;
-                var keptPartners = 0;
-                if (!await _db.Branches.AnyAsync(b => b.IsDemo, c))
-                    (keptProducts, keptPartners) = await CleanSampleCatalogAsync(c);
-
-                return new DemoBranchDeletionResultDto
-                {
-                    ReassignedUserCount = reassignedUserCount,
-                    KeptSampleProductCount = keptProducts,
-                    KeptSamplePartnerCount = keptPartners,
-                };
-            }
-            catch (Exception ex) when (IsForeignKeyViolation(ex))
-            {
-                // A write that does not take the branch gate (a new fund, warehouse, credit limit or a user's default
-                // branch) landed between two steps. Nothing is deleted: the transaction rolls back.
-                throw new ConflictException("DEMO_BRANCH_BUSY", "Chi nhánh demo vừa có dữ liệu mới. Hãy thử xóa lại.");
-            }
+                ReassignedUserCount = reassignedUserCount,
+                KeptSampleProductCount = keptProducts,
+                KeptSamplePartnerCount = keptPartners,
+            };
         }, ct);
+
+    /// Runs a statement a concurrent write can make fail on a foreign key: logs the original error and maps it to the
+    /// retryable 409. A foreign key error anywhere else in the delete is a bug and surfaces as it is.
+    private async Task MapBusyAsync(Func<Task> statement)
+    {
+        try
+        {
+            await statement();
+        }
+        catch (Exception ex) when (IsForeignKeyViolation(ex))
+        {
+            var pg = ex as PostgresException ?? ex.InnerException as PostgresException;
+            _logger.LogWarning(ex, "Demo branch delete hit a foreign key (constraint {Constraint}, table {Table}): {Message}",
+                pg?.ConstraintName, pg?.TableName, ex.Message);
+            throw new ConflictException("DEMO_BRANCH_BUSY", "Chi nhánh demo vừa có dữ liệu mới. Hãy thử xóa lại.");
+        }
+    }
 
     /// The exclusive gate waits for in-flight writes of the branch and keeps new ones out (D30); the guards are read
     /// behind it. Locks the products (keys are valid for every branch): the sample catalog and the products with a
@@ -216,7 +232,7 @@ public sealed class DemoBranchService : IDemoBranchService
             .ExecuteDeleteAsync(ct);
 
         // The partners nothing refers to; their addresses belong to them alone and go first.
-        var unusedPartners = _db.Customers.IgnoreQueryFilters()
+        var unusedPartnerIds = await _db.Customers.IgnoreQueryFilters()
             .Where(p => p.IsSample
                         && !_db.StockVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
                         && !_db.CashVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
@@ -224,11 +240,17 @@ public sealed class DemoBranchService : IDemoBranchService
                         && !_db.DebtOffsetVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
                         && !_db.OpeningDebts.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
                         && !_db.CreditLimits.IgnoreQueryFilters().Any(x => x.CustomerId == p.Id)
-                        && !_db.Quotations.IgnoreQueryFilters().Any(x => x.CustomerId == p.Id));
+                        && !_db.Quotations.IgnoreQueryFilters().Any(x => x.CustomerId == p.Id))
+            .Select(p => p.Id)
+            .ToListAsync(ct);
         await _db.CustomerAddresses.IgnoreQueryFilters()
-            .Where(a => unusedPartners.Any(p => p.Id == a.CustomerId))
+            .Where(a => unusedPartnerIds.Contains(a.CustomerId))
             .ExecuteDeleteAsync(ct);
-        await unusedPartners.ExecuteDeleteAsync(ct);
+        // A real-branch document naming one of these partners since the list was read (it takes no branch gate) fails
+        // here: the same retryable 409.
+        await MapBusyAsync(() => _db.Customers.IgnoreQueryFilters()
+            .Where(p => unusedPartnerIds.Contains(p.Id))
+            .ExecuteDeleteAsync(ct));
 
         // Only the sample group: a real group may use the code DM too.
         await _db.ProductGroups.IgnoreQueryFilters()

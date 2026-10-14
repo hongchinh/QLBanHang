@@ -62,6 +62,40 @@ describe('Dialog focus return', () => {
     expect(document.activeElement).not.toBe(opener);
   });
 
+  // The product and customer catalog dialogs: their search box takes the focus as the dialog renders, and Radix then
+  // does not report the opening (onOpenAutoFocus).
+  it('gives the focus back to the opener when a field of the dialog took the focus by itself', async () => {
+    function CatalogDialog() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" data-testid="opener" onClick={() => setOpen(true)}>
+            Chọn hàng
+          </button>
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogContent>
+              <DialogTitle>Danh mục hàng</DialogTitle>
+              <DialogDescription>Mô tả</DialogDescription>
+              {/* eslint-disable-next-line jsx-a11y/no-autofocus -- what the catalog dialogs do */}
+              <input aria-label="Tìm hàng" autoFocus />
+            </DialogContent>
+          </Dialog>
+        </>
+      );
+    }
+    render(<CatalogDialog />);
+    const opener = screen.getByTestId('opener');
+    act(() => opener.focus());
+    fireEvent.click(opener);
+    const search = await screen.findByLabelText('Tìm hàng');
+    expect(document.activeElement).toBe(search);
+
+    fireEvent.keyDown(search, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByText('Danh mục hàng')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+  });
+
   it('does not throw or focus anything when the opener left the page', async () => {
     render(<StateDialog opener="remove" />);
     const opener = screen.getByTestId('opener');

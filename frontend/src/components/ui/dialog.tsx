@@ -24,10 +24,23 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+/**
+ * Mounts with the content of an open dialog. Its first render comes before that content is committed, so before a
+ * child with autoFocus takes the focus: what has the focus then is what the dialog was opened from. Radix reports the
+ * opening (onOpenAutoFocus) only when no child has taken the focus already.
+ */
+function OpenerRecorder({ openerRef }: { openerRef: React.MutableRefObject<HTMLElement | null> }) {
+  const [opener] = React.useState(currentFocus);
+  React.useLayoutEffect(() => {
+    openerRef.current = opener;
+  }, [opener, openerRef]);
+  return null;
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { showClose?: boolean }
->(({ className, children, showClose = true, onOpenAutoFocus, onCloseAutoFocus, ...props }, ref) => {
+>(({ className, children, showClose = true, onCloseAutoFocus, ...props }, ref) => {
   // A dialog opened from state has no DialogTrigger, so Radix would drop the focus on <body> when it closes.
   // Remember what had the focus when it opened and give it back, unless it is gone or disabled.
   const openerRef = React.useRef<HTMLElement | null>(null);
@@ -36,10 +49,6 @@ const DialogContent = React.forwardRef<
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
-      onOpenAutoFocus={(event) => {
-        openerRef.current = currentFocus();
-        onOpenAutoFocus?.(event);
-      }}
       onCloseAutoFocus={(event) => {
         onCloseAutoFocus?.(event);
         if (event.defaultPrevented) return;
@@ -57,6 +66,7 @@ const DialogContent = React.forwardRef<
       )}
       {...props}
     >
+      <OpenerRecorder openerRef={openerRef} />
       {children}
       {showClose && (
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring">

@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { cashKeys } from '@/features/cash-common/keys';
+import { invalidatePartnerQueries } from '@/features/customers/hooks';
+import { productGroupKeys } from '@/features/product-groups/keys';
+import { lookupKeys, productKeys } from '@/features/products/keys';
 import { inventoryKeys } from '@/features/stock-vouchers/keys';
+import { warehouseKeys } from '@/features/warehouses/keys';
 import { branchesApi } from './api';
 import { branchKeys } from './keys';
 import { branchesRefetchInterval } from './sample-data';
@@ -62,11 +66,20 @@ export function useDemoBranchDeletionPreview(id: string | null) {
   });
 }
 
+// The delete also hard-deletes the DM- products and partners, the DM product group and the branch's
+// warehouses, so the catalog lists and pickers are refetched too.
 export function useDeleteDemoBranch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => branchesApi.removeDemo(id),
-    onSuccess: () => invalidateBranches(qc),
+    onSuccess: () => {
+      invalidateBranches(qc);
+      invalidatePartnerQueries(qc);
+      qc.invalidateQueries({ queryKey: productKeys.all });
+      qc.invalidateQueries({ queryKey: productGroupKeys.all });
+      qc.invalidateQueries({ queryKey: lookupKeys.productGroups() });
+      qc.invalidateQueries({ queryKey: warehouseKeys.all });
+    },
   });
 }
 

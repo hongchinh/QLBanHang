@@ -1,5 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Badge } from '@/components/ui/badge';
+import { badgeVariants } from '@/components/ui/badge-variants';
 import {
   Select,
   SelectContent,
@@ -11,6 +11,7 @@ import { useMyBranches } from '@/features/branches/hooks';
 import { useSwitchWorkingBranch } from '@/features/branches/use-switch-working-branch';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
+import { cn } from '@/lib/utils';
 
 // Voucher detail/new pages belong to one branch; after a switch go back to the list.
 const VOUCHER_PAGE = /^\/(stock-in|stock-out)\/[^/]+/;
@@ -49,14 +50,20 @@ export function HeaderBranchSwitcher() {
         title={selectedLabel ?? 'Chi nhánh làm việc'}
         className="h-9 min-w-0 flex-1 gap-2 border-transparent bg-white text-sm text-foreground md:w-56 md:flex-none"
       >
-        {/* The label truncates; the badge is a sibling so it is never clipped. */}
-        <SelectValue className="min-w-0 flex-1 text-left">
-          {selected ? `${selected.code} — ${selected.name}` : undefined}
-        </SelectValue>
+        {/* The trigger clamps its direct child spans ([&>span]:line-clamp-1), so the label truncates. The badge is
+            a sibling so it is never clipped with the label, and a span because a button holds phrasing content only;
+            it forces its own display and overflow back. Radix drops className on SelectValue, so ml-auto on the
+            badge keeps it beside the chevron. */}
+        <SelectValue>{selected ? `${selected.code} — ${selected.name}` : undefined}</SelectValue>
         {selected?.isDemo && (
-          <Badge variant="info" className="shrink-0 px-2 py-0 text-xs">
+          <span
+            className={cn(
+              badgeVariants({ variant: 'info' }),
+              'ml-auto shrink-0 px-2 py-0 text-xs !inline-flex !overflow-visible',
+            )}
+          >
             Demo
-          </Badge>
+          </span>
         )}
       </SelectTrigger>
       <SelectContent>

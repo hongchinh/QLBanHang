@@ -121,9 +121,17 @@ describe('HeaderBranchSwitcher', () => {
     expect(trigger).toHaveTextContent('DEMO1 — CN demo');
     expect(trigger).toHaveAttribute('title', 'DEMO1 — CN demo (demo)');
     const badge = within(trigger).getByText('Demo');
-    // The badge is its own element, outside the truncating label span.
-    expect(badge.closest('span')).toBeNull();
-    expect(trigger).toContainElement(badge);
+    // A button holds phrasing content only, so the badge is a span beside the label, not inside it.
+    expect(badge.tagName).toBe('SPAN');
+    expect(badge.parentElement).toBe(trigger);
+    // The trigger clamps its direct child spans; the badge keeps its own display and overflow and sits at the end.
+    expect(badge).toHaveClass('ml-auto', 'shrink-0', '!inline-flex', '!overflow-visible');
+    // The label is the other direct child span, which the trigger's clamp truncates.
+    const label = within(trigger).getByText('DEMO1 — CN demo');
+    expect(label.tagName).toBe('SPAN');
+    expect(label.parentElement).toBe(trigger);
+    expect(label).not.toContainElement(badge);
+    expect(trigger).toHaveClass('[&>span]:line-clamp-1');
   });
 
   it('shows no Demo badge in the trigger for a real branch', () => {

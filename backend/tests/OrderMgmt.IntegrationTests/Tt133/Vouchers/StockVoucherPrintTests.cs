@@ -1,11 +1,15 @@
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using ClosedXML.Excel;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Identity.Models;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
@@ -24,7 +28,9 @@ public class StockVoucherPrintTests : InventoryTestBase
 {
     private static readonly string Dots = VoucherPrintRules.Dots;
 
-    public StockVoucherPrintTests(PostgresFixture pg) : base(pg) { }
+    private readonly PostgresFixture _fixture;
+
+    public StockVoucherPrintTests(PostgresFixture pg) : base(pg) => _fixture = pg;
 
     [Fact]
     public async Task Prints_a_stock_in_with_its_totals()
@@ -515,6 +521,44 @@ public class StockVoucherPrintTests : InventoryTestBase
     }
 
     [Fact]
+    public async Task Batch_names_follow_the_types_of_two_stock_outs()
+    {
+        await SetCompanyAsync();
+        var a = await CreateInventoryProductAsync(NewCode("A"));
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-01 08:00", LineRequest(a, 10, 100_000));
+        var out1 = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-05 09:00", LineRequest(a, 2, 0));
+        var out2 = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-06 09:00", LineRequest(a, 1, 0));
+
+        var stockOuts = await PrintManyAsync(_client, new StockVoucherPrintRequest { Ids = [out1.Id, out2.Id] });
+
+        stockOuts.StatusCode.Should().Be(HttpStatusCode.OK, await stockOuts.Content.ReadAsStringAsync());
+        stockOuts.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^PhieuXuatKho_\d{8}-\d{4}\.xlsx$");
+    }
+
+    [Fact]
+    public async Task Too_many_is_422()
+    {
+        var limited = new WebAppFactoryWithOneSheet(_fixture);
+        await ((IAsyncLifetime)limited).InitializeAsync();
+        try
+        {
+            using var client = await AdminClientAsync(limited);
+
+            var response = await client.PostAsJsonAsync("/api/stock-vouchers/print?format=xlsx",
+                new StockVoucherPrintRequest { Ids = [Guid.NewGuid(), Guid.NewGuid()] });
+
+            response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+            var error = (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!;
+            error.Code.Should().Be("EXPORT_TOO_MANY_SHEETS");
+            error.Message.Should().Be("Số phiếu cần in (2) vượt giới hạn 1. Hãy chọn ít phiếu hơn.");
+        }
+        finally
+        {
+            await ((IAsyncLifetime)limited).DisposeAsync();
+        }
+    }
+
+    [Fact]
     public async Task Unknown_voucher_is_404()
     {
         var a = await CreateInventoryProductAsync(NewCode("A"));
@@ -632,6 +676,17 @@ public class StockVoucherPrintTests : InventoryTestBase
         ws.Row(Tt133Sheet.RowOf(ws, $"Hàng {aCode}")).Cell(8).GetValue<decimal>().Should().Be(480_000);
     }
 
+    private static async Task<HttpClient> AdminClientAsync(WebAppFactory factory)
+    {
+        var client = factory.CreateClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest { Username = "admin", Password = "Admin@123" });
+        login.EnsureSuccessStatusCode();
+        var body = await login.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(TestJson.Options);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.Data!.AccessToken);
+        return client;
+    }
+
     private static Task<HttpResponseMessage> PrintManyAsync(HttpClient client, StockVoucherPrintRequest request,
         string format = "xlsx") =>
         client.PostAsJsonAsync($"/api/stock-vouchers/print?format={format}", request);
@@ -701,4 +756,17 @@ public class StockVoucherPrintTests : InventoryTestBase
     /// The amount of a row under the table: the last column of the form.
     private static decimal Amount(IXLWorksheet ws, string label) =>
         Tt133Sheet.Number(ws, Tt133Sheet.RowOf(ws, label), ws.LastColumnUsed()!.ColumnNumber());
+}
+
+/// Tt133Export:MaxSheets = 1, so a second voucher is one sheet too many.
+file sealed class WebAppFactoryWithOneSheet : WebAppFactory
+{
+    public WebAppFactoryWithOneSheet(PostgresFixture pg) : base(pg) { }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureAppConfiguration((_, config) =>
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Tt133Export:MaxSheets"] = "1" }));
+    }
 }

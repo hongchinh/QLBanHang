@@ -387,7 +387,7 @@ public class StockVoucherService : IStockVoucherService
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
             await _cashDebt.SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
             if (voucher.Type == StockDirection.In)
-                await RecomputeCostPricesAsync(productIds, c);
+                await ProductCostPrices.RecomputeAsync(_db, productIds, c);
             await _cashDebt.CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);
             await _cashDebt.CheckFundsAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, StockVoucherActivityAction.Created, "Tạo phiếu");
@@ -427,7 +427,7 @@ public class StockVoucherService : IStockVoucherService
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c);
             await _cashDebt.SyncDebtAsync(voucher, reason, remove: false, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
             if (voucher.Type == StockDirection.In)
-                await RecomputeCostPricesAsync(productIds, c);
+                await ProductCostPrices.RecomputeAsync(_db, productIds, c);
             await _cashDebt.CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);
             await _cashDebt.CheckFundsAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, StockVoucherActivityAction.Updated, "Cập nhật phiếu");
@@ -499,7 +499,7 @@ public class StockVoucherService : IStockVoucherService
             await PostLinesAsync(voucher, settings, request.AcknowledgeNegativeStock, c, removeAll: !restore);
             await _cashDebt.SyncDebtAsync(voucher, reason, remove: !restore, request.ConfirmRemoveSettlements, request.ConfirmedSettlements, c);
             if (voucher.Type == StockDirection.In)
-                await RecomputeCostPricesAsync(productIds, c);
+                await ProductCostPrices.RecomputeAsync(_db, productIds, c);
             await _cashDebt.CheckCreditAsync(credit, request.AcknowledgeCreditLimit, c);
             await _cashDebt.CheckFundsAsync(fundCapture, request.AcknowledgeNegativeFund, c);
             AddActivity(voucher, action, description);
@@ -1050,38 +1050,6 @@ public class StockVoucherService : IStockVoucherService
                         : 0m))
                 .ToList();
         await _posting.PostAsync(SourceTypeOf(voucher.Type), voucher.Id, drafts, acknowledge, ct);
-    }
-
-    /// D35: CostPrice follows the latest Active, non-deleted stock-in line (by VoucherAt, then the voucher's
-    /// CreatedAt and Code so vouchers with the same VoucherAt resolve deterministically, then SortOrder).
-    private async Task RecomputeCostPricesAsync(IEnumerable<Guid> productIds, CancellationToken ct)
-    {
-        foreach (var productId in productIds.Distinct())
-        {
-            var latest = await _db.StockVoucherLines
-                .Where(l => l.ProductId == productId
-                    && l.StockVoucher!.Type == StockDirection.In
-                    && l.StockVoucher.Status == StockVoucherStatus.Active)
-                .OrderByDescending(l => l.StockVoucher!.VoucherAt)
-                .ThenByDescending(l => l.StockVoucher!.CreatedAt)
-                .ThenByDescending(l => l.StockVoucher!.Code)
-                .ThenByDescending(l => l.SortOrder)
-                .Select(l => new { l.UnitPrice, l.StockVoucher!.VoucherAt })
-                .FirstOrDefaultAsync(ct);
-            var product = await _db.Products.FirstOrDefaultAsync(p => p.Id == productId, ct);
-            if (product is null)
-                continue;
-
-            if (latest is null)
-            {
-                product.CostPriceUpdatedOn = null;
-            }
-            else
-            {
-                product.CostPrice = latest.UnitPrice;
-                product.CostPriceUpdatedOn = latest.VoucherAt;
-            }
-        }
     }
 
     private void AddActivity(StockVoucher voucher, StockVoucherActivityAction action, string description) =>

@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
+using OrderMgmt.Application.Inventory.StockVouchers.Services;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Application.Organization.SampleData.Interfaces;
 using OrderMgmt.Domain.Common;
@@ -143,6 +144,10 @@ public sealed class DemoBranchService : IDemoBranchService
 
             // 15. The branch itself.
             await _db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId).ExecuteDeleteAsync(c);
+
+            // 16. The real products priced by the branch's stock-ins follow their latest remaining stock-in.
+            await ProductCostPrices.RecomputeAsync(_db, realStockInProducts, c);
+            await _db.SaveChangesAsync(c);
 
             return new DemoBranchDeletionResultDto { ReassignedUserCount = reassignedUserCount };
         }, ct);

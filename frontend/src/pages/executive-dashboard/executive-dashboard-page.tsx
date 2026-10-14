@@ -12,6 +12,7 @@ import { useExecutiveScope } from '@/features/executive-dashboard/use-executive-
 import { formatDateOnly } from '@/lib/date-only';
 import { ScopeSelect } from './components/scope-select';
 import { OverviewTab } from './tabs/overview-tab';
+import { SalesTab } from './tabs/sales-tab';
 
 interface TabPanelProps {
   params: ExecutiveParams;
@@ -30,6 +31,7 @@ const TAB_LABELS: Record<ExecutiveTab, string> = {
 // The tabs that exist. The bar shows those the user may open (useExecutiveAccess), in the order of access.tabs.
 const PANELS: Partial<Record<ExecutiveTab, ComponentType<TabPanelProps>>> = {
   overview: OverviewTab,
+  sales: SalesTab,
 };
 
 // Bảng điều hành: sales, cash, debt and inventory of the whole company or one branch, kept live.

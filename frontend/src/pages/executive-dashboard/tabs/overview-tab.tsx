@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { TileCard } from '@/features/dashboard/components/tile-card';
 import { TopListCard } from '@/features/dashboard/components/top-list-card';
 import { formatVndCompact } from '@/features/dashboard/format';
@@ -13,14 +12,9 @@ import {
   useSalesTop,
 } from '@/features/executive-dashboard/hooks';
 import { executiveLinks, reportLinkTitle } from '@/features/executive-dashboard/links';
-import { defaultGranularity, isDayGranularityAllowed } from '@/features/executive-dashboard/period';
-import type {
-  CashPoint,
-  ExecutiveParams,
-  ExecutiveTab,
-  SalesPoint,
-  SeriesGranularity,
-} from '@/features/executive-dashboard/types';
+import { isDayGranularityAllowed } from '@/features/executive-dashboard/period';
+import { isCashSeriesEmpty, isSalesSeriesEmpty, usePeriodGranularity } from '@/features/executive-dashboard/series';
+import type { CashPoint, ExecutiveParams, ExecutiveTab, SalesPoint } from '@/features/executive-dashboard/types';
 import { useExecutiveAccess } from '@/features/executive-dashboard/use-executive-access';
 import { useExecutiveScope } from '@/features/executive-dashboard/use-executive-scope';
 import { todayYmd } from '@/lib/vn-datetime';
@@ -43,27 +37,14 @@ interface OverviewTabProps {
 const NO_SALES_POINTS: SalesPoint[] = [];
 const NO_CASH_POINTS: CashPoint[] = [];
 
-// A chart tile is empty when no bucket has a figure.
-const salesEmpty = (points: SalesPoint[]) =>
-  points.every((p) => p.revenue === 0 && (p.cost ?? 0) === 0 && (p.grossProfit ?? 0) === 0);
-const cashEmpty = (points: CashPoint[]) => points.every((p) => p.receipts === 0 && p.payments === 0);
-
-// The granularity both charts share. It starts at the default of the period and goes back to it whenever the
-// period changes; it is worked out during render, so no request is sent for a new period with the old one.
-function useGranularity(from: string, to: string): [SeriesGranularity, (granularity: SeriesGranularity) => void] {
-  const period = `${from}|${to}`;
-  const [choice, setChoice] = useState<{ period: string; granularity: SeriesGranularity } | null>(null);
-  const granularity = choice?.period === period ? choice.granularity : defaultGranularity(from, to);
-  return [granularity, (next) => setChoice({ period, granularity: next })];
-}
-
 // The Tổng quan tab: the KPI row, then the charts and tables, with "Cần chú ý" and "Vừa phát sinh" on the
 // right. A tile the user may not see is not rendered and its request is not sent.
 export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
   const access = useExecutiveAccess();
   const scope = useExecutiveScope();
   const { from, to, branchId } = params;
-  const [granularity, setGranularity] = useGranularity(from, to);
+  // One granularity for both charts.
+  const [granularity, setGranularity] = usePeriodGranularity(from, to);
   const dayDisabled = !isDayGranularityAllowed(from, to);
   const companyView = scope.canSwitch && scope.mode === 'company';
   const linkTitle = reportLinkTitle(scope.mode, scope.branches.length, scope.workingBranch?.code);
@@ -84,7 +65,7 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
   const salesPoints = salesSeries.data?.points ?? NO_SALES_POINTS;
   const cashPoints = cashSeries.data?.points ?? NO_CASH_POINTS;
   const funds = cashSummary.data?.funds ?? [];
-  const noCashMovement = cashEmpty(cashPoints);
+  const noCashMovement = isCashSeriesEmpty(cashPoints);
 
   return (
     <div className="space-y-4">
@@ -96,7 +77,7 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
               title="Doanh thu – giá vốn – lãi gộp"
               className="lg:col-span-2"
               query={salesSeries}
-              isEmpty={salesEmpty(salesPoints)}
+              isEmpty={isSalesSeriesEmpty(salesPoints)}
               action={openSales('Chi tiết →')}
             >
               <ProfitChart

@@ -6,9 +6,6 @@ const SRC = path.resolve(__dirname, '../..');
 const ICONS_DIR = path.join(SRC, 'components', 'icons');
 const LUCIDE_IMPORT = /(?:from\s+|import\s*\(?\s*)['"]lucide-react(?:\/[^'"]*)?['"]/;
 
-// Files not yet moved to AppIcon. Each migration task removes its files; Phase 04 deletes this list.
-const LEGACY: string[] = [];
-
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     const full = path.join(dir, entry);
@@ -18,12 +15,12 @@ function walk(dir: string): string[] {
 }
 
 describe('lucide-react imports', () => {
-  it('happen only in components/icons (plus the legacy list)', () => {
+  it('happen only in components/icons', () => {
     const offenders = walk(SRC)
       .filter((file) => !file.startsWith(ICONS_DIR + path.sep))
       .filter((file) => LUCIDE_IMPORT.test(readFileSync(file, 'utf8')))
       .map((file) => path.relative(SRC, file).split(path.sep).join('/'))
       .sort();
-    expect(offenders).toEqual([...LEGACY].sort());
+    expect(offenders).toEqual([]);
   });
 });

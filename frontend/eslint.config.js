@@ -63,7 +63,7 @@ export default [
         'warn',
         { labelComponents: ['Label'], controlComponents: ['Input', 'Textarea'], assert: 'either' },
       ],
-      'no-restricted-imports': ['warn', {
+      'no-restricted-imports': ['error', {
         paths: [{ name: 'lucide-react', message: 'Dùng AppIcon và tên trong src/components/icons/icon-registry.ts.' }],
         patterns: [{ group: ['lucide-react/*'], message: 'Dùng AppIcon và tên trong src/components/icons/icon-registry.ts.' }],
       }],

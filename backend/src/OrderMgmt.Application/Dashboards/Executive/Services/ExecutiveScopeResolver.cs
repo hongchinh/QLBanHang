@@ -27,7 +27,7 @@ public class ExecutiveScopeResolver : IExecutiveScopeResolver
             if (branchId is not { } named)
             {
                 var branchIds = await _db.Branches.AsNoTracking()
-                    .Where(b => !b.IsDemo)
+                    .Where(b => !b.IsDemo) // S15
                     .OrderBy(b => b.Code)
                     .Select(b => b.Id)
                     .ToListAsync(ct);

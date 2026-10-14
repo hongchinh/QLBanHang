@@ -1,5 +1,6 @@
 using System.Net;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Domain.Enums;
@@ -31,6 +32,7 @@ public class ExecutiveDemoExclusionTests : ExecutiveDashboardTestBase
 
         var after = await GetExecAsync<List<BranchComparisonRowDto>>(client, $"branches?{October}");
         after.Should().NotContain(r => r.BranchId == ids.BranchBId);
+        after.Select(r => r.BranchId).Should().Equal(before.Select(r => r.BranchId).Where(id => id != ids.BranchBId));
         after.Single(r => r.BranchId == ids.MainBranchId).Should()
             .BeEquivalentTo(before.Single(r => r.BranchId == ids.MainBranchId));
     }
@@ -80,10 +82,30 @@ public class ExecutiveDemoExclusionTests : ExecutiveDashboardTestBase
 
         await MarkDemoAsync(ids.BranchBId);
 
-        var debtAfter = await GetExecAsync<DebtSummaryDto>(client, debtQuery);
-        debtAfter.Should().BeEquivalentTo(debtMain);
-        var inventoryAfter = await GetExecAsync<InventorySummaryDto>(client, inventoryQuery);
-        inventoryAfter.Should().BeEquivalentTo(inventoryMain);
+        // Both are checked: a debt failure must not hide the inventory result.
+        using var scope = new AssertionScope();
+        (await GetExecAsync<DebtSummaryDto>(client, debtQuery)).Should().BeEquivalentTo(debtMain);
+        (await GetExecAsync<InventorySummaryDto>(client, inventoryQuery)).Should().BeEquivalentTo(inventoryMain);
+    }
+
+    /// A guard on the routes that read the database directly: they take their branches from the resolver too.
+    [Fact]
+    public async Task Recent_documents_and_cash_funds_skip_demo_branch()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = CloneAdminClient();
+        var recentBefore = await GetExecAsync<List<RecentDocumentDto>>(client, "recent?limit=50");
+        recentBefore.Should().Contain(r => r.Id == ids.BranchBSaleId);
+        var cashBefore = await GetExecAsync<CashSummaryDto>(client, $"cash/summary?{October}");
+        cashBefore.Funds.Should().Contain(f => f.BranchId == ids.BranchBId);
+
+        await MarkDemoAsync(ids.BranchBId);
+
+        using var scope = new AssertionScope();
+        (await GetExecAsync<List<RecentDocumentDto>>(client, "recent?limit=50"))
+            .Should().NotContain(r => r.Id == ids.BranchBSaleId);
+        (await GetExecAsync<CashSummaryDto>(client, $"cash/summary?{October}"))
+            .Funds.Should().NotContain(f => f.BranchId == ids.BranchBId);
     }
 
     [Fact]

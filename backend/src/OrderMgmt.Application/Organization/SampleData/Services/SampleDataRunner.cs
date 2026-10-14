@@ -11,10 +11,13 @@ using OrderMgmt.Application.CashDebt.Funds.Models;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Interfaces;
 using OrderMgmt.Application.CashDebt.OpeningDebts.Models;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
+using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
 using OrderMgmt.Application.Inventory.OpeningStocks.Models;
 using OrderMgmt.Application.Inventory.Warehouses.Interfaces;
 using OrderMgmt.Application.Inventory.Warehouses.Models;
+using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Application.Organization.SampleData.Interfaces;
@@ -43,6 +46,10 @@ public sealed class SampleDataRunner : ISampleDataRunner
     private const int FailAttempts = 3;
     private const string UniqueViolation = "23505";
     private const string GenericError = "Lỗi hệ thống khi tạo dữ liệu mẫu. Hãy xóa chi nhánh demo và tạo lại.";
+    private const string BranchNotFound = "Không tìm thấy chi nhánh demo để tạo dữ liệu mẫu.";
+    private const string InterruptedError = "Bị gián đoạn do ứng dụng khởi động lại. Hãy xóa chi nhánh demo và tạo lại.";
+    /// How long the dashboard signal of a finished run may hold the worker before it is given up.
+    private static readonly TimeSpan SignalLimit = TimeSpan.FromSeconds(3);
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ISampleDataGenerator _generator;
@@ -57,22 +64,80 @@ public sealed class SampleDataRunner : ISampleDataRunner
         _logger = logger;
     }
 
-    public Task RunJobAsync(SampleDataJob job, CancellationToken ct = default) => throw new NotImplementedException("Phase 02b");
+    /// The generator's plan for the branch, VN today and the S5 owner count, then RunPlanAsync.
+    public async Task RunJobAsync(SampleDataJob job, CancellationToken ct = default)
+    {
+        using var logScope = BeginJobScope(job);
+        if (await GenerateAsync(job, ct) is { } plan)
+            await RunPlanCoreAsync(job, plan, ct);
+    }
 
     public async Task<SampleDataRunResult> RunPlanAsync(SampleDataJob job, SampleDataPlan plan, CancellationToken ct = default)
     {
-        using var logScope = _logger.BeginScope(new Dictionary<string, object?>
+        using var logScope = BeginJobScope(job);
+        return await RunPlanCoreAsync(job, plan, ct);
+    }
+
+    /// At startup: a run that a stopped process left Running never finishes, so every Running demo branch becomes
+    /// Failed. Its progress stays, so the screen still shows how far it got.
+    public async Task RecoverInterruptedAsync(CancellationToken ct = default)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        var count = await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
+            .Where(b => b.IsDemo && b.SampleDataStatus == SampleDataStatus.Running)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Failed)
+                .SetProperty(b => b.SampleDataError, InterruptedError), ct);
+        if (count > 0)
+            _logger.LogWarning("Marked the interrupted sample data of {Count} demo branches failed", count);
+    }
+
+    private IDisposable? BeginJobScope(SampleDataJob job) => _logger.BeginScope(new Dictionary<string, object?>
+    {
+        ["UserId"] = job.RequestedByUserId,
+        ["CorrelationId"] = $"sample-data-{job.BranchId:N}",
+    });
+
+    /// Null when no plan could be made: the branch is then Failed under KE-HOACH, and a generator failure keeps the
+    /// generator's own message.
+    private async Task<SampleDataPlan?> GenerateAsync(SampleDataJob job, CancellationToken ct)
+    {
+        try
         {
-            ["UserId"] = job.RequestedByUserId,
-            ["CorrelationId"] = $"sample-data-{job.BranchId:N}",
-        });
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
+            var branchCode = await db.Branches.IgnoreQueryFilters().Where(b => b.Id == job.BranchId)
+                    .Select(b => b.Code).SingleOrDefaultAsync(ct)
+                ?? throw new SampleDataPlanException(BranchNotFound);
+            var owners = await ResolveOwnersAsync(db, job.RequestedByUserId, ct);
+            var input = new SampleDataGeneratorInput(branchCode, VnTime.ToVnDate(_clock.UtcNow), owners.Count);
+            try
+            {
+                return _generator.Generate(input);
+            }
+            catch (Exception ex)
+            {
+                throw SampleDataPlanException.GeneratorFailed(ex);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            var error = FormatError(PlanKey, ex);
+            _logger.LogError(ex, "Sample data plan of branch {BranchId} could not be made", job.BranchId);
+            await FailAsync(job.BranchId, error);
+            return null;
+        }
+    }
+
+    private async Task<SampleDataRunResult> RunPlanCoreAsync(SampleDataJob job, SampleDataPlan plan, CancellationToken ct)
+    {
         var stopwatch = Stopwatch.StartNew();
         SampleRunState? run = null;
         try
         {
             run = new SampleRunState(job.BranchId, TotalItems(plan), PlanKey);
             if (!await StartAsync(job.BranchId, ct))
-                throw new SampleDataPlanException("Không tìm thấy chi nhánh demo để tạo dữ liệu mẫu.");
+                throw new SampleDataPlanException(BranchNotFound);
             await PrepareAsync(run, job.RequestedByUserId, ct);
             await RunSetupAsync(run, plan, ct);
             foreach (var step in plan.Steps)
@@ -82,6 +147,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
                 _logger.LogWarning("Sample data of branch {BranchCode} ran {Done} of {Total} items", run.BranchCode, run.Done, run.Total);
             run.CurrentKey = FinishKey;
             await SetReadyAsync(job.BranchId, ct);
+            await TrySignalDashboardsAsync(job.BranchId, ct);
             _logger.LogInformation(
                 "Sample data of branch {BranchCode} ready: {StepsExecuted} steps executed, {StepsSkipped} skipped in {Elapsed}",
                 run.BranchCode, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed);
@@ -97,8 +163,6 @@ public sealed class SampleDataRunner : ISampleDataRunner
             return new SampleDataRunResult(false, run?.StepsExecuted ?? 0, run?.StepsSkipped ?? 0, stopwatch.Elapsed, error);
         }
     }
-
-    public Task RecoverInterruptedAsync(CancellationToken ct = default) => throw new NotImplementedException("Phase 02b");
 
     /// SampleDataError: "{key}: {reason}", cut to 1000 characters without splitting a surrogate pair. Every signed-in
     /// user can read it, so the reason follows GlobalExceptionMiddleware and never shows an internal message.
@@ -360,6 +424,25 @@ public sealed class SampleDataRunner : ISampleDataRunner
             .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Ready)
             .SetProperty(b => b.SampleDataProgress, 100)
             .SetProperty(b => b.SampleDataError, (string?)null), ct);
+    }
+
+    /// S18: the controllers' signal is skipped, so a finished run tells the open dashboards once that every domain of
+    /// the branch changed. A signal that cannot be sent is only logged: the data is saved, and the dashboards catch up
+    /// with their periodic refresh.
+    private async Task TrySignalDashboardsAsync(Guid branchId, CancellationToken ct)
+    {
+        try
+        {
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            limit.CancelAfter(SignalLimit);
+            await using var scope = _scopeFactory.CreateAsyncScope();
+            await scope.ServiceProvider.GetRequiredService<IRealtimeNotifier>()
+                .NotifyDashboardChangedAsync(branchId, DashboardDomains.All, limit.Token);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not send the dashboard signal of the sample data of branch {BranchId}", branchId);
+        }
     }
 
     /// Best effort: a missed progress write must not fail the run.

@@ -1,5 +1,8 @@
+using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Organization.SampleData.Interfaces;
 using OrderMgmt.Application.Organization.SampleData.Models;
@@ -65,11 +68,19 @@ public static class TinyPlans
         };
     }
 
-    public static Task<Guid> AdminIdAsync(WebAppFactory factory) =>
+    public static Task<Guid> AdminIdAsync(WebApplicationFactory<Program> factory) =>
         InDbAsync(factory, db => db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync());
 
+    /// S19: a host of the factory's database whose `T` is `instance` (a recorder or a fake).
+    public static WebApplicationFactory<Program> WithService<T>(WebAppFactory factory, T instance) where T : class =>
+        factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+        {
+            s.RemoveAll<T>();
+            s.AddSingleton(instance);
+        }));
+
     /// S5, computed independently of the runner: active non-deleted SALES users by username, take 3.
-    public static Task<List<Guid>> SalesOwnersAsync(WebAppFactory factory) =>
+    public static Task<List<Guid>> SalesOwnersAsync(WebApplicationFactory<Program> factory) =>
         InDbAsync(factory, db => db.Users
             .Where(u => !u.IsDeleted && u.Status == UserStatus.Active && u.UserRoles.Any(r => r.Role.Code == RoleCodes.Sales))
             .OrderBy(u => u.Username)
@@ -79,19 +90,22 @@ public static class TinyPlans
 
     /// Runs `plan` for the branch as requested by admin, through a scope of the factory. The runner only fills demo
     /// branches, so the branch is flagged demo first unless `asDemo` is false.
-    public static async Task<SampleDataRunResult> RunAsync(WebAppFactory factory, Guid branchId, SampleDataPlan plan,
-        bool asDemo = true)
+    public static async Task<SampleDataRunResult> RunAsync(WebApplicationFactory<Program> factory, Guid branchId,
+        SampleDataPlan plan, bool asDemo = true)
     {
         if (asDemo)
-            await InDbAsync(factory, db => db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId)
-                .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsDemo, true)));
+            await MarkDemoAsync(factory, branchId);
         var adminId = await AdminIdAsync(factory);
         await using var scope = factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<ISampleDataRunner>()
             .RunPlanAsync(new SampleDataJob(branchId, adminId), plan);
     }
 
-    private static async Task<T> InDbAsync<T>(WebAppFactory factory, Func<AppDbContext, Task<T>> work)
+    public static Task<int> MarkDemoAsync(WebApplicationFactory<Program> factory, Guid branchId) =>
+        InDbAsync(factory, db => db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsDemo, true)));
+
+    private static async Task<T> InDbAsync<T>(WebApplicationFactory<Program> factory, Func<AppDbContext, Task<T>> work)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         return await work(scope.ServiceProvider.GetRequiredService<AppDbContext>());

@@ -93,6 +93,14 @@ vi.mock('@/features/debt/hooks', () => ({
   },
 }));
 
+let printProps: Record<string, unknown> = {};
+vi.mock('@/components/voucher-print/voucher-print-button', () => ({
+  VoucherPrintButton: (props: { disabled?: boolean; disabledReason?: string }) => {
+    printProps = props as Record<string, unknown>;
+    return <button type="button" data-testid="voucher-print" disabled={props.disabled} title={props.disabledReason} />;
+  },
+}));
+
 const FUND_CASH = '11111111-1111-4111-8111-111111111111';
 const FUND_BANK = '11111111-1111-4111-8111-111111111112';
 const R_TKH = '22222222-2222-4222-8222-222222222221';
@@ -305,6 +313,7 @@ function dialog() {
 
 describe('CashVoucherFormPage', () => {
   beforeEach(() => {
+    printProps = {};
     routeParams.id = 'new';
     voucherState.data = undefined;
     activitiesState.data = [];
@@ -618,6 +627,46 @@ describe('CashVoucherFormPage', () => {
     fireEvent.click(dialog().getByRole('button', { name: 'Khôi phục' }));
 
     await waitFor(() => expect(restoreMock).toHaveBeenCalledWith({ id: V1, body: { version: 7 } }));
+  });
+
+  it('no print button on a new voucher', () => {
+    renderPage('Receipt');
+
+    expect(screen.queryByTestId('voucher-print')).not.toBeInTheDocument();
+  });
+
+  it('prints a saved voucher', () => {
+    routeParams.id = V1;
+    const saved = voucher();
+    voucherState.data = saved;
+    renderPage('Receipt');
+
+    expect(screen.getByTestId('voucher-print')).toBeEnabled();
+    expect(printProps).toMatchObject({
+      kind: 'cash',
+      type: 'Receipt',
+      vouchers: [{ id: saved.id, code: saved.code }],
+      disabled: false,
+    });
+  });
+
+  it('print waits for unsaved changes', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher();
+    renderPage('Receipt');
+
+    fireEvent.change(byId('cash-voucher-note'), { target: { value: 'Sửa chưa lưu' } });
+
+    expect(printProps).toMatchObject({ disabled: true, disabledReason: 'Lưu thay đổi trước khi in' });
+  });
+
+  it('a cancelled voucher can be printed', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher({ status: 'Cancelled', canEdit: false });
+    renderPage('Receipt');
+
+    expect(screen.getByTestId('voucher-print')).toBeEnabled();
+    expect(printProps).toMatchObject({ disabled: false });
   });
 
   it('payment labels', () => {

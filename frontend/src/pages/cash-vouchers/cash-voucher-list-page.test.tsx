@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { createPortal } from 'react-dom';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { CashVoucherListPage } from './cash-voucher-list-page';
 import { useAuthStore } from '@/stores/auth-store';
@@ -12,6 +13,26 @@ import type {
 import type { CashVoucherType } from '@/features/cash-common/types';
 
 const useCashVouchersMock = vi.fn();
+const printCalls: Array<Record<string, unknown>> = [];
+
+vi.mock('@/components/voucher-print/voucher-print-button', () => ({
+  VoucherPrintButton: (props: {
+    variant?: string;
+    vouchers: Array<{ id: string; code: string }>;
+  }) => {
+    printCalls.push(props as unknown as Record<string, unknown>);
+    if (props.variant === 'icon') {
+      return (
+        <>
+          <span data-testid={`print-icon-${props.vouchers[0].code}`} />
+          {createPortal(<button>portal-{props.vouchers[0].code}</button>, document.body)}
+        </>
+      );
+    }
+    return <span data-testid="print-bar">{props.vouchers.map((v) => v.code).join(',')}</span>;
+  },
+}));
+
 const partner: CashPartnerSearchItem = {
   id: '77777777-7777-4777-8777-777777777777',
   code: 'KH01',
@@ -259,5 +280,139 @@ describe('CashVoucherListPage', () => {
     setPermissions(['receipts.view', 'payments.create']);
     renderPage('Receipt', '/receipts');
     expect(screen.queryByRole('link', { name: /Thêm/ })).not.toBeInTheDocument();
+  });
+
+  describe('selection and print', () => {
+    const third: CashVoucherListItem = { ...manual, id: 'v3', code: 'PT00003' };
+
+    function useThree(hasNextPage = false) {
+      useCashVouchersMock.mockReturnValue({
+        data: { ...result([manual, managed, third], 3_000_000), hasNextPage },
+        isLoading: false,
+        isFetching: false,
+        isError: false,
+      });
+    }
+
+    function lastCall(variant: 'icon' | 'button', code?: string) {
+      const matches = printCalls.filter(
+        (c) =>
+          (variant === 'icon' ? c.variant === 'icon' : c.variant === undefined) &&
+          (!code || (c.vouchers as Array<{ code: string }>)[0].code === code),
+      );
+      return matches[matches.length - 1];
+    }
+
+    beforeEach(() => {
+      printCalls.length = 0;
+      useThree();
+    });
+
+    it('gives every row a checkbox and an icon print button', () => {
+      renderPage('Receipt', '/receipts');
+      for (const v of [manual, managed, third]) {
+        expect(screen.getByRole('checkbox', { name: `Chọn ${v.code}` })).toBeInTheDocument();
+        expect(lastCall('icon', v.code)).toMatchObject({
+          variant: 'icon',
+          kind: 'cash',
+          type: 'Receipt',
+          vouchers: [{ id: v.id, code: v.code }],
+        });
+      }
+    });
+
+    it('shows the bar with the selected vouchers in page order', () => {
+      renderPage('Receipt', '/receipts');
+      expect(screen.queryByRole('region', { name: 'Phiếu đã chọn' })).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn PT00003' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn PT00001' }));
+      const bar = screen.getByRole('region', { name: 'Phiếu đã chọn' });
+      expect(bar).toHaveTextContent('Đã chọn 2 phiếu');
+      expect(lastCall('button')).toMatchObject({
+        kind: 'cash',
+        type: 'Receipt',
+        vouchers: [
+          { id: 'v1', code: 'PT00001' },
+          { id: 'v3', code: 'PT00003' },
+        ],
+      });
+    });
+
+    it('header checkbox selects all and is indeterminate after unticking one', () => {
+      renderPage('Receipt', '/receipts');
+      const getAll = () =>
+        screen.getByRole('checkbox', { name: 'Chọn tất cả phiếu trong trang' }) as HTMLInputElement;
+      fireEvent.click(getAll());
+      expect(screen.getByRole('region', { name: 'Phiếu đã chọn' })).toHaveTextContent('Đã chọn 3 phiếu');
+      expect(getAll().checked).toBe(true);
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn PT00002' }));
+      expect(getAll().checked).toBe(false);
+      expect(getAll().indeterminate).toBe(true);
+      expect(screen.getByRole('region', { name: 'Phiếu đã chọn' })).toHaveTextContent('Đã chọn 2 phiếu');
+    });
+
+    it('ticking does not navigate; portal clicks are ignored; the row cell still navigates', () => {
+      renderPage('Receipt', '/receipts');
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn PT00001' }));
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/receipts$/);
+
+      fireEvent.click(screen.getByText('portal-PT00001'));
+      expect(screen.getByTestId('location')).toHaveTextContent(/^\/receipts$/);
+    });
+
+    it('navigates when the row own cell is clicked', async () => {
+      useCashVouchersMock.mockReturnValue({
+        data: result([manual, managed, { ...managed, id: 'v3', code: 'PT00003' }], 1),
+        isLoading: false,
+        isFetching: false,
+        isError: false,
+      });
+      render(
+        <MemoryRouter initialEntries={['/receipts']}>
+          <Routes>
+            <Route path="/receipts" element={<><CashVoucherListPage type="Receipt" /><LocationProbe /></>} />
+            <Route path="/receipts/:id" element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+      fireEvent.click(screen.getByText('Thu nợ tháng 9'));
+      await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/receipts/v1'));
+    });
+
+    it('keeps the checkbox mounted and focused while selecting', () => {
+      renderPage('Receipt', '/receipts');
+      const box = screen.getByRole('checkbox', { name: 'Chọn PT00001' });
+      box.focus();
+      fireEvent.click(box);
+      expect(box.isConnected).toBe(true);
+      expect(document.activeElement).toBe(box);
+    });
+
+    it('Bỏ chọn hides the bar', () => {
+      renderPage('Receipt', '/receipts');
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn PT00001' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn' }));
+      expect(screen.queryByRole('region', { name: 'Phiếu đã chọn' })).not.toBeInTheDocument();
+    });
+
+    it('clears the selection on next page', () => {
+      useThree(true);
+      renderPage('Receipt', '/receipts');
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn PT00001' }));
+      expect(screen.getByRole('region', { name: 'Phiếu đã chọn' })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: 'Sau' }));
+      expect(screen.queryByRole('region', { name: 'Phiếu đã chọn' })).not.toBeInTheDocument();
+    });
+
+    it('clears the selection when the search changes, after the debounce', async () => {
+      renderPage('Receipt', '/receipts');
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn PT00001' }));
+      fireEvent.change(screen.getByPlaceholderText('Tìm theo số phiếu / đối tượng...'), {
+        target: { value: 'PT' },
+      });
+      await waitFor(() =>
+        expect(screen.queryByRole('region', { name: 'Phiếu đã chọn' })).not.toBeInTheDocument(),
+      );
+    });
   });
 });

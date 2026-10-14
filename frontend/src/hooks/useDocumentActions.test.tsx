@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '@/lib/use-toast';
 import type { ConfirmFlags } from '@/lib/confirm-required';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useDocumentActions } from './useDocumentActions';
 
 vi.mock('@/lib/use-toast', () => ({ toast: vi.fn() }));
@@ -314,4 +316,156 @@ describe('useDocumentActions focus return', () => {
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(document.activeElement).toBe(other);
   });
+
+  // The same rule as any dialog opened from state: back to what had the focus when it opened.
+  it('dismissing gives the focus back to where the user went while the action ran, not to where it started', async () => {
+    const perform = vi.fn<(a: Action) => Promise<void>>().mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      throw apiError(422, 'NEGATIVE_FUND_WARNING');
+    });
+    render(
+      <>
+        <input data-testid="other" />
+        <Harness perform={perform} />
+      </>,
+    );
+    const save = screen.getByTestId('save');
+    const other = screen.getByTestId('other');
+    act(() => save.focus());
+    fireEvent.click(save);
+    act(() => other.focus());
+
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(other));
+  });
+
+  it('still knows where the user went when that control stops its focus event', async () => {
+    const perform = vi.fn<(a: Action) => Promise<void>>().mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      throw apiError(422, 'NEGATIVE_FUND_WARNING');
+    });
+    render(
+      <>
+        <input data-testid="other" />
+        <Harness perform={perform} />
+      </>,
+    );
+    const save = screen.getByTestId('save');
+    const other = screen.getByTestId('other');
+    other.addEventListener('focusin', (event) => event.stopPropagation());
+    act(() => save.focus());
+    fireEvent.click(save);
+    act(() => other.focus());
+
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(other));
+  });
+
+  const options = {
+    reload: async () => undefined,
+    onReloaded: () => {},
+    errorTitles,
+    confirmLabels,
+    concurrencyMessage: 'Đã tải lại',
+    concurrencyReloadFailedMessage: 'Không tải lại được',
+  };
+
+  // A cancel / delete / restore is confirmed in a ConfirmDialog first, so the action starts from a button of a dialog
+  // that is closing. A save button sits first in the page: a blind Enter on it would save.
+  it('an action confirmed in a dialog returns the focus to the page button that asked for it, not to the first control', async () => {
+    function ViaConfirmHarness() {
+      const [asking, setAsking] = useState(false);
+      const { busy, run, confirmDialogProps } = useDocumentActions<Action>({
+        ...options,
+        // The answer takes a while: the page buttons are disabled when the confirm dialog gives the focus back.
+        perform: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          throw apiError(422, 'NEGATIVE_FUND_WARNING');
+        },
+      });
+      return (
+        <main id="main-content">
+          <button type="button" data-testid="save" disabled={busy}>
+            Cập nhật
+          </button>
+          <button type="button" data-testid="delete" disabled={busy} onClick={() => setAsking(true)}>
+            Xóa
+          </button>
+          <ConfirmDialog
+            open={asking}
+            onOpenChange={setAsking}
+            title="Xóa phiếu?"
+            confirmLabel="Xóa luôn"
+            onConfirm={() => {
+              setAsking(false);
+              void run({ kind: 'delete', flags: {} });
+            }}
+          />
+          <ConfirmRequiredDialog {...confirmDialogProps} />
+        </main>
+      );
+    }
+    render(<ViaConfirmHarness />);
+    const remove = screen.getByTestId('delete');
+    act(() => remove.focus());
+    fireEvent.click(remove);
+    const confirm = await screen.findByRole('button', { name: 'Xóa luôn' });
+    act(() => confirm.focus());
+    fireEvent.click(confirm);
+
+    await screen.findByText('Quỹ bị âm');
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(remove));
+    expect(document.activeElement).not.toBe(screen.getByTestId('save'));
+  });
+
+  // A status change can take the button away (a cancelled voucher has no "Hủy phiếu") or leave it disabled.
+  it.each(['removed', 'disabled'] as const)(
+    'focuses nothing when the element the action started from is %s: never another control of the page',
+    async (fate) => {
+      function LostOriginHarness() {
+        const [lost, setLost] = useState(false);
+        const { run, confirmDialogProps } = useDocumentActions<Action>({
+          ...options,
+          perform: async () => {
+            setLost(true);
+            // A real browser drops the focus of a button that gets disabled or removed.
+            (document.activeElement as HTMLElement | null)?.blur();
+            throw apiError(422, 'NEGATIVE_FUND_WARNING');
+          },
+        });
+        return (
+          <main id="main-content">
+            <button type="button" data-testid="first">
+              Cập nhật
+            </button>
+            {!(lost && fate === 'removed') && (
+              <button type="button" data-testid="origin" disabled={lost} onClick={() => void run({ kind: 'delete', flags: {} })}>
+                Xóa
+              </button>
+            )}
+            <ConfirmRequiredDialog {...confirmDialogProps} />
+          </main>
+        );
+      }
+      render(<LostOriginHarness />);
+      const origin = screen.getByTestId('origin');
+      act(() => origin.focus());
+      fireEvent.click(origin);
+      await screen.findByRole('dialog');
+      fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(document.activeElement).toBe(document.body);
+    },
+  );
 });

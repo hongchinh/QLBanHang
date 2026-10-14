@@ -6,7 +6,7 @@ import {
   type ConfirmationRequest,
   type ConfirmFlags,
 } from '@/lib/confirm-required';
-import { canTakeFocus, currentFocus, isFocusLost } from '@/lib/focus';
+import { canTakeFocus, isFocusLost } from '@/lib/focus';
 import { toast } from '@/lib/use-toast';
 
 /** `flags` are the confirmations (P10) already given for the action; a resend keeps them all. */
@@ -31,8 +31,30 @@ interface Options<A extends DocumentAction> {
   concurrencyReloadFailedMessage: string;
 }
 
-const FOCUSABLE =
-  'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+const DIALOG = '[role="dialog"], [role="alertdialog"]';
+
+/**
+ * The element the user was last on outside any dialog; a dialog comes and goes, so nothing inside one can take the
+ * focus back later. A cancel / delete / restore starts from the button of a confirm dialog that is closing, and the
+ * 422 dialog is opened from state: neither leaves Radix a trigger to return the focus to.
+ */
+function useLastFocusOutsideDialogs() {
+  const lastFocusRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    const remember = (target: EventTarget | null) => {
+      if (target instanceof HTMLElement && target !== document.body && !target.closest(DIALOG)) {
+        lastFocusRef.current = target;
+      }
+    };
+    // What already had the focus when the form mounted.
+    remember(document.activeElement);
+    const onFocusIn = (event: FocusEvent) => remember(event.target);
+    // Capture phase: a control that stops its own focus event must not hide where the user is.
+    document.addEventListener('focusin', onFocusIn, true);
+    return () => document.removeEventListener('focusin', onFocusIn, true);
+  }, []);
+  return lastFocusRef;
+}
 
 /**
  * The action flow shared by the document forms: busy state, the 422 confirmation chain
@@ -47,21 +69,20 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
   const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState<{ action: A; request: ConfirmationRequest } | null>(null);
 
-  // What had the focus when the user triggered the action (the 422 dialog is opened from state, so Radix has no
-  // trigger to give the focus back to); the action disables its own buttons, which makes the browser drop the focus.
-  const originRef = useRef<HTMLElement | null>(null);
-  // Set when a confirmed resend is running: the dialog is gone then and the origin may still be disabled.
+  // Where the focus goes back to once the 422 dialog is gone. The action disables its own buttons while it runs,
+  // which makes the browser drop the focus, so "what has the focus now" is not enough.
+  const lastFocusRef = useLastFocusOutsideDialogs();
+  // Set when a confirmed resend is running: the dialog is gone then and that element may still be disabled.
   const restoreAfterRunRef = useRef(false);
 
   useEffect(() => {
     if (busy || !restoreAfterRunRef.current) return;
     restoreAfterRunRef.current = false;
     // Never take the focus from something the user (or the page) already moved it to.
-    if (isFocusLost() && canTakeFocus(originRef.current)) originRef.current.focus();
-  }, [busy]);
+    if (isFocusLost() && canTakeFocus(lastFocusRef.current)) lastFocusRef.current.focus();
+  }, [busy, lastFocusRef]);
 
   function run(action: A): Promise<void> {
-    originRef.current = currentFocus();
     restoreAfterRunRef.current = false;
     return execute(action);
   }
@@ -113,11 +134,10 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
 
   const confirmDialogProps = {
     request: confirmation?.request ?? null,
-    // Dismissed: back to the origin, else the first control of the page. Confirmed: the effect above restores it later.
-    restoreFocusTo: (): HTMLElement | null => {
-      if (canTakeFocus(originRef.current)) return originRef.current;
-      return restoreAfterRunRef.current ? null : document.querySelector<HTMLElement>(`#main-content :is(${FOCUSABLE})`);
-    },
+    // Back to where the user was. When that element is gone or disabled the focus is left alone, never put on some
+    // other control: a blind Enter there would run an action the user did not ask for (a save button comes first).
+    // After a confirmation the buttons are still disabled here; the effect above restores the focus later.
+    restoreFocusTo: (): HTMLElement | null => (canTakeFocus(lastFocusRef.current) ? lastFocusRef.current : null),
     confirmLabel: confirmation ? options.confirmLabels[confirmation.action.kind as A['kind']] : undefined,
     onConfirm: () => {
       if (!confirmation) return;

@@ -464,6 +464,40 @@ describe('StockVoucherFormPage', () => {
       await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
       await waitFor(() => expect(document.activeElement).toBe(cell));
     });
+
+    // The cancel is confirmed in the "Hủy phiếu?" dialog first, so the action starts from a button of a dialog that
+    // is closing. The focus must come back to the button the user used: on "Cập nhật" a blind Enter would save.
+    it('dismissing the 422 of a cancel returns the focus to the "Hủy phiếu" button, not to a save button', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      // The answer takes a while, as in the app: the title-bar buttons are disabled when the first dialog closes.
+      cancelMock.mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            setTimeout(() => reject(apiError(422, 'DEBT_SETTLEMENTS_WILL_BE_REMOVED', SETTLEMENT_DETAILS)), 20);
+          }),
+      );
+      // The app renders the page in main#main-content.
+      render(
+        <main id="main-content">
+          <StockVoucherFormPage type="In" />
+        </main>,
+      );
+      const cancelButton = screen.getByRole('button', { name: 'Hủy phiếu' });
+      act(() => cancelButton.focus());
+      fireEvent.click(cancelButton);
+      const confirm = dialog().getByRole('button', { name: 'Hủy phiếu' });
+      act(() => confirm.focus());
+      fireEvent.click(confirm);
+
+      expect(await screen.findByText('Bỏ đối trừ chứng từ')).toBeInTheDocument();
+      fireEvent.click(dialog().getByRole('button', { name: 'Quay lại' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      await waitFor(() => expect(document.activeElement).toBe(cancelButton));
+      expect(document.activeElement).not.toBe(screen.getByRole('button', { name: 'Cập nhật' }));
+      expect(cancelMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('blocked negative stock shows the blocked dialog without resend', async () => {

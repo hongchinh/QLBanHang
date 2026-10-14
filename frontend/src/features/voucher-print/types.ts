@@ -27,12 +27,13 @@ const FILE_PREFIX: Record<string, string> = {
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
-// One voucher -> its code; several -> `{prefix}_{yyyyMMdd-HHmm}` in local time.
+// One voucher -> its code; several -> `{prefix}_{yyyyMMdd-HHmm}` in Vietnam time (UTC+7, no DST), like the backend.
 export function voucherPrintFileBase(
   request: Pick<VoucherPrintRequest, 'kind' | 'type' | 'vouchers'>,
   now: Date = new Date(),
 ): string {
   if (request.vouchers.length === 1) return request.vouchers[0].code;
-  const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+  const vn = new Date(now.getTime() + 7 * 3600_000);
+  const stamp = `${vn.getUTCFullYear()}${pad(vn.getUTCMonth() + 1)}${pad(vn.getUTCDate())}-${pad(vn.getUTCHours())}${pad(vn.getUTCMinutes())}`;
   return `${FILE_PREFIX[request.type]}_${stamp}`;
 }

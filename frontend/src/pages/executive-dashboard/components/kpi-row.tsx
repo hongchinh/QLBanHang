@@ -1,8 +1,8 @@
 import { useId } from 'react';
 import type { ReactNode } from 'react';
 import { StatTile } from '@/features/dashboard/components/stat-tile';
-import type { TileQuery } from '@/features/dashboard/components/tile-card';
 import { formatNumber, formatPct, formatSignedCompact, formatVndCompact } from '@/features/dashboard/format';
+import { statTileState } from '@/features/dashboard/stat-tile-state';
 import { useCashSummary, useDebtSummary, useInventorySummary, useSalesSummary } from '@/features/executive-dashboard/hooks';
 import { executiveLinks, reportLinkTitle } from '@/features/executive-dashboard/links';
 import type { ExecutiveParams, SalesSummary } from '@/features/executive-dashboard/types';
@@ -13,17 +13,6 @@ import { todayYmd } from '@/lib/vn-datetime';
 
 interface KpiRowProps {
   params: ExecutiveParams;
-}
-
-function queryState(query: TileQuery) {
-  return {
-    loading: query.isLoading,
-    // The figures of the previous key while the new one loads (keepPreviousData).
-    stale: query.isPlaceholderData === true,
-    // A failed background refresh keeps the figures on screen.
-    error: query.isError && query.data === undefined,
-    onRetry: () => void query.refetch(),
-  };
 }
 
 // The width of a group on wide screens: as many of the seven columns as it has tiles (static class names,
@@ -75,7 +64,7 @@ export function KpiRow({ params }: KpiRowProps) {
         value={s ? formatVndCompact(s.revenue) : null}
         delta={s ? s.revenueDeltaPct : undefined}
         hint="so với kỳ trước"
-        {...queryState(sales)}
+        {...statTileState(sales)}
       />,
       <StatTile
         key="gross-profit"
@@ -83,7 +72,7 @@ export function KpiRow({ params }: KpiRowProps) {
         value={s && canViewCost && s.grossProfit != null ? formatVndCompact(s.grossProfit) : null}
         badge={s?.isProvisional && canViewCost ? 'tạm tính' : undefined}
         hint={s && canViewCost ? marginHint(s) : undefined}
-        {...queryState(sales)}
+        {...statTileState(sales)}
       />,
     );
   }
@@ -95,7 +84,7 @@ export function KpiRow({ params }: KpiRowProps) {
         value={c ? formatSignedCompact(c.net) : null}
         delta={c ? c.netDeltaPct : undefined}
         hint={c ? `Thu ${formatVndCompact(c.receipts)} · Chi ${formatVndCompact(c.payments)}` : undefined}
-        {...queryState(cash)}
+        {...statTileState(cash)}
       />,
     );
     nowTiles.push(
@@ -107,7 +96,7 @@ export function KpiRow({ params }: KpiRowProps) {
         hintTone={c && c.balance < 0 ? 'bad' : 'default'}
         to={executiveLinks.cashBook()}
         title={linkTitle}
-        {...queryState(cash)}
+        {...statTileState(cash)}
       />,
     );
   }
@@ -121,7 +110,7 @@ export function KpiRow({ params }: KpiRowProps) {
         hintTone={d && d.receivable.overdue > 0 ? 'bad' : 'default'}
         to={executiveLinks.debtOverdue('Receivable', today)}
         title={linkTitle}
-        {...queryState(debt)}
+        {...statTileState(debt)}
       />,
       <StatTile
         key="payable"
@@ -131,7 +120,7 @@ export function KpiRow({ params }: KpiRowProps) {
         hintTone={d && d.payable.dueSoon > 0 ? 'warn' : 'default'}
         to={executiveLinks.debtBalance('Payable', params.from, params.to)}
         title={linkTitle}
-        {...queryState(debt)}
+        {...statTileState(debt)}
       />,
     );
   }
@@ -144,7 +133,7 @@ export function KpiRow({ params }: KpiRowProps) {
         hint={inv ? `${formatNumber(inv.productCount)} mã · ${formatNumber(inv.warehouseCount)} kho` : undefined}
         to={executiveLinks.stockOnHand()}
         title={linkTitle}
-        {...queryState(inventory)}
+        {...statTileState(inventory)}
       />,
     );
   }

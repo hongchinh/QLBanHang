@@ -13,6 +13,7 @@ import { formatDateOnly } from '@/lib/date-only';
 import { ScopeSelect } from './components/scope-select';
 import { CashTab } from './tabs/cash-tab';
 import { DebtTab } from './tabs/debt-tab';
+import { InventoryTab } from './tabs/inventory-tab';
 import { OverviewTab } from './tabs/overview-tab';
 import { SalesTab } from './tabs/sales-tab';
 
@@ -36,6 +37,7 @@ const PANELS: Partial<Record<ExecutiveTab, ComponentType<TabPanelProps>>> = {
   sales: SalesTab,
   cash: CashTab,
   debt: DebtTab,
+  inventory: InventoryTab,
 };
 
 // Bảng điều hành: sales, cash, debt and inventory of the whole company or one branch, kept live.

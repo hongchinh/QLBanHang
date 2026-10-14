@@ -379,6 +379,15 @@ describe('CashVoucherListPage', () => {
       await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/receipts/v1'));
     });
 
+    it('keeps the checkbox mounted and focused while selecting', () => {
+      renderPage('Receipt', '/receipts');
+      const box = screen.getByRole('checkbox', { name: 'Chọn PT00001' });
+      box.focus();
+      fireEvent.click(box);
+      expect(box.isConnected).toBe(true);
+      expect(document.activeElement).toBe(box);
+    });
+
     it('Bỏ chọn hides the bar', () => {
       renderPage('Receipt', '/receipts');
       fireEvent.click(screen.getByRole('checkbox', { name: 'Chọn PT00001' }));

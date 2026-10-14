@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
+import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type Table as TanstackTable } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Loader2, Plus, Search } from 'lucide-react';
 import { useCashVouchers } from '@/features/cash-vouchers/hooks';
@@ -63,6 +63,13 @@ const COLUMN_SIZING_DEFAULTS: Record<string, number> = {
   ownerName: 140,
   actions: 48,
 };
+
+type RowSelection = ReturnType<typeof useRowSelection>;
+
+// The selection travels through table meta so the column definitions (and their cell components) stay stable.
+function selectionOf(table: TanstackTable<CashVoucherListItem>) {
+  return (table.options.meta as { selection: RowSelection }).selection;
+}
 
 const SELECT_CLASS = 'h-9 rounded-md border border-input bg-background px-2 text-sm';
 
@@ -180,21 +187,27 @@ export function CashVoucherListPage({ type }: { type: CashVoucherType }) {
         size: COLUMN_SIZING_DEFAULTS.select,
         minSize: COLUMN_SIZING_DEFAULTS.select,
         enableResizing: false,
-        header: () => (
-          <SelectionCheckbox
-            checked={selection.allSelected}
-            indeterminate={selection.someSelected}
-            onCheckedChange={selection.toggleAll}
-            aria-label="Chọn tất cả phiếu trong trang"
-          />
-        ),
-        cell: ({ row }) => (
-          <SelectionCheckbox
-            checked={selection.isSelected(row.original.id)}
-            onCheckedChange={(checked) => selection.toggle(row.original.id, checked)}
-            aria-label={`Chọn ${row.original.code}`}
-          />
-        ),
+        header: ({ table }) => {
+          const s = selectionOf(table);
+          return (
+            <SelectionCheckbox
+              checked={s.allSelected}
+              indeterminate={s.someSelected}
+              onCheckedChange={s.toggleAll}
+              aria-label="Chọn tất cả phiếu trong trang"
+            />
+          );
+        },
+        cell: ({ row, table }) => {
+          const s = selectionOf(table);
+          return (
+            <SelectionCheckbox
+              checked={s.isSelected(row.original.id)}
+              onCheckedChange={(checked) => s.toggle(row.original.id, checked)}
+              aria-label={`Chọn ${row.original.code}`}
+            />
+          );
+        },
       },
       {
         id: 'code',
@@ -274,13 +287,14 @@ export function CashVoucherListPage({ type }: { type: CashVoucherType }) {
         ),
       },
     ],
-    [labels.basePath, labels.stockVoucherBasePath, labels.personLabel, selection, type],
+    [labels.basePath, labels.stockVoucherBasePath, labels.personLabel, type],
   );
 
   const table = useReactTable({
     data: items,
     columns,
     state: { columnSizing },
+    meta: { selection },
     onColumnSizingChange: setColumnSizing,
     columnResizeMode: 'onChange',
     enableColumnResizing: true,

@@ -21,6 +21,39 @@ const BRANCHES: Branch[] = [
     openingDate: '2026-01-01',
   },
   { id: 'b2', code: 'CN02', name: 'Chi nhánh 2', address: null, lockedUntil: null, openingDate: null },
+  {
+    id: 'b3',
+    code: 'DEMO1',
+    name: 'CN demo',
+    address: null,
+    lockedUntil: null,
+    openingDate: null,
+    isDemo: true,
+    sampleDataStatus: 'Ready',
+    sampleDataProgress: 100,
+  },
+  {
+    id: 'b4',
+    code: 'DEMO2',
+    name: 'CN demo 2',
+    address: null,
+    lockedUntil: null,
+    openingDate: null,
+    isDemo: true,
+    sampleDataStatus: 'Running',
+    sampleDataProgress: 45,
+  },
+  {
+    id: 'b5',
+    code: 'DEMO3',
+    name: 'CN demo 3',
+    address: null,
+    lockedUntil: null,
+    openingDate: null,
+    isDemo: true,
+    sampleDataStatus: 'Failed',
+    sampleDataError: 'XBH-0012: lỗi',
+  },
 ];
 
 vi.mock('@/features/branches/hooks', () => ({
@@ -28,6 +61,8 @@ vi.mock('@/features/branches/hooks', () => ({
   useCreateBranch: () => ({ mutateAsync: createMock, isPending: false }),
   useUpdateBranch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteBranch: () => ({ mutate: deleteMock, isPending: false }),
+  useDemoBranchDeletionPreview: () => ({ data: undefined, isLoading: false, isError: false }),
+  useDeleteDemoBranch: () => ({ mutate: vi.fn(), isPending: false }),
   useSetBranchOpeningDate: () => ({ mutateAsync: setOpeningDateMock, isPending: false }),
 }));
 
@@ -166,5 +201,42 @@ describe('BranchesPage', () => {
       expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive', description: message })),
     );
     expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  const rowOf = (code: string) => screen.getByText(code).closest('tr') as HTMLElement;
+
+  it('shows the demo badges', () => {
+    renderPage();
+
+    expect(within(rowOf('DEMO1')).getByText('Demo')).toBeInTheDocument();
+    expect(within(rowOf('DEMO2')).getByText('Đang tạo dữ liệu 45%')).toBeInTheDocument();
+    expect(within(rowOf('DEMO3')).getByText('Lỗi tạo dữ liệu')).toHaveAttribute('title', 'XBH-0012: lỗi');
+    expect(within(rowOf('CN01')).queryByText('Demo')).not.toBeInTheDocument();
+  });
+
+  it('demo rows use the demo delete action', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const row = within(rowOf('DEMO1'));
+    expect(row.queryByRole('button', { name: 'Xóa chi nhánh' })).not.toBeInTheDocument();
+    await user.click(row.getByRole('button', { name: 'Xóa chi nhánh demo' }));
+    expect(await screen.findByRole('dialog', { name: 'Xóa chi nhánh demo?' })).toBeInTheDocument();
+  });
+
+  it('demo delete is disabled while seeding', () => {
+    renderPage();
+
+    expect(within(rowOf('DEMO2')).getByRole('button', { name: 'Xóa chi nhánh demo' })).toBeDisabled();
+  });
+
+  it('normal rows keep the normal delete', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    const row = within(rowOf('CN01'));
+    expect(row.queryByRole('button', { name: 'Xóa chi nhánh demo' })).not.toBeInTheDocument();
+    await user.click(row.getByRole('button', { name: 'Xóa chi nhánh' }));
+    expect(await screen.findByRole('dialog', { name: 'Xóa chi nhánh?' })).toBeInTheDocument();
   });
 });

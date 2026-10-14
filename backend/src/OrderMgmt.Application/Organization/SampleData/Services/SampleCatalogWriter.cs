@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Organization.SampleData.Models;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
@@ -18,10 +19,12 @@ internal static class SampleCatalogWriter
     private const string GroupCode = "DM";
     private const string GroupName = "Dữ liệu mẫu";
 
-    public static async Task<SampleCatalogIds> WriteAsync(IAppDbContext db, SampleDataPlan plan, CancellationToken ct)
+    /// Runs in a transaction: a settings reset holds the product key until it commits.
+    public static async Task<SampleCatalogIds> WriteAsync(IAppDbContext db, IInventoryLock inventoryLock,
+        SampleDataPlan plan, CancellationToken ct)
     {
         var groupId = await GroupIdAsync(db, ct);
-        var products = await WriteProductsAsync(db, plan.Products, groupId, ct);
+        var products = await WriteProductsAsync(db, inventoryLock, plan.Products, groupId, ct);
         var partners = await WritePartnersAsync(db, plan.Partners, ct);
         await db.SaveChangesAsync(ct);
         return new SampleCatalogIds(products, partners);
@@ -41,7 +44,7 @@ internal static class SampleCatalogWriter
         return group.Id;
     }
 
-    private static async Task<Dictionary<string, Guid>> WriteProductsAsync(IAppDbContext db,
+    private static async Task<Dictionary<string, Guid>> WriteProductsAsync(IAppDbContext db, IInventoryLock inventoryLock,
         IReadOnlyCollection<SampleProductSpec> specs, Guid groupId, CancellationToken ct)
     {
         var codes = specs.Select(s => s.Code).ToList();
@@ -51,6 +54,7 @@ internal static class SampleCatalogWriter
         var units = await db.Units.Where(u => unitCodes.Contains(u.Code)).ToDictionaryAsync(u => u.Code, u => u.Id, ct);
 
         var ids = new Dictionary<string, Guid>();
+        var edited = new List<(Product Product, SampleProductSpec Spec)>();
         foreach (var spec in specs)
         {
             var product = ReuseSample(existing[spec.Code], p => p.IsSample, RealDataMessage(spec.Code));
@@ -59,6 +63,8 @@ internal static class SampleCatalogWriter
                 // A user may have stopped using it or deleted its group; the plan's documents need it active.
                 product.Status = ProductStatus.Active;
                 product.ProductGroupId ??= groupId;
+                if (ChangedSettings(product, spec).Count > 0)
+                    edited.Add((product, spec));
                 ids[spec.Code] = product.Id;
                 continue;
             }
@@ -87,7 +93,43 @@ internal static class SampleCatalogWriter
             db.Products.Add(product);
             ids[spec.Code] = product.Id;
         }
+
+        await RestoreSettingsAsync(db, inventoryLock, edited, ct);
         return ids;
+    }
+
+    /// The plan's quantities, totals and stock assume the spec's settings: priced per unit, the price without VAT,
+    /// stock tracked as the spec says. A reused product may have been edited since. Under the guard of
+    /// ProductService.UpdateAsync (the product key, then no stock postings) its settings go back to the spec; a product
+    /// with stock postings keeps them, as the service would, and the run fails.
+    private static async Task RestoreSettingsAsync(IAppDbContext db, IInventoryLock inventoryLock,
+        IReadOnlyList<(Product Product, SampleProductSpec Spec)> edited, CancellationToken ct)
+    {
+        if (edited.Count == 0)
+            return;
+        await inventoryLock.AcquireProductsAsync(edited.Select(e => e.Product.Id), ct);
+        foreach (var (product, spec) in edited)
+        {
+            if (await db.InventoryLedger.AnyAsync(e => e.ProductId == product.Id, ct))
+                throw new ConflictException($"Hàng mẫu {spec.Code} đã bị đổi " +
+                    $"{string.Join(", ", ChangedSettings(product, spec))}. Hãy xóa các chi nhánh demo rồi tạo lại.");
+            product.PricingMode = PricingMode.PerUnit;
+            product.TrackInventory = spec.TrackInventory;
+            product.PriceIncludesVat = false;
+        }
+    }
+
+    /// The settings of a reused product that differ from the spec, as the user calls them.
+    private static List<string> ChangedSettings(Product product, SampleProductSpec spec)
+    {
+        var changed = new List<string>();
+        if (product.PricingMode != PricingMode.PerUnit)
+            changed.Add("cách tính giá");
+        if (product.TrackInventory != spec.TrackInventory)
+            changed.Add("theo dõi tồn kho");
+        if (product.PriceIncludesVat)
+            changed.Add("giá gồm VAT");
+        return changed;
     }
 
     private static async Task<Dictionary<string, Guid>> WritePartnersAsync(IAppDbContext db,

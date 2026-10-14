@@ -13,6 +13,7 @@ using OrderMgmt.Application.CashDebt.OpeningDebts.Models;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
 using OrderMgmt.Application.Inventory.OpeningStocks.Models;
 using OrderMgmt.Application.Inventory.Warehouses.Interfaces;
@@ -267,7 +268,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
 
         await RunItemAsync(run, "CATALOG", requester, async (sp, c) =>
         {
-            var catalog = await SampleCatalogWriter.WriteAsync(sp.GetRequiredService<IAppDbContext>(), plan, c);
+            var catalog = await sp.GetRequiredService<ITransactionRunner>().RunAsync(tc => SampleCatalogWriter.WriteAsync(
+                sp.GetRequiredService<IAppDbContext>(), sp.GetRequiredService<IInventoryLock>(), plan, tc), c);
             foreach (var (code, id) in catalog.Products)
                 run.Products[code] = id;
             foreach (var (code, id) in catalog.Partners)

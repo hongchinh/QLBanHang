@@ -194,6 +194,49 @@ public class SampleDataRunnerSetupTests : CashDebtTestBase
         (dual.IsCustomer, dual.IsSupplier).Should().Be((true, true));
     }
 
+    /// The plan's quantities and totals assume the spec's pricing and stock settings. DM-SP30 has no stock postings,
+    /// so the product service would let them change: they go back to the spec.
+    [Fact]
+    public async Task Reused_product_without_stock_postings_gets_its_sample_settings_back()
+    {
+        (await RunPlanAsync(await CreateBranchAsync("RS12"), TinyPlans.Setup(TinyPlans.OpeningDate))).Succeeded.Should().BeTrue();
+        await InDbAsync(async db =>
+        {
+            var product = await db.Products.SingleAsync(p => p.Code == "DM-SP30");
+            product.PricingMode = PricingMode.PerSquareMeter;
+            product.TrackInventory = true;
+            product.PriceIncludesVat = true;
+            await db.SaveChangesAsync();
+        });
+
+        var result = await RunPlanAsync(await CreateBranchAsync("RS13"), TinyPlans.Setup(TinyPlans.OpeningDate));
+
+        result.Succeeded.Should().BeTrue(result.Error);
+        var restored = await InDbAsync(db => db.Products.AsNoTracking().SingleAsync(p => p.Code == "DM-SP30"));
+        (restored.PricingMode, restored.TrackInventory, restored.PriceIncludesVat)
+            .Should().Be((PricingMode.PerUnit, false, false));
+    }
+
+    /// DM-SP01 has stock postings (its opening stock), so the product service locks these settings: a changed one
+    /// fails the job instead of a plan built on other settings.
+    [Fact]
+    public async Task Reused_product_with_stock_postings_and_changed_settings_fails_the_job()
+    {
+        (await RunPlanAsync(await CreateBranchAsync("RS14"), TinyPlans.Setup(TinyPlans.OpeningDate))).Succeeded.Should().BeTrue();
+        await InDbAsync(db => db.Products.Where(p => p.Code == "DM-SP01")
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.TrackInventory, false)));
+        var branchId = await CreateBranchAsync("RS15");
+
+        var result = await RunPlanAsync(branchId, TinyPlans.Setup(TinyPlans.OpeningDate));
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Should().Be(
+            "CATALOG: Hàng mẫu DM-SP01 đã bị đổi theo dõi tồn kho. Hãy xóa các chi nhánh demo rồi tạo lại.");
+        (await InDbAsync(db => db.Products.SingleAsync(p => p.Code == "DM-SP01"))).TrackInventory
+            .Should().BeFalse("a product with stock postings keeps its settings");
+        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.BranchId == branchId))).Should().BeFalse();
+    }
+
     [Fact]
     public async Task Branch_that_is_not_demo_is_refused()
     {

@@ -24,12 +24,22 @@ public sealed class SampleRandom
         return hash;
     }
 
-    /// Integer in [min, maxExclusive).
-    public int Next(int min, int maxExclusive) => _random.Next(min, maxExclusive);
+    /// Integer in [min, max], both ends inclusive.
+    public int Between(int min, int max) => _random.Next(min, max + 1);
 
-    /// Decimal in [min, max], rounded to whole units (VND amounts).
-    public decimal NextDecimal(decimal min, decimal max) =>
-        min + Math.Round((decimal)_random.NextDouble() * (max - min), MidpointRounding.AwayFromZero);
+    /// True with probability `percent`/100.
+    public bool Chance(int percent) => _random.Next(0, 100) < percent;
+
+    /// Uniform double in [0, 1), for factors such as 0.95 to 1.05.
+    public double NextDouble() => _random.NextDouble();
+
+    /// Uniform multiple of `step` offset from `min`, in [min, max].
+    public decimal NextAmount(decimal min, decimal max, decimal step)
+    {
+        if (step <= 0) throw new ArgumentOutOfRangeException(nameof(step), "Step must be positive.");
+        if (max < min) throw new ArgumentOutOfRangeException(nameof(max), "Max must not be below min.");
+        return min + step * Between(0, (int)((max - min) / step));
+    }
 
     public T Pick<T>(IReadOnlyList<T> items) => items[_random.Next(0, items.Count)];
 }

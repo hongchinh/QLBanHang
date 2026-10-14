@@ -22,7 +22,7 @@ public static class SampleCalendar
         return days;
     }
 
-    /// UTC instant of `minutesFromMidnight` Vietnam time on `date`.
+    /// UTC instant of `minutesFromMidnight` (minutes after VN midnight, 0-1439) on `date`.
     public static DateTimeOffset At(DateOnly date, int minutesFromMidnight) =>
         VnTime.StartOfDay(date).AddMinutes(minutesFromMidnight);
 }

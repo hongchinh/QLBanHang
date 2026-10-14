@@ -1,6 +1,6 @@
 # Phase 02 — Cash and debt metrics
 
-**Status:** [ ] pending
+**Status:** [x] complete (2026-10-14, commits 4f4b9fe..32d4cdc; review fixes 7136c29, 98d3c3d; spec review compliant)
 **Complexity:** L
 
 ## Objective

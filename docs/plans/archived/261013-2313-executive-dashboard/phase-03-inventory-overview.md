@@ -1,6 +1,6 @@
 # Phase 03 — Inventory metrics, branch comparison, attention, recent documents
 
-**Status:** [ ] pending
+**Status:** [x] complete (2026-10-14, commits 78282f0..1b02581; review fixes e47dd08; spec review compliant)
 **Complexity:** L
 
 ## Objective

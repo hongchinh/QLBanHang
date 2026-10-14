@@ -1,6 +1,6 @@
 # Executive dashboard — shared dashboard base + director view (Bảng điều hành)
 
-> Created: 2026-10-13 23:13:01 · Source design: [brainstorm SUMMARY](../../brainstorms/261013-2247-executive-dashboard/SUMMARY.md), mockups [layout options](../../brainstorms/261013-2247-executive-dashboard/mockup-01-layout-options.html) and [overview tab](../../brainstorms/261013-2247-executive-dashboard/mockup-02-overview-tab.html)
+> Created: 2026-10-13 23:13:01 · Source design: [brainstorm SUMMARY](../../../brainstorms/261013-2247-executive-dashboard/SUMMARY.md), mockups [layout options](../../../brainstorms/261013-2247-executive-dashboard/mockup-01-layout-options.html) and [overview tab](../../../brainstorms/261013-2247-executive-dashboard/mockup-02-overview-tab.html)
 
 ## Goal
 
@@ -94,15 +94,17 @@ Give directors and managers one page, `/dashboard/executive`, that shows sales (
 
 ## Phases
 
+All phases are complete (2026-10-14). Amendments decided during execution — three parallel tracks, contract changes, Phase 03 list rules, final-review fixes — are listed under "Deviations from the plan" in [EXECUTION-REPORT.md](EXECUTION-REPORT.md).
+
 - [x] Phase 00 — Workspace, docs commit and failure baseline (S) — `phase-00-baseline.md`
 - [x] Phase 01 — Backend foundation and sales metrics (L) — `phase-01-foundation-sales.md`
-- [ ] Phase 02 — Cash and debt metrics (L) — `phase-02-cash-debt.md`
-- [ ] Phase 03 — Inventory metrics, branch comparison, attention, recent documents (L) — `phase-03-inventory-overview.md`
-- [ ] Phase 04 — Real-time signal (M) — `phase-04-realtime-signal.md`
-- [ ] Phase 05 — Frontend foundation: route, presets, data layer, live refresh, tile kit (L) — `phase-05-frontend-foundation.md`
-- [ ] Phase 06 — Frontend page shell and the Tổng quan tab (L) — `phase-06-overview-tab.md`
-- [ ] Phase 07 — Frontend deep-dive tabs (M) — `phase-07-deep-dive-tabs.md`
-- [ ] Phase 08 — Docs, final verification, execution report (M) — `phase-08-docs-and-verification.md`
+- [x] Phase 02 — Cash and debt metrics (L) — `phase-02-cash-debt.md`
+- [x] Phase 03 — Inventory metrics, branch comparison, attention, recent documents (L) — `phase-03-inventory-overview.md`
+- [x] Phase 04 — Real-time signal (M) — `phase-04-realtime-signal.md`
+- [x] Phase 05 — Frontend foundation: route, presets, data layer, live refresh, tile kit (L) — `phase-05-frontend-foundation.md`
+- [x] Phase 06 — Frontend page shell and the Tổng quan tab (L) — `phase-06-overview-tab.md`
+- [x] Phase 07 — Frontend deep-dive tabs (M) — `phase-07-deep-dive-tabs.md`
+- [x] Phase 08 — Docs, final verification, execution report (M) — `phase-08-docs-and-verification.md`
 
 Phases run in order. Phase 01 freezes the query classes, the scope resolver, the period and the controller shape; Phases 02 and 03 add services and routes to them. Phase 05 freezes the frontend data layer and the tile kit; Phases 06 and 07 only compose them.
 

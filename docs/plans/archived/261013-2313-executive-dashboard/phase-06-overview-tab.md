@@ -1,11 +1,11 @@
 # Phase 06 — Frontend page shell and the Tổng quan tab
 
-**Status:** [ ] pending
+**Status:** [x] complete (2026-10-14, commits 43f2ca1..dc31b88; review fixes e4764c7, 2039f15)
 **Complexity:** L
 
 ## Objective
 
-Replace the placeholder page with the real one: header (title, live status, comparison period, branch scope, period), tab bar, and the Tổng quan tab of the approved mockup ([mockup-02-overview-tab.html](../../brainstorms/261013-2247-executive-dashboard/mockup-02-overview-tab.html)): seven KPI tiles, the revenue–cost–gross profit chart, cash flow with fund balances, the receivable term structure, the branch comparison, top customers, "Cần chú ý" and "Vừa phát sinh".
+Replace the placeholder page with the real one: header (title, live status, comparison period, branch scope, period), tab bar, and the Tổng quan tab of the approved mockup ([mockup-02-overview-tab.html](../../../brainstorms/261013-2247-executive-dashboard/mockup-02-overview-tab.html)): seven KPI tiles, the revenue–cost–gross profit chart, cash flow with fund balances, the receivable term structure, the branch comparison, top customers, "Cần chú ý" and "Vừa phát sinh".
 
 ## Files
 

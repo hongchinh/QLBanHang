@@ -1,6 +1,6 @@
 # Phase 04 — Real-time signal
 
-**Status:** [ ] pending
+**Status:** [x] complete (2026-10-14, commits 014adad..738b033 on the real-time track; Task 4.5 run after the merge of the tracks; final review fix 417c7c7)
 **Complexity:** M
 
 ## Objective

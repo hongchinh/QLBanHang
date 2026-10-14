@@ -1,6 +1,6 @@
 # Phase 05 — Frontend foundation: route, presets, data layer, live refresh, tile kit
 
-**Status:** [ ] pending
+**Status:** [x] complete (2026-10-14, commits a636ad6..edba184; review fixes 781590b)
 **Complexity:** L
 
 ## Objective

@@ -1,6 +1,6 @@
 # Phase 07 — Frontend deep-dive tabs
 
-**Status:** [ ] pending
+**Status:** [x] complete (2026-10-14, commits 2e56464..2f7d710; reviewed by the final review workflow, fixes f82b2b0..69ae297)
 **Complexity:** M
 
 ## Objective

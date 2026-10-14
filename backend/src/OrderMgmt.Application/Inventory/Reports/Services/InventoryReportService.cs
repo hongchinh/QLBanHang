@@ -94,7 +94,7 @@ public class InventoryReportService : IInventoryReportService
             var info = productInfo[product.Key];
             var ordered = product.OrderBy(p => warehouses[p.WarehouseId].Code, StringComparer.Ordinal).ToList();
             var values = branchScope
-                ? SplitByQuantity(ordered.Sum(p => p.Value), ordered.Select(p => p.Qty).ToList())
+                ? StockValueSplit.ByQuantity(ordered.Sum(p => p.Value), ordered.Select(p => p.Qty).ToList())
                 : ordered.Select(p => p.Value).ToList();
             if (branchScope && request.WarehouseId is null)
                 totalValue += ordered.Sum(p => p.Value);
@@ -247,27 +247,9 @@ public class InventoryReportService : IInventoryReportService
         };
     }
 
-    /// Branch scope (D32): each warehouse gets R0(scopeValue × qty / scopeQty); the rounding residual goes to the last
-    /// warehouse (by code) holding stock. A zero scope quantity gives every warehouse 0.
-    private static List<decimal> SplitByQuantity(decimal scopeValue, IReadOnlyList<decimal> quantities)
-    {
-        var scopeQty = quantities.Sum();
-        if (scopeQty == 0m)
-            return quantities.Select(_ => 0m).ToList();
-
-        var values = quantities.Select(q => R0(scopeValue * q / scopeQty)).ToList();
-        var last = quantities.Count - 1;
-        while (quantities[last] == 0m)
-            last--;
-        values[last] += scopeValue - values.Sum();
-        return values;
-    }
-
     /// The costing period containing `date` has not ended yet (VN today).
     private bool IsProvisional(DateOnly date, CostingPeriod period) =>
         CostProvisional.IsProvisional(date, period, VnTime.ToVnDate(_clock.UtcNow));
-
-    private static decimal R0(decimal x) => Math.Round(x, 0, MidpointRounding.AwayFromZero);
 
     private static decimal R4(decimal x) => Math.Round(x, 4, MidpointRounding.AwayFromZero);
 

@@ -102,6 +102,7 @@ export function CashTab({ params }: CashTabProps) {
         <CashFlowChart
           points={points}
           granularity={granularity}
+          labelGranularity={series.data?.granularity}
           onGranularityChange={setGranularity}
           dayDisabled={!isDayGranularityAllowed(from, to)}
           height={280}

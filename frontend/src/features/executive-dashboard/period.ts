@@ -73,3 +73,14 @@ export function bucketLabel(date: string, granularity: SeriesGranularity): strin
   const [year, month, day] = date.slice(0, 10).split('-');
   return granularity === 'Month' ? `${month}/${year}` : `${day}/${month}`;
 }
+
+const GRANULARITY_UNIT: Record<SeriesGranularity, string> = { Day: 'ngày', Week: 'tuần', Month: 'tháng' };
+
+// "theo ngày, 01/10 – 13/10": the kind of bucket and the first and last bucket, for the text of a chart.
+export function seriesSpan(dates: string[], granularity: SeriesGranularity): string {
+  const unit = `theo ${GRANULARITY_UNIT[granularity]}`;
+  if (dates.length === 0) return unit;
+  const first = bucketLabel(dates[0], granularity);
+  const last = bucketLabel(dates[dates.length - 1], granularity);
+  return `${unit}, ${first === last ? first : `${first} – ${last}`}`;
+}

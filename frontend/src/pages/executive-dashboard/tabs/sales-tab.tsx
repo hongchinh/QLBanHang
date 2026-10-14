@@ -54,9 +54,9 @@ export function SalesTab({ params }: SalesTabProps) {
   const companyView = scope.canSwitch && scope.mode === 'company';
 
   const summary = useSalesSummary(params);
-  const canViewCost = summary.data?.canViewCost === true;
-  // Without the cost there is no gross profit to sort by.
-  const sort: SalesTopSort = canViewCost ? sortChoice : 'Revenue';
+  // Without the cost there is no gross profit to sort by. While the summary has no data the choice stands: it
+  // can only be "Lãi gộp" when the toggle was shown, that is when the cost was.
+  const sort: SalesTopSort = summary.data?.canViewCost === false ? 'Revenue' : sortChoice;
 
   const series = useSalesSeries({ ...params, granularity });
   const customers = useSalesTop({ ...params, by: 'Customer', sort, limit: 10 });
@@ -65,6 +65,12 @@ export function SalesTab({ params }: SalesTabProps) {
   const branches = useBranchComparison({ from, to }, { enabled: companyView });
 
   const points = series.data?.points ?? NO_POINTS;
+  // The summary decides. While it has no data (slow, or failed: no tile of this tab shows its error), the series
+  // and the lists stand in, since the server sends their cost only to a user who may see it.
+  const canViewCost =
+    summary.data?.canViewCost ??
+    (points.some((p) => p.cost !== null) ||
+      [customers, products, employees].some((list) => list.data?.some((row) => row.grossProfit !== null) === true));
   const partnerName = (row: SalesTopRow) => codeName(row.code, row.name);
 
   return (
@@ -74,6 +80,7 @@ export function SalesTab({ params }: SalesTabProps) {
           points={points}
           canViewCost={canViewCost}
           granularity={granularity}
+          labelGranularity={series.data?.granularity}
           onGranularityChange={setGranularity}
           dayDisabled={!isDayGranularityAllowed(from, to)}
           height={320}

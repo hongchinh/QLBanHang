@@ -56,6 +56,8 @@ const branchScope = (): Scope => ({
   branches: [B1, B2],
   selectCompany: vi.fn(),
   selectBranch: vi.fn(),
+  unknown: false,
+  retry: vi.fn(),
 });
 // Every panel is registered; this access keeps the bar at the overview alone.
 const overviewOnly = (): Access => ({ sales: true, cash: true, debt: true, inventory: true, tabs: ['overview'] });
@@ -331,6 +333,24 @@ describe('ExecutiveDashboardPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
       expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('from')).toBe('2026-10-01');
     });
+  });
+
+  // /me/branches failed for a user of every branch: without a branch id the server would answer for the whole
+  // company under a page that names no scope. The page says so and offers a retry instead of the tabs.
+  it('an unknown scope shows an error with a retry instead of the tabs', () => {
+    const retry = vi.fn();
+    state.scope = {
+      ...branchScope(), canSwitch: false, branchId: undefined, workingBranch: undefined, branches: [], unknown: true, retry,
+    };
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Điều hành' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Không tải được danh sách chi nhánh');
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(overviewTab).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   it('a user who cannot switch gets no scope select', () => {

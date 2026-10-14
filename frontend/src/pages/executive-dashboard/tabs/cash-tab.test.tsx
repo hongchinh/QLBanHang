@@ -25,7 +25,7 @@ const B2: Branch = { id: 'b2', code: 'CN02', name: 'Hưng Yên' };
 const B3: Branch = { id: 'b3', code: 'CN03', name: 'Đà Nẵng' };
 const companyScope = (): Scope => ({
   canSwitch: true, mode: 'company', branchId: undefined, workingBranch: B1, branches: [B1, B2, B3],
-  selectCompany: vi.fn(), selectBranch: vi.fn(),
+  selectCompany: vi.fn(), selectBranch: vi.fn(), unknown: false, retry: vi.fn(),
 });
 const branchScope = (): Scope => ({ ...companyScope(), mode: 'branch', branchId: 'b1' });
 const state: { scope: Scope } = { scope: companyScope() };
@@ -104,6 +104,8 @@ function renderTab(params: ExecutiveParams = MONTH) {
 }
 
 const tile = (title: string) => screen.getByRole('region', { name: title });
+const xTicks = (element: HTMLElement) =>
+  Array.from(element.querySelectorAll('.recharts-xAxis .recharts-cartesian-axis-tick-value')).map((t) => t.textContent);
 const headers = (title: string) => within(tile(title)).getAllByRole('columnheader').map((h) => h.textContent);
 const bodyRows = (title: string) => within(within(tile(title)).getAllByRole('rowgroup')[1]).getAllByRole('row');
 const cells = (row: HTMLElement) => within(row).getAllByRole('cell').map((c) => c.textContent);
@@ -324,6 +326,19 @@ describe('CashTab', () => {
 
       rerender({ from: '2026-08-01', to: '2026-10-13' });
       expect(granularities().at(-1)).toEqual(['2026-08-01', 'Week']);
+    });
+
+    // keepPreviousData keeps the daily points on screen while the monthly ones load.
+    it('labels the points on screen by their own granularity while another one loads', () => {
+      renderTab();
+      const chart = tile('Dòng tiền thu – chi');
+
+      fireEvent.click(within(chart).getByRole('button', { name: 'Tháng' }));
+
+      expect(useCashSeries).toHaveBeenLastCalledWith({ ...MONTH, granularity: 'Month' });
+      // The mock still answers the daily series, as the placeholder data would.
+      expect(xTicks(chart)).toEqual(['01/10', '02/10']);
+      expect(within(chart).getByRole('button', { name: 'Tháng' })).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('"Ngày" is disabled for a period longer than 366 days', () => {

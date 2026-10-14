@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { EXECUTIVE_PRESETS } from '@/features/executive-dashboard/presets';
 import { RangePicker } from './range-picker';
 
@@ -127,5 +127,54 @@ describe('RangePicker', () => {
     expect(activeLabels()).toEqual(['Tuỳ chỉnh ▾']);
     rerender(<RangePicker from="2026-01-01" to="2026-10-13" onChange={vi.fn()} presets={EXECUTIVE_PRESETS} />);
     expect(activeLabels()).toEqual(['Năm nay']);
+  });
+
+  describe('accessibility', () => {
+    const custom = () => screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' });
+
+    it('the chips are a group "Kỳ báo cáo" and say which one is selected, not by colour only', () => {
+      const { rerender } = render(
+        <RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} presets={EXECUTIVE_PRESETS} />,
+      );
+
+      const group = screen.getByRole('group', { name: 'Kỳ báo cáo' });
+      expect(within(group).getByRole('button', { name: 'Tháng này' })).toHaveAttribute('aria-pressed', 'true');
+      for (const name of ['Hôm nay', 'Tuần này', 'Năm nay', 'Tuỳ chỉnh ▾']) {
+        expect(within(group).getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
+      }
+
+      rerender(<RangePicker from="2026-10-02" to="2026-10-13" onChange={vi.fn()} presets={EXECUTIVE_PRESETS} />);
+      expect(custom()).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Tháng này' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    it('"Tuỳ chỉnh" says whether its dates are open, moves the focus to "Từ ngày" and closes on Escape', () => {
+      render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} />);
+      expect(custom()).toHaveAttribute('aria-expanded', 'false');
+
+      fireEvent.click(custom());
+
+      expect(custom()).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByLabelText('Từ ngày')).toHaveFocus();
+
+      fireEvent.keyDown(screen.getByLabelText('Từ ngày'), { key: 'Escape' });
+
+      expect(custom()).toHaveAttribute('aria-expanded', 'false');
+      expect(screen.queryByLabelText('Từ ngày')).not.toBeInTheDocument();
+    });
+
+    // At 375 px "Tuỳ chỉnh" wraps to the start of a line: a popover aligned on its right edge went off the left
+    // of the screen. The popover now moves itself back on screen (collision handling) and is never wider than it.
+    it('opens the dates in a popover that keeps itself on screen', () => {
+      render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} />);
+
+      fireEvent.click(custom());
+
+      const popover = screen.getByRole('dialog');
+      expect(popover).toContainElement(screen.getByLabelText('Từ ngày'));
+      expect(popover).toHaveAttribute('data-align', 'end');
+      expect(popover).toHaveClass('max-w-[calc(100vw-2rem)]');
+      expect(custom()).toHaveAttribute('aria-controls', popover.id);
+    });
   });
 });

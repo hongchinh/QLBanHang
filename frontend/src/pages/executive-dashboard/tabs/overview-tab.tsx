@@ -69,9 +69,10 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
   const noCashMovement = isCashSeriesEmpty(cashPoints);
   // Without fund balances to show (a refetch that fails keeps the last ones).
   const fundsFailed = cashSummary.isError && cashSummary.data === undefined;
-  // The cash tile shows both queries: it is dimmed while either shows the data of the previous key.
+  // The cash tile shows both queries: it loads until both have answered (no empty text before the funds
+  // arrive), and it is dimmed while either shows the data of the previous key.
   const cashQuery: TileQuery = {
-    isLoading: cashSeries.isLoading,
+    isLoading: cashSeries.isLoading || cashSummary.isLoading,
     isError: cashSeries.isError,
     error: cashSeries.error,
     data: cashSeries.data,
@@ -99,6 +100,7 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
                 points={salesPoints}
                 canViewCost={salesPoints.some((p) => p.cost !== null)}
                 granularity={granularity}
+                labelGranularity={salesSeries.data?.granularity}
                 onGranularityChange={setGranularity}
                 dayDisabled={dayDisabled}
               />
@@ -113,12 +115,14 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
               action={{ label: 'Sổ quỹ →', to: executiveLinks.cashBook(), title: linkTitle }}
             >
               <div className="space-y-3">
+                {/* Above the fund table "Chưa có dữ liệu." would read as "no data" right above data. */}
                 {noCashMovement ? (
-                  <p className="text-sm text-muted-foreground">Chưa có dữ liệu.</p>
+                  <p className="text-sm text-muted-foreground">Không có thu chi trong kỳ.</p>
                 ) : (
                   <CashFlowChart
                     points={cashPoints}
                     granularity={granularity}
+                    labelGranularity={cashSeries.data?.granularity}
                     onGranularityChange={profitChartDrawn ? undefined : setGranularity}
                     dayDisabled={dayDisabled}
                   />

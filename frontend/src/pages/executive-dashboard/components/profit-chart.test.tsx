@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { formatVnd } from '@/features/dashboard/format';
 import type { SalesPoint } from '@/features/executive-dashboard/types';
 import { ProfitChart } from './profit-chart';
 
@@ -52,6 +53,51 @@ describe('ProfitChart', () => {
       <ProfitChart points={[{ ...POINTS[0], date: '2026-09-01' }, { ...POINTS[1], date: '2026-10-01' }]} canViewCost granularity="Month" />,
     );
     expect(xTicks(month.container)).toEqual(['09/2026', '10/2026']);
+  });
+
+  // While another granularity loads, the points kept on screen (keepPreviousData) keep their own labels.
+  it('labels the axis by the granularity of the points, while the toggle shows the chosen one', () => {
+    const { container } = render(
+      <ProfitChart points={POINTS} canViewCost granularity="Month" labelGranularity="Day" onGranularityChange={vi.fn()} />,
+    );
+
+    expect(xTicks(container)).toEqual(['01/10', '02/10']);
+    expect(screen.getByRole('button', { name: 'Tháng' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('labels by the chosen granularity when the points carry none', () => {
+    const { container } = render(
+      <ProfitChart points={[{ ...POINTS[0], date: '2026-09-01' }]} canViewCost granularity="Month" />,
+    );
+
+    expect(xTicks(container)).toEqual(['09/2026']);
+  });
+
+  describe('text alternative', () => {
+    it('names what it draws, the buckets and the totals', () => {
+      render(<ProfitChart points={POINTS} canViewCost granularity="Day" />);
+
+      const chart = screen.getByRole('img', {
+        name: `Doanh thu, giá vốn và lãi gộp theo ngày, 01/10 – 02/10: doanh thu ${formatVnd(210_000_000)}, giá vốn ${formatVnd(180_000_000)}, lãi gộp ${formatVnd(30_000_000)}.`,
+      });
+      expect(chart.querySelector('svg.recharts-surface')).not.toBeNull();
+      // The toggle stays outside, reachable.
+      expect(chart.querySelector('button')).toBeNull();
+    });
+
+    it('names the revenue only without the cost right', () => {
+      render(<ProfitChart points={WITHOUT_COST} canViewCost={false} granularity="Week" labelGranularity="Day" />);
+
+      expect(
+        screen.getByRole('img', { name: `Doanh thu theo ngày, 01/10 – 02/10: doanh thu ${formatVnd(210_000_000)}.` }),
+      ).toBeInTheDocument();
+    });
+
+    it('of one month bucket', () => {
+      render(<ProfitChart points={[{ ...POINTS[0], date: '2026-10-01' }]} canViewCost granularity="Month" />);
+
+      expect(screen.getByRole('img').getAttribute('aria-label')).toMatch(/^Doanh thu, giá vốn và lãi gộp theo tháng, 10\/2026: /);
+    });
   });
 
   it('prints the Y axis in compact money', () => {

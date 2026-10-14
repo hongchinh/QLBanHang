@@ -29,7 +29,7 @@ const B2: Branch = { id: 'b2', code: 'CN02', name: 'Hưng Yên' };
 const selectBranch = vi.fn();
 const companyScope = (): Scope => ({
   canSwitch: true, mode: 'company', branchId: undefined, workingBranch: B1, branches: [B1, B2],
-  selectCompany: vi.fn(), selectBranch,
+  selectCompany: vi.fn(), selectBranch, unknown: false, retry: vi.fn(),
 });
 const branchScope = (): Scope => ({ ...companyScope(), mode: 'branch', branchId: 'b1' });
 const state: { scope: Scope } = { scope: companyScope() };
@@ -111,6 +111,8 @@ function renderTab(params: ExecutiveParams = MONTH) {
 }
 
 const tile = (title: string) => screen.getByRole('region', { name: title });
+const xTicks = (element: HTMLElement) =>
+  Array.from(element.querySelectorAll('.recharts-xAxis .recharts-cartesian-axis-tick-value')).map((t) => t.textContent);
 const headers = (title: string) => within(tile(title)).getAllByRole('columnheader').map((h) => h.textContent);
 const TITLES = ['Doanh thu – giá vốn – lãi gộp', 'Top khách hàng', 'Top hàng hoá', 'Theo nhân viên lập phiếu', 'So sánh chi nhánh'];
 const LISTS = ['Top khách hàng', 'Top hàng hoá', 'Theo nhân viên lập phiếu'];
@@ -244,12 +246,56 @@ describe('SalesTab', () => {
     for (const by of ['Customer', 'Product', 'Employee'] as const) expect(lastTopCall(by)?.sort).toBe('Revenue');
   });
 
-  it('while the summary loads the lists are by revenue without the gross profit', () => {
-    answer(useSalesSummary, ok(undefined, { isLoading: true }));
-    renderTab();
+  // The summary decides the cost right. While it has no data (slow, or failed with its error shown nowhere on
+  // this tab), the series and the lists stand in: the server sends their cost only to a user who may see it.
+  describe('while the summary has no data', () => {
+    const NO_COST_POINTS = SERIES.points.map((p) => ({ ...p, cost: null, grossProfit: null }));
+    const legend = () =>
+      Array.from(tile('Doanh thu – giá vốn – lãi gộp').querySelectorAll('.recharts-legend-item-text')).map((e) => e.textContent);
 
-    expect(screen.queryByRole('group', { name: 'Xếp hạng theo' })).not.toBeInTheDocument();
-    expect(headers('Top khách hàng')).toEqual(['Khách hàng', 'Doanh thu']);
+    it.each([
+      ['loads', ok(undefined, { isLoading: true })],
+      ['failed', failed()],
+    ])('and %s, the gross profit the series and the lists carry is shown', (_case, summary) => {
+      answer(useSalesSummary, summary);
+      renderTab();
+
+      expect(headers('Top khách hàng')).toEqual(['Khách hàng', 'Doanh thu', 'Lãi gộp']);
+      expect(screen.getByRole('group', { name: 'Xếp hạng theo' })).toBeInTheDocument();
+      expect(legend()).toEqual(['Doanh thu', 'Giá vốn', 'Lãi gộp']);
+    });
+
+    it('the series that carries the cost is enough', () => {
+      answer(useSalesSummary, failed());
+      tops.Customer = ok(CUSTOMERS.map((row) => ({ ...row, grossProfit: null })));
+      tops.Product = ok(PRODUCTS.map((row) => ({ ...row, grossProfit: null })));
+      renderTab();
+
+      expect(legend()).toEqual(['Doanh thu', 'Giá vốn', 'Lãi gộp']);
+      expect(headers('Top khách hàng')).toEqual(['Khách hàng', 'Doanh thu', 'Lãi gộp']);
+    });
+
+    it('a list that carries the gross profit is enough', () => {
+      answer(useSalesSummary, failed());
+      answer(useSalesSeries, ok({ ...SERIES, points: NO_COST_POINTS }));
+      tops.Customer = ok(CUSTOMERS.map((row) => ({ ...row, grossProfit: null })));
+      renderTab();
+
+      expect(headers('Top hàng hoá')).toEqual(['Hàng hoá', 'Doanh thu', 'Lãi gộp']);
+    });
+
+    it('without any cost in the series and the lists the lists are by revenue without the gross profit', () => {
+      answer(useSalesSummary, failed());
+      answer(useSalesSeries, ok({ ...SERIES, points: NO_COST_POINTS }));
+      tops.Customer = ok(CUSTOMERS.map((row) => ({ ...row, grossProfit: null })));
+      tops.Product = ok(PRODUCTS.map((row) => ({ ...row, grossProfit: null })));
+      renderTab();
+
+      expect(screen.queryByRole('group', { name: 'Xếp hạng theo' })).not.toBeInTheDocument();
+      expect(headers('Top khách hàng')).toEqual(['Khách hàng', 'Doanh thu']);
+      expect(legend()).toEqual(['Doanh thu']);
+      for (const by of ['Customer', 'Product', 'Employee'] as const) expect(lastTopCall(by)?.sort).toBe('Revenue');
+    });
   });
 
   it('an empty list shows "Chưa có dữ liệu."', () => {
@@ -325,6 +371,19 @@ describe('SalesTab', () => {
 
       expect(granularities().at(-1)).toEqual(['2026-01-01', 'Month']);
       for (const [from, granularity] of granularities()) if (from === '2026-01-01') expect(granularity).toBe('Month');
+    });
+
+    // keepPreviousData keeps the daily points on screen while the monthly ones load.
+    it('labels the points on screen by their own granularity while another one loads', () => {
+      renderTab();
+      const chart = tile('Doanh thu – giá vốn – lãi gộp');
+
+      fireEvent.click(within(chart).getByRole('button', { name: 'Tháng' }));
+
+      expect(granularities().at(-1)).toEqual(['2026-10-01', 'Month']);
+      // The mock still answers the daily series, as the placeholder data would.
+      expect(xTicks(chart)).toEqual(['01/10', '02/10']);
+      expect(within(chart).getByRole('button', { name: 'Tháng' })).toHaveAttribute('aria-pressed', 'true');
     });
 
     it('"Ngày" is disabled for a period longer than 366 days', () => {

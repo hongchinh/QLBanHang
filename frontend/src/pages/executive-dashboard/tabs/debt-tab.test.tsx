@@ -20,7 +20,7 @@ const B2: Branch = { id: 'b2', code: 'CN02', name: 'Hưng Yên' };
 const B3: Branch = { id: 'b3', code: 'CN03', name: 'Đà Nẵng' };
 const companyScope = (): Scope => ({
   canSwitch: true, mode: 'company', branchId: undefined, workingBranch: B1, branches: [B1, B2, B3],
-  selectCompany: vi.fn(), selectBranch: vi.fn(),
+  selectCompany: vi.fn(), selectBranch: vi.fn(), unknown: false, retry: vi.fn(),
 });
 const branchScope = (): Scope => ({ ...companyScope(), mode: 'branch', branchId: 'b1' });
 const state: { scope: Scope } = { scope: companyScope() };
@@ -230,12 +230,13 @@ describe('DebtTab', () => {
       expect(within(tile('Khách vượt hạn mức')).queryByRole('columnheader', { name: 'Chi nhánh' })).not.toBeInTheDocument();
     });
 
-    it('"Hạn mức nợ →" opens the credit limits, which are no report and carry no hint', () => {
+    // The credit limits page shows the limits of the working branch only, while the list covers the scope.
+    it('"Hạn mức nợ →" opens the credit limits with the hint of the working branch', () => {
       renderTab();
 
       const link = within(tile('Khách vượt hạn mức')).getByRole('link', { name: 'Hạn mức nợ →' });
       expect(link).toHaveAttribute('href', '/credit-limits');
-      expect(link).not.toHaveAttribute('title');
+      expect(link).toHaveAttribute('title', HINT);
     });
   });
 
@@ -305,6 +306,7 @@ describe('DebtTab', () => {
 
     expect(within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Tuổi nợ →' })).not.toHaveAttribute('title');
     expect(within(tile('Khách nợ nhiều nhất')).getByRole('link', { name: 'KH001 – CT Xây dựng An Phát' })).not.toHaveAttribute('title');
+    expect(within(tile('Khách vượt hạn mức')).getByRole('link', { name: 'Hạn mức nợ →' })).not.toHaveAttribute('title');
   });
 
   it('empty lists show "Chưa có dữ liệu."', () => {

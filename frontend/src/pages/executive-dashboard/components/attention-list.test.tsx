@@ -141,12 +141,13 @@ describe('AttentionList', () => {
     }
   });
 
-  it('the credit limit row is not a report and carries no hint', () => {
+  // The credit limits page shows the limits of the working branch only, while the count covers the scope.
+  it('the credit limit row carries the hint of the working branch too', () => {
     renderList(FULL, 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
 
     const link = rowOf('Khách vượt hạn mức nợ').querySelector('a');
     expect(link).toHaveAttribute('href', '/credit-limits');
-    expect(link).not.toHaveAttribute('title');
+    expect(link).toHaveAttribute('title', 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
   });
 
   it('the report links have no title without a hint', () => {

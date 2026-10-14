@@ -32,7 +32,9 @@ function marginHint(sales: SalesSummary): string {
   // floating-point difference of 14,56 and 13,71 is 0,8499…, which would round to 0,8 instead of 0,9.
   const hundredths = Math.round(sales.marginPct * 100) - Math.round(sales.prevMarginPct * 100);
   const change = (Math.sign(hundredths) * Math.round(Math.abs(hundredths) / 10)) / 10;
-  return `${margin} (${change >= 0 ? '▲' : '▼'} ${formatNumber(Math.abs(change))} điểm)`;
+  // A change that rounds to 0 has no arrow: "▲ 0" would show a fall of 0,04 points as a rise.
+  if (change === 0) return `${margin} (±0 điểm)`;
+  return `${margin} (${change > 0 ? '▲' : '▼'} ${formatNumber(Math.abs(change))} điểm)`;
 }
 
 // The KPI tiles of the Tổng quan tab: "Trong kỳ" follows the period, "Hiện tại" is the balance of today.

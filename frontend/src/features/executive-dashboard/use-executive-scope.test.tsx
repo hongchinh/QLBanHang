@@ -2,13 +2,21 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter, useLocation } from 'react-router-dom';
 import type { Branch, MyBranches } from '@/features/branches/types';
+import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
 import { useExecutiveScope } from './use-executive-scope';
 
 const state: { myBranches: MyBranches | undefined } = { myBranches: undefined };
+const refetchBranches = vi.fn();
 vi.mock('@/features/branches/hooks', () => ({
-  useMyBranches: () => ({ data: state.myBranches }),
+  useMyBranches: () => ({ data: state.myBranches, refetch: refetchBranches }),
 }));
+
+function signIn(permissions: string[]) {
+  useAuthStore.setState({
+    user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions },
+  });
+}
 
 const switchWorkingBranch = vi.fn((branchId: string): Promise<void> => {
   void branchId;
@@ -183,6 +191,38 @@ describe('useExecutiveScope', () => {
       expect(switchWorkingBranch).toHaveBeenCalledTimes(1);
       expect(searchAtSwitch).toBe('?scope=branch');
     });
+  });
+
+  // /me/branches failed (the page renders anyway): without a branch id the server answers a user of every branch
+  // for the whole company, which the page could not label. The page asks to retry instead.
+  describe('when /me/branches has no data', () => {
+    beforeEach(() => {
+      state.myBranches = undefined;
+      refetchBranches.mockReset();
+    });
+    afterEach(() => useAuthStore.setState({ user: null }));
+
+    it('the scope of a user of every branch is unknown, and retry asks for the branches again', () => {
+      signIn(['dashboard.executive', 'branches.access_all']);
+      const { scope } = setup('/dashboard/executive?scope=branch');
+
+      expect(scope().unknown).toBe(true);
+      act(() => scope().retry());
+      expect(refetchBranches).toHaveBeenCalledTimes(1);
+    });
+
+    it('the scope of a user of one branch is known: the server applies the own branch', () => {
+      signIn(['dashboard.executive']);
+
+      expect(setup().scope().unknown).toBe(false);
+    });
+  });
+
+  it('the scope of a user of every branch is known once /me/branches has data', () => {
+    signIn(['dashboard.executive', 'branches.access_all']);
+
+    expect(setup().scope().unknown).toBe(false);
+    useAuthStore.setState({ user: null });
   });
 
   it('has no branch to switch to while /me/branches is loading', () => {

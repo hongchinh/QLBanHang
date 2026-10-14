@@ -1,4 +1,5 @@
 import type { ComponentType } from 'react';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LiveStatus } from '@/features/dashboard/components/live-status';
 import { RangePicker } from '@/features/dashboard/components/range-picker';
@@ -82,22 +83,32 @@ export function ExecutiveDashboardPage() {
         </div>
       </div>
 
-      {/* Only the active panel is mounted (TabsContent default), so the queries of the other tabs do not run. */}
-      <Tabs value={activeTab} onValueChange={(value) => setTab(value as ExecutiveTab)}>
-        {/* Five tabs are wider than a phone: the bar scrolls sideways, from its first tab. */}
-        <TabsList className="max-w-full justify-start overflow-x-auto">
-          {panels.map(({ key }) => (
-            <TabsTrigger key={key} value={key}>
-              {TAB_LABELS[key]}
-            </TabsTrigger>
+      {scope.unknown ? (
+        // Without the branches the scope cannot be named (useExecutiveScope), so no figure is asked for.
+        <div role="alert" className="rounded-xl border border-border bg-card p-4 text-sm text-rose-700 shadow-sm">
+          <p>Không tải được danh sách chi nhánh nên chưa xác định được phạm vi số liệu.</p>
+          <Button type="button" variant="outline" size="sm" className="mt-2 text-foreground" onClick={() => scope.retry()}>
+            Thử lại
+          </Button>
+        </div>
+      ) : (
+        // Only the active panel is mounted (TabsContent default), so the queries of the other tabs do not run.
+        <Tabs value={activeTab} onValueChange={(value) => setTab(value as ExecutiveTab)}>
+          {/* Five tabs are wider than a phone: the bar scrolls sideways, from its first tab. */}
+          <TabsList className="max-w-full justify-start overflow-x-auto">
+            {panels.map(({ key }) => (
+              <TabsTrigger key={key} value={key}>
+                {TAB_LABELS[key]}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          {panels.map(({ key, Panel }) => (
+            <TabsContent key={key} value={key} className="mt-4">
+              <Panel params={params} openTabs={openTabs} onOpenTab={setTab} />
+            </TabsContent>
           ))}
-        </TabsList>
-        {panels.map(({ key, Panel }) => (
-          <TabsContent key={key} value={key} className="mt-4">
-            <Panel params={params} openTabs={openTabs} onOpenTab={setTab} />
-          </TabsContent>
-        ))}
-      </Tabs>
+        </Tabs>
+      )}
     </div>
   );
 }

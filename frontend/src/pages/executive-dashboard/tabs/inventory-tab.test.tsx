@@ -19,7 +19,7 @@ const B2: Branch = { id: 'b2', code: 'CN02', name: 'Hưng Yên' };
 const B3: Branch = { id: 'b3', code: 'CN03', name: 'Đà Nẵng' };
 const companyScope = (): Scope => ({
   canSwitch: true, mode: 'company', branchId: undefined, workingBranch: B1, branches: [B1, B2, B3],
-  selectCompany: vi.fn(), selectBranch: vi.fn(),
+  selectCompany: vi.fn(), selectBranch: vi.fn(), unknown: false, retry: vi.fn(),
 });
 const branchScope = (): Scope => ({ ...companyScope(), mode: 'branch', branchId: 'b1' });
 const state: { scope: Scope } = { scope: companyScope() };

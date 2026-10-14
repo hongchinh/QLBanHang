@@ -132,9 +132,10 @@ describe('StatTile', () => {
     expect(screen.getByText('Phải thu')).toBeInTheDocument();
   });
 
-  // Seven tiles share one row at 1366 px: a long label or hint is cut on one line, never wrapped onto a second
-  // line that would push the value of one tile below the values of the others.
-  describe('one line per text', () => {
+  // Seven tiles share one row at 1366 px. The label sits above the value: it is cut on one line, so a second
+  // line never pushes the value of one tile below the others. The hint sits under the value: it wraps instead
+  // of being cut, so no figure in it is hidden.
+  describe('text that does not fit', () => {
     it('the label is truncated and carries its full text as title', () => {
       renderTile({ label: 'Doanh thu xuất bán', badge: 'tạm tính' });
 
@@ -145,16 +146,17 @@ describe('StatTile', () => {
       expect(label.parentElement?.className).not.toContain('flex-wrap');
     });
 
-    it('a text hint is truncated and carries its full text as title', () => {
+    it('a text hint wraps instead of being cut, and keeps its full text as title', () => {
       renderTile({ hint: 'Thu 2,10 tỷ · Chi 1,91 tỷ', delta: 12.5 });
 
       const hint = screen.getByText('Thu 2,10 tỷ · Chi 1,91 tỷ');
-      expect(hint).toHaveClass('truncate', 'min-w-0');
+      expect(hint).not.toHaveClass('truncate');
       expect(hint).toHaveAttribute('title', 'Thu 2,10 tỷ · Chi 1,91 tỷ');
-      // The delta keeps its width; the line itself does not wrap.
-      expect(screen.getByText('▲ 12,5%')).toHaveClass('shrink-0');
-      expect(hint.parentElement?.className).not.toContain('flex-wrap');
-      expect(hint.parentElement).toHaveClass('whitespace-nowrap');
+      // The line flows as text: the hint goes on next to the delta and wraps under it.
+      const line = hint.parentElement as HTMLElement;
+      expect(line.className).not.toMatch(/\b(whitespace-nowrap|truncate|line-clamp-\d|flex)\b/);
+      // The delta stays in one piece.
+      expect(screen.getByText('▲ 12,5%')).toHaveClass('whitespace-nowrap');
     });
 
     it('a hint that is not text gets no title', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { formatVnd } from '@/features/dashboard/format';
 import type { CashPoint } from '@/features/executive-dashboard/types';
 import { CashFlowChart } from './cash-flow-chart';
 
@@ -31,6 +32,26 @@ describe('CashFlowChart', () => {
 
     const month = render(<CashFlowChart points={[{ ...POINTS[0], date: '2026-09-01' }]} granularity="Month" />);
     expect(xTicks(month.container)).toEqual(['09/2026']);
+  });
+
+  // While another granularity loads, the points kept on screen (keepPreviousData) keep their own labels.
+  it('labels the axis by the granularity of the points, while the toggle shows the chosen one', () => {
+    const { container } = render(
+      <CashFlowChart points={POINTS} granularity="Month" labelGranularity="Week" onGranularityChange={vi.fn()} />,
+    );
+
+    expect(xTicks(container)).toEqual(['28/09', '05/10']);
+    expect(screen.getByRole('button', { name: 'Tháng' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('has a text alternative: the buckets and the totals', () => {
+    render(<CashFlowChart points={POINTS} granularity="Week" onGranularityChange={vi.fn()} />);
+
+    const chart = screen.getByRole('img', {
+      name: `Thu và chi theo tuần, 28/09 – 05/10: thu ${formatVnd(143_000_000)}, chi ${formatVnd(42_000_000)}.`,
+    });
+    expect(chart.querySelector('svg.recharts-surface')).not.toBeNull();
+    expect(chart.querySelector('button')).toBeNull();
   });
 
   it('has no toggle without a handler', () => {

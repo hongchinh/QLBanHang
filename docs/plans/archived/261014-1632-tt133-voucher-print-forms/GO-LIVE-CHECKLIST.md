@@ -1,6 +1,6 @@
 # Danh sách kiểm tra trước khi dùng mẫu in chứng từ TT133
 
-> Lập: 2026-10-15 · Dành cho: kế toán và PO · Thuộc [kế hoạch mẫu in chứng từ TT133](SUMMARY.md) · Thiết kế: [brainstorm](../../brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md)
+> Lập: 2026-10-15 · Dành cho: kế toán và PO · Thuộc [kế hoạch mẫu in chứng từ TT133](SUMMARY.md) · Thiết kế: [brainstorm](../../../brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md)
 
 Phần mềm in được 4 mẫu chứng từ ra Excel và PDF theo bố cục Phụ lục 3 Thông tư 133/2016/TT-BTC, từ màn phiếu và từ màn danh sách (một phiếu, hoặc nhiều phiếu đã chọn, mỗi phiếu một trang):
 

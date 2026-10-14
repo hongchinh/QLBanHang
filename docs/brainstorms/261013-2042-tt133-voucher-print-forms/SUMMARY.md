@@ -1,6 +1,6 @@
 # Mẫu in chứng từ TT133 — Phiếu thu, Phiếu chi, Phiếu nhập kho, Phiếu xuất kho
 
-> Brainstorm: 2026-10-13 20:42:09 · Tiếp nối [brainstorm sổ TT133](../261012-2237-tt133-report-forms/SUMMARY.md) (mục non-goal "Mẫu in phiếu thu/chi, phiếu nhập/xuất") và [plan sổ TT133](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md) · Review đối chiếu code: 2026-10-14, đã sửa theo mục [Review đối chiếu code](#review-đối-chiếu-code-2026-10-14) · Trạng thái: **đã hiện thực** theo [plan mẫu in chứng từ TT133](../../plans/261014-1632-tt133-voucher-print-forms/SUMMARY.md); còn chờ kế toán trả lời các câu hỏi và duyệt bản in ([danh sách kiểm tra go-live](../../plans/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md))
+> Brainstorm: 2026-10-13 20:42:09 · Tiếp nối [brainstorm sổ TT133](../261012-2237-tt133-report-forms/SUMMARY.md) (mục non-goal "Mẫu in phiếu thu/chi, phiếu nhập/xuất") và [plan sổ TT133](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md) · Review đối chiếu code: 2026-10-14, đã sửa theo mục [Review đối chiếu code](#review-đối-chiếu-code-2026-10-14) · Trạng thái: **đã hiện thực** theo [plan mẫu in chứng từ TT133](../../plans/archived/261014-1632-tt133-voucher-print-forms/SUMMARY.md); còn chờ kế toán trả lời các câu hỏi và duyệt bản in ([danh sách kiểm tra go-live](../../plans/archived/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md))
 
 ## Problem framing
 
@@ -262,7 +262,7 @@ Kiểm quyền và chi nhánh theo cùng thứ tự với `GetAsync` của màn 
 
 ## Open questions
 
-**Kế toán / PO** (không chặn việc phát triển; là go-live gate, đã đưa vào [danh sách kiểm tra go-live](../../plans/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md), phần 1; chưa có câu trả lời):
+**Kế toán / PO** (không chặn việc phát triển; là go-live gate, đã đưa vào [danh sách kiểm tra go-live](../../plans/archived/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md), phần 1; chưa có câu trả lời):
 - Phiếu thu/chi của **quỹ ngân hàng** có in theo 01-TT/02-TT không, hay kế toán chỉ dùng giấy báo Có / ủy nhiệm chi của ngân hàng? Thiết kế hiện cho in cả hai loại quỹ.
 - Có chấp nhận để trống ô Nợ, Có và Quyển số cho kế toán ghi tay không?
 - Cột "Số lượng theo chứng từ / yêu cầu" in bằng số lượng thực nhập/xuất có đúng thực tế không, hay phải để trống cho thủ kho ghi?
@@ -295,7 +295,7 @@ Kiểm quyền và chi nhánh theo cùng thứ tự với `GetAsync` của màn 
 
 ## Next steps
 
-1. ~~Gửi kế toán các câu hỏi Kế toán/PO ở trên.~~ Đã đưa vào [danh sách kiểm tra go-live](../../plans/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md); việc gửi và nhận câu trả lời vẫn mở.
-2. ~~`write-plan` cho 3 phase.~~ Xong: [plan](../../plans/261014-1632-tt133-voucher-print-forms/SUMMARY.md) (6 phase, hiện thực xong).
+1. ~~Gửi kế toán các câu hỏi Kế toán/PO ở trên.~~ Đã đưa vào [danh sách kiểm tra go-live](../../plans/archived/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md); việc gửi và nhận câu trả lời vẫn mở.
+2. ~~`write-plan` cho 3 phase.~~ Xong: [plan](../../plans/archived/261014-1632-tt133-voucher-print-forms/SUMMARY.md) (6 phase, hiện thực xong).
 3. ~~Cập nhật `docs/project-pdr/product-goals.md`.~~ Xong.
 4. Kế toán trả lời 6 câu hỏi và duyệt bản in từng mẫu so với Phụ lục 3 bản gốc (phần 1 và 2 của danh sách kiểm tra go-live).

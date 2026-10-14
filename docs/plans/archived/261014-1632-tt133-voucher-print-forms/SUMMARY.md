@@ -1,6 +1,6 @@
 # TT133 voucher print forms — Excel/PDF of receipts, payments, stock-in and stock-out vouchers (Mẫu in chứng từ TT133)
 
-> Created: 2026-10-14 16:32 · Based on `qlbanhang/main` at `8135477` (PR #14 executive dashboard merged) · Source design: [brainstorm SUMMARY](../../brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md) (reviewed against code 2026-10-14, R1–R12) · Builds on: [TT133 report forms plan](../archived/261013-1926-tt133-report-forms/SUMMARY.md) (PR #12) · Reviewed against code: 2026-10-14 20:15 (fixes applied: test data that the guards refuse, lint in test wrappers, list page variables, signature and header layout, portal clicks on list rows, indexed ledger read, a worktree per track)
+> Created: 2026-10-14 16:32 · Based on `qlbanhang/main` at `8135477` (PR #14 executive dashboard merged) · Source design: [brainstorm SUMMARY](../../../brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md) (reviewed against code 2026-10-14, R1–R12) · Builds on: [TT133 report forms plan](../261013-1926-tt133-report-forms/SUMMARY.md) (PR #12) · Reviewed against code: 2026-10-14 20:15 (fixes applied: test data that the guards refuse, lint in test wrappers, list page variables, signature and header layout, portal clicks on list rows, indexed ledger read, a worktree per track)
 
 ## Goal
 

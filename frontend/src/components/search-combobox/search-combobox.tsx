@@ -6,7 +6,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { AppIcon } from '@/components/icons';
+import { AppIcon } from "@/components/icons";
 import { Input } from "@/components/ui/input";
 import { useDebouncedValue } from "@/lib/use-debounced-value";
 import { cn } from "@/lib/utils";

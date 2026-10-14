@@ -49,6 +49,7 @@ describe('VoucherPrintButton', () => {
     renderButton();
     const button = screen.getByRole('button', { name: 'In' });
     expect(button.querySelector('[data-icon="print"]')).not.toBeNull();
+    expect(button.querySelector('[data-icon="print"]')).not.toHaveClass('text-icon-print');
     expect(button.querySelector('[data-icon="chevronDown"]')).not.toBeNull();
     await user.click(button);
     expect(screen.getByRole('menuitem', { name: 'In (PDF)' }).querySelector('[data-icon="exportPdf"]')).not.toBeNull();

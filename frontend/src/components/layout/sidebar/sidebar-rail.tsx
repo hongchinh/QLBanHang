@@ -61,6 +61,7 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
             onClick={onSearch}
             className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
+            {/* tone="none": takes the button's muted colour and its hover colour */}
             <AppIcon name="search" tone="none" />
           </button>
         </TooltipTrigger>
@@ -79,7 +80,7 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
               aria-label="Mục đã ghim"
               className="flex h-10 w-10 items-center justify-center rounded-md text-nav-pin-fg hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <AppIcon name="pin" tone="none" className="fill-current" />
+              <AppIcon name="pin" className="fill-current" />
             </button>
           }
         >

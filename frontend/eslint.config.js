@@ -63,6 +63,9 @@ export default [
         'warn',
         { labelComponents: ['Label'], controlComponents: ['Input', 'Textarea'], assert: 'either' },
       ],
+      'no-restricted-imports': ['warn', {
+        paths: [{ name: 'lucide-react', message: 'Dùng AppIcon và tên trong src/components/icons/icon-registry.ts.' }],
+      }],
     },
   },
   {
@@ -80,5 +83,9 @@ export default [
         vi: 'readonly',
       },
     },
+  },
+  {
+    files: ['src/components/icons/**/*.{ts,tsx}'],
+    rules: { 'no-restricted-imports': 'off' },
   },
 ];

@@ -596,6 +596,42 @@ public class StockVoucherPrintTests : InventoryTestBase
         error.Details!["priceMode"].Should().Equal("Chế độ giá không hợp lệ.");
     }
 
+    [Fact]
+    public async Task No_provisional_note_without_printed_lines()
+    {
+        await SetCompanyAsync();
+        var today = VnTime.ToVnDate(DateTimeOffset.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var u = await CreateInventoryProductAsync(NewCode("U"), track: false);
+        var v = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", $"{today} 00:02", LineRequest(u, 1, 50_000));
+
+        var response = await PrintAsync(_client, v.Id, "format=xlsx&priceMode=Cost");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        var ws = wb.Worksheets.Single();
+        Tt133Sheet.Contains(ws, "Phiếu không có hàng theo dõi tồn kho.").Should().BeTrue();
+        Tt133Sheet.Contains(ws, ProvisionalNote).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Cancelled_voucher_at_voucher_prices_has_no_cost_note()
+    {
+        await SetCompanyAsync();
+        var aCode = NewCode("A");
+        var a = await CreateInventoryProductAsync(aCode);
+        var v = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-05 09:00", LineRequest(a, 4, 120_000));
+        await ActionAsync(v.Id, "cancel", v.Version);
+
+        var response = await PrintAsync(_client, v.Id, "format=xlsx&priceMode=Voucher");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        var ws = wb.Worksheets.Single();
+        Texts(ws).Should().Contain("ĐÃ HỦY");
+        Tt133Sheet.Contains(ws, "Phiếu đã hủy, không có giá vốn.").Should().BeFalse();
+        ws.Row(Tt133Sheet.RowOf(ws, $"Hàng {aCode}")).Cell(8).GetValue<decimal>().Should().Be(480_000);
+    }
+
     private static Task<HttpResponseMessage> PrintManyAsync(HttpClient client, StockVoucherPrintRequest request,
         string format = "xlsx") =>
         client.PostAsJsonAsync($"/api/stock-vouchers/print?format={format}", request);

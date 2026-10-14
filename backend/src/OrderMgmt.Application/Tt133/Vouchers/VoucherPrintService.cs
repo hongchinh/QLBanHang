@@ -209,6 +209,14 @@ public class VoucherPrintService : IVoucherPrintService
         model.PriceMode = mode;
         if (priceMode == StockPrintPriceMode.Cost && cancelled) model.Notes.Add("Phiếu đã hủy, không có giá vốn.");
 
+        if (mode != StockPrintPriceMode.Voucher && printed.Count == 0)
+        {
+            // An empty table: no amount, words as dots, and no cost note.
+            model.Totals = [new StockVoucherPrintTotal("Cộng", null)];
+            model.Notes.Add("Phiếu không có hàng theo dõi tồn kho.");
+            return model;
+        }
+
         switch (mode)
         {
             case StockPrintPriceMode.Voucher:
@@ -221,13 +229,6 @@ public class VoucherPrintService : IVoucherPrintService
                 model.Lines = printed.Select((l, i) => PrintLine(l, i + 1, null, null)).ToList();
                 model.Totals = [new StockVoucherPrintTotal("Cộng", null)];
                 break;
-        }
-
-        if (mode != StockPrintPriceMode.Voucher && printed.Count == 0)
-        {
-            model.Totals = [new StockVoucherPrintTotal("Cộng", null)];
-            model.AmountInWords = null;
-            model.Notes.Add("Phiếu không có hàng theo dõi tồn kho.");
         }
         return model;
     }

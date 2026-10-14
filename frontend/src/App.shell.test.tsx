@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { App } from './App';
 import type { PushState } from '@/hooks/usePushNotification';
 
 // What the push hook reports; a test sets it before rendering.
 const push = vi.hoisted(() => ({ state: 'idle' as PushState }));
+// Makes the boot (outside the route error boundary) or the routed page (inside it) throw while rendering.
+const crash = vi.hoisted(() => ({ boot: false, page: false }));
 
 vi.mock('@/hooks/useBeforeInstallPrompt', () => ({
   useBeforeInstallPrompt: () => ({ canShow: false, install: vi.fn(), dismiss: vi.fn() }),
@@ -12,12 +14,20 @@ vi.mock('@/hooks/useBeforeInstallPrompt', () => ({
 vi.mock('@/hooks/usePushNotification', () => ({
   usePushNotification: () => ({ state: push.state, subscribe: vi.fn() }),
 }));
-vi.mock('@/routes/auth-init', () => ({ AuthInit: ({ children }: { children: React.ReactNode }) => <>{children}</> }));
+vi.mock('@/routes/auth-init', () => ({
+  AuthInit: ({ children }: { children: React.ReactNode }) => {
+    if (crash.boot) throw new Error('boot failed');
+    return <>{children}</>;
+  },
+}));
 vi.mock('@/routes/protected-route', () => ({
   ProtectedRoute: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 vi.mock('@/pages/error-pages', () => ({
-  NotFoundPage: () => <div>not-found</div>,
+  NotFoundPage: () => {
+    if (crash.page) throw new Error('page failed');
+    return <div>not-found</div>;
+  },
   ForbiddenPage: () => <div>forbidden</div>,
 }));
 
@@ -71,5 +81,47 @@ describe('App shell', () => {
     const shell = screen.getByTestId('app-shell');
     expect(shell.children).toHaveLength(2);
     expect(shell.firstElementChild).toContainElement(screen.getByRole('button', { name: button }));
+  });
+
+  describe('error fallback', () => {
+    // A render error a boundary catches still reaches window as an "error" event. Cancelling it tells React and
+    // jsdom that it was expected, so neither prints it; the boundary's own report goes to console.error.
+    const expectError = (event: Event) => event.preventDefault();
+
+    beforeEach(() => {
+      window.addEventListener('error', expectError);
+      vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      window.removeEventListener('error', expectError);
+      vi.mocked(console.error).mockRestore();
+      crash.boot = false;
+      crash.page = false;
+    });
+
+    // The route boundary sits inside the shell's content box, under the banner. A fallback that claimed the
+    // viewport height there would be taller than its box by the height of the banner, and scroll.
+    it('fills the shell when a routed page throws', () => {
+      crash.page = true;
+      window.history.pushState({}, '', '/404');
+      render(<App />);
+
+      const fallback = screen.getByRole('heading', { name: 'Đã có lỗi xảy ra' }).parentElement;
+      expect(screen.getByTestId('app-shell')).toContainElement(fallback);
+      expect(fallback).toHaveClass('flex-1');
+      expect(fallback).not.toHaveClass('min-h-screen');
+    });
+
+    // The outer boundary replaces the whole app, shell included: nothing is left to give its fallback a height.
+    it('claims the viewport height itself when the app throws outside the routes', () => {
+      crash.boot = true;
+      render(<App />);
+
+      const fallback = screen.getByRole('heading', { name: 'Đã có lỗi xảy ra' }).parentElement;
+      expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
+      expect(fallback).toHaveClass('min-h-screen');
+      expect(fallback).not.toHaveClass('flex-1');
+    });
   });
 });

@@ -86,9 +86,14 @@ import { PushPermissionPrompt } from '@/components/PushPermissionPrompt';
 import { isPushPromptVisible } from '@/components/push-prompt-visibility';
 import { AppShell } from '@/components/layout/app-shell';
 
+// Sits inside the shell's content box, so its fallback fills that box: the viewport height is the shell's.
 function RouteErrorBoundary({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
-  return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>;
+  return (
+    <ErrorBoundary key={pathname} fill>
+      {children}
+    </ErrorBoundary>
+  );
 }
 
 export function App() {

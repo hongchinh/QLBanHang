@@ -6,7 +6,7 @@ import {
   type ConfirmationRequest,
   type ConfirmFlags,
 } from '@/lib/confirm-required';
-import { canTakeFocus, isFocusLost } from '@/lib/focus';
+import { canTakeFocus, giveFocusBack, isFocusLost } from '@/lib/focus';
 import { toast } from '@/lib/use-toast';
 
 /** `flags` are the confirmations (P10) already given for the action; a resend keeps them all. */
@@ -76,30 +76,33 @@ function useFocusReturnTarget(): () => HTMLElement | null {
  * Callers own the submit guard (run has no re-entry guard), `perform` (mutations, navigation, success
  * toasts; it should reject with the API error) and the field-error mapping; the hook owns busy, the 422
  * resend with accumulated flags (token-aware via withConfirmed), the 409 reload and the error toasts.
+ * It also gives the focus back to where the user was once an action has ended or its 422 dialog has closed.
  */
 export function useDocumentActions<A extends DocumentAction>(options: Options<A>) {
   const [busy, setBusy] = useState(false);
   const [confirmation, setConfirmation] = useState<{ action: A; request: ConfirmationRequest } | null>(null);
 
-  // Where the focus goes back to once the 422 dialog is gone. The action disables its own buttons while it runs,
+  // Where the focus goes back to after an action or its 422 dialog. The action disables its own buttons while it runs,
   // which makes the browser drop the focus, so "what has the focus now" is not enough.
   const focusReturnTarget = useFocusReturnTarget();
-  // Set when a confirmed resend is running: the dialog is gone then and that element may still be disabled.
-  const restoreAfterRunRef = useRef(false);
+  // `busy` as of the last render, to tell when an action has just ended.
+  const wasBusyRef = useRef(false);
 
+  // Once an action has ended, however it ended (a save that stays on the page, a 409, a 500, a confirmed resend), and
+  // its buttons are enabled again.
   useEffect(() => {
-    if (busy || !restoreAfterRunRef.current) return;
-    restoreAfterRunRef.current = false;
+    const ended = wasBusyRef.current && !busy;
+    wasBusyRef.current = busy;
+    if (!ended) return;
+    // The 422 dialog takes the focus itself and gives it back when it closes.
+    if (confirmation) return;
     // Never take the focus from something the user (or the page) already moved it to.
-    if (isFocusLost()) focusReturnTarget()?.focus();
-  }, [busy, focusReturnTarget]);
+    const target = isFocusLost() ? focusReturnTarget() : null;
+    // The Enter that pressed the save button may still be down: it must not save again now that the button is back.
+    if (target) giveFocusBack(target);
+  }, [busy, confirmation, focusReturnTarget]);
 
-  function run(action: A): Promise<void> {
-    restoreAfterRunRef.current = false;
-    return execute(action);
-  }
-
-  async function execute(action: A): Promise<void> {
+  async function run(action: A): Promise<void> {
     setBusy(true);
     try {
       await options.perform(action, action.flags);
@@ -146,8 +149,9 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
 
   const confirmDialogProps = {
     request: confirmation?.request ?? null,
-    // Back to where the user was; null leaves the focus alone (that element is gone or disabled, or the page is).
-    // After a confirmation the buttons are still disabled here; the effect above restores the focus later.
+    // Back to where the user was, whether the dialog was dismissed or confirmed. Null when that element is gone or
+    // disabled, or the page is: the dialog then only has what had the focus when it opened. After a confirmation the
+    // buttons are still disabled here, and the effect above gives the focus back once the resend has ended.
     restoreFocusTo: focusReturnTarget,
     confirmLabel: confirmation ? options.confirmLabels[confirmation.action.kind as A['kind']] : undefined,
     onConfirm: () => {
@@ -156,8 +160,7 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
       setConfirmation(null);
       // A blocked 422 has nothing to confirm.
       if (request.blocked) return;
-      restoreAfterRunRef.current = true;
-      void execute({ ...action, flags: withConfirmed(action.flags, request) });
+      void run({ ...action, flags: withConfirmed(action.flags, request) });
     },
     onClose: () => setConfirmation(null),
   };

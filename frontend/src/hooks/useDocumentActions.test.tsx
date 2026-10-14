@@ -704,4 +704,182 @@ describe('useDocumentActions focus return', () => {
       expect(document.activeElement).toBe(document.body);
     });
   });
+
+  // The buttons of the page are disabled while an action runs, so a real browser drops the focus of the one that was
+  // used: simulated with blur() inside perform (jsdom keeps the focus on a disabled button).
+  describe('after an action that needs no confirmation', () => {
+    const dropFocus = () => (document.activeElement as HTMLElement | null)?.blur();
+
+    it.each([
+      ['a success', async () => {}],
+      [
+        'a server error (500)',
+        async () => {
+          throw apiError(500, 'INTERNAL');
+        },
+      ],
+      [
+        'a version conflict (409)',
+        async () => {
+          throw apiError(409, 'CONCURRENCY');
+        },
+      ],
+    ])('the focus is back on the button the action started from after %s', async (_outcome, answer) => {
+      const perform = vi.fn(async () => {
+        dropFocus();
+        await answer();
+      });
+      render(<Harness perform={perform} />);
+      const save = screen.getByTestId('save');
+      act(() => save.focus());
+
+      fireEvent.click(save);
+      expect(document.activeElement).toBe(document.body);
+
+      await waitFor(() => expect(document.activeElement).toBe(save));
+      expect(perform).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not take the focus from where the page put it meanwhile', async () => {
+      // The page moves the focus itself, e.g. to the first field the server rejected.
+      const perform = vi.fn(async () => {
+        dropFocus();
+        screen.getByTestId('other').focus();
+        throw apiError(500, 'INTERNAL');
+      });
+      render(
+        <>
+          <input data-testid="other" />
+          <Harness perform={perform} />
+        </>,
+      );
+      const save = screen.getByTestId('save');
+      act(() => save.focus());
+      fireEvent.click(save);
+      expect(save).toBeDisabled();
+
+      await waitFor(() => expect(save).toBeEnabled());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(document.activeElement).toBe(screen.getByTestId('other'));
+    });
+
+    // E.g. the confirm dialog the action started from, still on the page for its exit animation.
+    it('does not pull the focus out of a dialog', async () => {
+      let answer!: () => void;
+      const perform = vi.fn(() => {
+        dropFocus();
+        return new Promise<void>((resolve) => (answer = resolve));
+      });
+      render(
+        <>
+          <Harness perform={perform} />
+          <div role="dialog" aria-label="Xóa phiếu?">
+            <button type="button" data-testid="in-dialog">
+              Xóa
+            </button>
+          </div>
+        </>,
+      );
+      const save = screen.getByTestId('save');
+      const inDialog = screen.getByTestId('in-dialog');
+      act(() => save.focus());
+      fireEvent.click(save);
+      act(() => inDialog.focus());
+
+      await act(async () => answer());
+      await waitFor(() => expect(save).toBeEnabled());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(document.activeElement).toBe(inDialog);
+    });
+
+    it('focuses nothing when that button is gone once the action ended', async () => {
+      function CancelPage() {
+        const [cancelled, setCancelled] = useState(false);
+        const { busy, run } = useDocumentActions<Action>({
+          ...options,
+          perform: async () => {
+            dropFocus();
+            setCancelled(true);
+          },
+        });
+        return (
+          <main id="main-content">
+            {cancelled && <button type="button">Khôi phục</button>}
+            {!cancelled && (
+              <button type="button" disabled={busy} onClick={() => void run({ kind: 'delete', flags: {} })}>
+                Hủy phiếu
+              </button>
+            )}
+          </main>
+        );
+      }
+      render(<CancelPage />);
+      const cancel = screen.getByRole('button', { name: 'Hủy phiếu' });
+      act(() => cancel.focus());
+      fireEvent.click(cancel);
+
+      await screen.findByRole('button', { name: 'Khôi phục' });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(document.activeElement).toBe(document.body);
+    });
+
+    // The dialog takes the focus itself and gives it back when it closes: nothing to do in between. In a browser the
+    // dialog and the enabled buttons come in the same render. The page here only shows the request: in jsdom the real
+    // dialog would open and take the focus a render before the buttons are enabled again, and hide a focus call.
+    it('leaves the focus to the 422 dialog when the action ends with one', async () => {
+      function RequestOnlyPage() {
+        const { busy, run, confirmDialogProps } = useDocumentActions<Action>({
+          ...options,
+          perform: blurAndReject('NEGATIVE_FUND_WARNING'),
+        });
+        return (
+          <>
+            <button type="button" data-testid="save" disabled={busy} onClick={() => void run({ kind: 'save', flags: {} })}>
+              Lưu
+            </button>
+            {confirmDialogProps.request && <p>{confirmDialogProps.request.title}</p>}
+          </>
+        );
+      }
+      render(<RequestOnlyPage />);
+      const save = screen.getByTestId('save');
+      act(() => save.focus());
+      const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+      try {
+        fireEvent.click(save);
+        await screen.findByText('Quỹ bị âm');
+        await waitFor(() => expect(save).toBeEnabled());
+        await new Promise((resolve) => setTimeout(resolve, 20));
+
+        expect(focus.mock.contexts).not.toContain(save);
+        expect(document.activeElement).toBe(document.body);
+      } finally {
+        focus.mockRestore();
+      }
+    });
+
+    // jsdom has no keyboard activation. A browser clicks a focused button on every Enter keydown that was not
+    // cancelled, the auto-repeated ones of a held key included.
+    function pressEnter(button: HTMLElement, init: { repeat?: boolean } = {}) {
+      if (fireEvent.keyDown(button, { key: 'Enter', ...init })) fireEvent.click(button);
+    }
+
+    it('a key that is still held down does not press the button again when it has the focus back', async () => {
+      const perform = vi.fn(async () => dropFocus());
+      render(<Harness perform={perform} />);
+      const save = screen.getByTestId('save');
+      act(() => save.focus());
+
+      pressEnter(save);
+      await waitFor(() => expect(document.activeElement).toBe(save));
+      pressEnter(save, { repeat: true });
+      pressEnter(save, { repeat: true });
+      expect(perform).toHaveBeenCalledTimes(1);
+
+      // Released and pressed again: a save the user asked for.
+      fireEvent.keyUp(save, { key: 'Enter' });
+      pressEnter(save);
+      await waitFor(() => expect(perform).toHaveBeenCalledTimes(2));
+    });
+  });
 });

@@ -109,6 +109,8 @@ The minor fixes:
 | Frontend tests | 1703 tests, 1700 passed, 3 failed: exactly the three in `BASELINE.md` (bank-accounts "adds a new account via the form", useNotificationHub "invalidates unread-count query on NewNotification", payment-qr "generates and displays a QR…"). The frontend files of `feat/executive-dashboard` are identical to those of the run (`git diff` empty). |
 | Frontend build | exit 0; tracked `tsbuildinfo` restored |
 
+After the report, `qlbanhang/main` @ `fa51918` (PR #13, stock voucher form fixes, frontend and docs only) was merged in as `76f6715` without conflicts, because the remote branch of the same name had been created at that commit. Re-checked on the merged tree: frontend typecheck exit 0; tests 1961, 1958 passed, the same 3 baseline failures; lint 16 problems (3 errors, 13 warnings; PR #13 removed one baseline warning), none in a file of this plan; build exit 0. The backend did not change.
+
 The baseline counts grew because the merge of `main` brought the TT133 tests, and this plan added its own: 841 → 1281 backend tests, 948 → 1703 frontend tests.
 
 ## Manual checks (Task 8.3)

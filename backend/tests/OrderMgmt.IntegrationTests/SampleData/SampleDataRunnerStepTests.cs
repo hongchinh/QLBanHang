@@ -382,4 +382,169 @@ public class SampleDataRunnerStepTests : CashDebtTestBase
         await AssertInvariantsAsync();
         await AssertCashDebtInvariantsAsync();
     }
+
+    /// S11: MaxAmount only caps. A target with less open than its MaxAmount allocates what is open, and a target with
+    /// nothing open allocates nothing whatever its MaxAmount.
+    [Fact]
+    public async Task Max_amount_above_the_open_amount_allocates_what_is_open()
+    {
+        var branchId = await CreateBranchAsync("RT08");
+        var plan = TinyPlans.WithSteps(TinyPlans.OpeningDate,
+            Stock("XBH-0001", At(1), null, StockDirection.Out, "XBH", "DM-KH01", null, null,
+                new SampleStockLine("DM-SP01", 10m, 100_000m, 0m, 10m)),
+            Allocate("TKH-0001", At(2), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("OD-01", null), new SampleAllocationTarget("XBH-0001", 5_000_000m)),
+            Allocate("TKH-0002", At(3), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("OD-01", 1_000_000m)));
+
+        var result = await TinyPlans.RunAsync(_factory, branchId, plan);
+
+        result.Succeeded.Should().BeTrue(result.Error);
+        (result.StepsExecuted, result.StepsSkipped).Should().Be((2, 1));
+        var receipt = (await CashVouchersByLineAsync(branchId)).Should().ContainSingle().Subject;
+        receipt.Key.Should().Be("TKH-0001");
+        receipt.Value.Total.Should().Be(4_100_000m);
+        var own = (await EntriesOfAsync(DebtSourceType.Receipt, receipt.Value.Id)).Should().ContainSingle().Subject;
+        var od01 = await OpeningEntryAsync(branchId, "HD-DK-01");
+        var xbh = (await EntriesOfAsync(DebtSourceType.StockOut, (await VouchersByKeyAsync(branchId))["XBH-0001"].Id))
+            .Should().ContainSingle().Subject;
+        (await SettlementsOfAsync(own.Id)).ToDictionary(s => s.IncreaseEntryId, s => s.Amount).Should().BeEquivalentTo(
+            new Dictionary<Guid, decimal> { [od01.Id] = 3_000_000m, [xbh.Id] = 1_100_000m });
+
+        await AssertInvariantsAsync();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    /// A target with nothing open (a cash sale settled by its automatic receipt) is left out of a voucher that also
+    /// allocates to an open one.
+    [Fact]
+    public async Task Zero_open_target_is_left_out_of_a_mixed_receipt()
+    {
+        var branchId = await CreateBranchAsync("RT09");
+        var plan = TinyPlans.WithSteps(TinyPlans.OpeningDate,
+            Stock("XBH-0001", At(1), null, StockDirection.Out, "XBH", "DM-KH01", "TM", "QTM",
+                new SampleStockLine("DM-SP01", 1m, 100_000m, 0m, 0m)),
+            Allocate("TKH-0001", At(2), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("XBH-0001", null), new SampleAllocationTarget("OD-01", null)));
+
+        var result = await TinyPlans.RunAsync(_factory, branchId, plan);
+
+        result.Succeeded.Should().BeTrue(result.Error);
+        (result.StepsExecuted, result.StepsSkipped).Should().Be((2, 0));
+        var receipt = (await CashVouchersByLineAsync(branchId)).Should().ContainSingle().Subject;
+        receipt.Value.Total.Should().Be(3_000_000m);
+        var own = (await EntriesOfAsync(DebtSourceType.Receipt, receipt.Value.Id)).Should().ContainSingle().Subject;
+        var settlement = (await SettlementsOfAsync(own.Id)).Should().ContainSingle().Subject;
+        (settlement.IncreaseEntryId, settlement.Amount)
+            .Should().Be(((await OpeningEntryAsync(branchId, "HD-DK-01")).Id, 3_000_000m));
+
+        await AssertInvariantsAsync();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    [Fact]
+    public async Task Duplicate_target_keys_fail_the_step()
+    {
+        var branchId = await CreateBranchAsync("RT10");
+        var plan = TinyPlans.WithSteps(TinyPlans.OpeningDate,
+            Allocate("TKH-0001", At(1), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("OD-01", null), new SampleAllocationTarget("OD-01", 1_000_000m)));
+
+        var result = await TinyPlans.RunAsync(_factory, branchId, plan);
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Should().Be("TKH-0001: Bước TKH-0001 chọn khóa OD-01 hai lần.");
+        (await CashVouchersByLineAsync(branchId)).Should().BeEmpty();
+    }
+
+    /// A cash step has a fixed amount or targets: never both (the targets would be ignored), never neither (the step
+    /// would count as skipped).
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Cash_step_needs_a_fixed_amount_or_targets(bool both)
+    {
+        var branchId = await CreateBranchAsync("RT11");
+        var step = new SampleCashVoucherStep("TKH-0001", At(1), null, CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+            null, "TKH-0001", both ? 1_000_000m : null,
+            both ? new[] { new SampleAllocationTarget("OD-01", null) } : Array.Empty<SampleAllocationTarget>());
+
+        var result = await TinyPlans.RunAsync(_factory, branchId, TinyPlans.WithSteps(TinyPlans.OpeningDate, step));
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Should().Be(
+            "TKH-0001: Bước TKH-0001 phải có đúng một trong hai: số tiền cố định hoặc chứng từ cần đối trừ.");
+        (await CashVouchersByLineAsync(branchId)).Should().BeEmpty();
+    }
+
+    /// A skipped step wrote nothing, so a step naming it finds nothing open there: an allocation leaves it out, and a
+    /// step left with nothing to do (allocate, cancel, offset) is skipped too.
+    [Fact]
+    public async Task Steps_naming_a_skipped_step_are_skipped()
+    {
+        var branchId = await CreateBranchAsync("RT12");
+        var plan = TinyPlans.WithSteps(TinyPlans.OpeningDate,
+            Allocate("TKH-0001", At(1), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("OD-01", null)),
+            // OD-01 is settled: skipped, so TKH-0002 names nothing.
+            Allocate("TKH-0002", At(2), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("OD-01", null)),
+            new SampleCashVoucherStep("TKH-0003", At(3), null, CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01", null,
+                "TKH-0003", 1_000_000m, Array.Empty<SampleAllocationTarget>()),
+            Allocate("CHKH-0001", At(4), CashVoucherType.Payment, "CHKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("TKH-0002", null), new SampleAllocationTarget("TKH-0003", 400_000m)),
+            Allocate("CHKH-0002", At(5), CashVoucherType.Payment, "CHKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("TKH-0002", null)),
+            new SampleCancelStep("HUY-0001", At(6), null, "TKH-0002"),
+            new SampleDebtOffsetStep("BT-0001", At(7), null, "DM-KH01", "CHKH-0002", "OD-02"));
+
+        var result = await TinyPlans.RunAsync(_factory, branchId, plan);
+
+        result.Succeeded.Should().BeTrue(result.Error);
+        (result.StepsExecuted, result.StepsSkipped).Should().Be((3, 4));
+        var vouchers = await CashVouchersByLineAsync(branchId);
+        vouchers.Keys.Should().BeEquivalentTo("TKH-0001", "TKH-0003", "CHKH-0001");
+        vouchers.Values.Should().OnlyContain(v => v.Status == DocumentStatus.Active);
+        var refund = vouchers["CHKH-0001"];
+        refund.Total.Should().Be(400_000m);
+        var advance = (await EntriesOfAsync(DebtSourceType.Receipt, vouchers["TKH-0003"].Id)).Should().ContainSingle().Subject;
+        var settlement = (await SettlementsOfAsync(advance.Id)).Should().ContainSingle().Subject;
+        (settlement.Amount, settlement.BatchId).Should().Be((400_000m, refund.Id));
+        (await InDbAsync(db => db.DebtOffsetVouchers.AnyAsync(o => o.BranchId == branchId))).Should().BeFalse();
+
+        await AssertInvariantsAsync();
+        await AssertCashDebtInvariantsAsync();
+    }
+
+    /// Cancelling an allocated receipt removes its settlements, so what it settled is open again for a later step.
+    [Fact]
+    public async Task Cancel_of_an_allocated_receipt_reopens_its_targets()
+    {
+        var branchId = await CreateBranchAsync("RT13");
+        var plan = TinyPlans.WithSteps(TinyPlans.OpeningDate,
+            Stock("XBH-0001", At(1), null, StockDirection.Out, "XBH", "DM-KH01", null, null,
+                new SampleStockLine("DM-SP01", 10m, 100_000m, 0m, 10m)),
+            Allocate("TKH-0001", At(2), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("XBH-0001", null)),
+            new SampleCancelStep("HUY-0001", At(3), null, "TKH-0001"),
+            Allocate("TKH-0002", At(4), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("XBH-0001", null)));
+
+        var result = await TinyPlans.RunAsync(_factory, branchId, plan);
+
+        result.Succeeded.Should().BeTrue(result.Error);
+        (result.StepsExecuted, result.StepsSkipped).Should().Be((4, 0));
+        var vouchers = await CashVouchersByLineAsync(branchId);
+        vouchers["TKH-0001"].Status.Should().Be(DocumentStatus.Cancelled);
+        (await EntriesOfAsync(DebtSourceType.Receipt, vouchers["TKH-0001"].Id)).Should().BeEmpty();
+        var second = vouchers["TKH-0002"];
+        (second.Status, second.Total).Should().Be((DocumentStatus.Active, 1_100_000m));
+        var xbh = (await EntriesOfAsync(DebtSourceType.StockOut, (await VouchersByKeyAsync(branchId))["XBH-0001"].Id))
+            .Should().ContainSingle().Subject;
+        var settlement = (await SettlementsOfAsync(xbh.Id)).Should().ContainSingle().Subject;
+        (settlement.Amount, settlement.BatchId).Should().Be((1_100_000m, second.Id));
+
+        await AssertInvariantsAsync();
+        await AssertCashDebtInvariantsAsync();
+    }
 }

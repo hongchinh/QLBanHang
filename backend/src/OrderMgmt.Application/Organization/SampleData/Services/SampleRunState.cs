@@ -54,6 +54,8 @@ internal sealed class SampleRunState
     public Dictionary<string, SampleDebtEntryRef> Entries { get; } = new();
     /// Cash voucher ids by plan key (for SampleCancelStep).
     public Dictionary<string, Guid> CashVouchers { get; } = new();
+    /// Keys of the steps skipped (S11): they wrote nothing, so a step naming one finds nothing open there.
+    public HashSet<string> SkippedKeys { get; } = new();
 
     /// S5: `index` picks among the owners (wrapping); null is the requesting user.
     public Guid OwnerOf(int? index) => index is { } i ? Owners[i % Owners.Count] : RequestedBy;

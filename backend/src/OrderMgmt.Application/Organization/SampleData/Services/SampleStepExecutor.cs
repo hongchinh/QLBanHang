@@ -34,15 +34,22 @@ internal sealed class SampleStepExecutor
         _run = run;
     }
 
-    public Task<SampleStepOutcome> ExecuteAsync(SampleStep step, CancellationToken ct) => step switch
+    /// A skipped step's key is remembered, so a later step naming it finds nothing there instead of an unknown key.
+    public async Task<SampleStepOutcome> ExecuteAsync(SampleStep step, CancellationToken ct)
     {
-        SampleStockVoucherStep s => StockVoucherAsync(s, ct),
-        SampleCashVoucherStep s => CashVoucherAsync(s, ct),
-        SampleFundTransferStep s => FundTransferAsync(s, ct),
-        SampleDebtOffsetStep s => DebtOffsetAsync(s, ct),
-        SampleCancelStep s => CancelAsync(s, ct),
-        _ => throw new SampleDataPlanException($"Loại bước {step.GetType().Name} chưa được hỗ trợ."),
-    };
+        var outcome = await (step switch
+        {
+            SampleStockVoucherStep s => StockVoucherAsync(s, ct),
+            SampleCashVoucherStep s => CashVoucherAsync(s, ct),
+            SampleFundTransferStep s => FundTransferAsync(s, ct),
+            SampleDebtOffsetStep s => DebtOffsetAsync(s, ct),
+            SampleCancelStep s => CancelAsync(s, ct),
+            _ => throw new SampleDataPlanException($"Loại bước {step.GetType().Name} chưa được hỗ trợ."),
+        });
+        if (outcome == SampleStepOutcome.Skipped)
+            _run.SkippedKeys.Add(step.Key);
+        return outcome;
+    }
 
     /// A purchase or sale through the stock voucher service; the paid amount follows the payment method (P9). The key
     /// then names the voucher's debt entry, when it posted one.
@@ -85,6 +92,15 @@ internal sealed class SampleStepExecutor
     /// voucher and its own debt entry, when it posted one.
     private async Task<SampleStepOutcome> CashVoucherAsync(SampleCashVoucherStep step, CancellationToken ct)
     {
+        var hasFixedAmount = step.FixedAmount is not null;
+        var hasTargets = step.Targets.Count > 0;
+        if (hasFixedAmount == hasTargets)
+            throw new SampleDataPlanException(
+                $"Bước {step.Key} phải có đúng một trong hai: số tiền cố định hoặc chứng từ cần đối trừ.");
+        // The service would refuse it too, without naming the key.
+        if (step.Targets.GroupBy(t => t.TargetKey).FirstOrDefault(g => g.Count() > 1) is { } twice)
+            throw new SampleDataPlanException($"Bước {step.Key} chọn khóa {twice.Key} hai lần.");
+
         var request = new UpsertCashVoucherRequest
         {
             Type = step.Type,
@@ -104,7 +120,9 @@ internal sealed class SampleStepExecutor
         }
         else
         {
+            // A skipped target has nothing open, so it allocates nothing.
             var targets = step.Targets
+                .Where(t => !_run.SkippedKeys.Contains(t.TargetKey))
                 .Select(t => (Entry: SampleRunState.Lookup(_run.Entries, t.TargetKey), t.MaxAmount))
                 .ToList();
             var open = await OpenAmountsAsync(targets.Select(t => t.Entry), ct);
@@ -147,9 +165,12 @@ internal sealed class SampleStepExecutor
         return SampleStepOutcome.Executed;
     }
 
-    /// Offsets what is open on both entries now: min(open receivable, open payable); 0 skips the step (S11).
+    /// Offsets what is open on both entries now: min(open receivable, open payable); 0 skips the step (S11), as does a
+    /// skipped target.
     private async Task<SampleStepOutcome> DebtOffsetAsync(SampleDebtOffsetStep step, CancellationToken ct)
     {
+        if (_run.SkippedKeys.Contains(step.ReceivableTargetKey) || _run.SkippedKeys.Contains(step.PayableTargetKey))
+            return SampleStepOutcome.Skipped;
         var partnerId = SampleRunState.Lookup(_run.Partners, step.PartnerCode);
         var receivable = SampleRunState.Lookup(_run.Entries, step.ReceivableTargetKey);
         var payable = SampleRunState.Lookup(_run.Entries, step.PayableTargetKey);
@@ -170,9 +191,12 @@ internal sealed class SampleStepExecutor
         return SampleStepOutcome.Executed;
     }
 
-    /// Cancels the cash voucher of step TargetKey at its current version; its settlements go with it.
+    /// Cancels the cash voucher of step TargetKey at its current version; its settlements go with it, so what it
+    /// settled is open again. A skipped target wrote no voucher, so the cancel is skipped too.
     private async Task<SampleStepOutcome> CancelAsync(SampleCancelStep step, CancellationToken ct)
     {
+        if (_run.SkippedKeys.Contains(step.TargetKey))
+            return SampleStepOutcome.Skipped;
         var voucherId = SampleRunState.Lookup(_run.CashVouchers, step.TargetKey);
         var service = _services.GetRequiredService<ICashVoucherService>();
         var voucher = await service.GetAsync(voucherId, ct);

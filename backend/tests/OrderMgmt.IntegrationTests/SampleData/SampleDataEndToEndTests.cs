@@ -5,6 +5,7 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
@@ -94,8 +95,11 @@ public class SampleDataEndToEndTests : ExecutiveDashboardTestBase
         aging.Buckets.Select(b => (b.From, b.To)).Should().Equal(new (int, int?)[] { (0, 30), (31, 60), (61, 90), (91, null) });
         aging.Totals.Amounts.Should().HaveCount(4).And.OnlyContain(amount => amount > 0);
 
-        var overdue = await GetReportAsync<DebtOverdueReportDto>("debt-overdue", $"side=Receivable&at={Iso(yesterday)}");
+        // The generator's end state at T (the day it runs): an overdue amount in each default overdue bucket.
+        var overdue = await GetReportAsync<DebtOverdueReportDto>("debt-overdue", $"side=Receivable&at={Iso(VnToday())}");
         overdue.Groups.Should().NotBeEmpty();
+        overdue.Buckets.Select(b => (b.From, b.To)).Should().Equal(new (int, int?)[] { (1, 30), (31, 60), (61, 90), (91, null) });
+        overdue.TotalAmounts.Should().HaveCount(4).And.OnlyContain(amount => amount > 0);
 
         var bySalesperson = await GetReportAsync<DebtBySalespersonReportDto>("debt-by-salesperson",
             $"side=Receivable&{period}");
@@ -158,7 +162,10 @@ public class SampleDataEndToEndTests : ExecutiveDashboardTestBase
         var from = Min(demoOpening, ReportDataset.OpeningDate);
         var to = Max(today.AddDays(-1), new DateOnly(2026, 10, 31));
         var companyQuery = $"side=Receivable&from={Iso(from)}&to={Iso(to)}&scope=Company";
-        var c0 = (await GetReportAsync<DebtBalanceReportDto>("debt-balance", companyQuery)).Totals;
+        var company = await GetReportAsync<DebtBalanceReportDto>("debt-balance", companyQuery);
+        company.Scope.Should().Be(ReportScope.Company);
+        var c0 = company.Totals;
+        c0.ClosingDebit.Should().BePositive("the report dataset has receivables");
 
         var e2e03 = await CreateDemoAndWaitAsync("E2E03");
         var e2e04 = await CreateDemoAndWaitAsync("E2E04");
@@ -173,11 +180,14 @@ public class SampleDataEndToEndTests : ExecutiveDashboardTestBase
         demoTotals.ClosingDebit.Should().BePositive("the demo branch has receivables the company total must not count");
         (await GetReportAsync<DebtBalanceReportDto>("debt-balance", companyQuery)).Totals.Should().BeEquivalentTo(c0);
 
+        var catalogRows = await SampleCatalogRowCountAsync();
+        catalogRows.Should().BePositive();
         await DeleteDemoAsync(e2e03);
-        (await SampleCatalogRowCountAsync()).Should().BePositive("E2E04 still uses the sample catalog");
+        (await SampleCatalogRowCountAsync()).Should().Be(catalogRows, "E2E04 still uses the whole sample catalog");
         (await InDbAsync(db => db.Products.IgnoreQueryFilters().CountAsync(p => p.Code == "DM-SP01"))).Should().Be(1);
 
-        await DeleteDemoAsync(e2e04);
+        var lastDelete = await DeleteDemoAsync(e2e04);
+        (lastDelete.KeptSampleProductCount, lastDelete.KeptSamplePartnerCount).Should().Be((0, 0));
         (await SampleCatalogRowCountAsync()).Should().Be(0, "the last demo delete removes the sample catalog");
         (await InDbAsync(db => db.ProductGroups.IgnoreQueryFilters().CountAsync(g => g.Code == "DM"))).Should().Be(0);
 
@@ -214,8 +224,8 @@ public class SampleDataEndToEndTests : ExecutiveDashboardTestBase
         return branch;
     }
 
-    /// The time split (catalog, the rest of the setup, the document steps) read from the rows' CreatedAt, and the
-    /// documents per type.
+    /// The time split read from the rows' CreatedAt, and the documents per type. "Plan + catalog" runs from the branch
+    /// row to its first warehouse: the wait in the queue, the plan's generation and the CATALOG item.
     private async Task WriteDatasetAsync(string code, Guid branchId)
     {
         var times = await InDbAsync(async db => new
@@ -233,7 +243,7 @@ public class SampleDataEndToEndTests : ExecutiveDashboardTestBase
                 .MaxAsync(t => (DateTimeOffset?)(t.UpdatedAt ?? t.CreatedAt)),
         });
         var lastStep = new[] { times.LastStock, times.LastCash, times.LastTransfer }.Max();
-        _output.WriteLine($"{code}: catalog {Seconds(times.Created, times.FirstWarehouse)} s, "
+        _output.WriteLine($"{code}: plan + catalog {Seconds(times.Created, times.FirstWarehouse)} s, "
             + $"rest of the setup {Seconds(times.FirstWarehouse, times.FirstStep)} s, "
             + $"steps {Seconds(times.FirstStep, lastStep)} s");
 

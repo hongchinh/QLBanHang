@@ -78,7 +78,7 @@ internal sealed partial class SampleDocumentSimulator
     }
 
     /// The document steps of `plan` (catalog, dates and opening balances already filled), in strictly increasing time.
-    /// `netExcludesVat` is the branch's inventory setting the voucher totals are estimated with.
+    /// `netExcludesVat` is the company-wide `InventorySettings.NetExcludesVat` the voucher totals are estimated with.
     public static List<SampleStep> Run(SampleRandom random, SampleDataPlan plan, bool netExcludesVat) =>
         new SampleDocumentSimulator(random, plan, netExcludesVat).Simulate();
 

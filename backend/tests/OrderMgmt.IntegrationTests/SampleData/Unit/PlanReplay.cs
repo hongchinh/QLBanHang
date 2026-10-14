@@ -87,7 +87,7 @@ public sealed class PlanReplay
     public decimal CreditBalance(string partnerCode) =>
         _debtList.Where(d => d.PartnerCode == partnerCode && d.Side == DebtSide.Receivable && d.IsIncrease).Sum(d => d.Open);
 
-    /// `netExcludesVat` is the branch's inventory setting the runner computes real totals with.
+    /// `netExcludesVat` is the company-wide `InventorySettings.NetExcludesVat` the real totals are computed with.
     public static PlanReplay Run(SampleDataPlan plan, Action<SampleStep, PlanReplay>? afterStep = null, bool netExcludesVat = false)
     {
         var replay = new PlanReplay(plan, netExcludesVat);

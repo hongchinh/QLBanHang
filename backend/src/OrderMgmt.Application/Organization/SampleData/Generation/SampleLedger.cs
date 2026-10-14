@@ -59,7 +59,7 @@ internal sealed class SampleLedger
     private readonly Dictionary<string, SampleProductSpec> _products;
     private readonly bool _netExcludesVat;
 
-    /// `netExcludesVat` is the branch's inventory setting, so estimated totals match the real ones.
+    /// `netExcludesVat` is the company-wide `InventorySettings.NetExcludesVat`, so estimated totals match the real ones.
     public SampleLedger(SampleDataPlan plan, bool netExcludesVat)
     {
         _netExcludesVat = netExcludesVat;

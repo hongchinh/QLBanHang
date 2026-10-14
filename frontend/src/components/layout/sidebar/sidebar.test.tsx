@@ -149,6 +149,7 @@ describe('Sidebar search', () => {
     await user.type(searchBox(), 'xyz');
     expect(screen.getByText('Không tìm thấy chức năng')).toBeInTheDocument();
     expect(screen.getByText('Thử từ khóa ngắn hơn')).toBeInTheDocument();
+    expect(document.querySelector('[data-icon="searchEmpty"]')).toBeInTheDocument();
   });
 
   it('treats a blank query as no search', async () => {

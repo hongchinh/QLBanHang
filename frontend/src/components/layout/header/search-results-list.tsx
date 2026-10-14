@@ -1,4 +1,4 @@
-import { Loader2, Search } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import type { CustomerSearchItem, GlobalSearchResult } from '@/features/search/api';
 import { cn } from '@/lib/utils';
 
@@ -33,7 +33,7 @@ export function SearchResultsList({
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 px-2 py-4 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <AppIcon name="loading" />
         Đang tìm…
       </div>
     );
@@ -71,7 +71,7 @@ export function SearchResultsList({
                 isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
               )}
             >
-              <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <AppIcon name="search" />
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{c.name}</div>
                 <div className="truncate text-xs text-muted-foreground">
@@ -109,7 +109,7 @@ export function SearchResultsList({
                   isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60',
                 )}
               >
-                <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+                <AppIcon name="search" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate font-medium">{q.code}</span>

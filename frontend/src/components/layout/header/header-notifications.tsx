@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Loader2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -55,7 +55,7 @@ export function HeaderNotifications() {
           aria-label={`Thông báo, ${unreadCount} chưa đọc`}
           className="relative flex h-11 w-11 items-center justify-center rounded-md text-header-fg hover:bg-header-active"
         >
-          <Bell className="h-5 w-5" />
+          <AppIcon name="notifications" size={20} />
           {unreadCount > 0 && (
             <span
               aria-hidden
@@ -85,7 +85,7 @@ export function HeaderNotifications() {
         <div className="max-h-[60vh] overflow-y-auto">
           {listQuery.isLoading ? (
             <div className="flex items-center gap-2 px-3 py-4 text-sm text-muted-foreground">
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <AppIcon name="loading" />
               Đang tải…
             </div>
           ) : items.length === 0 ? (

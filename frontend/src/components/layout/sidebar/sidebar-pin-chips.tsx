@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Link } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import type { NavItem } from '../nav-config';
@@ -47,7 +47,7 @@ export function SidebarPinChips({ items, activePath, onUnpin }: SidebarPinChipsP
                 onClick={() => onUnpin(item.to)}
                 className="mr-1 shrink-0 rounded-full opacity-0 group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-100"
               >
-                <X className="h-3 w-3" aria-hidden />
+                <AppIcon name="close" size={12} />
               </button>
             </li>
           );

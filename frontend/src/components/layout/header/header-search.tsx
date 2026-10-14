@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useGlobalSearch, SEARCH_MIN_LENGTH } from '@/features/search/hooks';
@@ -99,7 +99,7 @@ export function HeaderSearch() {
     <Popover open={showPopover} onOpenChange={(o) => !o && close()}>
       <PopoverAnchor asChild>
         <div className="relative hidden h-10 w-full max-w-[320px] md:block md:max-w-[240px] lg:max-w-[320px]">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <AppIcon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             ref={inputRef}
             type="search"

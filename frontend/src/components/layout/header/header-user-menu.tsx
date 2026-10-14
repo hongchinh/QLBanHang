@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +40,7 @@ export function HeaderUserMenu({ user, onLogout }: HeaderUserMenuProps) {
           <span className="hidden max-w-[160px] truncate text-sm font-medium lg:inline">
             {user.fullName}
           </span>
-          <ChevronDown className="hidden h-4 w-4 lg:inline" />
+          <AppIcon name="chevronDown" className="hidden lg:inline" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

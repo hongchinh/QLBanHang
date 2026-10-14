@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { FileText, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { logoUrl } from '@/features/branding/api';
 import { useBrandingMeta } from '@/features/branding/hooks';
@@ -23,7 +23,7 @@ export function BrandBlock({ collapsed, onToggleCollapse }: BrandBlockProps) {
     />
   ) : (
     <>
-      <FileText className="h-6 w-6 shrink-0" />
+      <AppIcon name="brandFallback" size={24} />
       <span className="truncate text-base font-bold">QLBanHang</span>
     </>
   );
@@ -35,7 +35,7 @@ export function BrandBlock({ collapsed, onToggleCollapse }: BrandBlockProps) {
       className="h-8 w-8 object-contain"
     />
   ) : (
-    <FileText className="h-6 w-6 shrink-0" />
+    <AppIcon name="brandFallback" size={24} />
   );
 
   return (
@@ -65,7 +65,7 @@ export function BrandBlock({ collapsed, onToggleCollapse }: BrandBlockProps) {
             aria-label="Mở rộng menu"
             className="mx-auto flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
           >
-            {hasMark ? markLogo : <PanelLeftOpen className="h-5 w-5" />}
+            {hasMark ? markLogo : <AppIcon name="sidebarExpand" size={20} />}
           </button>
         ) : (
           <>
@@ -81,7 +81,7 @@ export function BrandBlock({ collapsed, onToggleCollapse }: BrandBlockProps) {
               aria-label="Thu gọn menu"
               className="mr-1 flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             >
-              <PanelLeftClose className="h-5 w-5" />
+              <AppIcon name="sidebarCollapse" size={20} />
             </button>
           </>
         )}

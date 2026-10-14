@@ -1,4 +1,4 @@
-import { Menu } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import { useLogout } from '@/features/auth/hooks';
@@ -27,7 +27,7 @@ export function AppHeader() {
         onClick={openMobileDrawer}
         className="ml-2 flex h-11 w-11 items-center justify-center rounded-md text-header-fg hover:bg-header-active md:hidden"
       >
-        <Menu className="h-5 w-5" />
+        <AppIcon name="menu" size={20} />
       </button>
 
       <BrandBlock collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />

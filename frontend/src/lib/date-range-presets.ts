@@ -7,7 +7,10 @@ export interface PresetOption {
   label: string;
 }
 
-// The only implementation of the range presets: every chip list (dashboards, quotation filter) calls it.
+// The chip presets, ranges that end today: every chip list (the dashboards' RangePicker, the quotation date
+// filter) calls it. The report period presets (whole months, quarters and years, for PeriodPresetSelect) live
+// in lib/period-presets.ts; neither module copies the other's ranges, and "Năm nay" differs between them
+// (here 1 January to today, there the whole year).
 export function computePreset(preset: RangePreset, today: Date = new Date()): { from: string; to: string } {
   let start: Date;
   let end: Date = today;

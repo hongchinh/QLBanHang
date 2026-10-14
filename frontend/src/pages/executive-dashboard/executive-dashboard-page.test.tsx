@@ -56,6 +56,8 @@ const branchScope = (): Scope => ({
   branches: [B1, B2],
   selectCompany: vi.fn(),
   selectBranch: vi.fn(),
+  unknown: false,
+  retry: vi.fn(),
 });
 // Every panel is registered; this access keeps the bar at the overview alone.
 const overviewOnly = (): Access => ({ sales: true, cash: true, debt: true, inventory: true, tabs: ['overview'] });
@@ -270,6 +272,85 @@ describe('ExecutiveDashboardPage', () => {
     renderPage();
 
     expect(screen.getByRole('tablist')).toHaveClass('max-w-full', 'overflow-x-auto', 'justify-start');
+  });
+
+  // A page left open overnight with the default period moves to the new day: the tabs get the new period (and
+  // build new query keys from it), and the comparison period follows.
+  describe('without a period in the URL', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // Saturday 31 October 2026, 23:59:30 in VN time.
+      vi.setSystemTime(new Date(2026, 9, 31, 23, 59, 30));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('follows the VN date past midnight', () => {
+      renderPage('/dashboard/executive');
+      expect(lastOverviewProps().params).toEqual({ from: '2026-10-01', to: '2026-10-31', branchId: 'b1' });
+      expect(screen.getByText('So với kỳ trước: 31/08/2026 – 30/09/2026')).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(30_000));
+
+      expect(lastOverviewProps().params).toEqual({ from: '2026-11-01', to: '2026-11-01', branchId: 'b1' });
+      expect(screen.getByText('So với kỳ trước: 31/10/2026 – 31/10/2026')).toBeInTheDocument();
+      // A preset still (on the 1st "Hôm nay" comes first), not "Tuỳ chỉnh".
+      expect(screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' })).not.toHaveClass('bg-foreground');
+      expect(screen.getByTestId('search')).toBeEmptyDOMElement();
+    });
+
+    it('keeps a period given in the URL', () => {
+      renderPage('/dashboard/executive?from=2026-10-01&to=2026-10-31');
+
+      act(() => vi.advanceTimersByTime(60_000));
+
+      expect(lastOverviewProps().params).toEqual({ from: '2026-10-01', to: '2026-10-31', branchId: 'b1' });
+    });
+  });
+
+  describe('a period the API refuses', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      // Tuesday 13 October 2026.
+      vi.setSystemTime(new Date(2026, 9, 13, 10, 0, 0));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('in the URL gives way to the default period and its comparison period', () => {
+      renderPage('/dashboard/executive?from=2026-10-20&to=2026-10-01');
+
+      expect(lastOverviewProps().params).toEqual({ from: '2026-10-01', to: '2026-10-13', branchId: 'b1' });
+      expect(screen.getByText('So với kỳ trước: 18/09/2026 – 30/09/2026')).toBeInTheDocument();
+    });
+
+    it('cannot be applied from "Tuỳ chỉnh", which gives the reason of the API', () => {
+      renderPage();
+      fireEvent.click(screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' }));
+      fireEvent.change(screen.getByLabelText('Từ ngày'), { target: { value: '2022-10-01' } });
+      fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: '2026-10-13' } });
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Khoảng thời gian tối đa là 3 năm.');
+      expect(screen.getByRole('button', { name: 'Áp dụng' })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+      expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('from')).toBe('2026-10-01');
+    });
+  });
+
+  // /me/branches failed for a user of every branch: without a branch id the server would answer for the whole
+  // company under a page that names no scope. The page says so and offers a retry instead of the tabs.
+  it('an unknown scope shows an error with a retry instead of the tabs', () => {
+    const retry = vi.fn();
+    state.scope = {
+      ...branchScope(), canSwitch: false, branchId: undefined, workingBranch: undefined, branches: [], unknown: true, retry,
+    };
+    renderPage();
+
+    expect(screen.getByRole('heading', { level: 1, name: 'Điều hành' })).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent('Không tải được danh sách chi nhánh');
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+    expect(overviewTab).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Thử lại' }));
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 
   it('a user who cannot switch gets no scope select', () => {

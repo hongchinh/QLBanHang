@@ -55,8 +55,9 @@ export function StatTile({
   const canOpenLink = useCanOpenLink();
   const busy = loading || stale || undefined;
 
-  // Seven tiles share a row at 1366 px: a label or a hint that does not fit is cut on its line (the title
-  // carries the full text) instead of wrapping and pushing this tile's value below the others.
+  // Seven tiles share a row at 1366 px. A label that does not fit is cut on its line (the title carries the
+  // full text): wrapping would push this tile's value below the others. The hint sits under the value, so it
+  // wraps instead and no figure in it is hidden; the tiles of a row stretch to the tallest.
   const content = (
     <>
       <div className="flex items-start justify-between gap-2 text-xs text-muted-foreground">
@@ -77,7 +78,8 @@ export function StatTile({
           {error ? '—' : (value ?? '—')}
         </div>
       )}
-      <div className={cn('mt-0.5 flex min-h-4 items-center gap-x-1.5 whitespace-nowrap text-xs', stale && STALE_CLASS)}>
+      {/* Flowing text: the hint goes on next to the delta and wraps under it. */}
+      <div className={cn('mt-0.5 min-h-4 text-xs leading-4', stale && STALE_CLASS)}>
         {delta !== undefined && <DeltaBadge delta={delta} />}
         {error ? (
           <button type="button" onClick={() => onRetry?.()} className="text-primary hover:underline">
@@ -85,10 +87,7 @@ export function StatTile({
           </button>
         ) : (
           hint != null && (
-            <span
-              className={cn('min-w-0 truncate', HINT_TONE[hintTone])}
-              title={typeof hint === 'string' ? hint : undefined}
-            >
+            <span className={HINT_TONE[hintTone]} title={typeof hint === 'string' ? hint : undefined}>
               {hint}
             </span>
           )
@@ -119,11 +118,12 @@ export function StatTile({
 }
 
 function DeltaBadge({ delta }: { delta: number | null }) {
-  if (delta === null) return <span className="shrink-0 text-muted-foreground">—</span>;
+  // In one piece, with a gap before the hint.
+  if (delta === null) return <span className="mr-1.5 whitespace-nowrap text-muted-foreground">—</span>;
   // Zero counts as a rise, as formatDelta does for the quotation dashboards.
   const rise = delta >= 0;
   return (
-    <span className={cn('shrink-0 font-medium', rise ? 'text-emerald-700' : 'text-rose-700')}>
+    <span className={cn('mr-1.5 whitespace-nowrap font-medium', rise ? 'text-emerald-700' : 'text-rose-700')}>
       {rise ? '▲' : '▼'} {formatPct(Math.abs(delta))}
     </span>
   );

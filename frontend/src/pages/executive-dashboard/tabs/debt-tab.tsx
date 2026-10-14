@@ -100,7 +100,7 @@ export function DebtTab({ params }: DebtTabProps) {
   ];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <TileCard
         title="Cơ cấu nợ phải thu"
         query={summary}
@@ -127,8 +127,9 @@ export function DebtTab({ params }: DebtTabProps) {
         title="Khách vượt hạn mức"
         query={breakdown}
         isEmpty={overLimit.length === 0}
-        // The credit limits are no report: they are managed per branch, the branch hint does not apply.
-        action={{ label: 'Hạn mức nợ →', to: executiveLinks.creditLimits() }}
+        // The credit limits page lists the limits of the working branch only (they are kept per branch), while
+        // this list covers the scope: the branch hint applies.
+        action={{ label: 'Hạn mức nợ →', to: executiveLinks.creditLimits(), title: linkTitle }}
       >
         <DataTable columns={overLimitColumns} rows={overLimit} rowKey={(row) => `${row.partnerId}-${row.branchId}`} />
       </TileCard>

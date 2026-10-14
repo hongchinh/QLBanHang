@@ -31,7 +31,7 @@ const B2: Branch = { id: 'b2', code: 'CN02', name: 'Hưng Yên' };
 const B3: Branch = { id: 'b3', code: 'CN03', name: 'Đà Nẵng' };
 const branchScope = (): Scope => ({
   canSwitch: true, mode: 'branch', branchId: 'b1', workingBranch: B1, branches: [B1, B2, B3],
-  selectCompany: vi.fn(), selectBranch: vi.fn(),
+  selectCompany: vi.fn(), selectBranch: vi.fn(), unknown: false, retry: vi.fn(),
 });
 const allDomains = (): Access => ({
   sales: true, cash: true, debt: true, inventory: true, tabs: ['overview', 'sales', 'cash', 'debt', 'inventory'],
@@ -253,6 +253,20 @@ describe('KpiRow', () => {
       expect(within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/).textContent).toBe('Tỷ suất 13% (▼ 1,5 điểm)');
     });
 
+    // A change that rounds to 0 points has no arrow: "▲ 0" would read as a rise of a margin that fell.
+    it.each([
+      ['a fall', 14.5, 14.54],
+      ['a rise', 14.54, 14.5],
+      ['no change', 14.5, 14.5],
+    ])('%s that rounds to 0 points is "±0 điểm", without an arrow', (_case, marginPct, prevMarginPct) => {
+      answer(useSalesSummary, ok({ ...SALES, marginPct, prevMarginPct }));
+      renderRow();
+
+      const hint = within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/).textContent;
+      expect(hint).toMatch(/^Tỷ suất 14,5% \(±0 điểm\)$/);
+      expect(hint).not.toMatch(/[▲▼]/);
+    });
+
     it('has no change without a previous margin', () => {
       answer(useSalesSummary, ok({ ...SALES, prevMarginPct: null }));
       renderRow();
@@ -464,12 +478,14 @@ describe('KpiRow', () => {
     });
   });
 
-  // Seven tiles in one row at 1366 px: they must not depend on text wrapping to line up.
-  it('lays seven tiles in one row on wide screens, each label and hint on one line with its full text as title', () => {
+  // Seven tiles in one row at 1366 px: a label stays on one line so the values line up; a hint wraps under the
+  // value, so no figure in it is cut off.
+  it('lays seven tiles in one row on wide screens, each label on one line, each hint whole, with the full text as title', () => {
     renderRow();
 
     const grid = screen.getByRole('group', { name: 'Trong kỳ' }).parentElement;
-    expect(grid).toHaveClass('grid', 'xl:grid-cols-7');
+    // One column that can shrink on a phone, so a long hint never widens the page.
+    expect(grid).toHaveClass('grid', 'grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-4', 'xl:grid-cols-7');
     for (const label of LABELS) {
       const element = screen.getByText(label);
       expect(element).toHaveClass('truncate');
@@ -477,7 +493,8 @@ describe('KpiRow', () => {
     }
     for (const hint of ['so với kỳ trước', 'Thu 2,10 tỷ · Chi 1,91 tỷ', 'TM 210 tr · NH 1,05 tỷ', 'Quá hạn 420 tr', 'Đến hạn 7 ngày: 310 tr', '318 mã · 3 kho', 'Tỷ suất 14,5% (▲ 0,8 điểm)']) {
       const element = screen.getByText(hint);
-      expect(element).toHaveClass('truncate');
+      expect(element).not.toHaveClass('truncate');
+      expect(element.parentElement?.className).not.toMatch(/\b(whitespace-nowrap|truncate|line-clamp-\d)\b/);
       expect(element).toHaveAttribute('title', hint);
     }
   });

@@ -89,7 +89,7 @@ export function CashTab({ params }: CashTabProps) {
   ];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <TileCard
         title="Số dư các quỹ"
         query={summary}
@@ -102,6 +102,7 @@ export function CashTab({ params }: CashTabProps) {
         <CashFlowChart
           points={points}
           granularity={granularity}
+          labelGranularity={series.data?.granularity}
           onGranularityChange={setGranularity}
           dayDisabled={!isDayGranularityAllowed(from, to)}
           height={280}

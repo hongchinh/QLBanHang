@@ -11,7 +11,7 @@ interface AttentionListProps {
   today: string;
   from: string;
   to: string;
-  // The title of the report links (which branch the report opens for).
+  // The title of the links (which branch the page opens for).
   linkTitle?: string;
 }
 
@@ -20,7 +20,7 @@ interface Row {
   text: string;
   sub: (item: AttentionItem) => string | null;
   to: string;
-  // The tooltip of the link: the branch hint on the report rows only.
+  // The tooltip of the link: the branch hint.
   title: string | undefined;
   // The dot of an item that needs attention.
   dot: string;
@@ -47,8 +47,9 @@ export function AttentionList({ attention, today, from, to, linkTitle }: Attenti
       text: 'Khách vượt hạn mức nợ',
       sub: (item) => (item.amount == null ? null : `vượt ${formatVnd(item.amount)}`),
       to: executiveLinks.creditLimits(),
-      // Not a report: the credit limits are managed per branch, the hint does not apply.
-      title: undefined,
+      // The credit limits page lists the limits of the working branch only (they are kept per branch), while
+      // the count covers the scope: the branch hint applies.
+      title: linkTitle,
       dot: 'bg-rose-500',
     },
     {

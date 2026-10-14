@@ -7,10 +7,31 @@ import type { SeriesGranularity } from './types';
 const DAY_MS = 86_400_000;
 // The server refuses a daily series longer than this.
 const MAX_DAILY_DAYS = 366;
+// The limits of ExecutiveQueryValidator (ReportDates.Min/Max, MaxDays).
+const MIN_DATE = '2000-01-01';
+const MAX_DATE = '2100-12-31';
+const MAX_DAYS = 1100;
 
 function parseYmd(value: string): Date {
   const [year, month, day] = value.split('-').map(Number);
   return new Date(year, month - 1, day);
+}
+
+// A real 'yyyy-MM-dd' date within the dates the server accepts (strings of that form compare as dates).
+function isAcceptedDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value < MIN_DATE || value > MAX_DATE) return false;
+  // 2026-02-30 would roll over into March.
+  return formatDateYmd(parseYmd(value)) === value;
+}
+
+// Why the server would refuse the period (its message), or null: the dates must exist, lie between 2000 and
+// 2100, be in order and span at most 1,100 days.
+export function periodError(from: string, to: string): string | null {
+  if (!isAcceptedDate(from)) return 'Từ ngày không hợp lệ.';
+  if (!isAcceptedDate(to)) return 'Đến ngày không hợp lệ.';
+  if (to < from) return 'Đến ngày phải sau hoặc bằng từ ngày.';
+  if (rangeDays(from, to) > MAX_DAYS) return 'Khoảng thời gian tối đa là 3 năm.';
+  return null;
 }
 
 function addDays(date: Date, days: number): Date {
@@ -51,4 +72,15 @@ export function isDayGranularityAllowed(from: string, to: string): boolean {
 export function bucketLabel(date: string, granularity: SeriesGranularity): string {
   const [year, month, day] = date.slice(0, 10).split('-');
   return granularity === 'Month' ? `${month}/${year}` : `${day}/${month}`;
+}
+
+const GRANULARITY_UNIT: Record<SeriesGranularity, string> = { Day: 'ngày', Week: 'tuần', Month: 'tháng' };
+
+// "theo ngày, 01/10 – 13/10": the kind of bucket and the first and last bucket, for the text of a chart.
+export function seriesSpan(dates: string[], granularity: SeriesGranularity): string {
+  const unit = `theo ${GRANULARITY_UNIT[granularity]}`;
+  if (dates.length === 0) return unit;
+  const first = bucketLabel(dates[0], granularity);
+  const last = bucketLabel(dates[dates.length - 1], granularity);
+  return `${unit}, ${first === last ? first : `${first} – ${last}`}`;
 }

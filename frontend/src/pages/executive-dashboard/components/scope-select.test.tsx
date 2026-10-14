@@ -24,6 +24,8 @@ const scope = (over: Partial<Scope> = {}): Scope => ({
   branches: [B1, B2],
   selectCompany,
   selectBranch,
+  unknown: false,
+  retry: vi.fn(),
   ...over,
 });
 

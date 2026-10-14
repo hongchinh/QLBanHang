@@ -14,8 +14,9 @@ export const executiveLinks = {
   creditLimits: () => '/credit-limits',
 };
 
-// The hint of a report link when the dashboard shows more than the report will: the reports follow the
-// working branch, the dashboard may show the whole company. Undefined when both show the same.
+// The hint of a link when the dashboard shows more than the page it opens will: the reports, stock on hand and
+// the credit limits follow the working branch, the dashboard may show the whole company. Undefined when both
+// show the same.
 export function reportLinkTitle(
   mode: ExecutiveScopeMode,
   branchCount: number,

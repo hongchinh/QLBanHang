@@ -55,7 +55,7 @@ const B3: Branch = { id: 'b3', code: 'CN03', name: 'Đà Nẵng' };
 const selectBranch = vi.fn();
 const companyScope = (): Scope => ({
   canSwitch: true, mode: 'company', branchId: undefined, workingBranch: B1, branches: [B1, B2, B3],
-  selectCompany: vi.fn(), selectBranch,
+  selectCompany: vi.fn(), selectBranch, unknown: false, retry: vi.fn(),
 });
 const branchScope = (): Scope => ({ ...companyScope(), mode: 'branch', branchId: 'b1' });
 const allDomains = (): Access => ({
@@ -182,6 +182,8 @@ function renderTab(params: ExecutiveParams = MONTH, openTabs: ExecutiveTab[] = [
 }
 
 const tile = (title: string) => screen.getByRole('region', { name: title });
+const xTicks = (element: HTMLElement) =>
+  Array.from(element.querySelectorAll('.recharts-xAxis .recharts-cartesian-axis-tick-value')).map((t) => t.textContent);
 const TITLES = [
   'Doanh thu – giá vốn – lãi gộp',
   'Dòng tiền thu – chi',
@@ -220,6 +222,20 @@ describe('OverviewTab', () => {
     expect(screen.getByText('Doanh thu xuất bán')).toBeInTheDocument();
     expect(screen.getByText('Tồn quỹ')).toBeInTheDocument();
     for (const title of TITLES) expect(tile(title)).toBeInTheDocument();
+  });
+
+  // Below xl the two column groups stack, below lg the tiles share one column; every column can shrink, so a
+  // wide table or a long line stays inside its tile instead of making the page wider than the screen.
+  it('lays the tiles in shrinkable columns at every width', () => {
+    renderTab();
+
+    const tiles = tile('Doanh thu – giá vốn – lãi gộp').parentElement;
+    expect(tiles).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    for (const title of TITLES.slice(0, 5)) expect(tile(title).parentElement).toBe(tiles);
+    const columns = tiles?.parentElement;
+    expect(columns).toHaveClass('grid', 'grid-cols-1', 'xl:grid-cols-[minmax(0,1fr)_280px]');
+    expect(tile('Cần chú ý').parentElement?.parentElement).toBe(columns);
+    expect(within(tile('So sánh chi nhánh')).getByRole('table').parentElement).toHaveClass('w-full', 'overflow-auto');
   });
 
   it('fills the tiles from their queries', () => {
@@ -452,6 +468,19 @@ describe('OverviewTab', () => {
       }
     });
 
+    // keepPreviousData keeps the daily points on screen while the monthly ones load.
+    it('both charts label the points on screen by their own granularity while another one loads', () => {
+      renderTab();
+
+      fireEvent.click(within(tile('Doanh thu – giá vốn – lãi gộp')).getByRole('button', { name: 'Tháng' }));
+
+      expect(granularities(useSalesSeries).at(-1)).toEqual(['2026-10-01', 'Month']);
+      expect(granularities(useCashSeries).at(-1)).toEqual(['2026-10-01', 'Month']);
+      // The mocks still answer the daily series, as the placeholder data would.
+      expect(xTicks(tile('Doanh thu – giá vốn – lãi gộp'))).toEqual(['01/10', '02/10']);
+      expect(xTicks(tile('Dòng tiền thu – chi'))).toEqual(['01/10', '02/10']);
+    });
+
     it('the toggle is on the profit chart only', () => {
       renderTab();
 
@@ -533,14 +562,33 @@ describe('OverviewTab', () => {
       expect(within(cash).queryByText('Chưa có dữ liệu.')).not.toBeInTheDocument();
     });
 
-    it('a period without cash movement still shows the fund balances', () => {
+    // "Chưa có dữ liệu." above a filled fund table would read as "no data" right above data.
+    it('a period without cash movement says so and still shows the fund balances', () => {
       answer(useCashSeries, ok({ granularity: 'Day', points: [{ date: '2026-10-01', receipts: 0, payments: 0 }] }));
       renderTab();
 
       const cash = tile('Dòng tiền thu – chi');
-      expect(within(cash).getByText('Chưa có dữ liệu.')).toBeInTheDocument();
+      expect(within(cash).getByText('Không có thu chi trong kỳ.')).toBeInTheDocument();
+      expect(within(cash).queryByText('Chưa có dữ liệu.')).not.toBeInTheDocument();
       expect(cash.querySelector('svg.recharts-surface')).toBeNull();
       expect(within(cash).getByText('CN01 · QTM – Tiền mặt')).toBeInTheDocument();
+    });
+
+    // When the series answers first, the tile must not say "no data" and then pop the funds in.
+    it.each([
+      ['without', { granularity: 'Day', points: [] }],
+      ['with', CASH_SERIES],
+    ])('stays on its skeleton until the fund balances have loaded, a series %s movement having answered', (_case, series) => {
+      answer(useCashSeries, ok(series));
+      answer(useCashSummary, ok(undefined, { isLoading: true }));
+      renderTab();
+
+      const cash = tile('Dòng tiền thu – chi');
+      expect(cash).toHaveAttribute('aria-busy', 'true');
+      expect(cash.querySelector('.animate-pulse')).not.toBeNull();
+      expect(within(cash).queryByText('Chưa có dữ liệu.')).not.toBeInTheDocument();
+      expect(within(cash).queryByText('Không có thu chi trong kỳ.')).not.toBeInTheDocument();
+      expect(cash.querySelector('svg.recharts-surface')).toBeNull();
     });
 
     it('no cash movement and no fund: the tile is empty', () => {

@@ -45,7 +45,7 @@ export function TileCard({ title, action, query, isEmpty, emptyText, className, 
     <section
       aria-labelledby={titleId}
       aria-busy={query?.isLoading || stale || undefined}
-      className={cn('rounded-xl border border-border bg-card p-4 shadow-sm', className)}
+      className={cn('min-w-0 rounded-xl border border-border bg-card p-4 shadow-sm', className)}
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 id={titleId} className="text-sm font-semibold text-foreground">

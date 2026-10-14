@@ -73,7 +73,7 @@ export function InventoryTab({ params }: InventoryTabProps) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="Giá trị tồn kho"
           value={compact(s?.stockValue)}
@@ -90,7 +90,7 @@ export function InventoryTab({ params }: InventoryTabProps) {
           {...tileState}
         />
       </div>
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <TileCard title="Giá trị tồn theo kho" query={breakdown} isEmpty={byWarehouse.length === 0} action={stockOnHand}>
           <DataTable columns={warehouseColumns} rows={byWarehouse} rowKey={(row, index) => row.id ?? `none-${index}`} />
         </TileCard>

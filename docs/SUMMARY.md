@@ -8,7 +8,7 @@ System design, component interactions, data flows, deployment, and external inte
 
 | File | Description |
 | ---- | ----------- |
-| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile), API response, soft-delete/audit, migration/seed, logging and frontend layering |
+| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile), the executive dashboard (metrics services, scope, routes and permissions, which figures are tested against which report, the real-time `DashboardChanged` SignalR signal), API response, soft-delete/audit, migration/seed, logging and frontend layering |
 
 ## Codebase
 
@@ -16,7 +16,7 @@ Directory structure, entry points, API patterns, and key modules.
 
 | File | Description |
 | ---- | ----------- |
-| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile and the TT133 report forms), API controllers, entry points, runtime artifacts and production configuration keys |
+| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms, the executive dashboard and the real-time signal), API controllers, entry points, runtime artifacts and production configuration keys |
 
 ## Code Standard
 
@@ -24,7 +24,7 @@ Conventions, naming rules, tech stack versions, and development workflows.
 
 | File | Description |
 | ---- | ----------- |
-| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A) and TT133 report form patterns |
+| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets) |
 
 ## Project PDR
 
@@ -32,7 +32,7 @@ Product goals, use cases, business rules, and constraints.
 
 | File | Description |
 | ---- | ----------- |
-| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports and the TT133 report forms), planned Round 3 scope and non-goals |
+| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms and the executive dashboard), planned Round 3 scope and role dashboards, and non-goals |
 
 ## Other
 

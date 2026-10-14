@@ -160,10 +160,13 @@ frontend/src/
 │   ├── credit-limits/
 │   ├── customers/
 │   ├── dashboard/               # quotation dashboards; format.ts (also compact money and percent) and the shared tiles
-│   │                            # in components/: TileCard, StatTile, LiveStatus, RangePicker (optional `presets`)
+│   │                            # in components/: TileCard (+ TileError), StatTile, LiveStatus, RangePicker (optional
+│   │                            # `presets`); stat-tile-state.ts (statTileState: the StatTile props that follow a query)
 │   ├── debt/                    # partner summary, open items, matching helpers, settlements
 │   ├── debt-offsets/
 │   ├── executive-dashboard/     # types, api, keys (['executive']), hooks (executiveQueryOptions), presets, links, period,
+│   │                            # series.ts (usePeriodGranularity, isSalesSeriesEmpty / isCashSeriesEmpty), labels.ts
+│   │                            # (table texts: codeName, withBranch, formatAmount, formatCompactAmount),
 │   │                            # use-executive-params / -scope / -access / -live
 │   ├── fund-transfers/
 │   ├── funds/
@@ -192,7 +195,8 @@ frontend/src/
 │   ├── credit-limits/
 │   ├── customers/
 │   ├── debt/                    # /debt/opening, /debt/matching, /debt/offsets list + form
-│   ├── executive-dashboard/     # /dashboard/executive: page shell; components/ (KPI row, charts, DataTable, BranchDocumentLink,
+│   ├── executive-dashboard/     # /dashboard/executive: page shell; components/ (KPI row, charts, GranularityToggle and
+│   │                            # SegmentedToggle, DataTable, fund table, debt term bar, branch table, BranchDocumentLink,
 │   │                            # ScopeSelect, attention list, recent feed); tabs/ (overview, sales, cash, debt, inventory)
 │   ├── fund-transfers/          # /fund-transfers list + form
 │   ├── funds/                   # funds and fund opening balance

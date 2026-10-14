@@ -10,4 +10,7 @@ public interface IInventoryMetricsService
 
     /// Stock value now per branch of the scope. No permission check: the caller masks.
     Task<IReadOnlyDictionary<Guid, decimal>> GetValueByBranchAsync(ExecutiveScope scope, CancellationToken ct = default);
+
+    /// Number of product × warehouse pairs below zero in the scope.
+    Task<int> CountNegativeStockAsync(ExecutiveScope scope, CancellationToken ct = default);
 }

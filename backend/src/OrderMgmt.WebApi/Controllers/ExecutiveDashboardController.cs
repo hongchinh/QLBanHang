@@ -9,7 +9,8 @@ using OrderMgmt.WebApi.Authorization;
 namespace OrderMgmt.WebApi.Controllers;
 
 /// Executive dashboard (Bảng điều hành): read-only. Each action needs dashboard.executive and the report permission
-/// of its domain; the branch comparison needs branches.access_all instead.
+/// of its domain; the branch comparison needs branches.access_all instead. The attention list and the recent
+/// documents need nothing more: they show only the parts the user may read.
 [Route("api/dashboard/executive")]
 [HasPermission(Permissions.Dashboard.Executive)]
 public class ExecutiveDashboardController : ApiControllerBase
@@ -22,10 +23,12 @@ public class ExecutiveDashboardController : ApiControllerBase
     private readonly IValidator<ExecutiveQuery> _queryValidator;
     private readonly IValidator<ExecutiveSeriesQuery> _seriesValidator;
     private readonly IValidator<SalesTopQuery> _topValidator;
+    private readonly IValidator<RecentQuery> _recentValidator;
 
     public ExecutiveDashboardController(ISalesMetricsService sales, ICashMetricsService cash, IDebtMetricsService debt,
         IInventoryMetricsService inventory, IExecutiveOverviewService overview, IValidator<ExecutiveQuery> queryValidator,
-        IValidator<ExecutiveSeriesQuery> seriesValidator, IValidator<SalesTopQuery> topValidator)
+        IValidator<ExecutiveSeriesQuery> seriesValidator, IValidator<SalesTopQuery> topValidator,
+        IValidator<RecentQuery> recentValidator)
     {
         _sales = sales;
         _cash = cash;
@@ -35,6 +38,7 @@ public class ExecutiveDashboardController : ApiControllerBase
         _queryValidator = queryValidator;
         _seriesValidator = seriesValidator;
         _topValidator = topValidator;
+        _recentValidator = recentValidator;
     }
 
     [HttpGet("sales/summary")]
@@ -134,5 +138,20 @@ public class ExecutiveDashboardController : ApiControllerBase
     {
         await _queryValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _overview.GetBranchComparisonAsync(query, ct));
+    }
+
+    [HttpGet("attention")]
+    public async Task<ActionResult<ApiResponse<AttentionDto>>> Attention([FromQuery] ExecutiveQuery query, CancellationToken ct)
+    {
+        await _queryValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _overview.GetAttentionAsync(query, ct));
+    }
+
+    [HttpGet("recent")]
+    public async Task<ActionResult<ApiResponse<List<RecentDocumentDto>>>> Recent([FromQuery] RecentQuery query,
+        CancellationToken ct)
+    {
+        await _recentValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _overview.GetRecentAsync(query, ct));
     }
 }

@@ -6,4 +6,6 @@ namespace OrderMgmt.Application.Dashboards.Executive.Interfaces;
 public interface IExecutiveOverviewService
 {
     Task<List<BranchComparisonRowDto>> GetBranchComparisonAsync(ExecutiveQuery query, CancellationToken ct = default);
+    Task<AttentionDto> GetAttentionAsync(ExecutiveQuery query, CancellationToken ct = default);
+    Task<List<RecentDocumentDto>> GetRecentAsync(RecentQuery query, CancellationToken ct = default);
 }

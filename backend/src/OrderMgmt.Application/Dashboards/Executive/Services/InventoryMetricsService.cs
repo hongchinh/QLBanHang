@@ -271,6 +271,10 @@ public class InventoryMetricsService : IInventoryMetricsService
         CancellationToken ct = default) =>
         (await LoadPairsAsync(scope, ct)).GroupBy(p => p.BranchId).ToDictionary(g => g.Key, g => g.Sum(p => p.Value));
 
+    /// The number of product × warehouse pairs of the scope below zero now. Runs inside the caller's snapshot.
+    public async Task<int> CountNegativeStockAsync(ExecutiveScope scope, CancellationToken ct = default) =>
+        BelowZero(await LoadBalancesAsync(scope, ct)).Count();
+
     /// The quantities now (kept up to date on every ledger change) of every product and warehouse of the scope.
     private async Task<List<BalanceRow>> LoadBalancesAsync(ExecutiveScope scope, CancellationToken ct)
     {

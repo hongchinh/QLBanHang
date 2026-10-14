@@ -37,7 +37,7 @@ public class Tt133FormRenderer : ITt133FormRenderer
     public byte[] RenderStockDetail(Tt133FormContext context, IReadOnlyList<StockCardSheet> sheets) =>
         Render(workbook => StockDetailForm.Write(workbook, context, sheets));
 
-    private static byte[] Render(Action<XLWorkbook> write)
+    internal static byte[] Render(Action<XLWorkbook> write)
     {
         using var workbook = new XLWorkbook();
         write(workbook);

@@ -177,6 +177,14 @@ const funds: Fund[] = [
   fund(FUND_BANK, 'NH01', 'Bank', { isDefault: true }),
 ];
 
+let printProps: Record<string, unknown> = {};
+vi.mock('@/components/voucher-print/voucher-print-button', () => ({
+  VoucherPrintButton: (props: { disabled?: boolean; disabledReason?: string }) => {
+    printProps = props as Record<string, unknown>;
+    return <button type="button" data-testid="voucher-print" disabled={props.disabled} title={props.disabledReason} />;
+  },
+}));
+
 vi.mock('@/features/warehouses/hooks', () => ({ useWarehouses: () => ({ data: warehouses }) }));
 vi.mock('@/features/stock-reasons/hooks', () => ({
   useStockReasons: (params: unknown) => {
@@ -353,6 +361,7 @@ function dialog() {
 
 describe('StockVoucherFormPage', () => {
   beforeEach(() => {
+    printProps = {};
     localStorage.clear();
     routeParams.id = 'new';
     voucherState.data = undefined;
@@ -772,6 +781,46 @@ describe('StockVoucherFormPage', () => {
     await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
     await new Promise((r) => setTimeout(r, 20));
     expect(createMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('no print button on a new voucher', () => {
+    renderPage('In');
+
+    expect(screen.queryByTestId('voucher-print')).not.toBeInTheDocument();
+  });
+
+  it('prints a saved voucher', () => {
+    routeParams.id = V1;
+    const saved = voucher();
+    voucherState.data = saved;
+    renderPage('In');
+
+    expect(screen.getByTestId('voucher-print')).toBeEnabled();
+    expect(printProps).toMatchObject({
+      kind: 'stock',
+      type: 'In',
+      vouchers: [{ id: saved.id, code: saved.code }],
+      disabled: false,
+    });
+  });
+
+  it('print waits for unsaved changes', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher();
+    renderPage('In');
+
+    fireEvent.change(byId('stock-voucher-note'), { target: { value: 'Sửa chưa lưu' } });
+
+    expect(printProps).toMatchObject({ disabled: true, disabledReason: 'Lưu thay đổi trước khi in' });
+  });
+
+  it('a cancelled voucher can be printed', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher({ status: 'Cancelled', canEdit: false });
+    renderPage('In');
+
+    expect(screen.getByTestId('voucher-print')).toBeEnabled();
+    expect(printProps).toMatchObject({ disabled: false });
   });
 
   it('new voucher waits for defaults fetched after mount, never cached ones', () => {

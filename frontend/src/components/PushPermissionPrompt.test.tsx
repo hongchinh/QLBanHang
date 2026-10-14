@@ -51,7 +51,7 @@ describe('PushPermissionPrompt', () => {
 
   // App asks isPushPromptVisible whether the shell gets a banner slot. The prompt has to agree in every state,
   // or the slot stays empty (or the prompt goes missing).
-  it.each<PushState>(['idle', 'loading', 'error', 'granted', 'denied', 'unsupported'])(
+  it.each<PushState>(['idle', 'loading', 'error', 'granted', 'denied', 'unsupported', 'ios-needs-install'])(
     'renders something exactly when isPushPromptVisible says so (%s)',
     (state) => {
       const { container } = render(<PushPermissionPrompt state={state} onEnable={vi.fn()} onDismiss={vi.fn()} />)
@@ -68,3 +68,18 @@ describe('PushPermissionPrompt', () => {
     expect(container.firstElementChild).not.toHaveClass('py-3')
   })
 })
+  it('tells iOS Safari users how to install the app instead of offering to enable', () => {
+    const onDismiss = vi.fn()
+    render(<PushPermissionPrompt state="ios-needs-install" onEnable={vi.fn()} onDismiss={onDismiss} />)
+    expect(screen.getByText(/Chia sẻ/)).toBeInTheDocument()
+    expect(screen.getByText(/Thêm vào MH chính/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /bật thông báo/i })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /để sau/i }))
+    expect(onDismiss).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the iOS hint short with py-2', () => {
+    const { container } = render(<PushPermissionPrompt state="ios-needs-install" onEnable={vi.fn()} onDismiss={vi.fn()} />)
+    expect(container.firstElementChild).toHaveClass('py-2')
+  })
+

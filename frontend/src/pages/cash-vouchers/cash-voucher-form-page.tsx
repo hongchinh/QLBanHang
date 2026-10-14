@@ -43,6 +43,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonLoader } from '@/components/ui/button-loader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { VoucherPrintButton } from '@/components/voucher-print/voucher-print-button';
 import { useDocumentActions } from '@/hooks/useDocumentActions';
 import { getErrorMessage } from '@/lib/api-client';
 import type { ConfirmFlags } from '@/lib/confirm-required';
@@ -453,6 +454,15 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
             )}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            {isEdit && voucher && (
+              <VoucherPrintButton
+                kind="cash"
+                type={type}
+                vouchers={[{ id: voucher.id, code: voucher.code }]}
+                disabled={isDirty || busy}
+                disabledReason={isDirty ? 'Lưu thay đổi trước khi in' : undefined}
+              />
+            )}
             {!isEdit && (
               <>
                 <Button type="button" variant="outline" size="sm" onClick={() => submitWithIntent('save-exit')} disabled={busy || allocationsInvalid}>

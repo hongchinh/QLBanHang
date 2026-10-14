@@ -47,7 +47,7 @@ export function HeaderBranchSwitcher() {
       <SelectTrigger
         aria-label={selected?.isDemo ? 'Chi nhánh làm việc (demo)' : 'Chi nhánh làm việc'}
         title={selectedLabel ?? 'Chi nhánh làm việc'}
-        className="h-9 w-40 gap-2 border-transparent bg-white text-sm text-foreground md:w-56"
+        className="h-9 min-w-0 flex-1 gap-2 border-transparent bg-white text-sm text-foreground md:w-56 md:flex-none"
       >
         {/* The label truncates; the badge is a sibling so it is never clipped. */}
         <SelectValue className="min-w-0 flex-1 text-left">

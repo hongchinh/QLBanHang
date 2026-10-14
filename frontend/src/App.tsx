@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from '@/lib/query-client';
 import { ProtectedRoute } from '@/routes/protected-route';
 import { AuthInit } from '@/routes/auth-init';
+import { SwNavigateListener } from '@/components/sw-navigate-listener';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -135,6 +136,7 @@ export function App() {
           }
         >
         <BrowserRouter>
+          <SwNavigateListener />
           <AuthInit>
             <RouteErrorBoundary>
             <Routes>
@@ -763,7 +765,7 @@ export function App() {
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
       {needRefresh && (
-        <div className="fixed bottom-4 right-4 z-50 flex items-center gap-3 rounded-lg bg-gray-900 px-4 py-3 text-sm text-white shadow-xl">
+        <div className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 z-50 flex items-center gap-3 rounded-lg bg-gray-900 px-4 py-3 text-sm text-white shadow-xl">
           <span>Có phiên bản mới</span>
           <button
             onClick={() => updateServiceWorker(true)}

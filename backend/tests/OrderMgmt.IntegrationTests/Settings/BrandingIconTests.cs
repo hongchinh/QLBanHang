@@ -28,6 +28,7 @@ public class BrandingIconTests : IAsyncLifetime
     }
 
     [Theory]
+    [InlineData(180)]
     [InlineData(192)]
     [InlineData(512)]
     public async Task GetIcon_NoLogoUploaded_Returns200Png(int size)
@@ -38,6 +39,17 @@ public class BrandingIconTests : IAsyncLifetime
         response.Content.Headers.ContentType!.MediaType.Should().Be("image/png");
         var bytes = await response.Content.ReadAsByteArrayAsync();
         bytes.Length.Should().BeGreaterThan(0);
+    }
+
+    // iOS reads apple-touch-icon at 180x180; the renderer must honour the requested size.
+    [Fact]
+    public async Task GetIcon_180_IsA180PxSquarePng()
+    {
+        var bytes = await _client.GetByteArrayAsync("/api/settings/branding/icon/180");
+
+        using var bitmap = SkiaSharp.SKBitmap.Decode(bytes);
+        bitmap.Width.Should().Be(180);
+        bitmap.Height.Should().Be(180);
     }
 
     [Theory]

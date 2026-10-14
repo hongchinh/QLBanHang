@@ -16,16 +16,18 @@ public class ExecutiveDashboardController : ApiControllerBase
 {
     private readonly ISalesMetricsService _sales;
     private readonly ICashMetricsService _cash;
+    private readonly IDebtMetricsService _debt;
     private readonly IValidator<ExecutiveQuery> _queryValidator;
     private readonly IValidator<ExecutiveSeriesQuery> _seriesValidator;
     private readonly IValidator<SalesTopQuery> _topValidator;
 
-    public ExecutiveDashboardController(ISalesMetricsService sales, ICashMetricsService cash,
+    public ExecutiveDashboardController(ISalesMetricsService sales, ICashMetricsService cash, IDebtMetricsService debt,
         IValidator<ExecutiveQuery> queryValidator, IValidator<ExecutiveSeriesQuery> seriesValidator,
         IValidator<SalesTopQuery> topValidator)
     {
         _sales = sales;
         _cash = cash;
+        _debt = debt;
         _queryValidator = queryValidator;
         _seriesValidator = seriesValidator;
         _topValidator = topValidator;
@@ -83,5 +85,14 @@ public class ExecutiveDashboardController : ApiControllerBase
     {
         await _queryValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _cash.GetBreakdownAsync(query, ct));
+    }
+
+    [HttpGet("debt/summary")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtSummaryDto>>> DebtSummary(
+        [FromQuery] ExecutiveQuery query, CancellationToken ct)
+    {
+        await _queryValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _debt.GetSummaryAsync(query, ct));
     }
 }

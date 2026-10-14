@@ -51,6 +51,8 @@ public class CashDebtReportService : ICashDebtReportService
         var entries = _db.DebtEntries.AsNoTracking().Where(e => e.Side == request.Side);
         if (request.Scope == ReportScope.Branch)
             entries = entries.Where(e => e.BranchId == branchId);
+            else
+                entries = entries.Where(e => !_db.Branches.Any(b => b.Id == e.BranchId && b.IsDemo));
         if (request.PartnerId is { } partnerId)
             entries = entries.Where(e => e.PartnerId == partnerId);
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -156,6 +158,8 @@ public class CashDebtReportService : ICashDebtReportService
             .Where(e => e.PartnerId == request.PartnerId && e.Side == request.Side);
         if (request.Scope == ReportScope.Branch)
             entries = entries.Where(e => e.BranchId == branchId);
+            else
+                entries = entries.Where(e => !_db.Branches.Any(b => b.Id == e.BranchId && b.IsDemo));
 
         // Same window rule as the balance report (P29): Opening entries are opening balance in every window.
         var openingBalance = await entries
@@ -309,6 +313,8 @@ public class CashDebtReportService : ICashDebtReportService
         var partnerEntries = _db.DebtEntries.AsNoTracking().Where(e => e.PartnerId == request.PartnerId);
         if (request.Scope == ReportScope.Branch)
             partnerEntries = partnerEntries.Where(e => e.BranchId == branchId);
+            else
+                partnerEntries = partnerEntries.Where(e => !_db.Branches.Any(b => b.Id == e.BranchId && b.IsDemo));
         var sidesWithEntries = await partnerEntries
             .Select(e => e.Side)
             .Distinct()

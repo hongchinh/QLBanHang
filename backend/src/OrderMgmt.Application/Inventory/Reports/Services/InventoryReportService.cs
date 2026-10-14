@@ -299,6 +299,8 @@ public class InventoryReportService : IInventoryReportService
             .Where(e => e.PostedAt < end && productIds.Contains(e.ProductId));
         if (request.Scope == ReportScope.Branch)
             ledger = ledger.Where(e => e.BranchId == branchId);
+            else
+                ledger = ledger.Where(e => !_db.Branches.Any(b => b.Id == e.BranchId && b.IsDemo));
         if (request.WarehouseId is { } warehouseId)
             ledger = ledger.Where(e => e.WarehouseId == warehouseId);
         var sums = await ledger

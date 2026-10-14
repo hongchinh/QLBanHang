@@ -284,9 +284,9 @@ public class StockVoucherFormTests
         using var wb = Render(StockInWithLines(40));
         var ws = wb.Worksheet(1);
 
-        var dateRow = RowOf(ws, "Người lập phiếu") - 1;
-        ws.Cell(dateRow, 6).GetString().Should().Be("Ngày 05 tháng 10 năm 2026");
-        ws.PageSetup.RowBreaks.Should().Equal(dateRow - 1);
+        // The new page starts with the last two lines, so the repeated table header stands over real rows and the
+        // totals and the signatures travel with them.
+        ws.PageSetup.RowBreaks.Should().Equal(RowOf(ws, "Hàng 39") - 1);
     }
 
     [Fact]

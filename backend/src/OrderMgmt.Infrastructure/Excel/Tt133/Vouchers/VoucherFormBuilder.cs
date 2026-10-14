@@ -30,6 +30,7 @@ public sealed class VoucherFormBuilder
     private readonly VoucherPaper _paper;
     private readonly int _rightStart;
     private readonly int _leftEnd;
+    private int _lastBodyRow;
     private int _signatureFirstRow;
     private int _signatureLastRow;
 
@@ -146,6 +147,13 @@ public sealed class VoucherFormBuilder
             ? $"{label} {VoucherPrintRules.Dots}"
             : $"{label} {value.Trim()}");
 
+    /// One table body row (see Tt133FormBuilder.WriteRow); the builder keeps the last ones with the signatures.
+    public void WriteRow(params object?[] cells)
+    {
+        _lastBodyRow = Table.Row;
+        Table.WriteRow(cells);
+    }
+
     /// The date, then one block of columns per signer (split by column width): title, hint, four empty rows, name.
     public void WriteSignatures(DateOnly date, IReadOnlyList<VoucherSigner> signers)
     {
@@ -187,31 +195,38 @@ public sealed class VoucherFormBuilder
         setup.CenterHorizontally = true;
     }
 
-    /// A4 is fitted to one page wide only, so a long voucher flows onto more pages: when a page could end inside the
-    /// signature block (from its date to the names), a page break before the date moves the whole block to a new page.
+    /// A4 is fitted to one page wide only, so a long voucher flows onto more pages. The end of the voucher is kept on
+    /// one page: the last two body rows, the totals and text lines and the signature block (date to names). When a
+    /// page could end inside it, a page break before it moves it whole to a new page, where the repeated table header
+    /// stands over real rows.
     private void KeepSignaturesOnOnePage()
     {
         if (_signatureFirstRow == 0) return;
+        var keepFrom = _lastBodyRow > 0
+            ? Math.Max(Table.TableHeaderLastRow + 1, _lastBodyRow - 1)
+            : _signatureFirstRow;
+
         var tableWidth = _columns.Sum(c => (c.Width + SavedWidthPadding) * PointsPerWidthUnit);
         var scale = Math.Min(1, Math.Floor(100 * (A4WidthPoints - 2 * MarginPoints) / tableWidth) / 100);
         var pageHeight = (A4HeightPoints - 2 * MarginPoints) / scale;
 
-        var low = SignaturePages(pageHeight * (1 - PageHeightTolerance));
-        var high = SignaturePages(pageHeight * (1 + PageHeightTolerance));
+        // A break cannot help when the kept rows and the repeated header do not fit on one page.
+        var kept = RepeatedHeaderHeight();
+        for (var r = keepFrom; r <= _signatureLastRow; r++) kept += Sheet.Row(r).Height;
+        if (kept > pageHeight * (1 - PageHeightTolerance)) return;
+
+        var low = PagesOf(keepFrom, pageHeight * (1 - PageHeightTolerance));
+        var high = PagesOf(keepFrom, pageHeight * (1 + PageHeightTolerance));
         if (low.First != low.Last || high.First != high.Last || low.First != high.First)
-            Sheet.PageSetup.AddHorizontalPageBreak(_signatureFirstRow - 1);
+            Sheet.PageSetup.AddHorizontalPageBreak(keepFrom - 1);
     }
 
-    /// The pages (1-based) of the signature date row and of the names row, for a page of the given height in sheet
-    /// points; whole rows only, and the repeated table header rows take their height again on every later page.
-    private (int First, int Last) SignaturePages(double pageHeight)
+    /// The pages (1-based) of the row `from` and of the names row, for a page of the given height in sheet points;
+    /// whole rows only, and the repeated table header rows take their height again on every later page.
+    private (int First, int Last) PagesOf(int from, double pageHeight)
     {
-        var headerFirst = Table.TableHeaderFirstRow;
         var headerLast = Table.TableHeaderLastRow;
-        var repeated = 0d;
-        if (headerFirst > 0)
-            for (var r = headerFirst; r <= headerLast; r++) repeated += Sheet.Row(r).Height;
-
+        var repeated = RepeatedHeaderHeight();
         var page = 1;
         var used = 0d;
         var firstPage = 0;
@@ -221,12 +236,20 @@ public sealed class VoucherFormBuilder
             if (used > 0 && used + height > pageHeight)
             {
                 page++;
-                used = headerFirst > 0 && r > headerLast ? repeated : 0;
+                used = Table.TableHeaderFirstRow > 0 && r > headerLast ? repeated : 0;
             }
             used += height;
-            if (r == _signatureFirstRow) firstPage = page;
+            if (r == from) firstPage = page;
         }
         return (firstPage, page);
+    }
+
+    private double RepeatedHeaderHeight()
+    {
+        var height = 0d;
+        if (Table.TableHeaderFirstRow > 0)
+            for (var r = Table.TableHeaderFirstRow; r <= Table.TableHeaderLastRow; r++) height += Sheet.Row(r).Height;
+        return height;
     }
 
     private void WriteSignatureRow(int row, int[] bounds, IReadOnlyList<string?> texts, bool bold, bool italic)

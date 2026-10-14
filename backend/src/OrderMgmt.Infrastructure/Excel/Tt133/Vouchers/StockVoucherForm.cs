@@ -78,7 +78,7 @@ public static class StockVoucherForm
             var cells = new List<object?> { line.Number, line.Name, line.Code, line.UnitName };
             if (m.ShowWarehouseColumn) cells.Add(line.WarehouseCode);
             cells.AddRange([line.Quantity, line.Quantity, line.UnitPrice, line.Amount]);
-            builder.Table.WriteRow(cells.ToArray());
+            builder.WriteRow(cells.ToArray());
         }
 
         var amountColumn = columns.Length;

@@ -101,6 +101,7 @@ public class CompanyScopeDemoTests : CashDebtTestBase
         side.TotalIncrease.Should().Be(mainSide.TotalIncrease);
         side.OpeningBalance.Should().Be(mainSide.OpeningBalance);
     }
+
     [Fact]
     public Task Stock_summary_company_skips_demo_branch() => Stock_summary_Async(softDeleted: false);
 
@@ -174,6 +175,7 @@ public class CompanyScopeDemoTests : CashDebtTestBase
         reconciliation.Sides.Should().ContainSingle().Which.ClosingBalance
             .Should().Be(mainReconciliation.Sides.Single().ClosingBalance);
     }
+
     [Fact]
     public Task Reconciliation_company_side_list_skips_demo_branch() => Reconciliation_side_list_Async(softDeleted: false);
 

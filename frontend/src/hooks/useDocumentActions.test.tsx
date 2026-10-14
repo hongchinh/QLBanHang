@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
@@ -491,6 +491,78 @@ describe('useDocumentActions focus return', () => {
       await userEvent.keyboard('{Enter}');
       expect(onDiscardDraft).not.toHaveBeenCalled();
     });
+  });
+
+  // The sidebar link that opened the form still has the focus when the form mounts. The user was never on it while
+  // working in the form, and an Enter there leaves the form.
+  it('never gives the focus to what had it before the form opened', async () => {
+    const perform = vi.fn<(a: Action) => Promise<void>>().mockRejectedValue(apiError(422, 'NEGATIVE_FUND_WARNING'));
+    function Shell({ children }: { children?: ReactNode }) {
+      return (
+        <>
+          <a href="#stock-out">Phiếu xuất</a>
+          <main id="main-content">{children}</main>
+        </>
+      );
+    }
+    const { rerender } = render(<Shell />);
+    const link = screen.getByRole('link', { name: 'Phiếu xuất' });
+    act(() => link.focus());
+    rerender(
+      <Shell>
+        <Harness perform={perform} />
+      </Shell>,
+    );
+    expect(document.activeElement).toBe(link);
+    // A click on the page takes the focus off the link, and the save button does not take it (as in Safari).
+    act(() => link.blur());
+    fireEvent.click(screen.getByTestId('save'));
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // Past the tick in which the closed dialog hands the focus back.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  // The other side of that rule. A form that puts the focus in its first field as it mounts does so before the hook
+  // listens. The fields stay enabled while an action runs, so that field still has the focus when the 422 dialog opens,
+  // and the dialog itself gives the focus back to what had it then.
+  it('a field focused as the form mounts gets the focus back from the dismissed 422 dialog', async () => {
+    function FormPage() {
+      const first = useRef<HTMLInputElement>(null);
+      useLayoutEffect(() => first.current?.focus(), []);
+      const { run, confirmDialogProps } = useDocumentActions<Action>({
+        ...options,
+        perform: async () => {
+          throw apiError(422, 'NEGATIVE_FUND_WARNING');
+        },
+      });
+      return (
+        <>
+          <input
+            ref={first}
+            aria-label="Khách hàng"
+            onKeyDown={(event) => {
+              if (event.key === 's' && event.ctrlKey) void run({ kind: 'save', flags: {} });
+            }}
+          />
+          <ConfirmRequiredDialog {...confirmDialogProps} />
+        </>
+      );
+    }
+    render(<FormPage />);
+    const first = screen.getByLabelText('Khách hàng');
+    expect(document.activeElement).toBe(first);
+
+    fireEvent.keyDown(first, { key: 's', ctrlKey: true });
+    await screen.findByRole('dialog');
+    expect(document.activeElement).not.toBe(first);
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(first));
   });
 
   // In a browser the dialog stays on the page for its exit animation (about 150 ms) and only then asks where the focus

@@ -35,8 +35,8 @@ const DIALOG = '[role="dialog"], [role="alertdialog"]';
 
 /**
  * Where the focus may go back to after an action or its 422 dialog: the element the user was last on outside any
- * dialog, while it is on the page and enabled. Never another control: a blind Enter there would run an action the user
- * did not ask for (a save button comes first in a form, "Xóa nháp" on a new stock voucher).
+ * dialog since the form opened, while it is on the page and enabled. Never another control: a blind Enter there would
+ * run an action the user did not ask for (a save button comes first in a form, "Xóa nháp" on a new stock voucher).
  *
  * A dialog comes and goes, so nothing inside one can take the focus back later. A cancel / delete / restore starts
  * from the button of a confirm dialog that is closing, and the 422 dialog is opened from state: neither leaves Radix a
@@ -47,14 +47,12 @@ function useFocusReturnTarget(): () => HTMLElement | null {
   const mountedRef = useRef(false);
   useEffect(() => {
     mountedRef.current = true;
-    const remember = (target: EventTarget | null) => {
-      if (target instanceof HTMLElement && target !== document.body && !target.closest(DIALOG)) {
-        lastFocusRef.current = target;
-      }
+    // What had the focus when the form mounted is not remembered: that can be the sidebar link the form was opened
+    // with, a control outside the form.
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (target instanceof HTMLElement && !target.closest(DIALOG)) lastFocusRef.current = target;
     };
-    // What already had the focus when the form mounted.
-    remember(document.activeElement);
-    const onFocusIn = (event: FocusEvent) => remember(event.target);
     // Capture phase: a control that stops its own focus event must not hide where the user is.
     document.addEventListener('focusin', onFocusIn, true);
     return () => {

@@ -82,7 +82,7 @@ Stock vouchers print in one of three price modes chosen at print time: the vouch
 - [x] Phase 02 — Print button and row selection on the cash voucher pages (M) — `phase-02-cash-voucher-frontend.md`
 - [x] Phase 03 — Stock voucher forms and price modes, backend (L) — `phase-03-stock-voucher-backend.md`
 - [x] Phase 04 — Price mode dialog and the stock voucher pages (M) — `phase-04-stock-voucher-frontend.md`
-- [ ] Phase 05 — Real output, go-live checklist, docs, final verification (M) — `phase-05-docs-and-verification.md`
+- [x] Phase 05 — Real output, go-live checklist, docs, final verification (M) — `phase-05-docs-and-verification.md`
 
 Order: 00 first. Phases 01 → 03 (backend) and 02 → 04 (frontend) are two tracks that may run in parallel, because the frontend tests mock the API and the routes are fixed above; Phase 03 needs Phase 01 and Phase 04 needs Phase 02. In parallel, the backend track works in `.claude/worktrees/tt133-voucher-print` and the frontend track in `.claude/worktrees/tt133-voucher-print-fe` (V1, created by Phase 00 Task 0.3); one after the other, both work in the first worktree. Phase 05 runs last, on the merged result (Task 5.0 merges the frontend branch).
 

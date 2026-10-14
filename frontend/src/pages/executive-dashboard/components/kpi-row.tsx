@@ -8,6 +8,7 @@ import { executiveLinks, reportLinkTitle } from '@/features/executive-dashboard/
 import type { ExecutiveParams, SalesSummary } from '@/features/executive-dashboard/types';
 import { useExecutiveAccess } from '@/features/executive-dashboard/use-executive-access';
 import { useExecutiveScope } from '@/features/executive-dashboard/use-executive-scope';
+import { DeltaArrow } from '@/features/dashboard/components/delta-arrow';
 import { cn } from '@/lib/utils';
 import { todayYmd } from '@/lib/vn-datetime';
 
@@ -24,17 +25,22 @@ const XL_SPAN: Record<number, string> = {
   4: 'xl:col-span-4',
 };
 
-// "Tỷ suất 14,5% (▲ 0,8 điểm)": the margin and its change against the previous period, in points.
-function marginHint(sales: SalesSummary): string {
+// "Tỷ suất 14,5% (up arrow 0,8 điểm)": the margin and its change against the previous period, in points.
+function marginHint(sales: SalesSummary): ReactNode {
   const margin = `Tỷ suất ${formatPct(sales.marginPct)}`;
   if (sales.marginPct == null || sales.prevMarginPct == null) return margin;
   // Rounded half away from zero to one decimal, worked in hundredths (the server sends two decimals): the
   // floating-point difference of 14,56 and 13,71 is 0,8499…, which would round to 0,8 instead of 0,9.
   const hundredths = Math.round(sales.marginPct * 100) - Math.round(sales.prevMarginPct * 100);
   const change = (Math.sign(hundredths) * Math.round(Math.abs(hundredths) / 10)) / 10;
-  // A change that rounds to 0 has no arrow: "▲ 0" would show a fall of 0,04 points as a rise.
+  // A change that rounds to 0 has no arrow: an up arrow with 0 would show a fall of 0,04 points as a rise.
   if (change === 0) return `${margin} (±0 điểm)`;
-  return `${margin} (${change > 0 ? '▲' : '▼'} ${formatNumber(Math.abs(change))} điểm)`;
+  return (
+    <>
+      {margin} (<DeltaArrow direction={change > 0 ? 'up' : 'down'} />
+      {formatNumber(Math.abs(change))} điểm)
+    </>
+  );
 }
 
 // The KPI tiles of the Tổng quan tab: "Trong kỳ" follows the period, "Hiện tại" is the balance of today.

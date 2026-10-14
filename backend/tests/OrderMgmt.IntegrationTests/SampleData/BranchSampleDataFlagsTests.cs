@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Organization.Branches.Models;
@@ -20,6 +21,9 @@ public class BranchSampleDataFlagsTests : CashDebtTestBase
     {
         var response = await _client.PostAsJsonAsync("/api/branches", new CreateBranchRequest { Code = "SDF1", Name = "CN SDF1" });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.GetProperty("data");
+        data.GetProperty("sampleDataStatus").GetString().Should().Be("None");
+        data.GetProperty("sampleDataError").ValueKind.Should().Be(JsonValueKind.Null);
         var created = await ReadDataAsync<BranchDto>(response);
         AssertNoFlags(created);
 
@@ -31,7 +35,7 @@ public class BranchSampleDataFlagsTests : CashDebtTestBase
     public async Task Product_and_partner_default_to_not_sample()
     {
         var productId = await CreateInventoryProductAsync("SDP" + Guid.NewGuid().ToString("N")[..6]);
-        var partnerId = await CreatePartnerAsync("SDC" + Guid.NewGuid().ToString("N")[..6], true, false);
+        var partnerId = await CreatePartnerAsync("SDC" + Guid.NewGuid().ToString("N")[..6], isCustomer: true, isSupplier: false);
 
         var (productSample, partnerSample) = await InDbAsync(async db => (
             await db.Products.Where(p => p.Id == productId).Select(p => p.IsSample).SingleAsync(),

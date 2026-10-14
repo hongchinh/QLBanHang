@@ -6,6 +6,8 @@ using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Dashboards.Executive.Realtime;
+using OrderMgmt.Application.Tt133.Models;
+using OrderMgmt.Application.Tt133.Vouchers;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.WebApi.Filters;
 
@@ -21,13 +23,15 @@ public class CashVouchersController : ApiControllerBase
     private readonly ICashVoucherService _service;
     private readonly IValidator<UpsertCashVoucherRequest> _upsertValidator;
     private readonly IValidator<CashVoucherListRequest> _listValidator;
+    private readonly IVoucherPrintService _print;
 
     public CashVouchersController(ICashVoucherService service, IValidator<UpsertCashVoucherRequest> upsertValidator,
-        IValidator<CashVoucherListRequest> listValidator)
+        IValidator<CashVoucherListRequest> listValidator, IVoucherPrintService print)
     {
         _service = service;
         _upsertValidator = upsertValidator;
         _listValidator = listValidator;
+        _print = print;
     }
 
     [HttpGet]
@@ -36,6 +40,14 @@ public class CashVouchersController : ApiControllerBase
     {
         await _listValidator.ValidateAndThrowAsync(request, ct);
         return Success(await _service.ListAsync(request, ct));
+    }
+
+    /// 01-TT / 02-TT of one voucher as Excel or PDF.
+    [HttpGet("{id:guid}/print")]
+    public async Task<IActionResult> Print(Guid id, [FromQuery] ExportFormat format, CancellationToken ct)
+    {
+        var file = await _print.PrintCashVouchersAsync(new[] { id }, format, ct);
+        return File(file.Bytes, file.ContentType, file.FileName);
     }
 
     [HttpGet("defaults")]

@@ -82,6 +82,7 @@ using OrderMgmt.Application.Search.Interfaces;
 using OrderMgmt.Application.Search.Services;
 using OrderMgmt.Application.Tt133.Interfaces;
 using OrderMgmt.Application.Tt133.Services;
+using OrderMgmt.Application.Tt133.Vouchers;
 
 namespace OrderMgmt.Application;
 
@@ -160,6 +161,7 @@ public static class DependencyInjection
         services.AddScoped<IInventoryReportService, InventoryReportService>();
         services.AddScoped<ITt133ExportService, Tt133ExportService>();
         services.AddScoped<Tt133ExportSupport>();
+        services.AddScoped<IVoucherPrintService, VoucherPrintService>();
         services.AddScoped<IExecutiveScopeResolver, ExecutiveScopeResolver>();
         services.AddScoped<ISalesMetricsService, SalesMetricsService>();
         services.AddScoped<ExecutiveLookups>();

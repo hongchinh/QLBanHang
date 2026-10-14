@@ -40,6 +40,7 @@ public class SampleDataGeneratorMechanismTests
                 var input = $"{code} {today:yyyy-MM-dd}";
                 var observed = Replay(plan);
 
+                AssertEarlyLimitedSales(plan, input);
                 AssertPlacedSales(observed.End, today, input);
                 AssertHold(plan, observed.End, input);
                 AssertNoGatheringPastT(plan, observed.End, input);
@@ -66,6 +67,33 @@ public class SampleDataGeneratorMechanismTests
         ((double)endingBelowFloor / inputs).Should().BeLessThanOrEqualTo(0.2, "the receivables at T end within the band");
         // Coverage: the end hold's early collection rule is exercised (a short till on a deposit day inside the hold).
         inputsWithShortTillInHold.Should().BeGreaterThanOrEqualTo(2, "some inputs have a short till inside the end hold");
+    }
+
+    /// Each credit-limit customer gets a single-line credit sale (no payment method) planned LimitedCustomerSaleDay days
+    /// after the opening date (the Monday after when that day is a Sunday), so it always has credit sales whatever the
+    /// stream. A planned sale takes one of the day's sales and a day may have only one, so these are the first sales from
+    /// that day on: the first on that day, the second on that day or the next working day.
+    private static void AssertEarlyLimitedSales(SampleDataPlan plan, string input)
+    {
+        var early = plan.OpeningDate.AddDays(SampleDataVolumes.LimitedCustomerSaleDay);
+        if (early.DayOfWeek == DayOfWeek.Sunday)
+            early = early.AddDays(1);
+        var nextWorkingDay = early.AddDays(early.DayOfWeek == DayOfWeek.Saturday ? 2 : 1);
+        var customers = plan.CreditLimits.Select(c => c.PartnerCode).ToList();
+        customers.Should().HaveCount(2, $"{input}: two customers have a credit limit");
+
+        var first = plan.Steps.OfType<SampleStockVoucherStep>()
+            .Where(s => s.ReasonCode == "XBH" && SampleDataGeneratorTests.VnDate(s) >= early)
+            .Take(customers.Count)
+            .ToList();
+        first.Select(s => s.PartnerCode).Should().BeEquivalentTo(customers,
+            $"{input}: the first sales from {early:yyyy-MM-dd} on go to the credit-limit customers");
+        first.Should().OnlyContain(s => s.PaymentMethodCode == null
+                && s.Lines.Count(l => l.ProductCode != SampleCatalog.TransportProductCode) == 1,
+            $"{input}: each is a single-line credit sale");
+        var dates = first.Select(SampleDataGeneratorTests.VnDate).ToList();
+        dates.Should().StartWith(early, $"{input}: the first is made on {early:yyyy-MM-dd}")
+            .And.OnlyContain(d => d == early || d == nextWorkingDay, $"{input}: the second by {nextWorkingDay:yyyy-MM-dd}");
     }
 
     /// An open sale of the first late payer due LateSaleOverdueDays before T, and one of the bad debt customer due

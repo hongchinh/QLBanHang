@@ -132,6 +132,7 @@ public class SampleDataGeneratorTests
     [InlineData("CN024", "2026-07-31", 3, false)]
     [InlineData("CN-DEMO", "2026-12-31", 2, true)]
     [InlineData("B011", "2027-06-01", 3, false)]
+    [InlineData("B010", "2027-03-01", 4, true)]
     public void Invariants_hold_for_several_inputs(string code, string today, int owners, bool netExcludesVat)
     {
         var plan = Generate(code, owners, ParseDate(today), netExcludesVat);

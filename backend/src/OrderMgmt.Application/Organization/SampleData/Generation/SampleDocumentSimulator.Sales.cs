@@ -16,9 +16,10 @@ internal sealed partial class SampleDocumentSimulator
 
     private void Sale()
     {
-        // Planned credit sales come first (placed relative to T for the overdue buckets, or for an owner's open invoice at
-        // T), then, shortly before the debt offset, one to the dual-role partner if it has no open one. A planned sale is
-        // taken off the plan only once it is made.
+        // Planned credit sales come first (one early sale to each credit-limit customer, LimitedCustomerSaleDay days after
+        // the opening; then placed relative to T for the overdue buckets, or for an owner's open invoice at T), then,
+        // shortly before the debt offset, one to the dual-role partner if it has no open one. A planned sale is taken off
+        // the plan only once it is made.
         var plannedIndex = _plannedSales.FindIndex(s => s.Date <= _date);
         var plannedSale = plannedIndex >= 0 ? _plannedSales[plannedIndex] : ((DateOnly Date, SampleCustomerProfile Customer, bool Hold)?)null;
         var customer = plannedSale?.Customer ?? (OffsetNeedsSale() ? _profiles[DualRolePartner] : PickCustomer());

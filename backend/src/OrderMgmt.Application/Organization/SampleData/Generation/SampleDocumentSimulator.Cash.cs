@@ -33,9 +33,10 @@ internal sealed partial class SampleDocumentSimulator
     /// One receipt per customer and day once an invoice's collection date has come. Besides the invoices due, it takes
     /// (oldest first, never a held invoice nor one the customer never pays):
     /// - on the deposit day with a short till, invoices to collect within EarlyCollectionDays (during the end hold only
-    ///   invoices already due or due within OnTimeDaysBeforeDueMax days, as an on-time customer pays);
+    ///   invoices already due or due within OnTimeDaysBeforeDueMax days, as an on-time customer pays); before the hold
+    ///   this early collection can still take an invoice that would otherwise be open at T;
     /// - before the end hold, the invoices to collect within ReceiptGatherDays and by the last working day (gathering),
-    ///   so a receipt never takes an invoice that would still be open at T.
+    ///   so gathering never takes an invoice that would still be open at T.
     /// The dual-role partner pays nothing before its debt offset, so the offset finds both sides open.
     private void CustomerReceipts()
     {

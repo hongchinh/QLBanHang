@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ChevronDown, FileSpreadsheet, FileText, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -7,8 +8,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CompanyProfileHint } from '@/components/tt133-export/company-profile-hint';
+import { StockPriceModeDialog } from './stock-price-mode-dialog';
 import { useVoucherPrint } from '@/features/voucher-print/use-voucher-print';
-import type { VoucherPrintKind, VoucherPrintTarget } from '@/features/voucher-print/types';
+import type { StockPrintPriceMode, VoucherPrintKind, VoucherPrintTarget } from '@/features/voucher-print/types';
 import type { ExportFormat } from '@/features/tt133-export/types';
 import type { CashVoucherType } from '@/features/cash-common/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
@@ -35,7 +37,16 @@ export function VoucherPrintButton({
 }: VoucherPrintButtonProps) {
   const { print, isPending } = useVoucherPrint();
   const isDisabled = disabled || vouchers.length === 0 || isPending;
-  const choose = (format: ExportFormat) => void print({ kind, type, vouchers, format });
+  // Stock vouchers ask for the price mode first; the format waits here while the dialog is open.
+  const [pendingFormat, setPendingFormat] = useState<ExportFormat | null>(null);
+  const choose = (format: ExportFormat) => {
+    if (kind === 'stock') setPendingFormat(format);
+    else void print({ kind, type, vouchers, format });
+  };
+  // Runs inside the dialog's "In" click, so a PDF tab can still open in that user gesture.
+  const confirmPriceMode = (priceMode: StockPrintPriceMode) => {
+    if (pendingFormat) void print({ kind, type, vouchers, format: pendingFormat, priceMode });
+  };
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const title = disabled ? disabledReason : undefined;
   const icon = isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />;
@@ -74,6 +85,13 @@ export function VoucherPrintButton({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+      {kind === 'stock' && (
+        <StockPriceModeDialog
+          open={pendingFormat !== null}
+          onOpenChange={(open) => !open && setPendingFormat(null)}
+          onConfirm={confirmPriceMode}
+        />
+      )}
       {variant === 'button' && <CompanyProfileHint />}
     </div>
   );

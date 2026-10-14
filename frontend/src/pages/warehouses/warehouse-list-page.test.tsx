@@ -89,4 +89,10 @@ describe('WarehouseListPage', () => {
     // Without a branch the backend lists the working branch only, so the default says so.
     expect(screen.getByRole('combobox', { name: 'Lọc chi nhánh' })).toHaveTextContent('Chi nhánh làm việc');
   });
+
+  it('row actions use AppIcon edit and delete tones', () => {
+    const { container } = renderPage();
+    expect(container.querySelector('[data-icon="edit"]')).toHaveClass('text-icon-edit');
+    expect(container.querySelector('[data-icon="delete"]')).toHaveClass('text-icon-danger');
+  });
 });

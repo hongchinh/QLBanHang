@@ -8,27 +8,17 @@ const LUCIDE_IMPORT = /(?:from\s+|import\s*\(?\s*)['"]lucide-react(?:\/[^'"]*)?[
 
 // Files not yet moved to AppIcon. Each migration task removes its files; Phase 04 deletes this list.
 const LEGACY: string[] = [
-  'features/customers/components/customer-catalog-list.tsx',
-  'features/products/components/product-catalog-list.tsx',
   'pages/admin/components/role-matrix-table.tsx',
   'pages/admin/components/user-actions-menu.tsx',
   'pages/admin/roles-matrix-page.tsx',
   'pages/admin/user-settings-page.tsx',
   'pages/admin/users-list-page.tsx',
-  'pages/cash-reasons/cash-reason-list-page.tsx',
-  'pages/payment-methods/payment-method-list-page.tsx',
-  'pages/product-groups/product-group-list-page.tsx',
-  'pages/products/product-form-page.tsx',
-  'pages/products/product-list-page.tsx',
   'pages/reports/revenue-page.tsx',
   'pages/reports/sales-performance-page.tsx',
   'pages/reports/sales-revenue-detail-page.tsx',
   'pages/settings/branches-page.tsx',
   'pages/settings/recalc-cost-page.tsx',
   'pages/settings/settings-hub-page.tsx',
-  'pages/stock-reasons/stock-reason-list-page.tsx',
-  'pages/suppliers/supplier-list-page.tsx',
-  'pages/warehouses/warehouse-list-page.tsx',
 ];
 
 function walk(dir: string): string[] {

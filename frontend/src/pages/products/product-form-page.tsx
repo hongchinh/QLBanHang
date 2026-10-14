@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Controller, useForm, type Resolver, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useCreateProduct,
@@ -144,7 +144,7 @@ function ProductFormInner({
     <div className="space-y-4">
       <div className="flex items-center gap-2">
         <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
-          <Link to="/products"><ArrowLeft className="h-4 w-4 text-slate-500" /></Link>
+          <Link to="/products"><AppIcon name="back" /></Link>
         </Button>
         <h1 className="text-2xl font-bold">{isEdit ? 'Chỉnh sửa hàng hóa' : 'Thêm hàng hóa'}</h1>
       </div>

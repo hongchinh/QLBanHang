@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useDeleteStockReason, useStockReasons } from '@/features/stock-reasons/hooks';
 import {
   PARTNER_TYPE_LABELS,
@@ -70,7 +70,7 @@ export function StockReasonListPage() {
                   setDialogOpen(true);
                 }}
               >
-                <Pencil className="h-4 w-4 text-blue-600" />
+                <AppIcon name="edit" />
               </Button>
               {!row.original.isSystem && (
                 <Button
@@ -79,7 +79,7 @@ export function StockReasonListPage() {
                   aria-label="Xóa lý do"
                   onClick={() => setPendingDelete(row.original)}
                 >
-                  <Trash2 className="h-4 w-4 text-red-600" />
+                  <AppIcon name="delete" />
                 </Button>
               )}
             </div>
@@ -115,7 +115,7 @@ export function StockReasonListPage() {
         </div>
         <Can permission="inventory.catalogs.manage">
           <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm lý do
+            <AppIcon name="add" className="mr-2" /> Thêm lý do
           </Button>
         </Can>
       </div>

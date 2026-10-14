@@ -6,7 +6,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useDeleteSupplier, useSuppliers } from '@/features/suppliers/hooks';
 import type { CustomerGroup, CustomerListItem } from '@/features/customers/types';
 import { Button } from '@/components/ui/button';
@@ -75,7 +75,7 @@ export function SupplierListPage() {
             <Can permission="suppliers.update">
               <Button asChild variant="ghost" size="icon" aria-label="Sửa nhà cung cấp">
                 <Link to={`/suppliers/${row.original.id}`}>
-                  <Pencil className="h-4 w-4 text-blue-600" />
+                  <AppIcon name="edit" />
                 </Link>
               </Button>
             </Can>
@@ -86,7 +86,7 @@ export function SupplierListPage() {
                 aria-label="Xóa nhà cung cấp"
                 onClick={() => setPendingDelete(row.original)}
               >
-                <Trash2 className="h-4 w-4 text-red-600" />
+                <AppIcon name="delete" />
               </Button>
             </Can>
           </div>
@@ -134,7 +134,7 @@ export function SupplierListPage() {
         <Can permission="suppliers.create">
           <Button asChild>
             <Link to="/suppliers/new">
-              <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm nhà cung cấp
+              <AppIcon name="add" className="mr-2" /> Thêm nhà cung cấp
             </Link>
           </Button>
         </Can>
@@ -144,7 +144,7 @@ export function SupplierListPage() {
         <CardContent className="p-4">
           <div className="mb-4 flex items-center gap-2">
             <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Tìm theo tên / mã / SĐT / MST..."
                 value={search}

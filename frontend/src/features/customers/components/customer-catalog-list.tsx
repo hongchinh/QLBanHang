@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCustomers } from '@/features/customers/hooks';
@@ -49,7 +49,7 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
       {/* Search */}
       <div className="border-b p-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <AppIcon name="search" className="absolute left-2.5 top-2.5" />
           <Input
             className="pl-8"
             placeholder="Tìm mã, tên khách hàng..."

@@ -519,16 +519,48 @@ describe('StockLineGrid', () => {
     expect([price.selectionStart, price.selectionEnd]).toEqual([0, 5]);
   });
 
-  it('a number cell focused with the mouse is not selected synchronously, so the caret goes where clicked', async () => {
-    renderGrid({ lines: [line({ quantity: 5 })] });
+  // What a click on Đơn giá / SL does in Chrome (measured; the same as before the keyboard fix): the browser puts the
+  // caret where the user clicked, right after the focus event, and one frame later the cell selects its WHOLE text.
+  // So the first click on a cell selects the whole number: the caret does not stay where the user clicked.
+  // jsdom places no caret; the test shows the cell's part: no select in the focus event, everything a frame later.
+  it('a number cell focused with the mouse selects its whole text one frame later, not in the focus event', async () => {
+    renderGrid({ lines: [line({ quantity: 1250 })] });
     const select = vi.spyOn(HTMLInputElement.prototype, 'select');
     try {
       const cell = byId('stock-line-quantity-0');
       fireEvent.mouseDown(cell);
       act(() => cell.focus());
       expect(select).not.toHaveBeenCalled();
-      await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+      await nextFrame();
       expect(select.mock.contexts).toEqual([cell]);
+      expect(cell.value).toBe('1250');
+      expect([cell.selectionStart, cell.selectionEnd]).toEqual([0, 4]);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  // Only a click in the cell that already has the focus leaves the caret where the user clicked (measured in
+  // Chrome): that click brings no focus event, so the cell selects nothing. jsdom cannot show the caret; the test
+  // shows that no select() follows such a click.
+  it('a click inside the number cell that already has the focus selects nothing', async () => {
+    renderGrid({ lines: [line({ quantity: 1250 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      const cell = byId('stock-line-quantity-0');
+      fireEvent.mouseDown(cell);
+      act(() => cell.focus());
+      await nextFrame();
+      expect(select.mock.contexts).toEqual([cell]); // the first click: the whole text
+      select.mockClear();
+
+      fireEvent.mouseDown(cell);
+      fireEvent.mouseUp(cell);
+      fireEvent.click(cell);
+      await nextFrame();
+
+      expect(select).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(cell);
     } finally {
       select.mockRestore();
     }
@@ -647,10 +679,12 @@ describe('StockLineGrid', () => {
       expect(selectedBy(() => act(() => cell.focus()))).toEqual([cell]);
     });
 
+    // Unlike Đơn giá / SL, these cells select nothing after a mouse press, in the focus event or later, so the caret
+    // stays where the browser put it. jsdom cannot show the caret; the test shows that no select() follows.
     it.each([
       ['%CK', 'discount-rate'],
       ['Số tấm', 'sheet-count'],
-    ])('a mouse click on %s never selects: the caret stays where the browser put it', async (_label, field) => {
+    ])('a mouse click on %s selects nothing, in the focus event or a frame later', async (_label, field) => {
       renderGrid({ lines: [cubic()] });
       const select = vi.spyOn(HTMLInputElement.prototype, 'select');
       try {

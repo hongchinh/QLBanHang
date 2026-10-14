@@ -134,7 +134,9 @@ function parseQuantityInput(text: string): number | undefined {
  * Tells a keyboard focus from a mouse one. A mouse press on the cell comes right before its mouse focus; every other
  * focus is keyboard navigation (Enter / arrows / Ctrl+Delete through focusCell, or Tab). After keyboard navigation a
  * numeric cell selects its whole value at once, so a digit typed right away replaces the value instead of being
- * appended; after a click the caret stays where the browser put it. Returns the props to spread on the <input>.
+ * appended. What a mouse focus does is up to the cell: a type=number cell selects nothing, so the caret stays where
+ * the browser put it; a NumberCell selects its whole text one frame later, as it always did. Returns the props to
+ * spread on the <input>.
  */
 function useFocusOrigin(onFocus: (el: HTMLInputElement, byKeyboard: boolean) => void, onBlur?: () => void) {
   const pressed = useRef(false);
@@ -190,7 +192,9 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
       if (byKeyboard) {
         selectAfterRender.current = true;
       } else {
-        // A click places the caret after the focus event; select one frame later, as before.
+        // Mouse focus, as before: the browser sets the caret right after the focus event, so the whole text is
+        // selected one frame later. The first click on a cell therefore selects the whole number; only a click in
+        // the cell that already has the focus (no focus event, so no select) leaves the caret where the user clicked.
         requestAnimationFrame(() => {
           if (document.activeElement === el) el.select();
         });

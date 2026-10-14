@@ -722,8 +722,8 @@ describe('useDocumentActions focus return', () => {
       expect(document.activeElement).toBe(document.body);
     });
 
-    it('does not count: the focus goes back to where the user was in the page before', async () => {
-      const perform = vi.fn(async () => {});
+    it('does not count: the dismissed 422 dialog gives the focus back to where the user was in the page before', async () => {
+      const perform = vi.fn<(a: Action) => Promise<void>>().mockRejectedValue(apiError(422, 'NEGATIVE_FUND_WARNING'));
       render(
         <WithHeader>
           <Harness perform={perform} />
@@ -734,9 +734,32 @@ describe('useDocumentActions focus return', () => {
       leaveHeaderSearch();
 
       fireEvent.click(save);
+      await screen.findByRole('dialog');
+      fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
 
       await waitFor(() => expect(document.activeElement).toBe(save));
       expect(perform).toHaveBeenCalledTimes(1);
+    });
+
+    // The user had left the page's controls (Escape out of the header search) and pressed Ctrl+S on <body>. The action
+    // took the focus from nothing, so it gives nothing back: a control the user had left getting the focus would take
+    // a blind Enter (the save button would save again).
+    it('an action started from <body> leaves the focus there, even after the user was on a page control', async () => {
+      const perform = vi.fn(async () => {});
+      render(
+        <WithHeader>
+          <Harness perform={perform} />
+        </WithHeader>,
+      );
+      act(() => screen.getByTestId('save').focus());
+      leaveHeaderSearch();
+
+      fireEvent.click(screen.getByTestId('save'));
+      await waitFor(() => expect(perform).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByTestId('save')).toBeEnabled());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(document.activeElement).toBe(document.body);
     });
   });
 

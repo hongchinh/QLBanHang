@@ -98,6 +98,9 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
   const focusReturnTarget = useFocusReturnTarget();
   // `busy` as of the last render, to tell when an action has just ended.
   const wasBusyRef = useRef(false);
+  // Whether nothing had the focus when the last action started (Ctrl+S on <body>): the user had left the page's
+  // controls, so the action did not take the focus from any of them.
+  const startedLostRef = useRef(false);
 
   // Once an action has ended, however it ended (a save that stays on the page, a 409, a 500, a confirmed resend), and
   // its buttons are enabled again.
@@ -107,6 +110,8 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
     if (!ended) return;
     // The 422 dialog takes the focus itself and gives it back when it closes.
     if (confirmation) return;
+    // Nothing to give back: the control last focused is one the user had left before the action.
+    if (startedLostRef.current) return;
     // Never take the focus from something the user (or the page) already moved it to.
     const target = isFocusLost() ? focusReturnTarget() : null;
     // The Enter that pressed the save button may still be down: it must not save again now that the button is back.
@@ -114,6 +119,7 @@ export function useDocumentActions<A extends DocumentAction>(options: Options<A>
   }, [busy, confirmation, focusReturnTarget]);
 
   async function run(action: A): Promise<void> {
+    startedLostRef.current = isFocusLost();
     setBusy(true);
     try {
       await options.perform(action, action.flags);

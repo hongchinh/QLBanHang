@@ -14,7 +14,7 @@ export function PushPermissionPrompt({ state, onEnable, onDismiss }: Props) {
   const isLoading = state === 'loading'
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2">
       <div className="text-sm text-blue-900">
         {isError
           ? 'Bật thông báo thất bại. Vui lòng thử lại.'

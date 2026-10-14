@@ -58,4 +58,13 @@ describe('PushPermissionPrompt', () => {
       expect(container.firstChild !== null).toBe(isPushPromptVisible(state))
     },
   )
+
+  // On a 1366x657 window the stock voucher form with its debt strip needs 545 px, and under a one-line banner
+  // of 54 px (py-3) it got 539: the page scrolled by 6 px. With py-2 the line is 46 px. Only a browser can
+  // measure that; this pins the class.
+  it('keeps a one-line banner short with py-2', () => {
+    const { container } = render(<PushPermissionPrompt state="idle" onEnable={vi.fn()} onDismiss={vi.fn()} />)
+    expect(container.firstElementChild).toHaveClass('py-2')
+    expect(container.firstElementChild).not.toHaveClass('py-3')
+  })
 })

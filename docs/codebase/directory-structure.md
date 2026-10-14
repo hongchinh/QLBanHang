@@ -72,7 +72,7 @@ QLBanHang/
 | Cross-feature application helpers | `Application/Common/LikePattern.cs` (ILike escaping), `Application/Common/References` (`IReferenceUsage`: every "is used" check of partners, payment methods, branches and funds), `Application/Common/Interfaces/IBeforeCommitHook.cs` (run by `EfTransactionRunner` before the outermost commit), `Application/Common/Interfaces/ISpreadsheetPdfConverter.cs` (xlsx → PDF, implemented by `Infrastructure/Excel/LibreOfficeSpreadsheetPdfConverter.cs`; shared by the quotation and TT133 exports), `Application/Common/VndAmountInWords.cs` (a VND amount in Vietnamese words), `Application/Common/ReportScope.cs` (`ReportScope` Branch / Company and `ReportScopeGuard`) |
 | Cash & debt reports | `Application/CashDebt/Reports`, `CashDebtReportsController.cs` |
 | Company profile | `Domain/Entities/Organization/CompanyProfile.cs` (one row, `Id = 1`), `Application/Organization/Company`, `Infrastructure/Persistence/Configurations/CompanyProfileConfiguration.cs`, `CompanyProfileController.cs` |
-| TT133 report forms | `Application/Tt133` (`ITt133ExportService` / `Tt133ExportService`, `ITt133FormRenderer`, `Models/Tt133ExportModels.cs`, `Validators`, `Tt133ExportOptions`), `Infrastructure/Excel/Tt133` (`Tt133FormBuilder`, `Tt133Column`, `Tt133FormRenderer` and one class per form: `CashBookForm`, `DebtLedgerForm`, `DebtSummaryForm`, `DebtReconciliationForm`, `StockSummaryForm`, `StockDetailForm`, `StockCardForm`), `Tt133ExportController.cs` |
+| TT133 report forms | `Application/Tt133` (`ITt133ExportService` / `Tt133ExportService`, `ITt133FormRenderer`, `Models/Tt133ExportModels.cs`, `Validators`, `Tt133ExportOptions`), `Infrastructure/Excel/Tt133` (`Tt133FormBuilder`, `Tt133Column`, `Tt133FormRenderer` and one class per form: `CashBookForm`, `DebtLedgerForm`, `DebtSummaryForm`, `DebtReconciliationForm`, `StockSummaryForm`, `StockDetailForm`, `StockCardForm`), `Tt133ExportController.cs`. Voucher prints (01-TT, 02-TT, 01-VT, 02-VT): `Application/Tt133/Vouchers` (`IVoucherPrintService` / `VoucherPrintService`, `IVoucherFormRenderer`, `VoucherPrintModels.cs`, `VoucherPrintRules`), `Application/Tt133/Services/Tt133ExportSupport.cs` (context, sheet count, file conversion shared with the report exports), `Infrastructure/Excel/Tt133/Vouchers` (`VoucherFormBuilder`, `CashVoucherForm`, `StockVoucherForm`, `VoucherFormRenderer`) |
 | Executive dashboard | `Application/Dashboards/Executive`: `Models` (`ExecutiveModels.cs` with the queries, then `SalesModels`, `CashModels`, `DebtModels`, `InventoryModels`, `OverviewModels`), `Common` (`ExecutiveScope`, `ExecutivePeriod`, `ExecutiveDay`, `ExecutiveMath`, `ExecutiveSeries`, `DebtPositionMath`, `OpenDebtItem`), `Interfaces` (`IExecutiveScopeResolver` and one interface per service), `Services` (`SalesMetricsService`, `CashMetricsService`, `DebtMetricsService`, `InventoryMetricsService`, `ExecutiveOverviewService`, `ExecutiveScopeResolver`, `ExecutiveLookups`), `Validators/ExecutiveQueryValidators.cs`, `Realtime/DashboardDomains.cs`; helpers shared with the inventory reports `Application/Inventory/Common/CostProvisional.cs` and `StockValueSplit.cs`; `Domain/Constants/StockReasonCodes.cs` (`XBH`, `NTL`); `ExecutiveDashboardController.cs`; tests in `tests/OrderMgmt.IntegrationTests/ExecutiveDashboard` (pure tests in `ExecutiveDashboard/Unit`, base class `ExecutiveDashboardTestBase`) |
 | Real-time signals | `WebApi/Hubs` (`NotificationHub` at `/hubs/notifications` with the `user-{id}` and dashboard groups, `SignalRNotifier` implementing `Application/Notifications/Interfaces/IRealtimeNotifier`, `DashboardGroups.cs` with the event and group names), `WebApi/Filters/DashboardSignalAttribute.cs` (`[DashboardSignal]`, `[SkipDashboardSignal]`, `DashboardSignalFilter`) |
 
@@ -105,7 +105,7 @@ QLBanHang/
 | `PaymentMethodsController` | `/api/payment-methods` CRUD |
 | `SuppliersController` | `/api/suppliers` CRUD and `/search` (partners with the supplier role) |
 | `InventorySettingsController` | `/api/inventory/settings`, `/api/inventory/numbering`, `/api/inventory/numbering/{docType}` (stock types need `inventory.settings`, the cash types `Receipt`/`Payment`/`FundTransfer`/`DebtOffset` need `cash.settings`; checked in the service) |
-| `StockVouchersController` | `/api/stock-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/owners`, `/defaults`, `/stock-at`, `/partners` |
+| `StockVouchersController` | `/api/stock-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/owners`, `/defaults`, `/stock-at`, `/partners`, GET `/{id}/print` and POST `/print` (Excel/PDF of 01-VT/02-VT, `?format=xlsx\|pdf&priceMode=Voucher\|Cost\|None`) |
 | `OpeningStocksController` | `/api/inventory/opening-stock` (GET grid, PUT save) |
 | `InventoryCostController` | `/api/inventory/recalc-cost` |
 | `InventoryReportsController` | `/api/reports/stock-on-hand`, `/api/reports/stock-card`, `/api/reports/stock-summary` |
@@ -114,7 +114,7 @@ QLBanHang/
 | `FundsController` | `/api/funds` CRUD, `/{id}/opening-balance`, scoped to the working branch |
 | `CreditLimitsController` | `/api/credit-limits` list, `PUT`/`DELETE /{customerId}` |
 | `OpeningDebtsController` | `/api/opening-debts` list/CRUD |
-| `CashVouchersController` | `/api/cash-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults`, `/partners` |
+| `CashVouchersController` | `/api/cash-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults`, `/partners`, GET `/{id}/print` and POST `/print` (Excel/PDF of 01-TT/02-TT, `?format=xlsx\|pdf`) |
 | `FundTransfersController` | `/api/fund-transfers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults` |
 | `DebtController` | `/api/debt/partner-summary`, `/open-items`, `/partners`, `/settlements` (GET, POST), `DELETE /settlements/{id}`, `DELETE /settlement-batches/{batchId}` |
 | `DebtOffsetsController` | `/api/debt-offsets` list/create/view, `/{id}/cancel`, `DELETE /{id}`, `/{id}/activities`, `/defaults` |
@@ -140,8 +140,10 @@ frontend/src/
 │   ├── period-preset-select/    # PeriodPresetSelect: month / quarter / year presets of a report date range
 │   ├── report-scope-select/     # ReportScopeSelect and useReportScope: Branch / Company scope of a report, kept in the URL
 │   ├── search-combobox/         # generic search combobox behind DebtPartnerPicker and the ledger PartnerPicker
-│   ├── tt133-export/            # Tt133ExportButton ("Xuất theo mẫu TT133"), ExportTargetsDialog (one / several / all with activity)
-│   └── ui/                      # shadcn-style primitives
+│   ├── tt133-export/            # Tt133ExportButton ("Xuất theo mẫu TT133"), ExportTargetsDialog (one / several / all with activity),
+│   │                            # company-profile-hint.tsx ("Chưa có thông tin đơn vị", also used by the voucher print button)
+│   ├── ui/                      # shadcn-style primitives (includes selection-checkbox.tsx: select-all with an indeterminate state)
+│   └── voucher-print/           # VoucherPrintButton (menu "In (PDF)" / "Excel"), StockPriceModeDialog (Giá trên phiếu / Giá vốn / Không in tiền)
 ├── features/
 │   ├── admin-roles/
 │   ├── admin-user-settings/
@@ -186,6 +188,7 @@ frontend/src/
 │   ├── stock-vouchers/          # voucher module, schema, payload, draft store
 │   ├── suppliers/
 │   ├── tt133-export/            # downloadTt133, useTt133Download, Tt133ExportForm, tt133FileBase
+│   ├── voucher-print/           # types, api, useVoucherPrint, price-mode-storage (last price mode per user)
 │   └── warehouses/              # warehouse queries, selectableWarehouses
 ├── pages/
 │   ├── admin/
@@ -219,7 +222,8 @@ frontend/src/
 ├── stores/
 ├── lib/                         # includes date-only.ts, to-number.ts, money-input.ts, vn-datetime.ts,
 │                                # report-scope.ts, period-presets.ts, blob-error.ts, date-range-presets.ts (dashboard
-│                                # and quotation range presets), realtime-bus.ts (hub status and dashboard signal)
+│                                # and quotation range presets), realtime-bus.ts (hub status and dashboard signal),
+│                                # blob-download.ts (requestBlob, saveBlob), pdf-tab.ts (openPdfTab), use-row-selection.ts
 ├── styles/
 └── test/
 ```

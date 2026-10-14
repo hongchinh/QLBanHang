@@ -17,7 +17,7 @@ Directory structure, entry points, API patterns, and key modules.
 
 | File | Description |
 | ---- | ----------- |
-| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms, the executive dashboard and the real-time signal), API controllers, entry points, runtime artifacts and production configuration keys |
+| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms and voucher prints, the executive dashboard and the real-time signal), API controllers, entry points, runtime artifacts and production configuration keys |
 
 ## Code Standard
 
@@ -25,7 +25,7 @@ Conventions, naming rules, tech stack versions, and development workflows.
 
 | File | Description |
 | ---- | ----------- |
-| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets) |
+| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and voucher print (`IVoucherPrintService`, `Tt133ExportSupport`, nullable list bodies, selection through table meta) and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets) |
 
 ## Project PDR
 
@@ -33,7 +33,7 @@ Product goals, use cases, business rules, and constraints.
 
 | File | Description |
 | ---- | ----------- |
-| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms and the executive dashboard), planned Round 3 scope and role dashboards, and non-goals |
+| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms, the TT133 voucher print forms and the executive dashboard), planned Round 3 scope and role dashboards, and non-goals |
 
 ## Other
 
@@ -63,7 +63,7 @@ Repository-specific docs outside the standard topic folders.
 | [brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md](brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md) | Per-form specs — shared frame, column-to-source mapping, debit/credit rules, S07 invariants, amount-in-words test cases |
 | [brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md](brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md) | BA/SA review — branch vs company scope, CostingScope=Warehouse at go-live, report DTO additions, rejected proposals and recorded risks |
 | [brainstorms/261013-0615-stock-voucher-form-tabs/SUMMARY.md](brainstorms/261013-0615-stock-voucher-form-tabs/SUMMARY.md) | Brainstorm for the stock in/out voucher form redesign — main fields + tabs (T2), full-height line grid with optional/sticky columns, per-pricing-mode Enter path configurable per user, sticky totals bar with receivable/payable and after-voucher debt; HTML mockups alongside |
-| [brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md](brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md) | Brainstorm for TT133 voucher print forms — Excel/PDF of 01-TT/02-TT (receipt/payment, A5 landscape) and 01-VT/02-VT (stock in/out, A4 portrait), single and bulk print from form and list pages, three price modes for stock vouchers; runs after the TT133 report forms plan |
+| [brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md](brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md) | Brainstorm for TT133 voucher print forms — Excel/PDF of 01-TT/02-TT (receipt/payment, A5 landscape) and 01-VT/02-VT (stock in/out, A4 portrait), single and bulk print from form and list pages, three price modes for stock vouchers (cost read from the inventory ledger, VAT row that adds up to the total); builds on the merged TT133 report forms plan (reviewed against code; implemented, see the plan) |
 | [brainstorms/261013-2247-executive-dashboard/SUMMARY.md](brainstorms/261013-2247-executive-dashboard/SUMMARY.md) | Brainstorm for the executive dashboard — shared dashboard base (tile kit, SignalR "domain changed" signal) and the director view: revenue/cost/gross profit from stock-out vouchers, cash, debt, inventory, "Cần chú ý" column, company-wide with branch filter, deep-dive tabs; first of five role-dashboard sub-projects; HTML mockups alongside |
 | [brainstorms/261014-0618-mobile-manager-hub/SUMMARY.md](brainstorms/261014-0618-mobile-manager-hub/SUMMARY.md) | Brainstorm for the manager mobile hub — bottom tab bar, operational overview, card reports, document event stream with fund and bank balance notifications (app push, Telegram, Google Chat, Zalo), post-posting review, SePay bank feed; merges the 261007 PWA mobile brainstorm; 6 rounds, native app later; HTML mockups alongside |
 | [brainstorms/261014-0618-mobile-manager-hub/section-01-mobile-shell-and-screens.md](brainstorms/261014-0618-mobile-manager-hub/section-01-mobile-shell-and-screens.md) | Rounds 1–2 — PWA foundation carried over from 261007, mobile tab bar rules, overview tiles and their sources, report index, five card reports, `ResponsiveTable` |
@@ -84,4 +84,5 @@ Repository-specific docs outside the standard topic folders.
 | [plans/archived/261012-0433-round2a-review-refactor/SUMMARY.md](plans/archived/261012-0433-round2a-review-refactor/SUMMARY.md) | Archived plan for the last Round 2A review findings — settlement confirmation token, shared backend helpers, Auto recompute before commit, frontend refactors |
 | [plans/archived/261012-2311-sidebar-navigation-redesign/SUMMARY.md](plans/archived/261012-2311-sidebar-navigation-redesign/SUMMARY.md) | Implementation plan for the sidebar redesign — scroll hotfix, task-based groups with colored blocks, longest-prefix highlight, collapsible groups, accent-insensitive search, per-user pin chips, collapsed rail with flyouts |
 | [plans/archived/261013-1926-tt133-report-forms/SUMMARY.md](plans/archived/261013-1926-tt133-report-forms/SUMMARY.md) | Implementation plan for the TT133 report forms — company profile, shared ClosedXML form builder, Excel/PDF exports of S04a/S05/S06/S07/S08/S12, debt summary and reconciliation record, branch/company scope, stock summary report |
+| [plans/archived/261014-1632-tt133-voucher-print-forms/SUMMARY.md](plans/archived/261014-1632-tt133-voucher-print-forms/SUMMARY.md) | Archived plan (executed; report in `EXECUTION-REPORT.md`, go-live gate in `GO-LIVE-CHECKLIST.md`) for the TT133 voucher print forms — 01-TT/02-TT (A5) and 01-VT/02-VT (A4) as Excel/PDF from the voucher and list pages, three price modes for stock vouchers, shared export support |
 | [plans/archived/](plans/archived/) | Archived implementation plans and execution reports |

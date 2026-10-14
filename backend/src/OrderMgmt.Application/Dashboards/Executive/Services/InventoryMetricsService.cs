@@ -165,8 +165,9 @@ public class InventoryMetricsService : IInventoryMetricsService
             .ToList();
     }
 
-    /// The products by group; products without a group make one row without an id or a name. With values the largest
-    /// group comes first, without them the group with the most products in stock.
+    /// The products by group; products without a group make one row without an id or a name. As with the warehouses, a
+    /// group with nothing in stock and no value has no row, and without inventory.view_cost the value is hidden before
+    /// that check. With values the largest group comes first, without them the group with the most products in stock.
     private async Task<List<StockGroupDto>> ProductGroupRowsAsync(IReadOnlyDictionary<Guid, ProductInfo> products,
         IReadOnlyDictionary<Guid, decimal> productValues, IReadOnlyDictionary<Guid, decimal> productQuantities,
         bool canViewCost, CancellationToken ct)
@@ -181,7 +182,8 @@ public class InventoryMetricsService : IInventoryMetricsService
                 Name = g.Key is { } groupId && groupNames.TryGetValue(groupId, out var name) ? name : null,
                 ProductCount = g.Count(p => productQuantities.GetValueOrDefault(p.Key) != 0m),
                 Value = canViewCost ? g.Sum(p => productValues.GetValueOrDefault(p.Key)) : null,
-            });
+            })
+            .Where(r => r.ProductCount != 0 || (r.Value ?? 0m) != 0m);
         var ordered = canViewCost
             ? rows.OrderByDescending(r => r.Value)
             : rows.OrderByDescending(r => r.ProductCount);
@@ -217,7 +219,7 @@ public class InventoryMetricsService : IInventoryMetricsService
             .Take(NegativeMaxRows)
             .ToList();
 
-    /// The products worth the most over the scope, the first ten.
+    /// The products worth the most over the scope, the first ten. A product worth nothing or less is not among them.
     private static List<StockProductRowDto> TopProductRows(IReadOnlyDictionary<Guid, ProductInfo> products,
         IReadOnlyDictionary<Guid, decimal> productValues, IReadOnlyDictionary<Guid, decimal> productQuantities) =>
         products
@@ -230,6 +232,7 @@ public class InventoryMetricsService : IInventoryMetricsService
                 Quantity = productQuantities.GetValueOrDefault(p.Key),
                 Value = productValues.GetValueOrDefault(p.Key),
             })
+            .Where(r => r.Value > 0m)
             .OrderByDescending(r => r.Value)
             .ThenBy(r => r.Code, StringComparer.Ordinal)
             .ThenBy(r => r.ProductId)

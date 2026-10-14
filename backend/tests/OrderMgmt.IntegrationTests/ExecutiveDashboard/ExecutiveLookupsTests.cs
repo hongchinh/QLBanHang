@@ -23,6 +23,8 @@ public class ExecutiveLookupsTests : ExecutiveDashboardTestBase
         var names = await LookUpAsync(rows);
 
         names.BranchCodes.Should().BeEquivalentTo(new Dictionary<Guid, string> { [rows.BranchId] = rows.BranchCode });
+        names.Branches.Should().BeEquivalentTo(
+            new Dictionary<Guid, (string Code, string Name)> { [rows.BranchId] = (rows.BranchCode, rows.BranchName) });
         names.Partners.Should().BeEquivalentTo(
             new Dictionary<Guid, (string Code, string Name)> { [rows.PartnerId] = (rows.PartnerCode, rows.PartnerName) });
         names.Products.Should().BeEquivalentTo(
@@ -49,6 +51,8 @@ public class ExecutiveLookupsTests : ExecutiveDashboardTestBase
         var names = await LookUpAsync(rows);
 
         names.BranchCodes.Should().BeEquivalentTo(new Dictionary<Guid, string> { [rows.BranchId] = rows.BranchCode });
+        names.Branches.Should().BeEquivalentTo(
+            new Dictionary<Guid, (string Code, string Name)> { [rows.BranchId] = (rows.BranchCode, rows.BranchName) });
         names.Partners.Should().BeEquivalentTo(
             new Dictionary<Guid, (string Code, string Name)> { [rows.PartnerId] = (rows.PartnerCode, rows.PartnerName) });
         names.Products.Should().BeEquivalentTo(
@@ -56,11 +60,12 @@ public class ExecutiveLookupsTests : ExecutiveDashboardTestBase
         names.Users.Should().BeEquivalentTo(new Dictionary<Guid, string> { [rows.UserId] = rows.UserName });
     }
 
-    private sealed record Rows(Guid BranchId, string BranchCode, Guid PartnerId, string PartnerCode, string PartnerName,
-        Guid ProductId, string ProductCode, string ProductName, Guid UserId, string UserName);
+    private sealed record Rows(Guid BranchId, string BranchCode, string BranchName, Guid PartnerId, string PartnerCode,
+        string PartnerName, Guid ProductId, string ProductCode, string ProductName, Guid UserId, string UserName);
 
-    private sealed record Names(Dictionary<Guid, string> BranchCodes, Dictionary<Guid, (string Code, string Name)> Partners,
-        Dictionary<Guid, (string Code, string Name)> Products, Dictionary<Guid, string> Users);
+    private sealed record Names(Dictionary<Guid, string> BranchCodes, Dictionary<Guid, (string Code, string Name)> Branches,
+        Dictionary<Guid, (string Code, string Name)> Partners, Dictionary<Guid, (string Code, string Name)> Products,
+        Dictionary<Guid, string> Users);
 
     /// One branch, partner, product and user (not the admin, who is never deleted) of this test.
     private async Task<Rows> ArrangeAsync()
@@ -76,8 +81,8 @@ public class ExecutiveLookupsTests : ExecutiveDashboardTestBase
         await CreateClientWithPermissionsAsync(username, MainBranchId, Permissions.Dashboard.Executive);
         var user = await InDbAsync(db => db.Users.Where(u => u.Username == username)
             .Select(u => new { u.Id, u.FullName }).SingleAsync());
-        return new Rows(branchId, branchCode, partnerId, partnerCode, $"Đối tượng {partnerCode}",
-            productId, productCode, $"Hàng {productCode}", user.Id, user.FullName);
+        return new Rows(branchId, branchCode, $"Chi nhánh {branchCode}", partnerId, partnerCode,
+            $"Đối tượng {partnerCode}", productId, productCode, $"Hàng {productCode}", user.Id, user.FullName);
     }
 
     /// Asks each lookup for the four ids of the rows and an id that exists nowhere.
@@ -89,6 +94,7 @@ public class ExecutiveLookupsTests : ExecutiveDashboardTestBase
         var ids = new[] { rows.BranchId, rows.PartnerId, rows.ProductId, rows.UserId, unknown };
         return new Names(
             await lookups.BranchCodesAsync(ids, CancellationToken.None),
+            await lookups.BranchesAsync(ids, CancellationToken.None),
             await lookups.PartnersAsync(ids, CancellationToken.None),
             await lookups.ProductsAsync(ids, CancellationToken.None),
             await lookups.UserNamesAsync(ids, CancellationToken.None));

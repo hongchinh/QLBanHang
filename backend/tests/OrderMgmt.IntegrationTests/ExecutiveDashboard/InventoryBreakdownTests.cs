@@ -105,6 +105,9 @@ public class InventoryBreakdownTests : ExecutiveDashboardTestBase
         (row.WarehouseId, row.WarehouseCode, row.BranchCode).Should().Be((stock.W1, codes[stock.W1], branchCode));
         row.Quantity.Should().Be(-3m);
         row.UnitName.Should().Be(await UnitNameAsync(productC));
+        // A quantity below zero is not zero: C counts in W1 (with A and B) and in group G (with A).
+        breakdown.ByWarehouse.Single(w => w.Id == stock.W1).ProductCount.Should().Be(3);
+        breakdown.ByProductGroup.Single(g => g.Id == stock.GroupId).ProductCount.Should().Be(2);
     }
 
     [Fact]
@@ -226,6 +229,23 @@ public class InventoryBreakdownTests : ExecutiveDashboardTestBase
                     .ToList();
                 request.AcknowledgeNegativeStock = true;
             });
+        // Ten more products in stock, worth 10, 20 … 100, beside A (1,600) and B (1,000): twelve with a value.
+        var valued = new Dictionary<int, Guid>();
+        foreach (var number in Enumerable.Range(1, 10))
+            valued[number] = await CreateInventoryProductAsync($"V{number:00}{suffix}");
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, valued[1], 1, 10,
+            request =>
+            {
+                request.WarehouseId = stock.W2;
+                request.Lines = Enumerable.Range(1, 10)
+                    .Select((number, index) =>
+                    {
+                        var line = LineRequest(valued[number], 1, number * 10);
+                        line.SortOrder = index;
+                        return line;
+                    })
+                    .ToList();
+            });
 
         var breakdown = await GetBreakdownAsync(stock);
 
@@ -236,8 +256,157 @@ public class InventoryBreakdownTests : ExecutiveDashboardTestBase
             breakdown.Negative.Should().HaveCount(50);
             breakdown.Negative.Select(r => r.ProductId)
                 .Should().Equal(Enumerable.Range(1, 50).Select(number => products[number]));
-            breakdown.TopByValue.Should().HaveCount(10);
+            // The ten largest: A, B, then 100 down to 30; 20 and 10 are cut, and the products without a value are not
+            // in the list at all.
+            breakdown.TopByValue.Select(p => p.ProductId).Should().Equal(
+                new[] { stock.ProductA, stock.ProductB }.Concat(Enumerable.Range(3, 8).Reverse().Select(n => valued[n])));
         }
+    }
+
+    [Fact]
+    public async Task Top_list_leaves_out_products_without_a_value()
+    {
+        var stock = await SeedStockScenarioAsync();
+        var branch = stock.Branch;
+        // C is sold without stock and without a cost price: it is worth 0. N is sold without stock at its cost price
+        // of 100: it is worth -200.
+        var productC = await CreateInventoryProductAsync("STC" + Guid.NewGuid().ToString("N")[..8]);
+        var productN = await CreateInventoryProductAsync("STN" + Guid.NewGuid().ToString("N")[..8], costPrice: 100m);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-05 09:00", branch.CustomerId, productC, 3, 100,
+            request => request.AcknowledgeNegativeStock = true);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-05 09:00", branch.CustomerId, productN, 2, 150,
+            request => request.AcknowledgeNegativeStock = true);
+
+        var breakdown = await GetBreakdownAsync(stock);
+
+        breakdown.TopByValue.Select(p => p.ProductId).Should().Equal(stock.ProductA, stock.ProductB);
+    }
+
+    [Fact]
+    public async Task Sold_out_group_is_left_out()
+    {
+        var stock = await SeedStockScenarioAsync();
+        var branch = stock.Branch;
+        // Z is the only product of group XPS here, bought and sold in full: XPS has nothing in stock and no value.
+        var xps = await InDbAsync(db => db.ProductGroups.Where(g => g.Code == "XPS").Select(g => g.Id).SingleAsync());
+        var productZ = await CreateInventoryProductAsync("STZ" + Guid.NewGuid().ToString("N")[..8]);
+        await InDbAsync(db => db.Products.Where(p => p.Id == productZ)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.ProductGroupId, (Guid?)xps)));
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, productZ, 2, 100);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-04 09:00", branch.CustomerId, productZ, 2, 150);
+        var user = await CreateClientWithPermissionsAsync("inv_no_cost", branch.BranchId,
+            Permissions.Dashboard.Executive, Permissions.Reports.Inventory);
+
+        var withCost = await GetBreakdownAsync(stock);
+        var withoutCost = await GetExecAsync<InventoryBreakdownDto>(user, "inventory/breakdown");
+
+        using (new AssertionScope())
+        {
+            withCost.ByProductGroup.Select(g => g.Id).Should().Equal((Guid?)stock.GroupId, null);
+            withoutCost.ByProductGroup.Select(g => g.Id).Should().BeEquivalentTo(new Guid?[] { stock.GroupId, null });
+        }
+    }
+
+    [Fact]
+    public async Task Residual_value_without_stock_shows_only_to_cost_users()
+    {
+        // Under the warehouse scope a warehouse keeps the value of its own rows; under the branch scope a warehouse
+        // without stock gets none of the branch's value.
+        (await PutCostingScopeAsync(CostingScope.Warehouse)).Should().Be(HttpStatusCode.OK);
+        var branch = await CreateFreshBranchAsync();
+        var product = await CreateInventoryProductAsync("STR" + Guid.NewGuid().ToString("N")[..8]);
+        // Sold without stock in September at no cost, bought back in October: the quantity is 0 but the value is 200.
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-09-15 09:00", branch.CustomerId, product, 2, 150,
+            request => request.AcknowledgeNegativeStock = true);
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, product, 2, 100);
+        var groupId = await InDbAsync(db => db.Products.Where(p => p.Id == product)
+            .Select(p => p.ProductGroupId!.Value).SingleAsync());
+        var user = await CreateClientWithPermissionsAsync("inv_no_cost", branch.BranchId,
+            Permissions.Dashboard.Executive, Permissions.Reports.Inventory);
+
+        var withCost = await GetExecAsync<InventoryBreakdownDto>(branch.Client,
+            $"inventory/breakdown?branchId={branch.BranchId}");
+        var withoutCost = await GetExecAsync<InventoryBreakdownDto>(user, "inventory/breakdown");
+
+        using (new AssertionScope())
+        {
+            withCost.ByWarehouse.Select(w => (w.Id, w.ProductCount, w.Value))
+                .Should().Equal(((Guid?)branch.WarehouseId, 0, (decimal?)200m));
+            withCost.ByProductGroup.Select(g => (g.Id, g.ProductCount, g.Value))
+                .Should().Equal(((Guid?)groupId, 0, (decimal?)200m));
+            // Without view cost the hidden value does not keep an empty row.
+            withoutCost.ByWarehouse.Should().BeEmpty();
+            withoutCost.ByProductGroup.Should().BeEmpty();
+        }
+    }
+
+    [Fact]
+    public async Task Company_wide_rows_are_ordered_by_branch_first()
+    {
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        // The branch codes sort the other way round from the warehouse codes.
+        var first = await BranchWithWarehouseAsync("OA" + suffix, "WZ" + suffix);
+        var second = await BranchWithWarehouseAsync("OB" + suffix, "WA" + suffix);
+        foreach (var branch in new[] { first, second })
+        {
+            var inStock = await CreateInventoryProductAsync("ORD" + Guid.NewGuid().ToString("N")[..8]);
+            var withoutStock = await CreateInventoryProductAsync("ORN" + Guid.NewGuid().ToString("N")[..8]);
+            await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, inStock, 1, 10);
+            await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-04 09:00", branch.CustomerId, withoutStock,
+                1, 10, request => request.AcknowledgeNegativeStock = true);
+        }
+
+        var breakdown = await GetExecAsync<InventoryBreakdownDto>(CloneAdminClient(), "inventory/breakdown");
+
+        using (new AssertionScope())
+        {
+            breakdown.ByWarehouse.Select(w => w.Id).Should().Equal(first.WarehouseId, second.WarehouseId);
+            breakdown.Negative.Select(r => r.WarehouseId).Should().Equal(first.WarehouseId, second.WarehouseId);
+        }
+    }
+
+    [Fact]
+    public async Task Warehouse_codes_are_compared_ordinally()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        // Ordinal order puts upper case first: WC… before Wb…, which a culture-aware order would put the other way.
+        var upper = await CreateWarehouseAsync(branch.BranchId, "WC" + suffix);
+        var lower = await CreateWarehouseAsync(branch.BranchId, "Wb" + suffix);
+        var product = await CreateInventoryProductAsync("STW" + Guid.NewGuid().ToString("N")[..8]);
+        // 101 split over one unit in each: 51 / 51 rounded, and the residual of -1 goes to the last warehouse by code.
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, product, 1, 50,
+            request => request.WarehouseId = upper);
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, product, 1, 51,
+            request => request.WarehouseId = lower);
+
+        var breakdown = await GetExecAsync<InventoryBreakdownDto>(branch.Client,
+            $"inventory/breakdown?branchId={branch.BranchId}");
+
+        breakdown.ByWarehouse.Select(w => (w.Id, w.Value)).Should().Equal(
+            ((Guid?)upper, (decimal?)51m), ((Guid?)lower, (decimal?)50m));
+    }
+
+    [Fact]
+    public async Task Groups_of_equal_value_are_ordered_by_name()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var groups = await InDbAsync(db => db.ProductGroups.Where(g => g.Code == "EPS" || g.Code == "XPS")
+            .Select(g => new { g.Id, g.Name }).ToListAsync());
+        var eps = await CreateInventoryProductAsync("STE" + Guid.NewGuid().ToString("N")[..8]);
+        var xps = await CreateInventoryProductAsync("STX" + Guid.NewGuid().ToString("N")[..8]);
+        var xpsGroup = groups.Single(g => g.Name.EndsWith("XPS")).Id;
+        await InDbAsync(db => db.Products.Where(p => p.Id == xps)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.ProductGroupId, (Guid?)xpsGroup)));
+        // Each group is worth 100.
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, eps, 1, 100);
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, xps, 1, 100);
+
+        var breakdown = await GetExecAsync<InventoryBreakdownDto>(branch.Client,
+            $"inventory/breakdown?branchId={branch.BranchId}");
+
+        breakdown.ByProductGroup.Select(g => g.Id).Should().Equal(
+            groups.OrderBy(g => g.Name, StringComparer.Ordinal).Select(g => (Guid?)g.Id));
     }
 
     [Fact]
@@ -281,6 +450,18 @@ public class InventoryBreakdownTests : ExecutiveDashboardTestBase
     /// The unit the stock of a product counted per unit is shown in.
     private Task<string> UnitNameAsync(Guid productId) =>
         InDbAsync(db => db.Products.Where(p => p.Id == productId).Select(p => p.Unit!.Name).SingleAsync());
+
+    /// A new branch with one warehouse of the given codes, a customer and a supplier, and an admin client working in it.
+    private async Task<FreshBranch> BranchWithWarehouseAsync(string branchCode, string warehouseCode)
+    {
+        var branchId = await CreateBranchAsync(branchCode);
+        var warehouseId = await CreateWarehouseAsync(branchId, warehouseCode);
+        var customerId = await CreatePartnerAsync("K" + warehouseCode, isCustomer: true, isSupplier: false);
+        var supplierId = await CreatePartnerAsync("S" + warehouseCode, isCustomer: false, isSupplier: true);
+        var client = CloneAdminClient();
+        UseBranch(client, branchId);
+        return new FreshBranch(branchId, warehouseId, customerId, supplierId, client);
+    }
 
     private Task<Dictionary<Guid, string>> WarehouseCodesAsync(StockScenario stock) =>
         InDbAsync(db => db.Warehouses.Where(w => w.BranchId == stock.Branch.BranchId)

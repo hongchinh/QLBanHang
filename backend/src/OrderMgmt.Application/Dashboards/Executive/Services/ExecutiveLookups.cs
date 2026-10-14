@@ -24,6 +24,15 @@ public sealed class ExecutiveLookups
                 .Select(b => new { b.Id, b.Code })
                 .ToDictionaryAsync(b => b.Id, b => b.Code, ct);
 
+    public Task<Dictionary<Guid, (string Code, string Name)>> BranchesAsync(
+        IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
+        ids.Count == 0
+            ? Task.FromResult(new Dictionary<Guid, (string Code, string Name)>())
+            : _db.Branches.IgnoreQueryFilters().AsNoTracking()
+                .Where(b => ids.Contains(b.Id))
+                .Select(b => new { b.Id, b.Code, b.Name })
+                .ToDictionaryAsync(b => b.Id, b => (b.Code, b.Name), ct);
+
     /// Customers and suppliers share one table.
     public Task<Dictionary<Guid, (string Code, string Name)>> PartnersAsync(
         IReadOnlyCollection<Guid> ids, CancellationToken ct) =>

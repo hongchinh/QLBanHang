@@ -163,7 +163,31 @@ public class RecentDocumentsTests : ExecutiveDashboardTestBase
         await AssertBadRequestKeyAsync(admin, "recent?limit=0", "limit", "Số dòng từ 1 đến 50.");
         await AssertBadRequestKeyAsync(admin, "recent?limit=51", "limit", "Số dòng từ 1 đến 50.");
         (await GetRecentAsync(admin, "limit=1")).Select(r => r.Id).Should().Equal(ids.BranchBSaleId);
-        (await GetRecentAsync(admin, "")).Should().HaveCountLessThanOrEqualTo(10);
+    }
+
+    [Fact]
+    public async Task Ten_rows_by_default()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainClient(ids);
+        // Four more receipts: eleven documents today.
+        var receipts = new List<Guid>();
+        foreach (var amount in new[] { 10m, 20m, 30m, 40m })
+        {
+            var request = CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TK"), ids.QtmId,
+                "2026-10-20 09:00", partnerId: null, amount);
+            request.PersonName = "Nguyễn F";
+            receipts.Add((await CreateCashAsync(client, request)).Id);
+        }
+
+        var rows = await GetRecentAsync(CloneAdminClient(), "");
+
+        // The newest ten: the oldest document, the sale of the dataset, is cut.
+        rows.Select(r => r.Id).Should().Equal(
+            Enumerable.Reverse(receipts).Concat(new[]
+            {
+                ids.BranchBSaleId, ids.Payment10Id, ids.Payment8Id, ids.Purchase7Id, ids.Return6Id, ids.Receipt5Id,
+            }));
     }
 
     [Fact]

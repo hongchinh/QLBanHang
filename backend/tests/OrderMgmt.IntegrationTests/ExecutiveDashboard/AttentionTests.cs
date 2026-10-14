@@ -50,8 +50,11 @@ public class AttentionTests : ExecutiveDashboardTestBase
         await PostPurchaseAsync(ids, ids.Ncc1Id, 800m, D(10, 25));
 
         var attention = await GetAttentionAsync(MainClient(ids), $"at=2026-10-21&branchId={ids.MainBranchId}");
+        var dayAfterDue = await GetAttentionAsync(MainClient(ids), $"at=2026-10-26&branchId={ids.MainBranchId}");
 
         AssertItem(attention.PayablesDueSoon, 1, 800m);
+        // On the 26th the purchase is a day late, no longer due soon.
+        AssertItem(dayAfterDue.PayablesDueSoon, 0, 0m);
     }
 
     [Fact]

@@ -15,6 +15,7 @@ public class ExecutiveLookupsEmptyIdsTests
         var none = Array.Empty<Guid>();
 
         (await lookups.BranchCodesAsync(none, CancellationToken.None)).Should().BeEmpty();
+        (await lookups.BranchesAsync(none, CancellationToken.None)).Should().BeEmpty();
         (await lookups.PartnersAsync(none, CancellationToken.None)).Should().BeEmpty();
         (await lookups.ProductsAsync(none, CancellationToken.None)).Should().BeEmpty();
         (await lookups.UserNamesAsync(none, CancellationToken.None)).Should().BeEmpty();

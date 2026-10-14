@@ -62,7 +62,7 @@ public class ExecutiveOverviewService : IExecutiveOverviewService
         var stockValue = _currentUser.HasPermission(Permissions.Reports.Inventory) && canViewCost
             ? await _inventory.GetValueByBranchAsync(scope, ct)
             : null;
-        var branches = await LoadBranchNamesAsync(scope.BranchIds, ct);
+        var branches = await _lookups.BranchesAsync(scope.BranchIds, ct);
 
         return scope.BranchIds
             .Select(id =>
@@ -221,14 +221,6 @@ public class ExecutiveOverviewService : IExecutiveOverviewService
         StockDirection.Out => RecentDocumentKind.StockOut,
         _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown stock voucher type."),
     };
-
-    /// Code and name of each branch. A deleted branch keeps them: this is a lookup by id with the query filters off.
-    private async Task<Dictionary<Guid, (string Code, string Name)>> LoadBranchNamesAsync(
-        IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
-        await _db.Branches.IgnoreQueryFilters().AsNoTracking()
-            .Where(b => ids.Contains(b.Id))
-            .Select(b => new { b.Id, b.Code, b.Name })
-            .ToDictionaryAsync(b => b.Id, b => (b.Code, b.Name), ct);
 
     private sealed record RecentRow(RecentDocumentKind Kind, Guid Id, string Code, DateTimeOffset CreatedAt, Guid BranchId,
         string? PartnerName, Guid OwnerUserId, decimal Amount);

@@ -1,6 +1,6 @@
 # Phase 02 — Print button and row selection on the cash voucher pages
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

@@ -2,8 +2,9 @@ import type { ReactNode } from 'react';
 
 interface Props {
   /**
-   * Sticky notice above the app (the push permission prompt); takes its own height. Pass null when there is
-   * nothing to show: an element that renders nothing still gets a slot.
+   * Sticky notice above the app (the push permission prompt). It takes its own height, up to 30% of the
+   * window: it cannot be scrolled away, so a notice that wraps to more lines than that (a phone) scrolls
+   * inside its slot. Pass null when there is nothing to show: an element that renders nothing still gets a slot.
    */
   banner?: ReactNode;
   children: ReactNode;
@@ -14,7 +15,7 @@ interface Props {
 export function AppShell({ banner, children }: Props) {
   return (
     <div data-testid="app-shell" className="flex h-screen flex-col">
-      {banner ? <div className="shrink-0">{banner}</div> : null}
+      {banner ? <div className="max-h-[30vh] shrink-0 overflow-y-auto">{banner}</div> : null}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
     </div>
   );

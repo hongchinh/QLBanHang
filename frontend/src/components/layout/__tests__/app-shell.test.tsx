@@ -21,7 +21,9 @@ describe('AppShell', () => {
     const shell = screen.getByTestId('app-shell');
     expect(shell).toHaveClass('flex', 'h-screen', 'flex-col');
     const [bannerSlot, content] = Array.from(shell.children);
-    expect(bannerSlot).toHaveClass('shrink-0');
+    // The banner cannot be scrolled away, so the slot takes its own height only up to 30% of the window; a
+    // banner that wraps to more lines than that (a phone) scrolls inside the slot.
+    expect(bannerSlot).toHaveClass('max-h-[30vh]', 'shrink-0', 'overflow-y-auto');
     expect(bannerSlot).toContainElement(screen.getByText('Bật thông báo'));
     expect(content).toHaveClass(...CONTENT_CLASSES);
     expect(content).toContainElement(screen.getByText('app'));

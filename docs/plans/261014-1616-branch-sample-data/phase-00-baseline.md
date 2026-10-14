@@ -1,6 +1,6 @@
 # Phase 00 — Worktree, plan commit and failure baseline
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** S
 
 ## Objective

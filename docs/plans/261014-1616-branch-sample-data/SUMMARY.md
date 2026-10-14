@@ -92,8 +92,8 @@ A **"Xóa chi nhánh demo"** button hard-deletes everything of that branch. When
 
 ## Phases
 
-- [ ] Phase 00 — Worktree, plan commit and failure baseline (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Foundation: flags, migration, acting identity, contracts, queue, create flag (M) — `phase-01-foundation.md`
+- [x] Phase 00 — Worktree, plan commit and failure baseline (S) — `phase-00-baseline.md`
+- [x] Phase 01 — Foundation: flags, migration, acting identity, contracts, queue, create flag (M) — `phase-01-foundation.md` — done at 41a1b7f; lanes started early from earlier Phase 01 commits (A 49fe77f, B and C 4892a0e, D 7e76e50), see EXECUTION-REPORT
 - [ ] Phase 02a — Lane A: deterministic sample data generator (L) — `phase-02a-generator.md`
 - [ ] Phase 02b — Lane B: runner and background worker (L) — `phase-02b-runner.md`
 - [ ] Phase 02c — Lane C: demo branch hard delete and company scope (L) — `phase-02c-demo-delete-and-scope.md`

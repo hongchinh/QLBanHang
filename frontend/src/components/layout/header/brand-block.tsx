@@ -40,13 +40,14 @@ export function BrandBlock({ collapsed, onToggleCollapse }: BrandBlockProps) {
 
   return (
     <>
-      {/* Mobile (<768px): always 160px with logo+text, no toggle. */}
-      <div className="flex h-16 w-40 shrink-0 items-center border-r bg-header-brand-bg text-foreground md:hidden">
+      {/* Mobile (<768px): 56px logo mark only, so the branch switcher and bell fit on a 360px screen. */}
+      <div className="flex h-16 w-14 shrink-0 items-center border-r bg-header-brand-bg text-foreground md:hidden">
         <Link
           to="/"
-          className="flex h-full w-full items-center gap-2 overflow-hidden px-4 text-primary"
+          aria-label="Trang chủ"
+          className="flex h-full w-full items-center justify-center overflow-hidden text-primary"
         >
-          {fullLogo}
+          {markLogo}
         </Link>
       </div>
 

@@ -32,10 +32,10 @@ export function AppHeader() {
 
       <BrandBlock collapsed={sidebarCollapsed} onToggleCollapse={toggleSidebar} />
 
-      <div className="flex flex-1 items-center gap-2 px-3 md:px-4">
+      <div className="flex min-w-0 flex-1 items-center gap-1 px-2 md:gap-2 md:px-4">
         <HeaderSearch />
         <HeaderSearchMobileSheet />
-        <div className="flex-1" />
+        <div className="hidden flex-1 md:block" />
         <HeaderBranchSwitcher />
         <HeaderNotifications />
         <HeaderUserMenu user={user} onLogout={() => logout.mutate()} />

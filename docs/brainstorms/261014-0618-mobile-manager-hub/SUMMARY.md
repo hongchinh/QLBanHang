@@ -132,7 +132,7 @@ Không câu nào chặn đợt 1–2.
 
 ## Next steps
 
-1. Lập plan đợt 1 bằng skill `write-plan`. Nguồn: 261007 §1 và §3, cùng [section-01](section-01-mobile-shell-and-screens.md).
+1. Lập plan đợt 1 bằng skill `write-plan`. Nguồn: 261007 §1 và §3, cùng [section-01](section-01-mobile-shell-and-screens.md). Plan: [261014-2227-pwa-push-ios-foundation](../../plans/261014-2227-pwa-push-ios-foundation/SUMMARY.md).
 2. Lập plan đợt 2.
 3. Trả lời câu hỏi mở 1 trước khi lập plan đợt 5, câu hỏi mở 2 trước đợt 6.
 4. Mỗi đợt cập nhật `docs/architecture/system-architecture.md`, `docs/code-standard/conventions.md` và `docs/project-pdr/product-goals.md`. Đợt 5 thu hẹp non-goal về webhook ngân hàng.

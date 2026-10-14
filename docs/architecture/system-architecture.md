@@ -336,6 +336,7 @@ Company-wide reads load the debt entries and fund movements of every branch on e
 - `SearchController` provides global search.
 - `SettingsController` manages branding/logo settings; writes require `user_settings.manage`. `CompanyProfileController` shares its route prefix (`/api/settings/company`).
 - `NotificationsController` exposes list, unread count and read/mark-all-read actions.
+- Web push: `NotificationService` → `PushSenderService` (VAPID) → service worker `push` / `notificationclick` → `NAVIGATE` message handled by `SwNavigateListener`. `GET /api/settings/branding/icon/{180|192|512}` serves the PWA and iOS icons. Platform limits and the push flow: [pwa-mobile.md](pwa-mobile.md).
 
 ## API Contract
 

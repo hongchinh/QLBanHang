@@ -703,6 +703,34 @@ describe('useDocumentActions focus return', () => {
 
       expect(document.activeElement).toBe(document.body);
     });
+
+    // The dialog itself gives the focus back to what had it when it opened when the hook names nothing. Not here:
+    // the dialog did not close, it went away with its page.
+    it('nothing is focused, even when the search box had the focus as the dialog opened', async () => {
+      const perform = vi.fn<(a: Action) => Promise<void>>().mockRejectedValue(apiError(422, 'NEGATIVE_FUND_WARNING'));
+      const { rerender } = render(
+        <Shell page="form">
+          <Harness perform={perform} />
+        </Shell>,
+      );
+      const search = screen.getByLabelText('Tìm kiếm');
+      act(() => search.focus());
+      // A click that leaves the focus where it was, as Safari does for a button.
+      fireEvent.click(screen.getByTestId('save'));
+      await screen.findByRole('dialog');
+      expect(document.activeElement).not.toBe(search);
+
+      rerender(
+        <Shell page="list">
+          <Harness perform={perform} />
+        </Shell>,
+      );
+      expect(screen.queryByRole('dialog')).toBeNull();
+      // Past the tick in which the closed dialog hands the focus back.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(document.activeElement).toBe(document.body);
+    });
   });
 
   // The buttons of the page are disabled while an action runs, so a real browser drops the focus of the one that was

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,12 +24,26 @@ interface Props {
 // Generic dialog for the 422 confirmation codes (P10); open while a request is set.
 export function ConfirmRequiredDialog({ request, confirmLabel = 'Vẫn tiếp tục', onConfirm, onClose, restoreFocusTo }: Props) {
   const blocked = request?.blocked ?? false;
+  // The dialog stays mounted and closes when the request is cleared. Unmounted, it went away with its page (browser
+  // Back while it was open), and Radix still asks where the focus goes a tick later.
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   return (
     <Dialog open={request !== null} onOpenChange={(next) => !next && onClose()}>
       <DialogContent
         showClose={false}
         className="max-w-lg"
         onCloseAutoFocus={(event) => {
+          // Nothing to give the focus back to for a page that is gone, not even what had it when the dialog opened.
+          if (!mountedRef.current) {
+            event.preventDefault();
+            return;
+          }
           const target = restoreFocusTo?.();
           if (!target) return;
           event.preventDefault();

@@ -442,7 +442,8 @@ public class CashVoucherPrintTests : CashDebtTestBase
     private static Task<HttpResponseMessage> PrintAsync(HttpClient client, Guid id, string format = "xlsx") =>
         client.GetAsync($"/api/cash-vouchers/{id}/print?format={format}");
 
-    private static List<string> Texts(IXLWorksheet ws) => ws.CellsUsed().Select(c => c.GetString()).ToList();
+    /// Every text line of the used cells (the header's right part is one cell of several lines; a saved file has CRLF line ends).
+    private static List<string> Texts(IXLWorksheet ws) => ws.CellsUsed().SelectMany(c => c.GetString().Split('\n')).Select(t => t.TrimEnd('\r')).ToList();
 
     /// A fresh branch opened on 10-01 with an admin client working in it and its default cash fund, holding 10,000,000.
     private async Task<(Guid BranchId, HttpClient Client, Guid FundId, string BranchName)> BranchClientAsync()

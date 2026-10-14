@@ -43,8 +43,9 @@ public class CashVoucherFormTests
         return new XLWorkbook(new MemoryStream(bytes));
     }
 
+    /// Every text line of the used cells (the header's right part is one cell of several lines; a saved file has CRLF line ends).
     private static List<string> Texts(IXLWorksheet sheet) =>
-        sheet.CellsUsed().Select(c => c.GetString()).ToList();
+        sheet.CellsUsed().SelectMany(c => c.GetString().Split('\n')).Select(t => t.TrimEnd('\r')).ToList();
 
     private static IXLCell CellWith(IXLWorksheet sheet, string text) =>
         sheet.CellsUsed().First(c => c.GetString() == text);

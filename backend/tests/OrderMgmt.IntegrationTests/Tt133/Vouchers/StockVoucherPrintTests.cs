@@ -695,7 +695,8 @@ public class StockVoucherPrintTests : InventoryTestBase
 
     private static string NewCode(string prefix) => prefix + Guid.NewGuid().ToString("N")[..8];
 
-    private static List<string> Texts(IXLWorksheet ws) => ws.CellsUsed().Select(c => c.GetString()).ToList();
+    /// Every text line of the used cells (the header's right part is one cell of several lines; a saved file has CRLF line ends).
+    private static List<string> Texts(IXLWorksheet ws) => ws.CellsUsed().SelectMany(c => c.GetString().Split('\n')).Select(t => t.TrimEnd('\r')).ToList();
 
     /// The amount of a row under the table: the last column of the form.
     private static decimal Amount(IXLWorksheet ws, string label) =>

@@ -52,8 +52,9 @@ public sealed class VoucherFormBuilder
 
     public IXLWorksheet Sheet { get; }
 
-    /// Unit and address on the left, the form code and its legal basis on the right; no MST line. Top-aligned, so the
-    /// right lines stay together when a left line wraps.
+    /// Unit and address on the left, one row each; no MST line. The form code and its legal basis on the right are one
+    /// wrapped cell over the three rows, so its lines stay together when a left line wraps; the rows are made tall
+    /// enough for both sides. Top-aligned.
     public void WriteHeaderBlock(string formCode)
     {
         var unit = string.IsNullOrWhiteSpace(_context.CompanyName)
@@ -62,32 +63,40 @@ public sealed class VoucherFormBuilder
                 ? _context.CompanyName
                 : $"{_context.CompanyName} – {_context.BranchName}";
         string[] left = [Labelled("Đơn vị:", unit), Labelled("Địa chỉ:", _context.Address), string.Empty];
-        string[] right =
-        [
-            $"Mẫu số {formCode}",
-            "(Ban hành theo Thông tư số 133/2016/TT-BTC",
-            "ngày 26/8/2016 của Bộ Tài chính)",
-        ];
+        var formLine = $"Mẫu số {formCode}";
+        const string basis = "(Ban hành theo Thông tư số 133/2016/TT-BTC";
+        const string basisDate = "ngày 26/8/2016 của Bộ Tài chính)";
 
+        var count = _columns.Count;
+        var first = Table.Row;
+        var rightLines = Tt133FormBuilder.LineCount(formLine, Width(_rightStart, count), bold: true)
+                         + Tt133FormBuilder.LineCount(basis, Width(_rightStart, count), bold: false)
+                         + Tt133FormBuilder.LineCount(basisDate, Width(_rightStart, count), bold: false);
+
+        var leftLines = 0;
         for (var i = 0; i < left.Length; i++)
         {
-            var row = Table.Row + i;
-            var leftCell = Merged(row, 1, _leftEnd);
+            var leftCell = Merged(first + i, 1, _leftEnd);
             leftCell.Value = left[i];
             leftCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
             leftCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
 
-            var rightCell = Merged(row, _rightStart, _columns.Count);
-            rightCell.Value = right[i];
-            rightCell.Style.Font.Bold = i == 0;
-            rightCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-            rightCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
-
-            var lines = Math.Max(
-                Wrap(leftCell, left[i], 1, _leftEnd, bold: false),
-                Wrap(rightCell, right[i], _rightStart, _columns.Count, bold: i == 0));
-            SetRowLines(row, lines);
+            var lines = Wrap(leftCell, left[i], 1, _leftEnd, bold: false);
+            // The last row takes the lines the right part still needs.
+            if (i == left.Length - 1) lines = Math.Max(lines, rightLines - leftLines);
+            SetRowLines(first + i, lines);
+            leftLines += lines;
         }
+
+        Sheet.Range(first, _rightStart, first + left.Length - 1, count).Merge();
+        var rightCell = Sheet.Cell(first, _rightStart);
+        var text = rightCell.GetRichText();
+        text.AddText(formLine).SetBold();
+        text.AddText($"\n{basis}\n{basisDate}");
+        rightCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        rightCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+        rightCell.Style.Alignment.WrapText = true;
+
         Table.Skip(left.Length + 1);
     }
 

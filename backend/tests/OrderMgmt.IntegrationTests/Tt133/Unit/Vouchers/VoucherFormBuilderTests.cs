@@ -77,20 +77,20 @@ public class VoucherFormBuilderTests
 
         RowOf(ws, "Đơn vị: Công ty ABC – Chi nhánh HN").Should().Be(1);
         RowOf(ws, "Địa chỉ: 12 Láng Hạ").Should().Be(2);
-        RowOf(ws, "Mẫu số 01-TT").Should().Be(1);
-        RowOf(ws, "(Ban hành theo Thông tư số 133/2016/TT-BTC").Should().Be(2);
-        RowOf(ws, "ngày 26/8/2016 của Bộ Tài chính)").Should().Be(3);
-
-        ColumnOf(ws, "Mẫu số 01-TT").Should().Be(7);
         SpanOf(ws, "Đơn vị: Công ty ABC – Chi nhánh HN").Should().Be((1, 6));
         SpanOf(ws, "Địa chỉ: 12 Láng Hạ").Should().Be((1, 6));
-        foreach (var right in new[] { "Mẫu số 01-TT", "(Ban hành theo Thông tư số 133/2016/TT-BTC", "ngày 26/8/2016 của Bộ Tài chính)" })
-        {
-            SpanOf(ws, right).Should().Be((7, 10));
-            CellWith(ws, right).Style.Alignment.Horizontal.Should().Be(XLAlignmentHorizontalValues.Center);
-        }
-        CellWith(ws, "Mẫu số 01-TT").Style.Font.Bold.Should().BeTrue();
-        CellWith(ws, "(Ban hành theo Thông tư số 133/2016/TT-BTC").Style.Font.Bold.Should().BeFalse();
+
+        // The three right lines are one wrapped cell over the three header rows, so they stay together.
+        var right = ws.Cell(1, 7);
+        right.GetString().Should().Be(string.Join("\n", RightLines("01-TT")));
+        right.IsMerged().Should().BeTrue();
+        right.MergedRange().RangeAddress.ToString().Should().Be("G1:J3");
+        right.Style.Alignment.WrapText.Should().BeTrue();
+        right.Style.Alignment.Horizontal.Should().Be(XLAlignmentHorizontalValues.Center);
+        var runs = right.GetRichText().ToList();
+        runs.Select(r => r.Text).Should().Equal("Mẫu số 01-TT", "\n(Ban hành theo Thông tư số 133/2016/TT-BTC\nngày 26/8/2016 của Bộ Tài chính)");
+        runs.Select(r => r.Bold).Should().Equal(true, false);
+        runs.Should().OnlyContain(r => r.FontName == "Times New Roman" && r.FontSize == 11);
 
         b.Table.Row.Should().Be(5); // three rows and one empty row
     }
@@ -102,14 +102,33 @@ public class VoucherFormBuilderTests
 
         b.WriteHeaderBlock("01-TT");
 
-        foreach (var text in new[]
-                 {
-                     "Đơn vị: Công ty ABC – Chi nhánh HN", "Địa chỉ: 12 Láng Hạ", "Mẫu số 01-TT",
-                     "(Ban hành theo Thông tư số 133/2016/TT-BTC", "ngày 26/8/2016 của Bộ Tài chính)",
-                 })
+        foreach (var text in new[] { "Đơn vị: Công ty ABC – Chi nhánh HN", "Địa chỉ: 12 Láng Hạ" })
             CellWith(ws, text).Style.Alignment.Vertical.Should().Be(XLAlignmentVerticalValues.Top, text);
         ws.Cell(3, 1).Style.Alignment.Vertical.Should().Be(XLAlignmentVerticalValues.Top);
+        ws.Cell(1, 7).Style.Alignment.Vertical.Should().Be(XLAlignmentVerticalValues.Top);
     }
+
+    [Fact]
+    public void Header_rows_are_tall_enough_for_the_wrapped_right_lines()
+    {
+        var columns = Enumerable.Range(1, 5).Select(i => new Tt133Column($"{i}", "", 8)).ToArray();
+        var context = Context();
+        context.CompanyName = "ABC";
+        context.BranchName = null;
+        var (b, ws) = NewBuilder(context, VoucherPaper.A4Portrait, columns);
+        Tt133FormBuilder.LineCount("Đơn vị: ABC", 3 * 8, bold: false).Should().Be(1); // preconditions of the case
+        Tt133FormBuilder.LineCount("Địa chỉ: 12 Láng Hạ", 3 * 8, bold: false).Should().Be(1);
+        var lines = RightLines("01-VT").Select((t, i) => Tt133FormBuilder.LineCount(t, 2 * 8, bold: i == 0)).Sum();
+        lines.Should().BeGreaterThan(3);
+
+        b.WriteHeaderBlock("01-VT");
+
+        ws.Cell(1, 4).MergedRange().RangeAddress.ToString().Should().Be("D1:E3");
+        Enumerable.Range(1, 3).Sum(r => ws.Row(r).Height).Should().BeApproximately(lines * ws.RowHeight, 0.01);
+    }
+
+    private static string[] RightLines(string formCode) =>
+        [$"Mẫu số {formCode}", "(Ban hành theo Thông tư số 133/2016/TT-BTC", "ngày 26/8/2016 của Bộ Tài chính)"];
 
     [Fact]
     public void Header_without_company_profile()

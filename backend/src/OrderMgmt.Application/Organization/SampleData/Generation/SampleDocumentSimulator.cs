@@ -31,8 +31,9 @@ internal sealed partial class SampleDocumentSimulator
         BankTransfer,
     }
 
-    /// The month's working days (whole month, also outside the window), its sales per day and its pending events.
-    /// An event fires on the first working day on or after its date where it can; it is dropped at the end of the month.
+    /// The month's working days (whole month, also outside the window), its sales per day, its revenue target and its
+    /// pending events. An event fires on the first working day on or after its date where it can; it is dropped at the
+    /// end of the month.
     private sealed class MonthPlan
     {
         public MonthPlan(IReadOnlyList<DateOnly> days)
@@ -44,6 +45,11 @@ internal sealed partial class SampleDocumentSimulator
         public IReadOnlyList<DateOnly> Days { get; }
         public int[] SalesPerDay { get; }
         public List<(DateOnly Date, MonthEvent Kind)> Events { get; } = new();
+
+        public int PlannedSales { get; set; }
+        public decimal RevenueTarget { get; set; }
+        public int SalesDone { get; set; }
+        public decimal Revenue { get; set; }
     }
 
     private readonly SampleRandom _random;
@@ -53,6 +59,9 @@ internal sealed partial class SampleDocumentSimulator
     private readonly Dictionary<string, SampleProductSpec> _products;
     private readonly Dictionary<string, SampleCustomerProfile> _profiles;
     private readonly List<SampleStep> _today = new();
+    private readonly List<(DateOnly Date, SampleCustomerProfile Customer, bool Hold)> _plannedSales = new();
+    private readonly HashSet<string> _heldKeys = new();
+    private bool _holdStarted;
 
     private DateOnly _date;
     private MonthPlan? _month;
@@ -83,6 +92,7 @@ internal sealed partial class SampleDocumentSimulator
     private List<SampleStep> Simulate()
     {
         PlanOncePerPeriod();
+        PlanBucketSales();
         TrackOpeningDebts();
 
         var steps = new List<SampleStep>();
@@ -95,6 +105,7 @@ internal sealed partial class SampleDocumentSimulator
 
             if (day == month.Days[0])
                 Expense(Vcb, Rent, $"Tiền thuê kho tháng {MonthText(day)}");
+            StartEndHold();
             Purchases();
             SupplierPayments();
             for (var i = month.SalesPerDay[DayIndex(day)]; i > 0; i--)
@@ -130,6 +141,8 @@ internal sealed partial class SampleDocumentSimulator
         var sales = _random.Between(SalesPerMonthMin, SalesPerMonthMax);
         for (var i = 0; i < sales; i++)
             month.SalesPerDay[i <= last ? i : _random.Between(0, last)]++;
+        month.PlannedSales = sales;
+        month.RevenueTarget = _random.NextAmount(RevenueTargetMin, RevenueTargetMax, RevenueTargetStep);
 
         void Add(MonthEvent kind, int fromIndex, int toIndex) =>
             month.Events.Add((month.Days[_random.Between(Math.Min(fromIndex, last), Math.Min(toIndex, last))], kind));
@@ -213,7 +226,7 @@ internal sealed partial class SampleDocumentSimulator
             if (debt.Kind == OpeningDebtKind.Prepayment)
             {
                 if (debt.Side == DebtSide.Receivable)
-                    _ledger.Items.Add(new SampleOpenItem(debt.Key, debt.PartnerCode, debt.Side, "OD", true, debt.Amount, null));
+                    _ledger.Items.Add(new SampleOpenItem(debt.Key, debt.PartnerCode, debt.Side, "OD", true, debt.Amount, null, null));
                 continue;
             }
 
@@ -221,15 +234,74 @@ internal sealed partial class SampleDocumentSimulator
             var payDate = debt.Side == DebtSide.Receivable
                 ? CollectionDate(_profiles[debt.PartnerCode], due, opening: true)
                 : due.AddDays(-_random.Between(SupplierDaysBeforeDueMin, SupplierDaysBeforeDueMax));
-            _ledger.Items.Add(new SampleOpenItem(debt.Key, debt.PartnerCode, debt.Side, "OD", false, debt.Amount,
+            _ledger.Items.Add(new SampleOpenItem(debt.Key, debt.PartnerCode, debt.Side, "OD", false, debt.Amount, due,
                 payDate is { } date ? IntoWindow(date) : null));
         }
     }
 
+    /// On time: shortly before the due date. Late: well after it. Bad debt: never for an opening item, very late for a new one.
     private DateOnly? CollectionDate(SampleCustomerProfile customer, DateOnly due, bool opening) => customer.Habit switch
     {
         PaymentHabit.OnTime => due.AddDays(-_random.Between(OnTimeDaysBeforeDueMin, OnTimeDaysBeforeDueMax)),
         PaymentHabit.BadDebt when opening => null,
+        PaymentHabit.BadDebt => due.AddDays(_random.Between(BadDebtDaysAfterDueMin, BadDebtDaysAfterDueMax)),
         _ => due.AddDays(_random.Between(LateDaysAfterDueMin, LateDaysAfterDueMax)),
     };
+
+    /// Credit sales placed relative to T (the day after the last document), so the overdue report at T has an item in the
+    /// 1–30 and the 31–60 day buckets whatever the window: a sale to the first late payer due LateSaleOverdueDays before T,
+    /// and one to the bad debt customer due BadDebtSaleOverdueDays before T. Neither customer pays them before T (their
+    /// habits pay later, and the invoices are held: never settled early).
+    private void PlanBucketSales()
+    {
+        var t = _plan.LastDocumentDate.AddDays(1);
+        foreach (var (habit, overdueDays) in new[] { (PaymentHabit.Late, LateSaleOverdueDays), (PaymentHabit.BadDebt, BadDebtSaleOverdueDays) })
+        {
+            var customer = SampleCatalog.CustomerProfiles.First(p => p.Habit == habit);
+            var date = t.AddDays(-(_partners[customer.Code].CreditDays ?? 0) - overdueDays);
+            if (date.DayOfWeek == DayOfWeek.Sunday)
+                date = date.AddDays(1);
+            _plannedSales.Add((date, customer, true));
+        }
+        _plannedSales.Sort((a, b) => a.Date.CompareTo(b.Date));
+    }
+
+    /// The planned credit sale for today, if one is still to be made; Hold means its invoice must stay open until T.
+    private (SampleCustomerProfile Customer, bool Hold)? TakePlannedSale()
+    {
+        var index = _plannedSales.FindIndex(s => s.Date <= _date);
+        if (index < 0)
+            return null;
+        var (_, customer, hold) = _plannedSales[index];
+        _plannedSales.RemoveAt(index);
+        return (customer, hold);
+    }
+
+    /// From EndHoldDays before T: customers pay only what is due (no early settlement), and every owner keeps an open
+    /// invoice at T. An owner's invoice still open at T is held (never settled early); an owner without one gets a planned
+    /// credit sale to its first on-time, non-retail customer, held as well.
+    private void StartEndHold()
+    {
+        if (_holdStarted || _date < _plan.LastDocumentDate.AddDays(1 - EndHoldDays))
+            return;
+        _holdStarted = true;
+        var t = _plan.LastDocumentDate.AddDays(1);
+        var owners = _plan.Partners.Where(p => p.IsCustomer && p.OwnerIndex != null).Select(p => p.OwnerIndex!.Value)
+            .Distinct().OrderBy(o => o).ToList();
+        foreach (var owner in owners)
+        {
+            var customers = SampleCatalog.CustomerProfiles.Where(c => _partners[c.Code].OwnerIndex == owner).ToList();
+            var openAtT = _ledger.Items.FirstOrDefault(i => i.Side == DebtSide.Receivable && !i.IsPrepayment && i.Open > 0
+                && customers.Any(c => c.Code == i.PartnerCode) && (i.PayDate is null || i.PayDate >= t));
+            if (openAtT != null)
+            {
+                _heldKeys.Add(openAtT.Key);
+                continue;
+            }
+            var customer = customers.FirstOrDefault(c => c.Habit == PaymentHabit.OnTime && c.Group != CustomerGroup.Retail
+                && c.CreditLimit == null && c.Code != DualRolePartner);
+            if (customer != null)
+                _plannedSales.Add((_date, customer, true));
+        }
+    }
 }

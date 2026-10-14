@@ -31,8 +31,10 @@ internal sealed partial class SampleDocumentSimulator
     }
 
     /// One receipt per customer and day once an invoice's collection date has come (on the deposit day with a short till:
-    /// within EarlyCollectionDays). It gathers, oldest first, every invoice to collect within the next ReceiptGatherDays
-    /// days. The dual-role partner pays nothing before its debt offset, so the offset finds both sides open.
+    /// within EarlyCollectionDays). Before the end hold it also settles, oldest first, the invoices to collect within the
+    /// next ReceiptGatherDays days, as long as the company's open receivables stay at or above GatherFloor. A held invoice
+    /// is never settled early. The dual-role partner pays nothing before its debt offset, so the offset finds both sides
+    /// open.
     private void CustomerReceipts()
     {
         foreach (var customer in SampleCatalog.CustomerProfiles)
@@ -40,13 +42,21 @@ internal sealed partial class SampleDocumentSimulator
             if (customer.Code == DualRolePartner && !_offsetDone)
                 continue;
             var collectBy = DepositIsShort() ? _date.AddDays(EarlyCollectionDays) : _date;
-            var gatherBy = _date.AddDays(Math.Max(ReceiptGatherDays, collectBy.DayNumber - _date.DayNumber));
-            var due = _ledger.Items
+            var gatherBy = _holdStarted ? collectBy : _date.AddDays(Math.Max(ReceiptGatherDays, collectBy.DayNumber - _date.DayNumber));
+            var candidates = _ledger.Items
                 .Where(i => i.PartnerCode == customer.Code && i.Side == DebtSide.Receivable && !i.IsPrepayment && i.Open > 0
-                    && i.PayDate <= gatherBy)
+                    && i.PayDate <= gatherBy && (i.PayDate <= _date || !_heldKeys.Contains(i.Key)))
                 .ToList();
-            if (!due.Any(i => i.PayDate <= collectBy))
+            if (!candidates.Any(i => i.PayDate <= collectBy))
                 continue;
+
+            var room = OpenReceivables() - GatherFloor;
+            var due = new List<SampleOpenItem>();
+            foreach (var item in candidates)
+            {
+                if (item.PayDate <= collectBy || room - due.Sum(i => i.Open) - item.Open >= 0m)
+                    due.Add(item);
+            }
 
             var partial = _partialsDone < _partialDates.Length && _date >= _partialDates[_partialsDone]
                 && customer.Habit == PaymentHabit.OnTime && due[0].Open >= PartialPaymentMinOpen;
@@ -76,8 +86,8 @@ internal sealed partial class SampleDocumentSimulator
         }
     }
 
-    /// One payment per supplier and day for the invoices whose payment date has come, oldest first, from the bank fund with
-    /// the most room. Invoices that do not fit wait for the next day.
+    /// One payment per supplier and day once an invoice's payment date has come. It pays, oldest first, the invoices to pay
+    /// within SupplierGatherDays from the bank fund with the most room; invoices that do not fit wait for the next day.
     private void SupplierPayments()
     {
         foreach (var supplier in _plan.Partners.Where(p => p.IsSupplier))
@@ -85,9 +95,10 @@ internal sealed partial class SampleDocumentSimulator
             if (supplier.Code == DualRolePartner && !_offsetDone)
                 continue;
             var due = _ledger.Items
-                .Where(i => i.PartnerCode == supplier.Code && i.Side == DebtSide.Payable && i.Open > 0 && i.PayDate <= _date)
+                .Where(i => i.PartnerCode == supplier.Code && i.Side == DebtSide.Payable && i.Open > 0
+                    && i.PayDate <= _date.AddDays(SupplierGatherDays))
                 .ToList();
-            if (due.Count == 0)
+            if (!due.Any(i => i.PayDate <= _date))
                 continue;
 
             var fund = BanksByRoom().First();

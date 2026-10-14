@@ -9,7 +9,7 @@ namespace OrderMgmt.Application.Organization.SampleData.Generation;
 internal sealed class SampleOpenItem
 {
     public SampleOpenItem(string key, string partnerCode, DebtSide side, string source, bool isPrepayment, decimal open,
-        DateOnly? payDate)
+        DateOnly? dueDate, DateOnly? payDate)
     {
         Key = key;
         PartnerCode = partnerCode;
@@ -17,6 +17,7 @@ internal sealed class SampleOpenItem
         Source = source;
         IsPrepayment = isPrepayment;
         Open = open;
+        DueDate = dueDate;
         PayDate = payDate;
     }
 
@@ -28,6 +29,9 @@ internal sealed class SampleOpenItem
     public string Source { get; }
 
     public bool IsPrepayment { get; }
+
+    /// Due date of an invoice; null for a prepayment.
+    public DateOnly? DueDate { get; }
     public decimal Open { get; private set; }
 
     /// First day the partner pays (or is paid); null means never.

@@ -11,7 +11,7 @@ import {
   UserPlus, UserRound, Users, Users2, Wallet, Warehouse, X, type LucideIcon,
 } from 'lucide-react';
 
-// The only file allowed to import lucide-react (enforced by no-direct-lucide-imports.test.ts and ESLint).
+// The only file that maps business names to lucide-react drawings; lucide-react may be imported only inside components/icons (enforced by no-direct-lucide-imports.test.ts and ESLint).
 // Names describe the business meaning, not the drawing, so a later icon set can map them differently.
 
 export const ICON_TONES = ['create', 'edit', 'danger', 'confirm', 'info', 'export', 'print', 'accent', 'muted', 'warn'] as const;

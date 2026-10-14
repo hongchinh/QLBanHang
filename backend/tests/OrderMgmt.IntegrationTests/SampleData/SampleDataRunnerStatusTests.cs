@@ -340,13 +340,32 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
             TinyPlans.WithSteps(TinyPlans.OpeningDate, Sale("XBH-0001", 1), Sale("XBH-0002", 2)));
 
         result.Succeeded.Should().BeFalse();
-        result.Error.Should().Be("HAN-MUC-DM-KH01: Chi nhánh demo không còn ở trạng thái đang tạo dữ liệu mẫu.");
+        result.Error.Should().Be("TIEN-DO: Chi nhánh demo không còn ở trạng thái đang tạo dữ liệu mẫu.");
         result.StepsExecuted.Should().Be(0);
         (await InDbAsync(db => db.StockVouchers.AnyAsync(v => v.BranchId == branchId))).Should().BeFalse();
         var branch = await BranchAsync(branchId);
         (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
             .Should().Be((SampleDataStatus.Failed, 0, InterruptedError));
         recorder.DashboardSignals.Should().BeEmpty();
+    }
+
+    /// A step that finished before the progress write stopped the run is counted.
+    [Fact]
+    public async Task Steps_done_before_the_stop_are_counted()
+    {
+        var branchId = await CreateBranchAsync("RC06");
+        // Items 11 to 20 are the 10 steps; the branch is failed as the first one starts, and the progress write after
+        // the 10th step (item 20) stops the run.
+        var identity = new InterruptingIdentity(() => FailAsRecoveryWould(branchId), atSet: 11);
+        var host = TinyPlans.WithService<IActingIdentity>(_factory, identity);
+        var steps = Enumerable.Range(1, 10).Select(i => (SampleStep)Sale($"XBH-{i:0000}", i)).ToArray();
+
+        var result = await TinyPlans.RunAsync(host, branchId, TinyPlans.WithSteps(TinyPlans.OpeningDate, steps));
+
+        result.Succeeded.Should().BeFalse();
+        result.StepsExecuted.Should().Be(10);
+        (await InDbAsync(db => db.StockVouchers.CountAsync(v => v.BranchId == branchId))).Should().Be(10);
+        result.Error.Should().Be("TIEN-DO: Chi nhánh demo không còn ở trạng thái đang tạo dữ liệu mẫu.");
     }
 
     [Fact]
@@ -402,18 +421,26 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
             .Should().Be((SampleDataStatus.Ready, 100, (string?)null));
     }
 
-    /// The acting identity, which lets `onFirstSet` run on its first Set, as another instance would meanwhile.
+    /// The acting identity, which lets `interrupt` run on its `atSet`-th Set (one per plan item), as another instance
+    /// would meanwhile.
     private sealed class InterruptingIdentity : IActingIdentity
     {
-        private Action? _onFirstSet;
+        private readonly Action _interrupt;
+        private readonly int _atSet;
+        private int _sets;
 
-        public InterruptingIdentity(Action onFirstSet) => _onFirstSet = onFirstSet;
+        public InterruptingIdentity(Action interrupt, int atSet = 1)
+        {
+            _interrupt = interrupt;
+            _atSet = atSet;
+        }
 
         public ActingIdentity? Current { get; private set; }
 
         public void Set(ActingIdentity identity)
         {
-            Interlocked.Exchange(ref _onFirstSet, null)?.Invoke();
+            if (Interlocked.Increment(ref _sets) == _atSet)
+                _interrupt();
             Current = identity;
         }
     }

@@ -42,6 +42,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
     private const string PlanKey = "KE-HOACH";
     /// Key of the final status write.
     private const string FinishKey = "HOAN-TAT";
+    /// Key of a progress write that found the branch no longer Running.
+    private const string ProgressKey = "TIEN-DO";
     private const int MaxOwners = 3;
     private const int ProgressEvery = 10;
     private const int ErrorMaxLength = 1000;
@@ -155,7 +157,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
             {
                 _logger.LogWarning("Sample data of branch {BranchId}: not a Running demo branch; skipped", job.BranchId);
                 var reason = await IsDemoAsync(job.BranchId, ct) ? NoLongerRunning : BranchNotFound;
-                return LeftUnchanged(run, stopwatch, reason);
+                return LeftUnchanged(run, stopwatch, PlanKey, reason);
             }
             await PrepareAsync(run, job.RequestedByUserId, owners, ct);
             await RunSetupAsync(run, plan, ct);
@@ -166,20 +168,21 @@ public sealed class SampleDataRunner : ISampleDataRunner
                 _logger.LogWarning("Sample data of branch {BranchCode} ran {Done} of {Total} items", run.BranchCode, run.Done, run.Total);
             run.CurrentKey = FinishKey;
             if (!await SetReadyAsync(job.BranchId, ct))
-                throw new NoLongerRunningException();
+                throw new NoLongerRunningException(FinishKey);
             await TrySignalDashboardsAsync(job.BranchId, ct);
             _logger.LogInformation(
                 "Sample data of branch {BranchCode} ready: {StepsExecuted} steps executed, {StepsSkipped} skipped in {Elapsed}",
                 run.BranchCode, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed);
             return new SampleDataRunResult(true, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed, null);
         }
-        catch (NoLongerRunningException)
+        // As the catch below: a cancelled token rethrows.
+        catch (NoLongerRunningException stop) when (!ct.IsCancellationRequested)
         {
             // Failed meanwhile, by the startup recovery of another instance during a rolling deploy for example.
             _logger.LogWarning(
                 "Sample data of branch {BranchId} ({BranchCode}): no longer a Running demo branch; left unchanged",
                 job.BranchId, run!.BranchCode);
-            return LeftUnchanged(run, stopwatch, NoLongerRunning);
+            return LeftUnchanged(run, stopwatch, stop.Key, NoLongerRunning);
         }
         // As in GenerateAsync: once the token is cancelled every failure is thrown and the branch stays Running.
         catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -194,13 +197,18 @@ public sealed class SampleDataRunner : ISampleDataRunner
     }
 
     /// The result of a run on a branch that is missing, real or no longer Running: the run does not change its status.
-    private static SampleDataRunResult LeftUnchanged(SampleRunState run, Stopwatch stopwatch, string reason) =>
+    private static SampleDataRunResult LeftUnchanged(SampleRunState run, Stopwatch stopwatch, string key,
+        string reason) =>
         new(false, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed,
-            FormatError(run.CurrentKey, new SampleDataPlanException(reason)));
+            FormatError(key, new SampleDataPlanException(reason)));
 
-    /// The branch stopped being a Running demo branch during the run: the run stops and leaves it as it is.
+    /// The branch stopped being a Running demo branch during the run: the run stops and leaves it as it is. `Key` names
+    /// the write that found it (TIEN-DO, HOAN-TAT).
     private sealed class NoLongerRunningException : Exception
     {
+        public NoLongerRunningException(string key) => Key = key;
+
+        public string Key { get; }
     }
 
     /// SampleDataError: "{key}: {reason}", cut to 1000 characters without splitting a surrogate pair. Every signed-in
@@ -394,25 +402,22 @@ public sealed class SampleDataRunner : ISampleDataRunner
             }, ct);
     }
 
-    /// One step, acting as its owner: the executor's outcome feeds the counters, and a skip is logged.
-    private async Task RunStepAsync(SampleRunState run, SampleStep step, CancellationToken ct)
-    {
-        var outcome = SampleStepOutcome.Executed;
-        await RunItemAsync(run, step.Key, run.OwnerOf(step.OwnerIndex),
-            async (sp, c) => outcome = await new SampleStepExecutor(sp, run).ExecuteAsync(step, c), ct);
-
-        if (outcome == SampleStepOutcome.Skipped)
+    /// One step, acting as its owner: the executor's outcome feeds the counters, and a skip is logged. The step is
+    /// counted as soon as it is done, so a progress write that then stops the run still counts it.
+    private Task RunStepAsync(SampleRunState run, SampleStep step, CancellationToken ct) =>
+        RunItemAsync(run, step.Key, run.OwnerOf(step.OwnerIndex), async (sp, c) =>
         {
-            run.StepsSkipped++;
-            _logger.LogInformation(
-                "Sample data step {StepKey} of branch {BranchCode} skipped: nothing to do (amount 0 or a skipped target)",
-                step.Key, run.BranchCode);
-        }
-        else
-        {
-            run.StepsExecuted++;
-        }
-    }
+            if (await new SampleStepExecutor(sp, run).ExecuteAsync(step, c) == SampleStepOutcome.Skipped)
+            {
+                run.StepsSkipped++;
+                _logger.LogInformation("Sample data step {StepKey} of branch {BranchCode} skipped: " +
+                    "nothing to do (amount 0 or a skipped target)", step.Key, run.BranchCode);
+            }
+            else
+            {
+                run.StepsExecuted++;
+            }
+        }, ct);
 
     /// One plan item (S7): a fresh scope acting as `userId` in the branch, then the progress every ProgressEvery items.
     private async Task RunItemAsync(SampleRunState run, string key, Guid userId,
@@ -428,7 +433,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
         run.Done++;
         if (run.Done % ProgressEvery == 0
             && !await TrySetProgressAsync(run.BranchId, Math.Min(99, run.Done * 100 / run.Total), ct))
-            throw new NoLongerRunningException();
+            throw new NoLongerRunningException(ProgressKey);
     }
 
     /// S6: controllers are skipped, so a request goes through its validator first, when one is registered.

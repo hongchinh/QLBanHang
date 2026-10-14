@@ -1,9 +1,12 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Organization.SampleData.Models;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
+using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
 using Xunit;
@@ -215,6 +218,36 @@ public class SampleDataRunnerSetupTests : CashDebtTestBase
         var restored = await InDbAsync(db => db.Products.AsNoTracking().SingleAsync(p => p.Code == "DM-SP30"));
         (restored.PricingMode, restored.TrackInventory, restored.PriceIncludesVat)
             .Should().Be((PricingMode.PerUnit, false, false));
+    }
+
+    /// The catalog takes the keys of the existing sample products before it reads them: a run waits for whoever holds
+    /// one (a product edit, the last demo branch's catalog cleanup), then reads what that holder committed.
+    [Fact]
+    public async Task Catalog_reads_sample_products_under_their_keys()
+    {
+        (await RunPlanAsync(await CreateBranchAsync("RS16"), TinyPlans.Setup(TinyPlans.OpeningDate))).Succeeded.Should().BeTrue();
+        var productId = await InDbAsync(db => db.Products.Where(p => p.Code == "DM-SP01").Select(p => p.Id).SingleAsync());
+        var branchId = await CreateBranchAsync("RS17");
+
+        Task<SampleDataRunResult> run;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await using var transaction = await db.Database.BeginTransactionAsync();
+            await scope.ServiceProvider.GetRequiredService<IInventoryLock>().AcquireProductsAsync(new[] { productId });
+
+            run = RunPlanAsync(branchId, TinyPlans.Setup(TinyPlans.OpeningDate));
+            await WaitForBlockedAsync(run, count: 1);
+            (await KeyWaitersAsync($"inv-product:{productId:N}")).Should().Be(1);
+            // As a product edit would, under the key.
+            await db.Products.Where(p => p.Id == productId)
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.PriceIncludesVat, true));
+            await transaction.CommitAsync();
+        }
+
+        var result = await run;
+        result.Error.Should().Be(
+            "CATALOG: Hàng mẫu DM-SP01 đã bị đổi giá gồm VAT. Hãy xóa các chi nhánh demo rồi tạo lại.");
     }
 
     /// DM-SP01 has stock postings (its opening stock), so the product service locks these settings: a changed one

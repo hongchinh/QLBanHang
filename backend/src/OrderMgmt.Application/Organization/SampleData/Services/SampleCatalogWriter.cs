@@ -19,15 +19,30 @@ internal static class SampleCatalogWriter
     private const string GroupCode = "DM";
     private const string GroupName = "Dữ liệu mẫu";
 
-    /// Must run inside the caller's transaction: a settings reset holds the product key until it commits.
+    /// Must run inside the caller's transaction, which holds the product keys until it commits.
     public static async Task<SampleCatalogIds> WriteAsync(IAppDbContext db, IInventoryLock inventoryLock,
         SampleDataPlan plan, CancellationToken ct)
     {
+        await LockSampleProductsAsync(db, inventoryLock, plan.Products, ct);
         var groupId = await GroupIdAsync(db, ct);
-        var products = await WriteProductsAsync(db, inventoryLock, plan.Products, groupId, ct);
+        var products = await WriteProductsAsync(db, plan.Products, groupId, ct);
         var partners = await WritePartnersAsync(db, plan.Partners, ct);
         await db.SaveChangesAsync(ct);
         return new SampleCatalogIds(products, partners);
+    }
+
+    /// The keys of the plan's existing sample products (soft-deleted ones too), taken before anything of the catalog is
+    /// read: (1) their settings are then read under the key ProductService.UpdateAsync takes to change them; (2) the
+    /// catalog cleanup of the last demo branch holds the same keys while it deletes the catalog, so the two never
+    /// interleave. One sorted statement takes all the keys, so this cannot deadlock.
+    private static async Task LockSampleProductsAsync(IAppDbContext db, IInventoryLock inventoryLock,
+        IReadOnlyCollection<SampleProductSpec> specs, CancellationToken ct)
+    {
+        var codes = specs.Select(s => s.Code).ToList();
+        var ids = await db.Products.IgnoreQueryFilters().Where(p => p.IsSample && codes.Contains(p.Code))
+            .Select(p => p.Id).ToListAsync(ct);
+        if (ids.Count > 0)
+            await inventoryLock.AcquireProductsAsync(ids, ct);
     }
 
     /// A DM group is the sample group only when it carries the sample name; any other DM group is real data.
@@ -44,7 +59,7 @@ internal static class SampleCatalogWriter
         return group.Id;
     }
 
-    private static async Task<Dictionary<string, Guid>> WriteProductsAsync(IAppDbContext db, IInventoryLock inventoryLock,
+    private static async Task<Dictionary<string, Guid>> WriteProductsAsync(IAppDbContext db,
         IReadOnlyCollection<SampleProductSpec> specs, Guid groupId, CancellationToken ct)
     {
         var codes = specs.Select(s => s.Code).ToList();
@@ -54,7 +69,6 @@ internal static class SampleCatalogWriter
         var units = await db.Units.Where(u => unitCodes.Contains(u.Code)).ToDictionaryAsync(u => u.Code, u => u.Id, ct);
 
         var ids = new Dictionary<string, Guid>();
-        var edited = new List<(Product Product, SampleProductSpec Spec)>();
         foreach (var spec in specs)
         {
             var product = ReuseSample(existing[spec.Code], p => p.IsSample, RealDataMessage(spec.Code));
@@ -63,8 +77,7 @@ internal static class SampleCatalogWriter
                 // A user may have stopped using it or deleted its group; the plan's documents need it active.
                 product.Status = ProductStatus.Active;
                 product.ProductGroupId ??= groupId;
-                if (ChangedSettings(product, spec).Count > 0)
-                    edited.Add((product, spec));
+                await RestoreSettingsAsync(db, product, spec, ct);
                 ids[spec.Code] = product.Id;
                 continue;
             }
@@ -93,41 +106,25 @@ internal static class SampleCatalogWriter
             db.Products.Add(product);
             ids[spec.Code] = product.Id;
         }
-
-        await RestoreSettingsAsync(db, inventoryLock, edited, ct);
         return ids;
     }
 
     /// The plan's quantities, totals and stock assume the spec's settings: priced per unit, the price without VAT,
-    /// stock tracked as the spec says. A reused product may have been edited since. Under the guard of
-    /// ProductService.UpdateAsync (the product key, then no stock postings) its settings go back to the spec; a product
-    /// with stock postings keeps them, as the service would, and the run fails.
-    private static async Task RestoreSettingsAsync(IAppDbContext db, IInventoryLock inventoryLock,
-        IReadOnlyList<(Product Product, SampleProductSpec Spec)> edited, CancellationToken ct)
+    /// stock tracked as the spec says. A reused product may have been edited since. Read under its product key (see
+    /// LockSampleProductsAsync), as ProductService.UpdateAsync guards the change: without stock postings its settings
+    /// go back to the spec; with them it keeps its settings, as the service would, and the run fails.
+    private static async Task RestoreSettingsAsync(IAppDbContext db, Product product, SampleProductSpec spec,
+        CancellationToken ct)
     {
-        if (edited.Count == 0)
+        var changed = ChangedSettings(product, spec);
+        if (changed.Count == 0)
             return;
-        var ids = edited.Select(e => e.Product.Id).ToList();
-        await inventoryLock.AcquireProductsAsync(ids, ct);
-        // Read again under the keys: the first read came before them, and the settings may have changed since.
-        var current = await db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => ids.Contains(p.Id))
-            .Select(p => new { p.Id, p.PricingMode, p.TrackInventory, p.PriceIncludesVat })
-            .ToDictionaryAsync(p => p.Id, ct);
-        foreach (var (product, spec) in edited)
-        {
-            var now = current[product.Id];
-            product.PricingMode = now.PricingMode;
-            product.TrackInventory = now.TrackInventory;
-            product.PriceIncludesVat = now.PriceIncludesVat;
-            if (ChangedSettings(product, spec).Count == 0)
-                continue;
-            if (await db.InventoryLedger.AnyAsync(e => e.ProductId == product.Id, ct))
-                throw new ConflictException($"Hàng mẫu {spec.Code} đã bị đổi " +
-                    $"{string.Join(", ", ChangedSettings(product, spec))}. Hãy xóa các chi nhánh demo rồi tạo lại.");
-            product.PricingMode = PricingMode.PerUnit;
-            product.TrackInventory = spec.TrackInventory;
-            product.PriceIncludesVat = false;
-        }
+        if (await db.InventoryLedger.AnyAsync(e => e.ProductId == product.Id, ct))
+            throw new ConflictException(
+                $"Hàng mẫu {spec.Code} đã bị đổi {string.Join(", ", changed)}. Hãy xóa các chi nhánh demo rồi tạo lại.");
+        product.PricingMode = PricingMode.PerUnit;
+        product.TrackInventory = spec.TrackInventory;
+        product.PriceIncludesVat = false;
     }
 
     /// The settings of a reused product that differ from the spec, as the user calls them.

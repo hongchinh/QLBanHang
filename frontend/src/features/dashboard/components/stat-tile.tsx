@@ -50,10 +50,14 @@ export function StatTile({
 }: StatTileProps) {
   const canOpenLink = useCanOpenLink();
 
+  // Seven tiles share a row at 1366 px: a label or a hint that does not fit is cut on its line (the title
+  // carries the full text) instead of wrapping and pushing this tile's value below the others.
   const content = (
     <>
       <div className="flex items-start justify-between gap-2 text-xs text-muted-foreground">
-        <span>{label}</span>
+        <span className="min-w-0 truncate" title={label}>
+          {label}
+        </span>
         {badge && <span className="shrink-0 text-amber-700">{badge}</span>}
       </div>
       {loading ? (
@@ -63,14 +67,21 @@ export function StatTile({
           {error ? '—' : (value ?? '—')}
         </div>
       )}
-      <div className="mt-0.5 flex min-h-4 flex-wrap items-center gap-x-1.5 text-xs">
+      <div className="mt-0.5 flex min-h-4 items-center gap-x-1.5 whitespace-nowrap text-xs">
         {delta !== undefined && <DeltaBadge delta={delta} />}
         {error ? (
           <button type="button" onClick={() => onRetry?.()} className="text-primary hover:underline">
             Thử lại
           </button>
         ) : (
-          hint != null && <span className={HINT_TONE[hintTone]}>{hint}</span>
+          hint != null && (
+            <span
+              className={cn('min-w-0 truncate', HINT_TONE[hintTone])}
+              title={typeof hint === 'string' ? hint : undefined}
+            >
+              {hint}
+            </span>
+          )
         )}
       </div>
     </>
@@ -97,11 +108,11 @@ export function StatTile({
 }
 
 function DeltaBadge({ delta }: { delta: number | null }) {
-  if (delta === null) return <span className="text-muted-foreground">—</span>;
+  if (delta === null) return <span className="shrink-0 text-muted-foreground">—</span>;
   // Zero counts as a rise, as formatDelta does for the quotation dashboards.
   const rise = delta >= 0;
   return (
-    <span className={cn('font-medium', rise ? 'text-emerald-700' : 'text-rose-700')}>
+    <span className={cn('shrink-0 font-medium', rise ? 'text-emerald-700' : 'text-rose-700')}>
       {rise ? '▲' : '▼'} {formatPct(Math.abs(delta))}
     </span>
   );

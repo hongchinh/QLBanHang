@@ -112,7 +112,8 @@ describe('StatTile', () => {
 
       expect(screen.queryByRole('link')).not.toBeInTheDocument();
       expect(screen.getByText('3,10 tỷ')).toBeInTheDocument();
-      expect(document.querySelector('[title]')).toBeNull();
+      // The tooltip of the link goes with it (the label keeps its own title, its full text).
+      expect(screen.queryByTitle('Báo cáo mở theo chi nhánh đang làm việc (CN01)')).not.toBeInTheDocument();
     });
 
     it('is not a link without "to"', () => {
@@ -129,6 +130,38 @@ describe('StatTile', () => {
     expect(screen.queryByText('3,10 tỷ')).not.toBeInTheDocument();
     expect(document.querySelector('.animate-pulse')).not.toBeNull();
     expect(screen.getByText('Phải thu')).toBeInTheDocument();
+  });
+
+  // Seven tiles share one row at 1366 px: a long label or hint is cut on one line, never wrapped onto a second
+  // line that would push the value of one tile below the values of the others.
+  describe('one line per text', () => {
+    it('the label is truncated and carries its full text as title', () => {
+      renderTile({ label: 'Doanh thu xuất bán', badge: 'tạm tính' });
+
+      const label = screen.getByText('Doanh thu xuất bán');
+      expect(label).toHaveClass('truncate', 'min-w-0');
+      expect(label).toHaveAttribute('title', 'Doanh thu xuất bán');
+      expect(screen.getByText('tạm tính')).toHaveClass('shrink-0');
+      expect(label.parentElement?.className).not.toContain('flex-wrap');
+    });
+
+    it('a text hint is truncated and carries its full text as title', () => {
+      renderTile({ hint: 'Thu 2,10 tỷ · Chi 1,91 tỷ', delta: 12.5 });
+
+      const hint = screen.getByText('Thu 2,10 tỷ · Chi 1,91 tỷ');
+      expect(hint).toHaveClass('truncate', 'min-w-0');
+      expect(hint).toHaveAttribute('title', 'Thu 2,10 tỷ · Chi 1,91 tỷ');
+      // The delta keeps its width; the line itself does not wrap.
+      expect(screen.getByText('▲ 12,5%')).toHaveClass('shrink-0');
+      expect(hint.parentElement?.className).not.toContain('flex-wrap');
+      expect(hint.parentElement).toHaveClass('whitespace-nowrap');
+    });
+
+    it('a hint that is not text gets no title', () => {
+      renderTile({ hint: <b>Quá hạn 420 tr</b> });
+
+      expect(screen.getByText('Quá hạn 420 tr').parentElement).not.toHaveAttribute('title');
+    });
   });
 
   describe('aria-busy', () => {

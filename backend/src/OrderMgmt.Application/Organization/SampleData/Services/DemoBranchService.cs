@@ -13,6 +13,9 @@ namespace OrderMgmt.Application.Organization.SampleData.Services;
 
 public sealed class DemoBranchService : IDemoBranchService
 {
+    private const string SampleGroupCode = "DM";
+    private const string SampleGroupName = "Dữ liệu mẫu";
+
     private readonly IAppDbContext _db;
     private readonly IDateTime _clock;
     private readonly ITransactionRunner _transaction;
@@ -149,8 +152,59 @@ public sealed class DemoBranchService : IDemoBranchService
             await ProductCostPrices.RecomputeAsync(_db, realStockInProducts, c);
             await _db.SaveChangesAsync(c);
 
-            return new DemoBranchDeletionResultDto { ReassignedUserCount = reassignedUserCount };
+            // 17. The last demo branch takes the sample catalog it no longer needs along (soft-deleted branches do not
+            // count). The rows still used by something stay, and are counted.
+            var keptProducts = 0;
+            var keptPartners = 0;
+            if (!await _db.Branches.AnyAsync(b => b.IsDemo, c))
+                (keptProducts, keptPartners) = await CleanSampleCatalogAsync(c);
+
+            return new DemoBranchDeletionResultDto
+            {
+                ReassignedUserCount = reassignedUserCount,
+                KeptSampleProductCount = keptProducts,
+                KeptSamplePartnerCount = keptPartners,
+            };
         }, ct);
+
+    /// Hard-deletes the sample products and partners nothing refers to, then the sample group when no product is
+    /// left in it. Returns how many sample products and partners remain. Every check ignores the query filters.
+    private async Task<(int KeptProducts, int KeptPartners)> CleanSampleCatalogAsync(CancellationToken ct)
+    {
+        await _db.Products.IgnoreQueryFilters()
+            .Where(p => p.IsSample
+                        && !_db.StockVoucherLines.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
+                        && !_db.OpeningStocks.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
+                        && !_db.QuotationLines.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
+                        && !_db.InventoryLedger.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
+                        && !_db.StockBalances.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
+                        && !_db.InventoryCostPeriods.IgnoreQueryFilters().Any(x => x.ProductId == p.Id))
+            .ExecuteDeleteAsync(ct);
+
+        // The partners nothing refers to; their addresses belong to them alone and go first.
+        var unusedPartners = _db.Customers.IgnoreQueryFilters()
+            .Where(p => p.IsSample
+                        && !_db.StockVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
+                        && !_db.CashVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
+                        && !_db.DebtEntries.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
+                        && !_db.DebtOffsetVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
+                        && !_db.OpeningDebts.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
+                        && !_db.CreditLimits.IgnoreQueryFilters().Any(x => x.CustomerId == p.Id)
+                        && !_db.Quotations.IgnoreQueryFilters().Any(x => x.CustomerId == p.Id));
+        await _db.CustomerAddresses.IgnoreQueryFilters()
+            .Where(a => unusedPartners.Any(p => p.Id == a.CustomerId))
+            .ExecuteDeleteAsync(ct);
+        await unusedPartners.ExecuteDeleteAsync(ct);
+
+        // Only the sample group: a real group may use the code DM too.
+        await _db.ProductGroups.IgnoreQueryFilters()
+            .Where(g => g.Code == SampleGroupCode && g.Name == SampleGroupName
+                        && !_db.Products.IgnoreQueryFilters().Any(p => p.ProductGroupId == g.Id))
+            .ExecuteDeleteAsync(ct);
+
+        return (await _db.Products.IgnoreQueryFilters().CountAsync(p => p.IsSample, ct),
+            await _db.Customers.IgnoreQueryFilters().CountAsync(p => p.IsSample, ct));
+    }
 
     /// The guards of the preview and the delete: the branch exists, is a demo one and is not being filled. Not tracked,
     /// so a read behind a lock sees the current row, not an instance the scope already holds.

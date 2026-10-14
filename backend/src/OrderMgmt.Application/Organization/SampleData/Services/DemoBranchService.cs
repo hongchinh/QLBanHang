@@ -1,7 +1,6 @@
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Npgsql;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Services;
@@ -74,8 +73,9 @@ public sealed class DemoBranchService : IDemoBranchService
             var reassignedUserCount = await ReassignUsersAsync(branchId, c);
 
             // 15. The branch. A write that does not take the branch gate (a new fund, warehouse, credit limit or a
-            // user's default branch) may have landed since its table was cleared: the only place a race hits here, so
-            // the only foreign key error mapped to "busy". Nothing is deleted: the transaction rolls back.
+            // user's default branch) may have landed since its table was cleared. One of the two places a race hits
+            // (with the sample partner delete), so one of the two foreign key errors mapped to "busy": nothing is
+            // deleted, the transaction rolls back.
             await MapBusyAsync(() => _db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId).ExecuteDeleteAsync(c));
 
             // 16. The products priced by the branch's stock-ins follow their latest remaining stock-in.
@@ -107,10 +107,10 @@ public sealed class DemoBranchService : IDemoBranchService
         }
         catch (Exception ex) when (IsForeignKeyViolation(ex))
         {
-            var pg = ex as PostgresException ?? ex.InnerException as PostgresException;
+            var pg = ex as DbException ?? ex.InnerException;
             _logger.LogWarning(ex, "Demo branch delete hit a foreign key (constraint {Constraint}, table {Table}): {Message}",
-                pg?.ConstraintName, pg?.TableName, ex.Message);
-            throw new ConflictException("DEMO_BRANCH_BUSY", "Chi nhánh demo vừa có dữ liệu mới. Hãy thử xóa lại.");
+                PgProperty(pg, "ConstraintName"), PgProperty(pg, "TableName"), ex.Message);
+            throw new ConflictException("DEMO_BRANCH_BUSY", "Dữ liệu của chi nhánh demo hoặc dữ liệu mẫu vừa thay đổi. Hãy thử xóa lại.");
         }
     }
 
@@ -261,6 +261,10 @@ public sealed class DemoBranchService : IDemoBranchService
         return (await _db.Products.IgnoreQueryFilters().CountAsync(p => p.IsSample, ct),
             await _db.Customers.IgnoreQueryFilters().CountAsync(p => p.IsSample, ct));
     }
+
+    /// A property of the provider's exception (PostgresException: ConstraintName, TableName), read by reflection like the
+    /// other services do, as the Application layer does not reference the provider.
+    private static string? PgProperty(Exception? ex, string name) => ex?.GetType().GetProperty(name)?.GetValue(ex) as string;
 
     /// A PostgreSQL foreign key violation (23503 or 23001), thrown by a bulk statement directly or wrapped by a save.
     private static bool IsForeignKeyViolation(Exception ex) =>

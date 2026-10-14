@@ -192,4 +192,61 @@ public class DemoBranchCatalogCleanupTests : DemoBranchFixture
 
         (await GroupCountAsync("Nhóm thật")).Should().Be(1);
     }
+
+    /// Copies one row of `table` (the first matching `source`) into a new one, after the plpgsql assignments on the row
+    /// `r`: lets a sample partner or product be named by exactly one kind of row, without the rows a real posting writes.
+    private Task CopyRowAsync(string table, string source, string assignments) =>
+        InDbAsync(db => db.Database.ExecuteSqlRawAsync(
+            $"do $$ declare r {table}; begin select * into r from {table} where {source} limit 1;"
+            + $" if not found then raise exception 'no source row in {table}'; end if; {assignments}"
+            + $" insert into {table} select r.*; end $$"));
+
+    private static string NewCode() => "Z" + Guid.NewGuid().ToString("N")[..10];
+
+    /// One sample partner or product per reference check of CleanSampleCatalogAsync, each named by that kind of row
+    /// alone (no row of another kind masks a dropped check). The last delete keeps all of them, and answers 200: a
+    /// dropped partner check would surface as DEMO_BRANCH_BUSY, a dropped product check as a kept-row failure or a 500.
+    [Fact]
+    public async Task Every_reference_check_keeps_its_own_row()
+    {
+        var (_, dk01, dk02) = await SetUpAsync();
+        var dk03 = await CreateDemoBranchAsync("DK03");
+        await FillAsync(dk03);
+        var main = MainBranchId;
+        var partners = new Dictionary<string, Guid>();
+        foreach (var name in new[] { "StockVouchers", "DebtOffsetVouchers", "OpeningDebts", "DebtEntries" })
+            partners[name] = await CreateSamplePartnerAsync("DM-P" + (partners.Count + 1), withAddress: false);
+        var products = new Dictionary<string, Guid>();
+        foreach (var name in new[] { "StockVoucherLines", "OpeningStocks", "InventoryLedger", "StockBalances", "InventoryCostPeriods" })
+            products[name] = await CreateSampleProductAsync("DM-Q" + (products.Count + 1));
+
+        await CopyRowAsync("stock_vouchers", $"branch_id = '{main}'",
+            $"r.id := gen_random_uuid(); r.code := '{NewCode()}'; r.partner_id := '{partners["StockVouchers"]}';");
+        await CopyRowAsync("debt_offset_vouchers", $"branch_id = '{dk03.BranchId}'",
+            $"r.id := gen_random_uuid(); r.code := '{NewCode()}'; r.branch_id := '{main}';"
+            + $" r.partner_id := '{partners["DebtOffsetVouchers"]}';");
+        await CopyRowAsync("opening_debts", $"branch_id = '{main}'",
+            $"r.id := gen_random_uuid(); r.partner_id := '{partners["OpeningDebts"]}';");
+        await CopyRowAsync("debt_entries", $"branch_id = '{main}'",
+            $"r.id := gen_random_uuid(); r.source_id := gen_random_uuid(); r.partner_id := '{partners["DebtEntries"]}';");
+        await CopyRowAsync("stock_voucher_lines", $"stock_voucher_id in (select id from stock_vouchers where branch_id = '{main}')",
+            $"r.id := gen_random_uuid(); r.product_id := '{products["StockVoucherLines"]}';");
+        await CopyRowAsync("opening_stocks", $"branch_id = '{dk03.BranchId}'",
+            $"r.id := gen_random_uuid(); r.branch_id := '{main}'; r.warehouse_id := '{DefaultWarehouseId}';"
+            + $" r.product_id := '{products["OpeningStocks"]}';");
+        await CopyRowAsync("inventory_ledger", $"branch_id = '{main}'",
+            $"r.id := gen_random_uuid(); r.product_id := '{products["InventoryLedger"]}';");
+        await CopyRowAsync("stock_balances", $"branch_id = '{main}'", $"r.product_id := '{products["StockBalances"]}';");
+        await CopyRowAsync("inventory_cost_periods", $"branch_id = '{main}'",
+            $"r.id := gen_random_uuid(); r.product_id := '{products["InventoryCostPeriods"]}';");
+
+        await DeleteDemoBranchAsync(dk01.BranchId);
+        await DeleteDemoBranchAsync(dk02.BranchId);
+        await DeleteDemoBranchAsync(dk03.BranchId);
+
+        foreach (var (check, id) in partners)
+            (await PartnerCountAsync(id)).Should().Be(1, $"only a {check} row names it");
+        foreach (var (check, id) in products)
+            (await ProductCountAsync(id)).Should().Be(1, $"only a {check} row uses it");
+    }
 }

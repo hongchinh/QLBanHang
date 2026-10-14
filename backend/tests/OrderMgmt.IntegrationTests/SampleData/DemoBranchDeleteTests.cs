@@ -229,62 +229,73 @@ public class DemoBranchDeleteTests : DemoBranchFixture
 
         var response = await _client.DeleteAsync(DeleteUrl(branch.BranchId));
 
-        response.StatusCode.Should().Be(HttpStatusCode.InternalServerError);
+        var (status, _, error) = await ReadDocumentResponseAsync<object>(response);
+        status.Should().Be(HttpStatusCode.InternalServerError);
+        error!.Code.Should().Be("INTERNAL_ERROR");
+        // The failure is at step 11 (the funds), so the branch alone proves nothing: the fund and the warehouse stay too.
         (await InDbAsync(db => db.Branches.AnyAsync(b => b.Id == branch.BranchId))).Should().BeTrue();
+        (await InDbAsync(db => db.Funds.AnyAsync(f => f.Id == branch.CashFundId))).Should().BeTrue();
+        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Id == branch.WarehouseId))).Should().BeTrue();
     }
 
-    /// The foreign keys into the branch and into every parent the delete removes, as "child.column -> parent". A new
-    /// one (another column name, another child table) fails the test until DeleteAsync covers it and the list is updated.
+    /// The foreign keys into the branch and into every parent the delete removes, as "child.column -> parent [delete
+    /// action: r restrict, n set null]". A new one (another column name, another child table, another action) fails the
+    /// test until it is covered and the list is updated: a key into branches, stock_vouchers, cash_vouchers,
+    /// fund_transfers, debt_offset_vouchers, debt_entries, funds or warehouses needs its rows deleted in DeleteAsync; a
+    /// key into products, customers, customer_addresses or product_groups needs a reference check in
+    /// CleanSampleCatalogAsync plus a keep test in DemoBranchCatalogCleanupTests. The two [n] keys are why a product or
+    /// group delete cannot hit a foreign key (only the partner delete can race): changing their action breaks that.
     private static readonly string[] KnownForeignKeys =
     {
-        "cash_voucher_lines.cash_voucher_id -> cash_vouchers",
-        "cash_vouchers.branch_id -> branches",
-        "cash_vouchers.fund_id -> funds",
-        "cash_vouchers.partner_id -> customers",
-        "cash_vouchers.source_stock_voucher_id -> stock_vouchers",
-        "credit_limits.branch_id -> branches",
-        "credit_limits.customer_id -> customers",
-        "customer_addresses.customer_id -> customers",
-        "debt_entries.branch_id -> branches",
-        "debt_entries.partner_id -> customers",
-        "debt_offset_vouchers.branch_id -> branches",
-        "debt_offset_vouchers.partner_id -> customers",
-        "debt_settlements.decrease_entry_id -> debt_entries",
-        "debt_settlements.increase_entry_id -> debt_entries",
-        "document_numberings.branch_id -> branches",
-        "fund_transfers.branch_id -> branches",
-        "fund_transfers.from_fund_id -> funds",
-        "fund_transfers.to_fund_id -> funds",
-        "funds.branch_id -> branches",
-        "opening_debts.branch_id -> branches",
-        "opening_debts.partner_id -> customers",
-        "opening_stocks.branch_id -> branches",
-        "opening_stocks.product_id -> products",
-        "opening_stocks.warehouse_id -> warehouses",
-        "products.product_group_id -> product_groups",
-        "quotation_lines.product_id -> products",
-        "quotations.customer_id -> customers",
-        "stock_voucher_activities.stock_voucher_id -> stock_vouchers",
-        "stock_voucher_lines.product_id -> products",
-        "stock_voucher_lines.stock_voucher_id -> stock_vouchers",
-        "stock_voucher_lines.warehouse_id -> warehouses",
-        "stock_vouchers.branch_id -> branches",
-        "stock_vouchers.fund_id -> funds",
-        "stock_vouchers.partner_id -> customers",
-        "stock_vouchers.warehouse_id -> warehouses",
-        "users.default_branch_id -> branches",
-        "warehouses.branch_id -> branches",
+        "cash_voucher_lines.cash_voucher_id -> cash_vouchers [r]",
+        "cash_vouchers.branch_id -> branches [r]",
+        "cash_vouchers.fund_id -> funds [r]",
+        "cash_vouchers.partner_id -> customers [r]",
+        "cash_vouchers.source_stock_voucher_id -> stock_vouchers [r]",
+        "credit_limits.branch_id -> branches [r]",
+        "credit_limits.customer_id -> customers [r]",
+        "customer_addresses.customer_id -> customers [r]",
+        "debt_entries.branch_id -> branches [r]",
+        "debt_entries.partner_id -> customers [r]",
+        "debt_offset_vouchers.branch_id -> branches [r]",
+        "debt_offset_vouchers.partner_id -> customers [r]",
+        "debt_settlements.decrease_entry_id -> debt_entries [r]",
+        "debt_settlements.increase_entry_id -> debt_entries [r]",
+        "document_numberings.branch_id -> branches [r]",
+        "fund_transfers.branch_id -> branches [r]",
+        "fund_transfers.from_fund_id -> funds [r]",
+        "fund_transfers.to_fund_id -> funds [r]",
+        "funds.branch_id -> branches [r]",
+        "opening_debts.branch_id -> branches [r]",
+        "opening_debts.partner_id -> customers [r]",
+        "opening_stocks.branch_id -> branches [r]",
+        "opening_stocks.product_id -> products [r]",
+        "opening_stocks.warehouse_id -> warehouses [r]",
+        "products.product_group_id -> product_groups [n]",
+        "quotation_lines.product_id -> products [n]",
+        "quotations.customer_id -> customers [r]",
+        "stock_voucher_activities.stock_voucher_id -> stock_vouchers [r]",
+        "stock_voucher_lines.product_id -> products [r]",
+        "stock_voucher_lines.stock_voucher_id -> stock_vouchers [r]",
+        "stock_voucher_lines.warehouse_id -> warehouses [r]",
+        "stock_vouchers.branch_id -> branches [r]",
+        "stock_vouchers.fund_id -> funds [r]",
+        "stock_vouchers.partner_id -> customers [r]",
+        "stock_vouchers.warehouse_id -> warehouses [r]",
+        "users.default_branch_id -> branches [r]",
+        "warehouses.branch_id -> branches [r]",
     };
 
     private async Task AssertForeignKeysKnownAsync()
     {
-        var rows = await QueryAsync("select c.conrelid::regclass::text || '.' || a.attname || ' -> ' || c.confrelid::regclass::text"
+        var rows = await QueryAsync("select x from (select c.conrelid::regclass::text || '.' || a.attname || ' -> ' || c.confrelid::regclass::text || ' [' || c.confdeltype::text || ']' as x"
             + " from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)"
             + " where c.contype = 'f' and c.confrelid::regclass::text in ('branches', 'stock_vouchers', 'cash_vouchers',"
             + " 'fund_transfers', 'debt_offset_vouchers', 'debt_entries', 'funds', 'warehouses', 'products', 'customers',"
-            + " 'customer_addresses', 'product_groups') order by 1");
+            + " 'customer_addresses', 'product_groups')) t order by x collate \"C\"");
         rows.Select(r => r[0]).Should().Equal(KnownForeignKeys,
-            "DemoBranchService.DeleteAsync must delete the rows of every table that refers to the branch or its parents");
+            "a new foreign key needs its rows deleted in DemoBranchService.DeleteAsync, or (into products, customers,"
+            + " customer_addresses, product_groups) a reference check in CleanSampleCatalogAsync plus a keep test");
     }
 
     /// Count queries of the fill's child rows by the ids of their parents: once the parents are gone, a child left

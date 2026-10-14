@@ -77,10 +77,10 @@ Stock vouchers print in one of three price modes chosen at print time: the vouch
 
 ## Phases
 
-- [ ] Phase 00 — Worktree, branch, failure baseline and the parallel decision (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Shared export support and cash voucher forms, backend (L) — `phase-01-cash-voucher-backend.md`
+- [x] Phase 00 — Worktree, branch, failure baseline and the parallel decision (S) — `phase-00-baseline.md`
+- [x] Phase 01 — Shared export support and cash voucher forms, backend (L) — `phase-01-cash-voucher-backend.md`
 - [x] Phase 02 — Print button and row selection on the cash voucher pages (M) — `phase-02-cash-voucher-frontend.md`
-- [ ] Phase 03 — Stock voucher forms and price modes, backend (L) — `phase-03-stock-voucher-backend.md`
+- [x] Phase 03 — Stock voucher forms and price modes, backend (L) — `phase-03-stock-voucher-backend.md`
 - [x] Phase 04 — Price mode dialog and the stock voucher pages (M) — `phase-04-stock-voucher-frontend.md`
 - [ ] Phase 05 — Real output, go-live checklist, docs, final verification (M) — `phase-05-docs-and-verification.md`
 

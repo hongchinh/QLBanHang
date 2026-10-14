@@ -1,6 +1,6 @@
 # Phase 01 — Shared export support and cash voucher forms, backend
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

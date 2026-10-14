@@ -1,6 +1,6 @@
 # Phase 03 — Stock voucher forms and price modes, backend
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective

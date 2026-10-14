@@ -532,6 +532,135 @@ describe('StockLineGrid', () => {
     }
   });
 
+  // %CK, %VAT, Số tấm, Dài, Rộng and Dày are type=number inputs: select() works on them but selectionStart does
+  // not, so these tests watch select(). A value that is not selected gets the next digit appended (5 -> 57).
+  describe('type=number cells', () => {
+    const cubic = (overrides: Partial<StockLineFormValues> = {}) =>
+      line({
+        pricingMode: 'PerCubicMeter',
+        sheetCount: 2,
+        length: 3000,
+        width: 100,
+        thickness: 50,
+        discountRate: 5,
+        vatRate: 8,
+        ...overrides,
+      });
+
+    // The elements select() was called on by the time `action` returned: no frame, timer or promise is awaited.
+    function selectedBy(action: () => void): Element[] {
+      const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+      try {
+        action();
+        return [...select.mock.contexts];
+      } finally {
+        select.mockRestore();
+      }
+    }
+
+    it.each([
+      ['%CK', 'discount-rate'],
+      ['%VAT', 'vat-rate'],
+      ['Số tấm', 'sheet-count'],
+      ['Dài', 'length'],
+      ['Rộng', 'width'],
+      ['Dày', 'thickness'],
+    ])('ArrowDown into %s selects its value before the key handler returns', (_label, field) => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const from = byId(`stock-line-${field}-0`);
+      act(() => from.focus());
+
+      const selected = selectedBy(() => fireEvent.keyDown(from, { key: 'ArrowDown' }));
+
+      expect(focused()).toBe(`stock-line-${field}-1`);
+      expect(selected).toEqual([byId(`stock-line-${field}-1`)]);
+    });
+
+    it('Enter into Số tấm selects its value before the key handler returns', () => {
+      renderGrid({ lines: [line({ pricingMode: 'PerSquareMeter', sheetCount: 2, length: 3000, width: 1200 })] });
+      act(() => byId('stock-line-product-code-0').focus());
+
+      const selected = selectedBy(() => enter('stock-line-product-code-0'));
+
+      expect(focused()).toBe('stock-line-sheet-count-0');
+      expect(selected).toEqual([byId('stock-line-sheet-count-0')]);
+    });
+
+    it('Enter into %CK selects its value before the key handler returns', () => {
+      storePrefs({ hiddenColumns: [], enterStops: { PerUnit: ['quantity', 'unit-price', 'discount-rate'] } });
+      renderGrid({ lines: [line({ pricingMode: 'PerUnit', discountRate: 5 })] });
+      act(() => byId('stock-line-unit-price-0').focus());
+
+      const selected = selectedBy(() => enter('stock-line-unit-price-0'));
+
+      expect(focused()).toBe('stock-line-discount-rate-0');
+      expect(selected).toEqual([byId('stock-line-discount-rate-0')]);
+    });
+
+    it('Ctrl+Delete lands on the same cell of the next line with its value selected', async () => {
+      const { values } = renderGrid({
+        lines: [cubic({ productCode: 'A' }), cubic({ _uiKey: 'b', productCode: 'B', length: 2500 })],
+      });
+      const from = byId('stock-line-length-0');
+      const survivor = byId('stock-line-length-1');
+      act(() => from.focus());
+
+      const selected = selectedBy(() => fireEvent.keyDown(from, { key: 'Delete', ctrlKey: true }));
+
+      expect(selected).toEqual([survivor]);
+      await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B']));
+      expect(document.activeElement).toBe(survivor);
+    });
+
+    // jsdom has no Tab navigation: like Tab, a bare focus() arrives without a mouse press on the cell.
+    it.each([
+      ['%VAT', 'vat-rate'],
+      ['Rộng', 'width'],
+    ])('a focus on %s that no mouse press brought (Tab) selects its value', (_label, field) => {
+      renderGrid({ lines: [cubic()] });
+      const cell = byId(`stock-line-${field}-0`);
+
+      expect(selectedBy(() => act(() => cell.focus()))).toEqual([cell]);
+    });
+
+    it.each([
+      ['%CK', 'discount-rate'],
+      ['Số tấm', 'sheet-count'],
+    ])('a mouse click on %s never selects: the caret stays where the browser put it', async (_label, field) => {
+      renderGrid({ lines: [cubic()] });
+      const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+      try {
+        const cell = byId(`stock-line-${field}-0`);
+        fireEvent.mouseDown(cell);
+        act(() => cell.focus());
+        fireEvent.mouseUp(cell);
+        fireEvent.click(cell);
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(select).not.toHaveBeenCalled();
+      } finally {
+        select.mockRestore();
+      }
+    });
+
+    // A press on the cell that already has the focus is followed by no focus event; it must not be taken for the
+    // press of a later visit.
+    it('a second click in the focused cell does not stop the next keyboard visit from selecting', () => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const cell = byId('stock-line-sheet-count-0');
+      fireEvent.mouseDown(cell);
+      act(() => cell.focus());
+      fireEvent.mouseDown(cell);
+      fireEvent.keyDown(cell, { key: 'ArrowDown' });
+      expect(focused()).toBe('stock-line-sheet-count-1');
+
+      const selected = selectedBy(() => fireEvent.keyDown(byId('stock-line-sheet-count-1'), { key: 'ArrowUp' }));
+
+      expect(focused()).toBe('stock-line-sheet-count-0');
+      expect(selected).toEqual([cell]);
+    });
+  });
+
   it('arrows leave the warehouse select alone', () => {
     showAllColumns();
     renderGrid({ lines: [line(), line({ _uiKey: 'b' })] });

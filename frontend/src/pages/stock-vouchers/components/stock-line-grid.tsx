@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Keyboard, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -130,6 +130,36 @@ function parseQuantityInput(text: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/**
+ * Tells a keyboard focus from a mouse one. A mouse press on the cell comes right before its mouse focus; every other
+ * focus is keyboard navigation (Enter / arrows / Ctrl+Delete through focusCell, or Tab). After keyboard navigation a
+ * numeric cell selects its whole value at once, so a digit typed right away replaces the value instead of being
+ * appended; after a click the caret stays where the browser put it. Returns the props to spread on the <input>.
+ */
+function useFocusOrigin(onFocus: (el: HTMLInputElement, byKeyboard: boolean) => void, onBlur?: () => void) {
+  const pressed = useRef(false);
+  return {
+    onMouseDown: () => {
+      pressed.current = true;
+    },
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      const byKeyboard = !pressed.current;
+      pressed.current = false;
+      onFocus(e.currentTarget, byKeyboard);
+    },
+    onBlur: () => {
+      // A press on the cell that already had the focus is followed by no focus event: forget it here.
+      pressed.current = false;
+      onBlur?.();
+    },
+  };
+}
+
+// A type=number cell shows the same text focused or not, so its value is selected right in the focus event.
+function selectOnKeyboardFocus(el: HTMLInputElement, byKeyboard: boolean) {
+  if (byKeyboard) el.select();
+}
+
 interface NumberCellProps {
   field: LineFocusField;
   rowIndex: number;
@@ -146,7 +176,6 @@ interface NumberCellProps {
 function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, disabled, error }: NumberCellProps) {
   const [editing, setEditing] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
-  const fromPointer = useRef(false);
   const selectAfterRender = useRef(false);
   // Keyboard focus: the raw text replaces the formatted one on this render, so select it as soon as
   // that render commits (still inside the event that moved the focus, not a frame later).
@@ -155,6 +184,20 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
     selectAfterRender.current = false;
     if (document.activeElement === ref.current) ref.current?.select();
   });
+  const focusProps = useFocusOrigin(
+    (el, byKeyboard) => {
+      setEditing(value === undefined ? '' : String(value));
+      if (byKeyboard) {
+        selectAfterRender.current = true;
+      } else {
+        // A click places the caret after the focus event; select one frame later, as before.
+        requestAnimationFrame(() => {
+          if (document.activeElement === el) el.select();
+        });
+      }
+    },
+    () => setEditing(null),
+  );
   return (
     <input
       ref={ref}
@@ -166,29 +209,10 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
       {...errorProps(field, rowIndex, error)}
       disabled={disabled}
       value={editing ?? format(value)}
-      onMouseDown={() => {
-        fromPointer.current = true;
-      }}
-      onFocus={(e) => {
-        const el = e.currentTarget;
-        setEditing(value === undefined ? '' : String(value));
-        if (fromPointer.current) {
-          // A click places the caret after the focus event; select one frame later, as before.
-          fromPointer.current = false;
-          requestAnimationFrame(() => {
-            if (document.activeElement === el) el.select();
-          });
-        } else {
-          selectAfterRender.current = true;
-        }
-      }}
+      {...focusProps}
       onChange={(e) => {
         setEditing(e.target.value);
         onCommit(parse(e.target.value));
-      }}
-      onBlur={() => {
-        fromPointer.current = false;
-        setEditing(null);
       }}
     />
   );
@@ -213,6 +237,7 @@ function PercentCell({
   error?: string;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const focusProps = useFocusOrigin(selectOnKeyboardFocus, () => setEditing(null));
   return (
     <input
       id={cellId(field, rowIndex)}
@@ -225,11 +250,46 @@ function PercentCell({
       {...errorProps(field, rowIndex, error)}
       disabled={disabled}
       value={editing ?? value ?? ''}
+      {...focusProps}
       onChange={(e) => {
         setEditing(e.target.value);
         onCommit(toOptionalNumber(e.target.value) ?? 0);
       }}
-      onBlur={() => setEditing(null)}
+    />
+  );
+}
+
+// Số tấm / Dài / Rộng / Dày: an emptied cell means "no value".
+function DimensionCell({
+  field,
+  rowIndex,
+  label,
+  value,
+  onCommit,
+  disabled,
+  error,
+}: {
+  field: LineFocusField;
+  rowIndex: number;
+  label: string;
+  value: number | string;
+  onCommit: (value: number | '') => void;
+  disabled: boolean;
+  error?: string;
+}) {
+  const focusProps = useFocusOrigin(selectOnKeyboardFocus);
+  return (
+    <input
+      id={cellId(field, rowIndex)}
+      className="cell-input cell-number tabular-nums"
+      type="number"
+      step="any"
+      aria-label={rowLabel(label, rowIndex)}
+      {...errorProps(field, rowIndex, error)}
+      disabled={disabled}
+      value={value}
+      {...focusProps}
+      onChange={(e) => onCommit(toOptionalNumber(e.target.value) ?? '')}
     />
   );
 }
@@ -422,16 +482,14 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     const error = errorOf(idx, field);
     return (
       <>
-        <input
-          id={cellId(focusField, idx)}
-          className="cell-input cell-number tabular-nums"
-          type="number"
-          step="any"
-          aria-label={rowLabel(label, idx)}
-          {...errorProps(focusField, idx, error)}
-          disabled={disabled}
+        <DimensionCell
+          field={focusField}
+          rowIndex={idx}
+          label={label}
           value={(line?.[field] ?? '') as number | string}
-          onChange={(e) => setLineField(idx, field, toOptionalNumber(e.target.value) ?? '')}
+          disabled={disabled}
+          error={error}
+          onCommit={(value) => setLineField(idx, field, value)}
         />
         <CellError id={errorId(focusField, idx)} message={error} />
       </>

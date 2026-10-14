@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -97,7 +97,7 @@ describe('VoucherPrintButton', () => {
     expect(await screen.findByText('Chọn giá in')).toBeInTheDocument();
     expect(printMock).not.toHaveBeenCalled();
     await user.click(screen.getByRole('radio', { name: 'Không in tiền' }));
-    await user.click(screen.getByRole('button', { name: 'In' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'In' }));
     expect(printMock).toHaveBeenCalledWith({
       kind: 'stock',
       type: 'In',
@@ -132,8 +132,29 @@ describe('VoucherPrintButton', () => {
     renderButton({ kind: 'stock', type: 'In', variant: 'icon' }, parentClick);
     await user.click(screen.getByRole('button', { name: 'In PT00001' }));
     await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
-    await user.click(await screen.findByRole('button', { name: 'In' }));
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'In' }));
     expect(printMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'stock', format: 'pdf' }));
     expect(parentClick).not.toHaveBeenCalled();
+  });
+
+  it('stock: Escape on the dialog returns the focus to the trigger', async () => {
+    const user = userEvent.setup();
+    renderButton({ kind: 'stock', type: 'In' });
+    const trigger = screen.getByRole('button', { name: 'In' });
+    await user.click(trigger);
+    await user.click(screen.getByRole('menuitem', { name: 'Excel' }));
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('stock: Hủy returns the focus to the trigger', async () => {
+    const user = userEvent.setup();
+    renderButton({ kind: 'stock', type: 'In', variant: 'icon' });
+    const trigger = screen.getByRole('button', { name: 'In PT00001' });
+    await user.click(trigger);
+    await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
+    await user.click(await screen.findByRole('button', { name: 'Hủy' }));
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });

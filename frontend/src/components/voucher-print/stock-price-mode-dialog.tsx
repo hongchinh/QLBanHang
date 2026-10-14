@@ -15,6 +15,7 @@ interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: (mode: StockPrintPriceMode) => void;
+  onCloseAutoFocus?: (event: Event) => void; // the opener is a menu item that is gone by now: say where the focus goes
 }
 
 function Body({ onConfirm, onClose }: { onConfirm: (mode: StockPrintPriceMode) => void; onClose: () => void }) {
@@ -60,10 +61,14 @@ function Body({ onConfirm, onClose }: { onConfirm: (mode: StockPrintPriceMode) =
 }
 
 // Which price a stock voucher prints with. The body mounts only while open, so each opening re-reads the remembered mode.
-export function StockPriceModeDialog({ open, onOpenChange, onConfirm }: Props) {
+export function StockPriceModeDialog({ open, onOpenChange, onConfirm, onCloseAutoFocus }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm" aria-describedby={undefined} onClick={(e) => e.stopPropagation()}>
+      <DialogContent
+        className="max-w-sm"
+        aria-describedby={undefined}
+        onCloseAutoFocus={onCloseAutoFocus}
+        onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>Chọn giá in</DialogTitle>
         </DialogHeader>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, FileSpreadsheet, FileText, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CompanyProfileHint } from '@/components/tt133-export/company-profile-hint';
 import { StockPriceModeDialog } from './stock-price-mode-dialog';
+import { canTakeFocus, giveFocusBack } from '@/lib/focus';
 import { useVoucherPrint } from '@/features/voucher-print/use-voucher-print';
 import type { StockPrintPriceMode, VoucherPrintKind, VoucherPrintTarget } from '@/features/voucher-print/types';
 import type { ExportFormat } from '@/features/tt133-export/types';
@@ -39,6 +40,20 @@ export function VoucherPrintButton({
   const isDisabled = disabled || vouchers.length === 0 || isPending;
   // Stock vouchers ask for the price mode first; the format waits here while the dialog is open.
   const [pendingFormat, setPendingFormat] = useState<ExportFormat | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const refocusWhenEnabled = useRef(false);
+  // The dialog was opened from a menu item that is gone, so Radix has nowhere to return the focus: send it to the
+  // trigger. The trigger is disabled while a print runs; then the focus follows once it is enabled again.
+  const returnFocus = (event: Event) => {
+    event.preventDefault();
+    if (canTakeFocus(triggerRef.current)) giveFocusBack(triggerRef.current);
+    else refocusWhenEnabled.current = true;
+  };
+  useEffect(() => {
+    if (isPending || !refocusWhenEnabled.current) return;
+    refocusWhenEnabled.current = false;
+    if (canTakeFocus(triggerRef.current)) giveFocusBack(triggerRef.current);
+  }, [isPending]);
   const choose = (format: ExportFormat) => {
     if (kind === 'stock') setPendingFormat(format);
     else void print({ kind, type, vouchers, format });
@@ -63,11 +78,12 @@ export function VoucherPrintButton({
               disabled={isDisabled}
               title={title}
               onClick={stop}
+              ref={triggerRef}
             >
               {icon}
             </Button>
           ) : (
-            <Button variant="outline" size="sm" disabled={isDisabled} title={title} onClick={stop}>
+            <Button variant="outline" size="sm" disabled={isDisabled} title={title} onClick={stop} ref={triggerRef}>
               {icon}
               {label}
               <ChevronDown className="h-4 w-4" />
@@ -90,6 +106,7 @@ export function VoucherPrintButton({
           open={pendingFormat !== null}
           onOpenChange={(open) => !open && setPendingFormat(null)}
           onConfirm={confirmPriceMode}
+          onCloseAutoFocus={returnFocus}
         />
       )}
       {variant === 'button' && <CompanyProfileHint />}

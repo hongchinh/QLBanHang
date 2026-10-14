@@ -37,8 +37,12 @@ function marginHint(sales: SalesSummary): ReactNode {
   if (change === 0) return `${margin} (±0 điểm)`;
   return (
     <>
-      {margin} (<DeltaArrow direction={change > 0 ? 'up' : 'down'} />
-      {formatNumber(Math.abs(change))} điểm)
+      {margin} (
+      <span className="inline-flex items-center gap-0.5 whitespace-nowrap">
+        <DeltaArrow direction={change > 0 ? 'up' : 'down'} />
+        {formatNumber(Math.abs(change))}
+      </span>{' '}
+      điểm)
     </>
   );
 }

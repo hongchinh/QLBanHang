@@ -204,7 +204,7 @@ export function OpeningStockPage() {
               role="alert"
               className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2 lg:col-span-3"
             >
-              <AppIcon name="warning" tone="none" className="mt-0.5 shrink-0" />
+              <AppIcon name="warning" tone="none" className="mt-0.5" />
               <span>Chi nhánh chưa có ngày đầu kỳ. Vào Cấu hình → Chi nhánh để đặt ngày đầu kỳ trước khi lưu.</span>
             </div>
           )}

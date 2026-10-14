@@ -201,7 +201,7 @@ export function OpeningDebtPage() {
           role="alert"
           className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
         >
-          <AppIcon name="warning" tone="none" className="mt-0.5 shrink-0" />
+          <AppIcon name="warning" tone="none" className="mt-0.5" />
           <span>
             Chi nhánh chưa có ngày đầu kỳ. Vào{' '}
             <Link to="/settings/branches" className="font-medium underline">

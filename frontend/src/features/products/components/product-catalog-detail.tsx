@@ -47,7 +47,7 @@ export function ProductCatalogDetail({ productId, onSelect }: Props) {
 
   if (productId === null) {
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground text-sm">
+      <div className="flex h-full items-center justify-center gap-1 text-muted-foreground text-sm">
         <AppIcon name="arrowLeft" size={14} /> Chọn sản phẩm để xem chi tiết
       </div>
     );

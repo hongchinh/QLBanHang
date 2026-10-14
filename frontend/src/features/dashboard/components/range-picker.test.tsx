@@ -121,6 +121,7 @@ describe('RangePicker', () => {
     const arrow = container.querySelector('[data-icon="arrowRight"]');
     expect(arrow).not.toBeNull();
     expect(arrow!.parentElement).toHaveTextContent('2026-10-01 2026-10-13');
+    expect(screen.getByRole('img', { name: 'đến' })).toHaveAttribute('data-icon', 'arrowRight');
   });
 
   it('marks the chip whose range is selected, and the custom button for any other range', () => {

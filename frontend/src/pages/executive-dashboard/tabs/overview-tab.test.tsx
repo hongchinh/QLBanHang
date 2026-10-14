@@ -632,7 +632,7 @@ describe('OverviewTab', () => {
     });
   });
 
-  describe('the "→" buttons', () => {
+  describe('the arrow buttons', () => {
     it('open the Kinh doanh tab when it is on the bar', () => {
       const onOpenTab = vi.fn();
       renderTab(MONTH, ['sales'], onOpenTab);

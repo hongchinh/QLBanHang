@@ -73,7 +73,7 @@ function TileActionControl({ action }: { action: TileAction }) {
     return (
       <Link to={to} title={title} className={ACTION_CLASS}>
         {label}
-        <AppIcon name="arrowRight" size={14} tone="none" />
+        <AppIcon name="arrowRight" size={14} />
       </Link>
     );
   }
@@ -81,7 +81,7 @@ function TileActionControl({ action }: { action: TileAction }) {
   return (
     <button type="button" title={title} onClick={() => onClick()} className={ACTION_CLASS}>
       {label}
-      <AppIcon name="arrowRight" size={14} tone="none" />
+      <AppIcon name="arrowRight" size={14} />
     </button>
   );
 }

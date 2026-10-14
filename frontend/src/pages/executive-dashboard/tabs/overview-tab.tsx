@@ -30,7 +30,7 @@ import { RecentFeed } from '../components/recent-feed';
 
 interface OverviewTabProps {
   params: ExecutiveParams;
-  // The other tabs on the bar; the "→" buttons open one of them.
+  // The other tabs on the bar; the arrow buttons open one of them.
   openTabs: ExecutiveTab[];
   onOpenTab(tab: ExecutiveTab): void;
 }

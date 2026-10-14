@@ -71,6 +71,8 @@ describe('KpiCard', () => {
     const icon = container.querySelector('[data-icon="kpiRevenueToday"]');
     expect(icon).not.toBeNull();
     expect(icon!.getAttribute('class')).not.toMatch(/text-icon-/);
+    expect(screen.getByText('Doanh thu hôm nay').parentElement!.contains(icon)).toBe(true);
+    expect(icon).toHaveAttribute('width', '18');
   });
 
   it('renders no icon in the label row when icon is omitted', () => {

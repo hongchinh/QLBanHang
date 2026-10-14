@@ -215,6 +215,10 @@ describe('KpiRow', () => {
     for (const label of ['Tồn quỹ', 'Phải thu', 'Phải trả', 'Giá trị tồn kho']) {
       expect(within(tileOf(label)).queryByRole('img', { name: /tăng|giảm/ })).not.toBeInTheDocument();
     }
+    // The gross profit tile has exactly one arrow, inside its margin hint.
+    const arrows = within(tileOf('Lãi gộp')).getAllByRole('img', { name: /tăng|giảm/ });
+    expect(arrows).toHaveLength(1);
+    expect(within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/)).toContainElement(arrows[0]);
   });
 
   it('a revenue without a previous one has "—" as delta', () => {
@@ -233,6 +237,7 @@ describe('KpiRow', () => {
       expect(hint).toHaveTextContent('0,8 điểm');
       expect(hint.textContent).toBe('Tỷ suất 14,5% (0,8 điểm)');
       expect(within(hint).getByRole('img', { name: 'tăng' })).toBeInTheDocument();
+      expect(within(hint).getByText('0,8').closest('span')).toHaveClass('whitespace-nowrap');
     });
 
     it('rounds the change to one decimal', () => {

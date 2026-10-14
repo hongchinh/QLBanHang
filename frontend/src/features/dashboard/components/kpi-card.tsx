@@ -28,7 +28,7 @@ export function KpiCard({ label, format = 'number', kpi, loading, accentColor, i
     >
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-        {icon && <AppIcon name={icon} className="text-muted-foreground" tone="none" />}
+        {icon && <AppIcon name={icon} size={18} className="text-muted-foreground" tone="none" />}
       </div>
       <div className="mt-2 flex items-baseline justify-between gap-3">
         <div className="text-3xl font-semibold tracking-tight tabular-nums text-foreground">

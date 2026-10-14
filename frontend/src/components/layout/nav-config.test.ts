@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { Presentation } from 'lucide-react';
 import type { Permission, Role } from '@/lib/permissions';
 import { visibleNavGroups } from './nav-config';
 
@@ -93,9 +94,17 @@ describe('visibleNavGroups', () => {
     expect(groupsFor(WAREHOUSE_PERMS).find((g) => g.id === 'debt')).toBeUndefined();
   });
 
+  it('the executive dashboard is the first report item and follows dashboard.executive', () => {
+    const first = all().find((g) => g.id === 'reports')!.items[0];
+    expect(first).toEqual({ to: '/dashboard/executive', label: 'Điều hành', icon: Presentation, section: 'Tổng hợp' });
+    expect(paths(['dashboard.executive'], 'reports')).toEqual(['/dashboard/executive']);
+    expect(paths(ACCOUNTANT_CASH_PERMS, 'reports')).not.toContain('/dashboard/executive');
+  });
+
   it('report sections for admin', () => {
     const reports = all().find((g) => g.id === 'reports')!;
     expect(reports.items.map((i) => [i.section, i.label])).toEqual([
+      ['Tổng hợp', 'Điều hành'],
       ['Doanh thu', 'Doanh thu'], ['Doanh thu', 'Doanh thu sale'], ['Doanh thu', 'Doanh thu xe'],
       ['Doanh thu', 'Hiệu suất sale'], ['Kho', 'Tồn kho'], ['Kho', 'Thẻ kho'], ['Kho', 'Tổng hợp nhập xuất tồn'],
       ['Quỹ', 'Sổ quỹ'],

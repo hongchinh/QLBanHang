@@ -50,6 +50,8 @@ using OrderMgmt.Application.CashDebt.Settings.Interfaces;
 using OrderMgmt.Application.CashDebt.Settings.Services;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.References;
+using OrderMgmt.Application.Dashboards.Executive.Interfaces;
+using OrderMgmt.Application.Dashboards.Executive.Services;
 using OrderMgmt.Application.Inventory.Costing;
 using OrderMgmt.Application.Inventory.Ledger;
 using OrderMgmt.Application.Inventory.Numbering;
@@ -157,6 +159,13 @@ public static class DependencyInjection
         services.AddScoped<IOpeningStockService, OpeningStockService>();
         services.AddScoped<IInventoryReportService, InventoryReportService>();
         services.AddScoped<ITt133ExportService, Tt133ExportService>();
+        services.AddScoped<IExecutiveScopeResolver, ExecutiveScopeResolver>();
+        services.AddScoped<ISalesMetricsService, SalesMetricsService>();
+        services.AddScoped<ExecutiveLookups>();
+        services.AddScoped<ICashMetricsService, CashMetricsService>();
+        services.AddScoped<IDebtMetricsService, DebtMetricsService>();
+        services.AddScoped<IInventoryMetricsService, InventoryMetricsService>();
+        services.AddScoped<IExecutiveOverviewService, ExecutiveOverviewService>();
 
         return services;
     }

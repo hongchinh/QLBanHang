@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import React from 'react';
@@ -27,6 +27,49 @@ describe('useDashboardParams', () => {
     const yyyy = now.getFullYear();
     const mm = String(now.getMonth() + 1).padStart(2, '0');
     expect(result.current.from.startsWith(`${yyyy}-${mm}-01`)).toBe(true);
+  });
+
+  // A dashboard left open overnight must not keep asking for the day it was opened.
+  describe('the default period follows the VN date while the page stays open', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // Saturday 31 October 2026, 30 seconds before midnight.
+      vi.setSystemTime(new Date(2026, 9, 31, 23, 59, 30));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('moves to the new day, and to the new month, at midnight', () => {
+      const { result } = renderHook(() => useDashboardParams(), { wrapper: wrap(['/']) });
+      expect([result.current.from, result.current.to]).toEqual(['2026-10-01', '2026-10-31']);
+
+      act(() => vi.advanceTimersByTime(29_000));
+      expect([result.current.from, result.current.to]).toEqual(['2026-10-01', '2026-10-31']);
+
+      act(() => vi.advanceTimersByTime(1_000));
+      expect([result.current.from, result.current.to]).toEqual(['2026-11-01', '2026-11-01']);
+
+      act(() => vi.advanceTimersByTime(24 * 3_600_000));
+      expect([result.current.from, result.current.to]).toEqual(['2026-11-01', '2026-11-02']);
+    });
+
+    it('keeps a period given in the URL', () => {
+      const { result } = renderHook(() => useDashboardParams(), {
+        wrapper: wrap(['/?from=2026-10-01&to=2026-10-31']),
+      });
+
+      act(() => vi.advanceTimersByTime(60_000));
+
+      expect([result.current.from, result.current.to]).toEqual(['2026-10-01', '2026-10-31']);
+    });
+
+    it('leaves no timer behind once unmounted', () => {
+      const { unmount } = renderHook(() => useDashboardParams(), { wrapper: wrap(['/']) });
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      unmount();
+
+      expect(vi.getTimerCount()).toBe(0);
+    });
   });
 
   it('setRange updates URL params', () => {

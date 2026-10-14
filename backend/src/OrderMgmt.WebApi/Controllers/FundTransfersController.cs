@@ -4,13 +4,16 @@ using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.FundTransfers.Interfaces;
 using OrderMgmt.Application.CashDebt.FundTransfers.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.WebApi.Authorization;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
 /// One document type, so the fund_transfers.* permissions are static guards; edit_all is checked by the service.
 [Route("api/fund-transfers")]
+[DashboardSignal(DashboardDomains.Cash)]
 [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
 public class FundTransfersController : ApiControllerBase
 {

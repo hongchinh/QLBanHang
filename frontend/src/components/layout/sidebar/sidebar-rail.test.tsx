@@ -34,7 +34,7 @@ describe('SidebarRail', () => {
     expect(groupButton('Báo cáo')).toHaveAttribute('aria-expanded', 'true');
     expect(within(flyout).getByRole('link', { name: 'Tuổi nợ' })).toBeInTheDocument();
     expect(within(flyout).getAllByRole('heading', { level: 4 }).map((h) => h.textContent))
-      .toEqual(['Doanh thu', 'Kho', 'Quỹ', 'Công nợ']);
+      .toEqual(['Tổng hợp', 'Doanh thu', 'Kho', 'Quỹ', 'Công nợ']);
     expect(within(flyout).getByRole('button', { name: 'Ghim Tuổi nợ' })).toBeInTheDocument();
   });
 

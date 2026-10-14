@@ -82,6 +82,11 @@ public static class Permissions
         public const string Cash = "reports.cash";
     }
 
+    public static class Dashboard
+    {
+        public const string Executive = "dashboard.executive";
+    }
+
     public static class Branches
     {
         public const string Manage = "branches.manage";

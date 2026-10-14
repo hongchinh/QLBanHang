@@ -170,6 +170,7 @@ public static class DbSeeder
             (Permissions.Cash.Settings, Permissions.CashModule, "Cấu hình tiền & công nợ"),
             (Permissions.CreditLimits.Manage, Permissions.CashModule, "Hạn mức nợ"),
             (Permissions.Reports.Cash, Permissions.ReportModule, "Sổ quỹ"),
+            (Permissions.Dashboard.Executive, Permissions.ReportModule, "Bảng điều hành"),
         };
 
         var inserted = new HashSet<string>();
@@ -338,9 +339,9 @@ public static class DbSeeder
         {
             NewStockReason("NMH", "Nhập mua hàng", StockDirection.In, PartnerType.Supplier, DebtEffect.PayableIncrease),
             NewStockReason("NKH", "Nhập khác", StockDirection.In, PartnerType.Any, DebtEffect.None),
-            NewStockReason("XBH", "Xuất bán hàng", StockDirection.Out, PartnerType.Customer, DebtEffect.ReceivableIncrease),
+            NewStockReason(StockReasonCodes.Sale, "Xuất bán hàng", StockDirection.Out, PartnerType.Customer, DebtEffect.ReceivableIncrease),
             NewStockReason("XKH", "Xuất khác", StockDirection.Out, PartnerType.Any, DebtEffect.None),
-            NewStockReason("NTL", "Nhập hàng bán bị trả lại", StockDirection.In, PartnerType.Customer, DebtEffect.ReceivableDecrease),
+            NewStockReason(StockReasonCodes.SaleReturn, "Nhập hàng bán bị trả lại", StockDirection.In, PartnerType.Customer, DebtEffect.ReceivableDecrease),
             NewStockReason("XTL", "Xuất trả hàng NCC", StockDirection.Out, PartnerType.Supplier, DebtEffect.PayableDecrease),
         };
         db.StockReasons.AddRange(stockReasonSeeds.Where(r => !stockReasonCodes.Contains(r.Code)));

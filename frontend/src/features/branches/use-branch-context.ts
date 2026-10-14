@@ -5,7 +5,8 @@ import { useMyBranches } from './hooks';
 
 // Resolves the working branch once per session: the user's stored choice when
 // it is still allowed, otherwise the default branch. Later /me/branches refetches
-// never touch it again (only the switcher and logout change it, review finding). `ready` turns true once the
+// never touch it again (only the header switcher, the branch select of the executive dashboard and logout
+// change it, review finding). `ready` turns true once the
 // store holds the branch (or /me/branches failed — the backend default applies),
 // so pages never fetch before X-Branch-Id is set.
 export function useBranchContext() {

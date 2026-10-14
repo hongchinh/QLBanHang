@@ -43,7 +43,7 @@ export function QuotationDateFilter({ from, to, onChange }: QuotationDateFilterP
   }, [open, from, to]);
 
   const noFilter = from === '' && to === '';
-  const activePreset = noFilter ? null : matchActivePreset(from, to);
+  const activePreset = noFilter ? null : matchActivePreset(from, to, PRESETS.map((p) => p.key));
   const isCustomActive = !noFilter && activePreset === null;
 
   const pillCls = (active: boolean) =>

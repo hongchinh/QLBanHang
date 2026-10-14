@@ -48,7 +48,7 @@ QLBanHang/
 | Roles/permissions | `Application/Identity/Admin`, `AdminRolesController.cs`, `Domain/Constants/Permissions.cs` |
 | User quotation settings | `Application/Identity/UserSettings`, `AdminUserSettingsController.cs`, `MeQuotationSettingsController.cs` |
 | Quotations | `Application/Sales/Quotations`, `Domain/Entities/Sales`, `QuotationsController.cs` |
-| Dashboard | `Application/Sales/Quotations/Services`, `DashboardController.cs` |
+| Quotation dashboard | `Application/Sales/Quotations/Services`, `DashboardController.cs` |
 | Reports | `Application/Reports/SalesRevenue`, `ReportsController.cs` |
 | Search | `Application/Search`, `SearchController.cs` |
 | Branding | `Domain/Branding`, `Application/Branding`, `SettingsController.cs` |
@@ -73,6 +73,8 @@ QLBanHang/
 | Cash & debt reports | `Application/CashDebt/Reports`, `CashDebtReportsController.cs` |
 | Company profile | `Domain/Entities/Organization/CompanyProfile.cs` (one row, `Id = 1`), `Application/Organization/Company`, `Infrastructure/Persistence/Configurations/CompanyProfileConfiguration.cs`, `CompanyProfileController.cs` |
 | TT133 report forms | `Application/Tt133` (`ITt133ExportService` / `Tt133ExportService`, `ITt133FormRenderer`, `Models/Tt133ExportModels.cs`, `Validators`, `Tt133ExportOptions`), `Infrastructure/Excel/Tt133` (`Tt133FormBuilder`, `Tt133Column`, `Tt133FormRenderer` and one class per form: `CashBookForm`, `DebtLedgerForm`, `DebtSummaryForm`, `DebtReconciliationForm`, `StockSummaryForm`, `StockDetailForm`, `StockCardForm`), `Tt133ExportController.cs` |
+| Executive dashboard | `Application/Dashboards/Executive`: `Models` (`ExecutiveModels.cs` with the queries, then `SalesModels`, `CashModels`, `DebtModels`, `InventoryModels`, `OverviewModels`), `Common` (`ExecutiveScope`, `ExecutivePeriod`, `ExecutiveDay`, `ExecutiveMath`, `ExecutiveSeries`, `DebtPositionMath`, `OpenDebtItem`), `Interfaces` (`IExecutiveScopeResolver` and one interface per service), `Services` (`SalesMetricsService`, `CashMetricsService`, `DebtMetricsService`, `InventoryMetricsService`, `ExecutiveOverviewService`, `ExecutiveScopeResolver`, `ExecutiveLookups`), `Validators/ExecutiveQueryValidators.cs`, `Realtime/DashboardDomains.cs`; helpers shared with the inventory reports `Application/Inventory/Common/CostProvisional.cs` and `StockValueSplit.cs`; `Domain/Constants/StockReasonCodes.cs` (`XBH`, `NTL`); `ExecutiveDashboardController.cs`; tests in `tests/OrderMgmt.IntegrationTests/ExecutiveDashboard` (pure tests in `ExecutiveDashboard/Unit`, base class `ExecutiveDashboardTestBase`) |
+| Real-time signals | `WebApi/Hubs` (`NotificationHub` at `/hubs/notifications` with the `user-{id}` and dashboard groups, `SignalRNotifier` implementing `Application/Notifications/Interfaces/IRealtimeNotifier`, `DashboardGroups.cs` with the event and group names), `WebApi/Filters/DashboardSignalAttribute.cs` (`[DashboardSignal]`, `[SkipDashboardSignal]`, `DashboardSignalFilter`) |
 
 ## API Controllers
 
@@ -83,6 +85,7 @@ QLBanHang/
 | `ProductsController` | `/api/products`, `/api/products/search` |
 | `QuotationsController` | `/api/quotations`, status transition, Excel/PDF export, clone, owner transfer |
 | `DashboardController` | `/api/dashboard/summary`, revenue series, top lists, recent activity, sales leaderboard |
+| `ExecutiveDashboardController` | GET `/api/dashboard/executive/` `sales/summary`, `sales/series`, `sales/top`, `cash/summary`, `cash/series`, `cash/breakdown`, `debt/summary`, `debt/breakdown`, `inventory/summary`, `inventory/breakdown`, `branches`, `attention`, `recent` |
 | `ReportsController` | `/api/reports/sales-revenue` |
 | `AdminUsersController` | `/api/admin/users` CRUD, reset password and status updates |
 | `AdminRolesController` | `/api/admin/roles`, `/api/admin/permissions` |
@@ -156,9 +159,15 @@ frontend/src/
 │   ├── company-profile/         # Thông tin đơn vị: GET/PUT /settings/company
 │   ├── credit-limits/
 │   ├── customers/
-│   ├── dashboard/
+│   ├── dashboard/               # quotation dashboards; format.ts (also compact money and percent) and the shared tiles
+│   │                            # in components/: TileCard (+ TileError), StatTile, LiveStatus, RangePicker (optional
+│   │                            # `presets`); stat-tile-state.ts (statTileState: the StatTile props that follow a query)
 │   ├── debt/                    # partner summary, open items, matching helpers, settlements
 │   ├── debt-offsets/
+│   ├── executive-dashboard/     # types, api, keys (['executive']), hooks (executiveQueryOptions), presets, links, period,
+│   │                            # series.ts (usePeriodGranularity, isSalesSeriesEmpty / isCashSeriesEmpty), labels.ts
+│   │                            # (table texts: codeName, withBranch, formatAmount, formatCompactAmount),
+│   │                            # use-executive-params / -scope / -access / -live
 │   ├── fund-transfers/
 │   ├── funds/
 │   ├── inventory-reports/       # stock-on-hand, stock-card and stock-summary queries
@@ -186,6 +195,9 @@ frontend/src/
 │   ├── credit-limits/
 │   ├── customers/
 │   ├── debt/                    # /debt/opening, /debt/matching, /debt/offsets list + form
+│   ├── executive-dashboard/     # /dashboard/executive: page shell; components/ (KPI row, charts, GranularityToggle and
+│   │                            # SegmentedToggle, DataTable, fund table, debt term bar, branch table, BranchDocumentLink,
+│   │                            # ScopeSelect, attention list, recent feed); tabs/ (overview, sales, cash, debt, inventory)
 │   ├── fund-transfers/          # /fund-transfers list + form
 │   ├── funds/                   # funds and fund opening balance
 │   ├── inventory/               # opening stock, stock-on-hand, stock card, stock summary (/inventory/stock-summary, Tổng hợp nhập xuất tồn)
@@ -201,10 +213,13 @@ frontend/src/
 │   ├── suppliers/
 │   └── warehouses/
 ├── hooks/                       # useDocumentActions (shared save flow of the four document forms), route access hooks
+│                                # (useCanAccessRoute, useCanOpenLink for links with a query string), useNotificationHub
+│                                # (the one SignalR connection: notifications, dashboard signal, connection status)
 ├── routes/
 ├── stores/
 ├── lib/                         # includes date-only.ts, to-number.ts, money-input.ts, vn-datetime.ts,
-│                                # report-scope.ts, period-presets.ts, blob-error.ts
+│                                # report-scope.ts, period-presets.ts, blob-error.ts, date-range-presets.ts (dashboard
+│                                # and quotation range presets), realtime-bus.ts (hub status and dashboard signal)
 ├── styles/
 └── test/
 ```

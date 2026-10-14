@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Branch } from '@/features/branches/types';
+import type { Branch, DemoBranchDeletionResult } from '@/features/branches/types';
 import { useDeleteDemoBranch, useDemoBranchDeletionPreview } from '@/features/branches/hooks';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,8 +37,8 @@ export function DemoBranchDeleteDialog({ branch, onClose, onDeleted }: DemoBranc
     !!branch && !!data && !preview.isFetching && !preview.isError && code.trim() === branch.code;
 
   async function handleDelete() {
-    if (!branch || !canConfirm) return;
-    let result: Awaited<ReturnType<typeof deleteBranch.mutateAsync>>;
+    if (!branch || !canConfirm || deleteBranch.isPending) return;
+    let result: DemoBranchDeletionResult;
     try {
       result = await deleteBranch.mutateAsync(branch.id);
     } catch (err) {
@@ -105,7 +105,7 @@ export function DemoBranchDeleteDialog({ branch, onClose, onDeleted }: DemoBranc
                 id="demo-delete-code"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                disabled={deleteBranch.isPending}
+                readOnly={deleteBranch.isPending}
                 autoComplete="off"
                 autoCapitalize="none"
                 spellCheck={false}

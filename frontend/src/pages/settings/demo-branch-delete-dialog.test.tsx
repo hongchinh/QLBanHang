@@ -208,12 +208,19 @@ describe('DemoBranchDeleteDialog', () => {
   });
 
   it('while deleting, everything is locked and Escape does not close', async () => {
+    const { user, onClose, view, ui } = renderDialog();
+    await user.type(screen.getByLabelText(CODE_LABEL), 'DEMO1');
     mutation = { mutateAsync: deleteMock, isPending: true };
-    const { user, onClose } = renderDialog();
+    view.rerender(ui(BRANCH));
 
     expect(screen.getByRole('button', { name: 'Đang xóa...' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Hủy' })).toBeDisabled();
-    expect(screen.getByLabelText(CODE_LABEL)).toBeDisabled();
+    const input = screen.getByLabelText(CODE_LABEL);
+    expect(input).toHaveAttribute('readonly');
+    expect(input).not.toBeDisabled();
+    input.focus();
+    await user.keyboard('{Enter}');
+    expect(deleteMock).not.toHaveBeenCalled();
     await user.keyboard('{Escape}');
     expect(onClose).not.toHaveBeenCalled();
   });

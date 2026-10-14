@@ -18,14 +18,14 @@ vi.mock('@/features/branches/hooks', () => ({
 vi.mock('@/lib/use-toast', () => ({ toast: vi.fn() }));
 
 const CHECKBOX_LABEL = 'Tạo kèm dữ liệu mẫu để đào tạo';
-const BRANCH = {
+const BRANCH: Branch = {
   id: 'b1',
   code: 'CN01',
   name: 'Chi nhánh chính',
   address: null,
   lockedUntil: null,
   openingDate: null,
-} as Branch;
+};
 
 function renderDialog(initial?: Branch) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -67,7 +67,11 @@ describe('BranchFormDialog', () => {
         withSampleData: true,
       }),
     );
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Đã tạo chi nhánh demo' }));
+    expect(toast).toHaveBeenCalledWith({
+      variant: 'success',
+      title: 'Đã tạo chi nhánh demo',
+      description: 'Dữ liệu mẫu đang được tạo, có thể mất khoảng một phút.',
+    });
   });
 
   it('creating without the box sends withSampleData false', async () => {
@@ -86,12 +90,27 @@ describe('BranchFormDialog', () => {
         withSampleData: false,
       }),
     );
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Đã tạo chi nhánh' }));
+    expect(toast).toHaveBeenCalledWith({ variant: 'success', title: 'Đã tạo chi nhánh' });
   });
 
   it('edit mode has no checkbox', () => {
     renderDialog(BRANCH);
 
     expect(screen.queryByLabelText(CHECKBOX_LABEL)).toBeNull();
+  });
+
+  it('edit mode submits without withSampleData', async () => {
+    const user = userEvent.setup();
+    renderDialog(BRANCH);
+
+    const name = screen.getByLabelText('Tên chi nhánh *');
+    await user.clear(name);
+    await user.type(name, 'Chi nhánh đổi tên');
+    await user.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+    await waitFor(() =>
+      expect(updateMock).toHaveBeenCalledWith({ id: 'b1', data: { name: 'Chi nhánh đổi tên', address: null } }),
+    );
+    expect(createMock).not.toHaveBeenCalled();
   });
 });

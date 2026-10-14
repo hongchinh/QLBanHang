@@ -16,6 +16,7 @@ const editSchema = z.object({
   code: z.string(),
   name: z.string().trim().min(1, 'Tên chi nhánh không được để trống').max(255, 'Tối đa 255 ký tự'),
   address: z.string().max(1000, 'Tối đa 1000 ký tự'),
+  // Create only; kept in the shared shape so both resolvers type the same values.
   withSampleData: z.boolean(),
 });
 

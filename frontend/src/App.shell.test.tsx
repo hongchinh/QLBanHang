@@ -7,6 +7,8 @@ import type { PushState } from '@/hooks/usePushNotification';
 const push = vi.hoisted(() => ({ state: 'idle' as PushState }));
 // Makes the boot (outside the route error boundary) or the routed page (inside it) throw while rendering.
 const crash = vi.hoisted(() => ({ boot: false, page: false }));
+// Keeps AuthInit on its loader, as while the session boots.
+const boot = vi.hoisted(() => ({ pending: false }));
 
 vi.mock('@/hooks/useBeforeInstallPrompt', () => ({
   useBeforeInstallPrompt: () => ({ canShow: false, install: vi.fn(), dismiss: vi.fn() }),
@@ -17,6 +19,7 @@ vi.mock('@/hooks/usePushNotification', () => ({
 vi.mock('@/routes/auth-init', () => ({
   AuthInit: ({ children }: { children: React.ReactNode }) => {
     if (crash.boot) throw new Error('boot failed');
+    if (boot.pending) return <div data-testid="boot-loader">Đang tải...</div>;
     return <>{children}</>;
   },
 }));
@@ -46,6 +49,21 @@ describe('App shell', () => {
     const shell = screen.getByTestId('app-shell');
     expect(shell).toContainElement(screen.getByText(/Bật thông báo để nhận cập nhật/));
     expect(shell).toContainElement(screen.getByText('not-found'));
+  });
+
+  // AuthInit's loader fills the room under the banner with flex-1: it has to be a child of the shell's content box.
+  it('shows the boot loader inside the shell content box, under the banner', () => {
+    boot.pending = true;
+    try {
+      window.history.pushState({}, '', '/404');
+      render(<App />);
+
+      const shell = screen.getByTestId('app-shell');
+      expect(screen.getByTestId('boot-loader').parentElement).toBe(shell.lastElementChild);
+      expect(shell.firstElementChild).toContainElement(screen.getByRole('button', { name: 'Bật thông báo' }));
+    } finally {
+      boot.pending = false;
+    }
   });
 
   it('has no banner slot once the banner was dismissed', () => {
@@ -111,6 +129,15 @@ describe('App shell', () => {
       expect(screen.getByTestId('app-shell')).toContainElement(fallback);
       expect(fallback).toHaveClass('flex-1');
       expect(fallback).not.toHaveClass('min-h-screen');
+    });
+
+    it('centres its content in the box it fills', () => {
+      crash.page = true;
+      window.history.pushState({}, '', '/404');
+      render(<App />);
+
+      const fallback = screen.getByRole('heading', { name: 'Đã có lỗi xảy ra' }).parentElement;
+      expect(fallback).toHaveClass('flex', 'flex-col', 'items-center', 'justify-center');
     });
 
     // The outer boundary replaces the whole app, shell included: nothing is left to give its fallback a height.

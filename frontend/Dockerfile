@@ -11,6 +11,9 @@ WORKDIR /app
 # VITE_* vars must be present at build time — Vite inlines them into the bundle.
 ARG VITE_API_BASE_URL
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+# Public VAPID key for web push; without it the push prompt reports "unsupported".
+ARG VITE_VAPID_PUBLIC_KEY
+ENV VITE_VAPID_PUBLIC_KEY=$VITE_VAPID_PUBLIC_KEY
 
 COPY package.json package-lock.json ./
 # Use `npm install` (not `npm ci`) because vitest@4 peers on vite@6+ but the

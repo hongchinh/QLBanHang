@@ -47,3 +47,16 @@ public class MyBranchesDto
     /// All branches when CanSwitch, otherwise only the default branch.
     public IReadOnlyList<BranchDto> Branches { get; set; } = Array.Empty<BranchDto>();
 }
+
+public class DemoBranchDeletionPreviewDto
+{
+    public int DocumentCount { get; set; }
+    public int ReassignedUserCount { get; set; }
+}
+
+public class DemoBranchDeletionResultDto
+{
+    public int ReassignedUserCount { get; set; }
+    public int KeptSampleProductCount { get; set; }
+    public int KeptSamplePartnerCount { get; set; }
+}

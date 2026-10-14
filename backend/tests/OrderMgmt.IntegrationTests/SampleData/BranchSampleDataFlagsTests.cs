@@ -3,7 +3,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.Organization.Branches.Models;
+using OrderMgmt.Application.Organization.SampleData.Interfaces;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -43,6 +45,20 @@ public class BranchSampleDataFlagsTests : CashDebtTestBase
 
         productSample.Should().BeFalse();
         partnerSample.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Sample_data_services_are_registered()
+    {
+        await using var scope1 = _factory.Services.CreateAsyncScope();
+        await using var scope2 = _factory.Services.CreateAsyncScope();
+
+        var queue1 = scope1.ServiceProvider.GetRequiredService<ISampleDataQueue>();
+        scope1.ServiceProvider.GetRequiredService<ISampleDataGenerator>();
+        scope1.ServiceProvider.GetRequiredService<ISampleDataRunner>();
+        scope1.ServiceProvider.GetRequiredService<IDemoBranchService>();
+
+        scope2.ServiceProvider.GetRequiredService<ISampleDataQueue>().Should().BeSameAs(queue1);
     }
 
     private static void AssertNoFlags(BranchDto b)

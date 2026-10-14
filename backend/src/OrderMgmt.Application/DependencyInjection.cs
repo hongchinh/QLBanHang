@@ -75,6 +75,9 @@ using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Services;
 using OrderMgmt.Application.Organization.Company.Interfaces;
 using OrderMgmt.Application.Organization.Company.Services;
+using OrderMgmt.Application.Organization.SampleData.Generation;
+using OrderMgmt.Application.Organization.SampleData.Interfaces;
+using OrderMgmt.Application.Organization.SampleData.Services;
 using OrderMgmt.Application.Payments.Interfaces;
 using OrderMgmt.Application.Payments.Services;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
@@ -168,6 +171,12 @@ public static class DependencyInjection
         services.AddScoped<IDebtMetricsService, DebtMetricsService>();
         services.AddScoped<IInventoryMetricsService, InventoryMetricsService>();
         services.AddScoped<IExecutiveOverviewService, ExecutiveOverviewService>();
+
+        // Sample data (demo branches)
+        services.AddSingleton<ISampleDataQueue, SampleDataQueue>();
+        services.AddSingleton<ISampleDataGenerator, SampleDataGenerator>();
+        services.AddScoped<ISampleDataRunner, SampleDataRunner>();
+        services.AddScoped<IDemoBranchService, DemoBranchService>();
 
         return services;
     }

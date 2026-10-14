@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { toast } from '@/lib/use-toast';
@@ -427,45 +428,67 @@ describe('useDocumentActions focus return', () => {
     expect(document.activeElement).not.toBe(screen.getByTestId('save'));
   });
 
-  // A status change can take the button away (a cancelled voucher has no "Hủy phiếu") or leave it disabled.
-  it.each(['removed', 'disabled'] as const)(
-    'focuses nothing when the element the action started from is %s: never another control of the page',
-    async (fate) => {
-      function LostOriginHarness() {
-        const [lost, setLost] = useState(false);
-        const { run, confirmDialogProps } = useDocumentActions<Action>({
-          ...options,
-          perform: async () => {
-            setLost(true);
-            // A real browser drops the focus of a button that gets disabled or removed.
-            (document.activeElement as HTMLElement | null)?.blur();
-            throw apiError(422, 'NEGATIVE_FUND_WARNING');
-          },
-        });
-        return (
-          <main id="main-content">
-            <button type="button" data-testid="first">
-              Cập nhật
-            </button>
-            {!(lost && fate === 'removed') && (
-              <button type="button" data-testid="origin" disabled={lost} onClick={() => void run({ kind: 'delete', flags: {} })}>
-                Xóa
-              </button>
-            )}
-            <ConfirmRequiredDialog {...confirmDialogProps} />
-          </main>
-        );
-      }
-      render(<LostOriginHarness />);
-      const origin = screen.getByTestId('origin');
+  // The first control of a new stock voucher is "Xóa nháp": one press deletes the draft and resets the form, with no
+  // question asked. The focus must never land there, or on any control the user was not on.
+  describe('when the element the user was on is gone or disabled', () => {
+    const fates = [
+      // Ctrl+S from a blank trailing row: the page drops the row first, then starts the save.
+      'removed before the action started',
+      // A status change takes a control away (a cancelled voucher has no "Hủy phiếu") or leaves it disabled.
+      'removed while the action ran',
+      'disabled while the action ran',
+    ] as const;
+
+    function LostOriginPage({ fate, onDiscardDraft }: { fate: (typeof fates)[number]; onDiscardDraft: () => void }) {
+      const [lost, setLost] = useState(false);
+      const { run, confirmDialogProps } = useDocumentActions<Action>({
+        ...options,
+        perform: async () => {
+          setLost(true);
+          // A real browser drops the focus of a control that gets disabled or removed.
+          (document.activeElement as HTMLElement | null)?.blur();
+          throw apiError(422, 'NEGATIVE_FUND_WARNING');
+        },
+      });
+      const removed = lost && fate !== 'disabled while the action ran';
+      return (
+        <main id="main-content">
+          <button type="button" aria-label="Xóa nháp" onClick={onDiscardDraft}>
+            ×
+          </button>
+          <button type="button">Lưu và thoát</button>
+          {!removed && (
+            <input
+              aria-label="Mã hàng"
+              disabled={lost}
+              onKeyDown={(event) => {
+                if (event.key !== 's' || !event.ctrlKey) return;
+                if (fate === 'removed before the action started') setLost(true);
+                setTimeout(() => void run({ kind: 'save', flags: {} }), 0);
+              }}
+            />
+          )}
+          <ConfirmRequiredDialog {...confirmDialogProps} />
+        </main>
+      );
+    }
+
+    it.each(fates)('focuses nothing (%s): never another control of the page', async (fate) => {
+      const onDiscardDraft = vi.fn();
+      render(<LostOriginPage fate={fate} onDiscardDraft={onDiscardDraft} />);
+      const origin = screen.getByLabelText('Mã hàng');
       act(() => origin.focus());
-      fireEvent.click(origin);
+      fireEvent.keyDown(origin, { key: 's', ctrlKey: true });
       await screen.findByRole('dialog');
       fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
 
       await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      // Past the tick in which the closed dialog hands the focus back.
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(document.activeElement).toBe(document.body);
-    },
-  );
+      // So a blind Enter runs nothing.
+      await userEvent.keyboard('{Enter}');
+      expect(onDiscardDraft).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -491,4 +491,69 @@ describe('useDocumentActions focus return', () => {
       expect(onDiscardDraft).not.toHaveBeenCalled();
     });
   });
+
+  // In a browser the dialog stays on the page for its exit animation (about 150 ms) and only then asks where the focus
+  // goes; a fast answer to the confirmed resend is there first. jsdom has no animations, so the test plays the dialog:
+  // it confirms, lets the resend settle, and then asks.
+  describe('the 422 dialog asks for the focus target after its confirmed resend has settled', () => {
+    type DialogProps = ReturnType<typeof useDocumentActions<Action>>['confirmDialogProps'];
+
+    // A cancel that needs a confirmation: resolves once the confirmed resend has settled.
+    async function cancelConfirmAndSettle(outcome: 'the voucher stays as it was' | 'the voucher is cancelled') {
+      let dialogProps!: DialogProps;
+      let attempts = 0;
+      function CancelPage() {
+        const [cancelled, setCancelled] = useState(false);
+        const { busy, run, confirmDialogProps } = useDocumentActions<Action>({
+          ...options,
+          perform: async () => {
+            attempts += 1;
+            // A real browser drops the focus of a button that gets disabled.
+            (document.activeElement as HTMLElement | null)?.blur();
+            if (attempts === 1) throw apiError(422, 'NEGATIVE_FUND_WARNING');
+            if (outcome === 'the voucher is cancelled') setCancelled(true);
+          },
+        });
+        dialogProps = confirmDialogProps;
+        return (
+          <main id="main-content">
+            {/* A cancelled voucher: "Khôi phục" comes first and "Hủy phiếu" is gone. */}
+            {cancelled && <button type="button">Khôi phục</button>}
+            <button type="button" disabled={busy}>
+              Cập nhật
+            </button>
+            {!cancelled && (
+              <button type="button" disabled={busy} onClick={() => void run({ kind: 'delete', flags: {} })}>
+                Hủy phiếu
+              </button>
+            )}
+          </main>
+        );
+      }
+      render(<CancelPage />);
+      const origin = screen.getByRole('button', { name: 'Hủy phiếu' });
+      act(() => origin.focus());
+      fireEvent.click(origin);
+      await waitFor(() => expect(dialogProps.request).not.toBeNull());
+      act(() => dialogProps.onConfirm());
+      await waitFor(() => expect(attempts).toBe(2));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Cập nhật' })).toBeEnabled());
+      // What the dialog calls when it is gone: the function of the latest render.
+      return { origin, restoreFocusTo: () => dialogProps.restoreFocusTo() };
+    }
+
+    it('gets the element the action started from when it is usable again', async () => {
+      const { origin, restoreFocusTo } = await cancelConfirmAndSettle('the voucher stays as it was');
+
+      expect(restoreFocusTo()).toBe(origin);
+    });
+
+    it('gets nothing when that element is gone: never another control of the page', async () => {
+      const { restoreFocusTo } = await cancelConfirmAndSettle('the voucher is cancelled');
+
+      expect(screen.getByRole('button', { name: 'Khôi phục' })).toBeEnabled();
+      expect(restoreFocusTo()).toBeNull();
+      expect(document.activeElement).toBe(document.body);
+    });
+  });
 });

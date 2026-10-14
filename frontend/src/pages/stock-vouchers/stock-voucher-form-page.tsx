@@ -68,7 +68,12 @@ import { StockVoucherMainFields, FieldError, SELECT_CLASS } from './components/s
 import { StockVoucherPaymentTab } from './components/stock-voucher-payment-tab';
 import { StockVoucherTabs } from './components/stock-voucher-tabs';
 import { savedImpactOf } from './utils/debt-after-voucher';
-import { HEADER_ERROR_FIELDS, LINE_ERROR_FIELDS, staleServerErrorKeys } from './utils/server-field-errors';
+import {
+  HEADER_ERROR_FIELDS,
+  LINE_ERROR_FIELDS,
+  QUANTITY_SOURCES,
+  staleServerErrorKeys,
+} from './utils/server-field-errors';
 import { errorTabs, firstErrorTab, tabOfField, type StockVoucherTab } from './utils/voucher-tabs';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
@@ -173,14 +178,17 @@ function errorKeysOf(errors: FieldErrors<StockVoucherFormValues>): string[] {
   return keys;
 }
 
-// Accepts form keys and server keys (`lines[3].width`).
-function focusIdOf(key: string): string | undefined {
+// The ids of the controls that correct the error of a key, best first. Accepts form keys and server keys
+// (`lines[3].width`).
+function focusIdsOf(key: string): string[] {
   const line = /^lines(?:\.|\[)(\d+)(?:\]\.|\.)(\w+)$/.exec(key);
   if (line) {
-    const cell = LINE_CELL_IDS[line[2]];
-    return cell ? `stock-line-${cell}-${line[1]}` : undefined;
+    // SL of a line priced by size is computed, and disabled: the cells it is computed from correct its error.
+    const fields = line[2] === 'quantity' ? ['quantity', ...QUANTITY_SOURCES] : [line[2]];
+    return fields.filter((field) => LINE_CELL_IDS[field]).map((field) => `stock-line-${LINE_CELL_IDS[field]}-${line[1]}`);
   }
-  return key === 'lines' ? 'stock-line-product-code-0' : FIELD_FOCUS_IDS[key];
+  const id = key === 'lines' ? 'stock-line-product-code-0' : FIELD_FOCUS_IDS[key];
+  return id ? [id] : [];
 }
 
 function productCodeCell(row: number): HTMLElement | null {
@@ -503,16 +511,17 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     const tab = firstErrorTab(keys);
     if (!tab) return;
     setActiveTab(tab);
-    const id = keys.filter((k) => tabOfField(k) === tab).map(focusIdOf).find((v) => !!v);
+    const ids = keys.filter((k) => tabOfField(k) === tab).map(focusIdsOf).find((v) => v.length > 0) ?? [];
     // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
     // A missing target (e.g. a voucher with no lines has no first cell) falls back to a control inside the form.
     setTimeout(() => {
       const candidates = [
-        id ? document.getElementById(id) : null,
+        ...ids.map((id) => document.getElementById(id)),
         document.getElementById('stock-line-add'),
         document.querySelector<HTMLElement>('[role="tab"][data-state="active"]'),
       ];
-      // A control in a hidden panel refuses focus, so take the first candidate that actually receives it.
+      // A control in a hidden panel, or a disabled one, refuses focus, so take the first candidate that actually
+      // receives it.
       for (const el of candidates) {
         el?.focus();
         if (el && document.activeElement === el) return;

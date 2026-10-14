@@ -1935,6 +1935,34 @@ describe('StockVoucherFormPage', () => {
     expect(createMock).not.toHaveBeenCalled();
   });
 
+  // SL of a line priced by size is computed and disabled: the cells it is computed from correct its error, and Số tấm
+  // comes first on every such line.
+  it.each<[string, Partial<StockVoucherLine>, string]>([
+    ['by unit', {}, 'stock-line-quantity-1'],
+    ['by metre', { pricingMode: 'PerLinearMeter', unitName: 'm', sheetCount: 2, length: 3000, quantity: 6 }, 'stock-line-sheet-count-1'],
+    [
+      'by square metre',
+      { pricingMode: 'PerSquareMeter', unitName: 'm²', sheetCount: 2, length: 3000, width: 1000, quantity: 6 },
+      'stock-line-sheet-count-1',
+    ],
+    [
+      'by cubic metre',
+      { pricingMode: 'PerCubicMeter', unitName: 'm³', sheetCount: 2, length: 3000, width: 100, thickness: 50, quantity: 0.03 },
+      'stock-line-sheet-count-1',
+    ],
+  ])('a server error on SL of a line priced %s focuses the cell that corrects it', async (_mode, overrides, focusedId) => {
+    routeParams.id = V1;
+    const first = voucher().lines[0];
+    voucherState.data = voucher({ lines: [first, { ...first, id: L2, sortOrder: 1, ...overrides }] });
+    updateMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', { 'lines[1].quantity': ['Số lượng quá lớn.'] }));
+    renderPage('In');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+    await waitFor(() => expect(byId('stock-line-quantity-1').getAttribute('aria-invalid')).toBe('true'));
+    await waitFor(() => expect(document.activeElement).toBe(byId(focusedId)));
+  });
+
   it('a cancelled voucher keeps the fund and due date disabled', () => {
     routeParams.id = V1;
     voucherState.data = voucher({ type: 'Out', status: 'Cancelled', canEdit: false, reasonId: R_OUT, reasonDebtEffect: 'ReceivableIncrease' });

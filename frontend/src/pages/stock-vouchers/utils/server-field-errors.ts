@@ -36,8 +36,8 @@ const HEADER_DRIVERS: Record<string, readonly string[]> = {
 };
 
 // The same inside one line, for a cell whose value is computed from other cells of that line.
-// SL of a line priced by dimensions (read-only there) comes from Số tấm and the dimensions.
-const QUANTITY_SOURCES: readonly string[] = ['sheetCount', 'length', 'width', 'thickness'];
+// SL of a line priced by dimensions (read-only there) comes from Số tấm and the dimensions, in column order.
+export const QUANTITY_SOURCES: readonly string[] = ['sheetCount', 'length', 'width', 'thickness'];
 // Until it is typed by hand, Tiền CK is %CK of Số tiền (SL × Đơn giá).
 const COMPUTED_DISCOUNT_SOURCES: readonly string[] = ['discountRate', 'unitPrice', 'quantity', ...QUANTITY_SOURCES];
 

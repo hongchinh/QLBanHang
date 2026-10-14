@@ -6,6 +6,8 @@ using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
+using OrderMgmt.Application.Tt133.Models;
+using OrderMgmt.Application.Tt133.Vouchers;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.WebApi.Filters;
 
@@ -22,14 +24,17 @@ public class StockVouchersController : ApiControllerBase
     private readonly IValidator<UpsertStockVoucherRequest> _upsertValidator;
     private readonly IValidator<StockVoucherListRequest> _listValidator;
     private readonly IValidator<StockAtRequest> _stockAtValidator;
+    private readonly IVoucherPrintService _print;
 
     public StockVouchersController(IStockVoucherService service, IValidator<UpsertStockVoucherRequest> upsertValidator,
-        IValidator<StockVoucherListRequest> listValidator, IValidator<StockAtRequest> stockAtValidator)
+        IValidator<StockVoucherListRequest> listValidator, IValidator<StockAtRequest> stockAtValidator,
+        IVoucherPrintService print)
     {
         _service = service;
         _upsertValidator = upsertValidator;
         _listValidator = listValidator;
         _stockAtValidator = stockAtValidator;
+        _print = print;
     }
 
     [HttpGet]
@@ -73,6 +78,15 @@ public class StockVouchersController : ApiControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Get(Guid id, CancellationToken ct)
         => Success(await _service.GetAsync(id, ct));
+
+    /// 01-VT / 02-VT of one voucher as Excel or PDF, at the voucher's prices, at cost or without money.
+    [HttpGet("{id:guid}/print")]
+    public async Task<IActionResult> Print(Guid id, [FromQuery] ExportFormat format,
+        [FromQuery] StockPrintPriceMode priceMode = StockPrintPriceMode.Voucher, CancellationToken ct = default)
+    {
+        var file = await _print.PrintStockVouchersAsync(new[] { id }, priceMode, format, ct);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
 
     [HttpGet("{id:guid}/activities")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<StockVoucherActivityDto>>>> ListActivities(

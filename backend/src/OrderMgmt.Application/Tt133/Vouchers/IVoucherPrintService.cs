@@ -6,4 +6,7 @@ namespace OrderMgmt.Application.Tt133.Vouchers;
 public interface IVoucherPrintService
 {
     Task<ExportFile> PrintCashVouchersAsync(IReadOnlyList<Guid> ids, ExportFormat format, CancellationToken ct = default);
+
+    Task<ExportFile> PrintStockVouchersAsync(IReadOnlyList<Guid> ids, StockPrintPriceMode priceMode, ExportFormat format,
+        CancellationToken ct = default);
 }

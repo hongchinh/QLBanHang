@@ -1,6 +1,6 @@
 # Phase 03 — Debt scope, ledger fields, S12, debt summary, reconciliation record
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** L
 
 ## Objective
@@ -39,7 +39,7 @@ Frontend:
 
 ## Reference files (read-only)
 
-- [section-01](../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md) — S12, Bảng tổng hợp, Biên bản đối chiếu; [section-02 B1, B3](../../brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md)
+- [section-01](../../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md) — S12, Bảng tổng hợp, Biên bản đối chiếu; [section-02 B1, B3](../../../brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md)
 - Phase 02 of this plan — builder contract, `Tt133ExportService` helpers, `Tt133Sheet` test helper, `Tt133ExportButton`, `useTt133Download`
 - `backend/tests/OrderMgmt.IntegrationTests/CashDebt/Reports/ReportDataset.cs`, `DebtLedgerReportTests.cs`, `DebtBalanceReportTests.cs`, `DebtReconciliationReportTests.cs`
 - `frontend/src/pages/warehouses/warehouse-list-page.tsx` — reading `branches.access_all` in a page

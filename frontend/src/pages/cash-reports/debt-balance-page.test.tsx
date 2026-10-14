@@ -2,8 +2,21 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { useAuthStore } from '@/stores/auth-store';
 import { DebtBalancePage } from './debt-balance-page';
 import type { DebtBalanceParams, DebtBalanceReport } from '@/features/cash-reports/types';
+import type { Tt133ExportForm } from '@/features/tt133-export/types';
+import { periodPreset } from '@/lib/period-presets';
+
+const exportButtonProps: { forms: Tt133ExportForm[]; disabled?: boolean; onSelect?: unknown } = { forms: [] };
+vi.mock('@/components/tt133-export/tt133-export-button', () => ({
+  Tt133ExportButton: (props: typeof exportButtonProps) => {
+    exportButtonProps.forms = props.forms;
+    exportButtonProps.disabled = props.disabled;
+    exportButtonProps.onSelect = props.onSelect;
+    return <div data-testid="tt133-export" data-disabled={String(!!props.disabled)} />;
+  },
+}));
 
 const reportState: { data: DebtBalanceReport | undefined } = { data: undefined };
 const useDebtBalanceMock = vi.fn((params: DebtBalanceParams, options?: { enabled?: boolean }) => {
@@ -17,6 +30,7 @@ vi.mock('@/features/cash-reports/hooks', () => ({
 
 const report = (over: Partial<DebtBalanceReport> = {}): DebtBalanceReport => ({
   side: 'Payable',
+  scope: 'Branch',
   from: '2026-10-01',
   to: '2026-10-31',
   rows: [
@@ -60,13 +74,16 @@ describe('DebtBalancePage', () => {
   beforeEach(() => {
     useDebtBalanceMock.mockClear();
     reportState.data = report();
+    useAuthStore.setState({
+      user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions: ['branches.access_all'] },
+    });
   });
 
   it('renders rows and totals with debit/credit columns', () => {
     renderAt('/reports/debt-balance?side=Payable&from=2026-10-01&to=2026-10-31&search=NCC');
 
     expect(useDebtBalanceMock).toHaveBeenLastCalledWith(
-      { side: 'Payable', from: '2026-10-01', to: '2026-10-31', search: 'NCC' },
+      { side: 'Payable', from: '2026-10-01', to: '2026-10-31', search: 'NCC', scope: 'Branch' },
       { enabled: true },
     );
     expect(screen.getByRole('combobox', { name: 'Phía' })).toHaveTextContent('Phải trả');
@@ -114,5 +131,62 @@ describe('DebtBalancePage', () => {
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31',
     );
+  });
+
+  it('choosing Toàn công ty puts scope=Company in the url and the hook params', async () => {
+    const user = userEvent.setup();
+    renderAt('/reports/debt-balance?side=Payable&from=2026-10-01&to=2026-10-31');
+
+    await user.click(screen.getByRole('combobox', { name: 'Phạm vi' }));
+    await user.click(screen.getByRole('option', { name: 'Toàn công ty' }));
+
+    expect(useDebtBalanceMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Company' }), { enabled: true });
+    expect(screen.getByTestId('location')).toHaveTextContent('scope=Company');
+  });
+
+  it('has no scope select and stays on Branch without branches.access_all', () => {
+    useAuthStore.setState({
+      user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions: [] },
+    });
+    renderAt('/reports/debt-balance?side=Payable&scope=Company');
+
+    expect(screen.queryByRole('combobox', { name: 'Phạm vi' })).not.toBeInTheDocument();
+    expect(useDebtBalanceMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Branch' }), { enabled: true });
+  });
+
+  describe('TT133 export', () => {
+    it('offers TongHopCongNo with the current filters and downloads directly', () => {
+      renderAt('/reports/debt-balance?side=Payable&from=2026-10-01&to=2026-10-31&search=NCC');
+
+      expect(exportButtonProps.forms).toEqual([
+        {
+          code: 'TongHopCongNo',
+          report: 'debt-balance',
+          params: { side: 'Payable', from: '2026-10-01', to: '2026-10-31', search: 'NCC', scope: 'Branch' },
+          fileBase: 'TongHopCongNo_20261001_20261031',
+        },
+      ]);
+      expect(exportButtonProps.onSelect).toBeUndefined();
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'false');
+    });
+
+    it('carries the company scope and disables on an invalid range', () => {
+      renderAt('/reports/debt-balance?side=Payable&from=2026-10-31&to=2026-10-01&scope=Company');
+
+      expect(exportButtonProps.forms[0].params).toEqual(expect.objectContaining({ scope: 'Company' }));
+      expect(screen.getByTestId('tt133-export')).toHaveAttribute('data-disabled', 'true');
+    });
+
+    it('the preset Tháng trước sets the previous month', async () => {
+      const user = userEvent.setup();
+      renderAt('/reports/debt-balance?side=Payable&from=2026-10-01&to=2026-10-31');
+
+      await user.click(screen.getByRole('combobox', { name: 'Kỳ' }));
+      await user.click(screen.getByRole('option', { name: 'Tháng trước' }));
+
+      const last = periodPreset('lastMonth');
+      expect(screen.getByLabelText('Từ ngày')).toHaveValue(last.from);
+      expect(screen.getByLabelText('Đến ngày')).toHaveValue(last.to);
+    });
   });
 });

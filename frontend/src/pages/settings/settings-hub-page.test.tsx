@@ -11,6 +11,7 @@ vi.mock('@/stores/auth-store', () => ({
 
 // [title, permissions (any of them shows the card), href]
 const CARDS: [string, string[], string][] = [
+  ['Thông tin đơn vị', ['settings.company'], '/settings/company'],
   ['Chi nhánh', ['branches.manage'], '/settings/branches'],
   ['Khóa sổ', ['period_lock.manage'], '/settings/period-lock'],
   ['Đánh số chứng từ', ['inventory.settings', 'cash.settings'], '/settings/numbering'],

@@ -16,7 +16,7 @@ Backend (.NET 9 Web API)
 PostgreSQL 16
 ```
 
-The product is quotation-first. The quotation is the main sales document; revenue is counted when a quotation reaches `Confirmed`. Orders and delivery are outside the scope. Inventory (Round 1: branches, stock vouchers, ledger, costing and reports) and cash & debt (Round 2A: receipts and payments, funds and fund transfers, the receivable/payable ledger, matching, debt offsets, credit limits and the reports Số dư công nợ, Sổ chi tiết công nợ and Sổ quỹ) are implemented and go live after Round 3. The debt reports by document, aging, overdue, by employee and the reconciliation record (Round 2B) are implemented too.
+The product is quotation-first. The quotation is the main sales document; revenue is counted when a quotation reaches `Confirmed`. Orders and delivery are outside the scope. Inventory (Round 1: branches, stock vouchers, ledger, costing and reports) and cash & debt (Round 2A: receipts and payments, funds and fund transfers, the receivable/payable ledger, matching, debt offsets, credit limits and the reports Số dư công nợ, Sổ chi tiết công nợ and Sổ quỹ) are implemented and go live after Round 3. The debt reports by document, aging, overdue, by employee and the reconciliation record (Round 2B) are implemented too. The cash, stock and debt reports export as Excel and PDF in the layout of Circular 133/2016/TT-BTC (see TT133 Report Forms).
 
 ## Backend Layers
 
@@ -62,6 +62,7 @@ Refresh-token reuse detection revokes the active token family for the user. The 
 - Deploy note (D39): every Round 1 deploy needs one seeder run (`Database__AutoMigrateAndSeed=true`) for the permissions, default grants, `KHO01`, system stock reasons, payment methods and numbering rows. Until go-live, revoke the inventory permissions from WAREHOUSE and MANAGER in production right after the deploy; the seeder never grants them again.
 - Cash & debt permissions form the module `cash` (shown as "Tiền & Công nợ" in the role matrix): `receipts.*` and `payments.*` (view/create/edit/delete/cancel/edit_all), `fund_transfers.*` (the same six), `debt_offset.view/create/cancel/delete` (no edit, no edit_all), `debt.matching`, `debt.opening_balance`, `debt.partner_summary` ("Xem công nợ đối tượng trên phiếu nhập/xuất") (an existing database keeps the old stored name; the debt strip now shows on both stock-in and stock-out forms), `cash.opening_balance`, `cash.catalogs.manage` (cash reasons and funds), `cash.settings` (cash policies and the numbering of the four cash document types) and `credit_limit.manage`. `reports.cash` (Sổ quỹ) sits in the report module next to `reports.debt`. `GET /api/debt/partner-summary` accepts `debt.partner_summary` or `reports.debt`.
 - Default grants (P5): ADMIN and MANAGER get every new code; ACCOUNTANT gets every new code (it already had `reports.debt`); SALES gets only `debt.partner_summary`; WAREHOUSE gets nothing new, because automatic receipts and payments follow the stock voucher permissions. Codes are granted once, like the Round 1 codes.
+- `settings.company` ("Thông tin đơn vị", in the system module) guards `PUT /api/settings/company`; the GET needs only a signed-in user, because every report page reads the profile to warn about an empty company name. ADMIN and MANAGER get it with every other code and it is in the default list of ACCOUNTANT, who fills in the tax code and the signers; it is granted once, like the other new codes. The TT133 exports have no permission of their own: each route carries the permission of its source report (`reports.cash`, `reports.debt`, `reports.inventory`), S06 also needs `inventory.view_cost`, and the company scope needs `branches.access_all`.
 - Deploy note (Round 2A): the deploy needs one seeder run for the new permissions and grants, the system cash reasons (`TKH`, `THNCC`, `TK`, `TNCC`, `CHKH`, `CK`, and the automatic `TPX` / `CPN`), the stock reasons `NTL` / `XTL`, the default cash fund `QTM` of every branch, and the numbering rows of `Receipt` (`PT`), `Payment` (`PC`), `FundTransfer` (`CQ`) and `DebtOffset` (`BT`). Existing test stock vouchers are not backfilled, so reset the dev and test databases after the deploy (a paid voucher whose payment method has no fund kind can no longer be saved).
 
 ## Core Business Flows
@@ -209,7 +210,7 @@ Each key set is taken in one statement, ordered `COLLATE "C"` (shared helper `Ad
 
 **Opening data (P8).** `Branch.OpeningDate` dates the opening stock, opening debts and fund opening balances. Saving any of them without it returns 400 `OPENING_DATE_NOT_SET`. `PUT /api/branches/{id}/opening-date` works only while the branch has no non-deleted stock voucher, cash voucher, fund transfer or debt offset (409 `BRANCH_HAS_DOCUMENTS`), and both dates must be after `LockedUntil`. One exception: a branch that never had an opening date may take its first one after documents exist, on or before the VN date of its earliest document (400 `openingDate` otherwise), because it has no opening data to re-post. Once the date is set, stock vouchers, cash vouchers, fund transfers and debt offsets dated before it are rejected (`OpeningDateGuard`, 400 `voucherAt`), so opening balances always come first. A branch with documents or opening data cannot be deleted (409). Clearing the date is refused while opening stock, opening debts or a fund with `OpeningAmount ≠ 0` exists (409 `OPENING_DATA_EXISTS`). A change re-posts the opening stock and moves the opening debt entries and their settlements.
 
-**Reports.** `GET /api/reports/debt-balance` (Số dư công nợ) and `GET /api/reports/debt-ledger` (Sổ chi tiết công nợ) need `reports.debt`; `GET /api/reports/cash-book` (Sổ quỹ) needs `reports.cash`.
+**Reports.** `GET /api/reports/debt-balance` (Số dư công nợ) and `GET /api/reports/debt-ledger` (Sổ chi tiết công nợ) need `reports.debt`; `GET /api/reports/cash-book` (Sổ quỹ) needs `reports.cash`. The debt balance, the debt ledger and the reconciliation record take `scope` (see TT133 Report Forms). Cash book rows carry `ReasonName`; debt ledger rows carry `ReasonName`, `DueDate` and, in company scope, `BranchCode`.
 
 - **Window rule (P29):** in every report window, `Opening` entries and fund `OpeningAmount` count as the opening balance and never as period movements, even when the report starts on the opening date.
 - **Balance sign (P24):** a positive receivable shows as Dư Nợ and a negative one as Dư Có; a positive payable shows as Dư Có and a negative one as Dư Nợ.
@@ -225,12 +226,44 @@ Each key set is taken in one statement, ordered `COLLATE "C"` (shared helper `Ad
 
 Other read endpoints: `GET /api/debt/partner-summary` (receivable and payable balance, credit limit, available amount and overdue amount, shown in the debt strip under the totals bar of the stock in/out form), `GET /api/debt/open-items` (with `forSourceType` / `forSourceId`, the open amount adds back the edited voucher's own `AtVoucher` settlements, the ones its save replaces, P26) and `GET /api/debt/partners`.
 
+### TT133 Report Forms
+
+Eight forms in the layout of Circular 133/2016/TT-BTC (Phụ lục 4), as Excel and PDF. Each is a presentation of a report the screens already show, so the file equals the screen. There is no chart of accounts: the "TK đối ứng" column of the official forms is replaced by "Lý do". Decisions and layouts: [TT133 report forms plan](../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md).
+
+| Form | Source report | Export route (`/api/reports/…`) | Permission |
+|---|---|---|---|
+| S04a-DNN Sổ quỹ tiền mặt / S05-DNN Sổ tiền gửi ngân hàng | `cash-book` (`kind=Cash` / `kind=Bank`) | `GET cash-book/export` | `reports.cash` |
+| S12-DNN Sổ chi tiết thanh toán với người mua (người bán) | `debt-ledger` | `POST debt-ledger/export` | `reports.debt` |
+| Bảng tổng hợp chi tiết thanh toán | `debt-balance` | `GET debt-balance/export` (a `partnerId` is refused with 400) | `reports.debt` |
+| Biên bản đối chiếu công nợ | `debt-reconciliation` | `GET debt-reconciliation/export` | `reports.debt` |
+| S07-DNN Bảng tổng hợp chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa | `stock-summary` | `GET stock-summary/export` | `reports.inventory` |
+| S08-DNN Thẻ kho | `stock-card` (quantities) | `POST stock-card/export` | `reports.inventory` |
+| S06-DNN Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa | `stock-card` (with values) | `POST stock-detail/export` | `reports.inventory` and `inventory.view_cost` (checked in the service) |
+
+**Export flow.** `Tt133ExportController` (route `api/reports`, one literal action per report, `format=xlsx|pdf` in the query) validates the request and calls `ITt133ExportService` (`Application/Tt133/Services/Tt133ExportService`):
+
+1. scope and cost permission checks (`ReportScopeGuard`, `inventory.view_cost` for S06);
+2. one `ITransactionRunner.RunSnapshotAsync` for the data of the export: the form context (`Tt133FormContext`: company profile, working branch, opening date, signers, print date), the targets, and one call of the existing report service per sheet (`ICashDebtReportService`, `IInventoryReportService`). The report services' own snapshots join the open one, so the target list and every sheet read the same state. `EnsureSheetCount` runs here;
+3. after the snapshot is closed, `ITt133FormRenderer` (`Infrastructure/Excel/Tt133/Tt133FormRenderer`) builds the workbook with ClosedXML: one form class per form on top of `Tt133FormBuilder`, one sheet per fund, partner or product × warehouse;
+4. for `format=pdf`, `ISpreadsheetPdfConverter` (LibreOffice, the converter of the quotation exports) converts the workbook; a failure becomes 503 `PDF_EXPORT_FAILED`. The conversion is synchronous and limited by `QuotationExport:ConversionTimeoutSeconds`; each conversion runs `soffice` with its own profile directory, so conversions can run at the same time, and when the wait is cancelled (timeout or request abort) the converter kills the `soffice` process tree;
+5. the file is returned with the name `{code}_{from:yyyyMMdd}_{to:yyyyMMdd}.{xlsx|pdf}` (`S04a-DNN`, `S05-DNN`, `S06-DNN`, `S07-DNN`, `S08-DNN`, `S12-DNN`, `TongHopCongNo`, `DoiChieuCongNo_{PartnerCode}`).
+
+**Targets and limits.** The three multi-target forms take their request as a JSON body: `partnerIds` or `all` for S12, `productIds` (with an optional `warehouseId`) or `all` for S06 and S08; `all` means every target with activity in the period. An export without a sheet returns 422 `EXPORT_NO_TARGETS`, and one with more sheets than `Tt133Export:MaxSheets` (default 300) returns 422 `EXPORT_TOO_MANY_SHEETS`. Each sheet costs one call of the source report (N+1 by design). Measured in Phase 05 of the plan on 300 generated sheets of 20 rows: the workbook takes about 3 s and the PDF conversion in the backend image 19 to 61 s (S06 is the slowest), which is why the conversion timeout is 130 s; the client waits 120 s. Each conversion uses its own LibreOffice profile directory: on the shared default profile about one in three conversions started together failed (risk R2 of the plan), and with separate profiles nine parallel conversions succeeded.
+
+**Scope.** `ReportScope` (`Branch`, the default, or `Company`) is a parameter of `debt-balance`, `debt-ledger`, `debt-reconciliation` and `stock-summary`, on the screen report and on its export. `Company` drops the working-branch filter and nothing else (settlements stay inside a branch), needs `branches.access_all` (`ReportScopeGuard`, 403 otherwise) and cannot be combined with a warehouse filter on the stock summary. The cash book, S06 and S08 always read the working branch. The form header prints `{company}` for `Company` and `{company} – {branch}` for `Branch`; "Ngày mở sổ" is the branch's opening date, or the earliest opening date of any branch for `Company`. Document numbers repeat across branches, so company-scope ledger rows carry `BranchCode`, shown as `[code]` in front of "Diễn giải" on the screen, on S12 and on the reconciliation record. A summary exported with a search text prints it as a "Điều kiện lọc" line.
+
+**Stock summary (S07).** `GET /api/reports/stock-summary` (`reports.inventory`, `InventoryReportsController`) returns opening, in, out and closing quantity and value per product for a period, filtered by warehouse, product group and search text. It uses the stock card's window rule: a ledger row before the start of `from` is opening, anything else is in the period, so opening stock posted on the opening date appears under "Nhập trong kỳ" in the first period. Values need `inventory.view_cost` and are left out for a warehouse filter under branch costing (`ValuesAtScopeOnly`, D32).
+
+**Company profile.** `CompanyProfile` is one row (`Id = 1`, inserted empty by the migration `AddCompanyProfile`; it does not inherit `BaseEntity` and every text field is nullable): name, address, tax code, chief accountant, legal representative and an optional accounting-service note. It feeds the header block and the signature block of every form. An empty profile does not block an export; the header lines stay empty.
+
+**Frontend.** Sổ quỹ, Số dư công nợ, Sổ chi tiết công nợ, Biên bản đối chiếu, Thẻ kho and the new page Tổng hợp nhập xuất tồn (`/inventory/stock-summary`) show the "Xuất theo mẫu TT133" button (`components/tt133-export`); S12, S06 and S08 first open the target dialog. Both formats download as a blob through `features/tt133-export`. The scope select appears only for users with `branches.access_all`. Thông tin đơn vị is `/settings/company` (`settings.company`).
+
 ### Dashboard, Reports, Search, Branding And Notifications
 
 - Dashboard endpoints under `/api/dashboard` expose summary, revenue series, top customers, top products, recent activity and sales leaderboard.
 - `ReportsController` currently exposes sales revenue reporting gated by `reports.revenue`.
 - `SearchController` provides global search.
-- `SettingsController` manages branding/logo settings; writes require `user_settings.manage`.
+- `SettingsController` manages branding/logo settings; writes require `user_settings.manage`. `CompanyProfileController` shares its route prefix (`/api/settings/company`).
 - `NotificationsController` exposes list, unread count and read/mark-all-read actions.
 
 ## API Contract
@@ -261,10 +294,12 @@ Failures use the same envelope with `success=false` and an `error` object. `Glob
 | `DbUpdateException` from a PostgreSQL unique violation `23505` (code `DUPLICATE`) | 409 |
 | `NegativeStockException` (`NEGATIVE_STOCK_WARNING` / `NEGATIVE_STOCK_BLOCKED`) | 422 |
 | `ConfirmationRequiredException` (`DEBT_SETTLEMENTS_WILL_BE_REMOVED`, `CREDIT_LIMIT_WARNING` / `CREDIT_LIMIT_BLOCKED`, `NEGATIVE_FUND_WARNING` / `NEGATIVE_FUND_BLOCKED`) | 422 |
+| `UnprocessableException` (`EXPORT_NO_TARGETS`, `EXPORT_TOO_MANY_SHEETS`) | 422 |
 | Rate-limit rejection | 429 |
 | Unhandled exceptions | 500 |
+| `ServiceUnavailableException` (`PDF_EXPORT_FAILED`) | 503 |
 
-A 422 is a confirmation request: the error carries `code`, `message` and `details`, and the client resends the request with the matching flag (`acknowledgeNegativeStock`, `confirmRemoveSettlements`, `acknowledgeCreditLimit`, `acknowledgeNegativeFund`). The `_BLOCKED` codes cannot be confirmed. `DomainException` codes returned as 400 include `PERIOD_LOCKED` and `OPENING_DATE_NOT_SET`.
+A 422 from `NegativeStockException` or `ConfirmationRequiredException` is a confirmation request: the error carries `code`, `message` and `details`, and the client resends the request with the matching flag (`acknowledgeNegativeStock`, `confirmRemoveSettlements`, `acknowledgeCreditLimit`, `acknowledgeNegativeFund`). The `_BLOCKED` codes cannot be confirmed, and neither can the `EXPORT_*` codes of `UnprocessableException`, which the client shows as a plain error. `DomainException` codes returned as 400 include `PERIOD_LOCKED` and `OPENING_DATE_NOT_SET`.
 
 ## Persistence, Soft Delete And Audit
 
@@ -280,7 +315,7 @@ A 422 is a confirmation request: the error carries `code`, `message` and `detail
 Migrations currently live in two folders because early migrations were generated before the final `Persistence/Migrations` path:
 
 - `OrderMgmt.Infrastructure/Migrations`: initial permissions, filtered indexes, refresh tokens, snake_case, product pricing, quotations, unaccent, quotation confirmed/cancelled audit fields, and (most recently) `banks`/`user_bank_accounts`. New migrations land wherever the EF tool's last-migration lookup points, which by default follows whichever of the two folders holds the most recent migration ID — not a fixed choice.
-- `OrderMgmt.Infrastructure/Persistence/Migrations`: quotation owner, owner history, user quotation settings, system branding and notifications, then the Round 1 inventory migrations (`AddBranches` … `AddStockVouchersAndLedger`) and the Round 2A cash & debt migrations: `AddCashDebtSettings`, `AddBranchOpeningDate`, `AddCashReasons`, `AddFunds`, `AddFundDefaultUniqueIndex` (one default fund per branch × kind; not in the original plan), `AddPaymentMethodFundKind`, `AddStockReasonDebtEffect`, `AddCustomerCreditDaysAndCreditLimits`, `AddDebtLedger`, `AddOpeningDebts`, `AddCashVouchers`, `AddFundTransfers`, `AddStockVoucherDebtFields`, `AddDebtOffsets`, `AddOpeningDebtVersion` (the `xmin` version of opening debts, added after the review). The model snapshot stays in `OrderMgmt.Infrastructure/Migrations` and is updated in place.
+- `OrderMgmt.Infrastructure/Persistence/Migrations`: quotation owner, owner history, user quotation settings, system branding and notifications, then the Round 1 inventory migrations (`AddBranches` … `AddStockVouchersAndLedger`) and the Round 2A cash & debt migrations: `AddCashDebtSettings`, `AddBranchOpeningDate`, `AddCashReasons`, `AddFunds`, `AddFundDefaultUniqueIndex` (one default fund per branch × kind; not in the original plan), `AddPaymentMethodFundKind`, `AddStockReasonDebtEffect`, `AddCustomerCreditDaysAndCreditLimits`, `AddDebtLedger`, `AddOpeningDebts`, `AddCashVouchers`, `AddFundTransfers`, `AddStockVoucherDebtFields`, `AddDebtOffsets`, `AddOpeningDebtVersion` (the `xmin` version of opening debts, added after the review), and `AddCompanyProfile` (the company profile table with its one empty row). The model snapshot stays in `OrderMgmt.Infrastructure/Migrations` and is updated in place.
 
 `Database:AutoMigrateAndSeed` is `true` in development and `false` in base production settings. Development seed creates roles, permissions, admin user, product groups and units. Production deployments should provide `Seed__AdminPassword` only when initial seeding is intended.
 

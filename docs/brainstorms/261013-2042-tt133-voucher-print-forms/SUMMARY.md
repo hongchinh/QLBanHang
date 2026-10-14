@@ -1,6 +1,6 @@
 # Mẫu in chứng từ TT133 — Phiếu thu, Phiếu chi, Phiếu nhập kho, Phiếu xuất kho
 
-> Brainstorm: 2026-10-13 20:42:09 · Tiếp nối [brainstorm sổ TT133](../261012-2237-tt133-report-forms/SUMMARY.md) (mục non-goal "Mẫu in phiếu thu/chi, phiếu nhập/xuất") và [plan sổ TT133](../../plans/261013-1926-tt133-report-forms/SUMMARY.md) · Trạng thái: thiết kế đã duyệt, chờ plan sổ TT133 chạy xong rồi viết plan
+> Brainstorm: 2026-10-13 20:42:09 · Tiếp nối [brainstorm sổ TT133](../261012-2237-tt133-report-forms/SUMMARY.md) (mục non-goal "Mẫu in phiếu thu/chi, phiếu nhập/xuất") và [plan sổ TT133](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md) · Trạng thái: thiết kế đã duyệt, chờ plan sổ TT133 chạy xong rồi viết plan
 
 ## Problem framing
 
@@ -255,7 +255,7 @@ POST api/stock-vouchers/print?format=xlsx|pdf         body { ids: Guid[], priceM
 
 ## Next steps
 
-1. Chạy xong [plan sổ TT133](../../plans/261013-1926-tt133-report-forms/SUMMARY.md) và merge vào `qlbanhang/main`.
+1. Chạy xong [plan sổ TT133](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md) và merge vào `qlbanhang/main`.
 2. Gửi kế toán các câu hỏi Kế toán/PO ở trên.
 3. `write-plan` cho 3 phase, đối chiếu contract với code đã hiện thực của plan sổ.
 4. Cập nhật `docs/project-pdr/product-goals.md` khi plan được duyệt.

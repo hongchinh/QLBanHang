@@ -1,4 +1,5 @@
 import type { DebtSide, DebtSourceType, FundKind } from '@/features/cash-common/types';
+import type { ReportScope } from '@/lib/report-scope';
 
 // Phase 09 report DTOs (Application/CashDebt/Reports/Models/CashDebtReportDtos.cs). Dates are VN yyyy-MM-dd.
 
@@ -14,6 +15,8 @@ export interface DebtBalanceParams {
   partnerId?: string;
   // Matches the partner code or name.
   search?: string;
+  // Branch (default) or the whole company (branches.access_all).
+  scope?: ReportScope;
 }
 
 // Opening and closing are split into Dư Nợ / Dư Có by the server (P24).
@@ -31,6 +34,7 @@ export interface DebtBalanceRow {
 
 export interface DebtBalanceReport {
   side: DebtSide;
+  scope: ReportScope;
   from: string;
   to: string;
   // One row per partner with any non-zero value, ordered by partner code.
@@ -45,6 +49,7 @@ export interface DebtLedgerParams {
   partnerId: string;
   from: string;
   to: string;
+  scope?: ReportScope;
 }
 
 export interface DebtLedgerRow {
@@ -55,6 +60,12 @@ export interface DebtLedgerRow {
   sourceType: DebtSourceType;
   sourceId: string;
   description?: string | null;
+  // Reason name of the source voucher; "Bù trừ công nợ" for an offset.
+  reasonName?: string | null;
+  // yyyy-MM-dd; set on Increase rows only.
+  dueDate?: string | null;
+  // Code of the entry's branch; only when the scope is Company.
+  branchCode?: string | null;
   increase: number;
   decrease: number;
   // Opening balance plus Σ Increase − Σ Decrease up to and including this row.
@@ -64,6 +75,7 @@ export interface DebtLedgerRow {
 // Opening and closing are split into Dư Nợ / Dư Có by the server (P24).
 export interface DebtLedgerReport {
   side: DebtSide;
+  scope: ReportScope;
   partnerId: string;
   partnerCode: string;
   partnerName: string;
@@ -119,15 +131,18 @@ export interface DebtReconciliationParams {
   partnerId: string;
   from: string;
   to: string;
+  scope?: ReportScope;
 }
 
 export interface DebtReconciliationReport {
+  scope: ReportScope;
   partnerId: string;
   partnerCode: string;
   partnerName: string;
   taxCode?: string | null;
   address?: string | null;
-  branchName: string;
+  // Null for the whole company.
+  branchName: string | null;
   from: string;
   to: string;
   // Receivable first, then Payable.
@@ -154,6 +169,8 @@ export interface CashBookRow {
   // Partner name snapshot, else the person name.
   partnerOrPerson?: string | null;
   description?: string | null;
+  // Reason name of the voucher; a transfer half is "Chuyển quỹ".
+  reasonName?: string | null;
   in: number;
   out: number;
   // Group opening plus Σ In − Σ Out up to and including this row.

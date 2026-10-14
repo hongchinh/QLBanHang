@@ -30,31 +30,31 @@ export function PartnerDebtStrip({ partnerId, partnerLabel, current, saved, canc
   const after = cancelled ? null : debtAfterVoucher(data, current, saved);
   const available = after?.receivableChanged ? after.availableAfter : data.available ?? null;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 whitespace-nowrap border-t border-dashed bg-muted/40 px-3 py-1.5 text-xs text-muted-foreground">
-      <span className="max-w-[28ch] truncate font-semibold text-foreground" title={partnerLabel}>{partnerLabel}</span>
-      <span>
+    <div className="flex flex-nowrap items-center gap-x-2.5 overflow-x-auto whitespace-nowrap border-t border-dashed bg-muted/40 px-3 py-1 text-xs text-muted-foreground">
+      <span className="min-w-0 max-w-[28ch] truncate font-semibold text-foreground" title={partnerLabel}>{partnerLabel}</span>
+      <span className="shrink-0">
         Phải thu <Value testId="partner-debt-receivable" value={data.receivableBalance} />
         {after?.receivableChanged && <> → sau phiếu <Value testId="partner-debt-receivable-after" value={after.receivableAfter} /></>}
       </span>
-      <span>
+      <span className="shrink-0">
         Phải trả <Value testId="partner-debt-payable" value={data.payableBalance} />
         {after?.payableChanged && <> → sau phiếu <Value testId="partner-debt-payable-after" value={after.payableAfter} /></>}
       </span>
-      <span>
+      <span className="shrink-0">
         Hạn mức <b className="text-foreground" data-testid="partner-debt-limit">{data.creditLimit == null ? UNLIMITED : fmt.format(data.creditLimit)}</b>
       </span>
-      <span>
+      <span className="shrink-0">
         {after?.receivableChanged ? 'Còn được nợ sau phiếu' : 'Còn được nợ'}{' '}
         <b
-          className={cn('tabular-nums text-foreground', available != null && available < 0 && 'text-destructive')}
+          className={cn('tabular-nums text-foreground', available != null && available < 0 && 'text-destructive dark:text-red-400')}
           data-testid="partner-debt-available"
         >
           {available == null ? UNLIMITED : fmt.format(available)}
         </b>
       </span>
-      <span>
+      <span className="shrink-0">
         Quá hạn{' '}
-        <b className={cn('tabular-nums text-foreground', data.overdueAmount > 0 && 'text-destructive')} data-testid="partner-debt-overdue">
+        <b className={cn('tabular-nums text-foreground', data.overdueAmount > 0 && 'text-destructive dark:text-red-400')} data-testid="partner-debt-overdue">
           {fmt.format(data.overdueAmount)}
         </b>
         {data.overdueAmount > 0 && canViewOverdueReport && (
@@ -71,7 +71,7 @@ export function PartnerDebtStrip({ partnerId, partnerLabel, current, saved, canc
           </>
         )}
       </span>
-      <span>
+      <span className="shrink-0">
         Số ngày nợ <b className="text-foreground" data-testid="partner-debt-credit-days">{data.creditDays == null ? '—' : String(data.creditDays)}</b>
       </span>
     </div>

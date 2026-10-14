@@ -134,3 +134,31 @@ Still open after the fix round:
 3. The debt strip still wraps to two lines at 1366 px with a long partner name plus 10-digit balances (bar 89 px, nothing covered).
 4. Not changed, user decision: the product suggestion list is cut by the bottom of the window on 768p (shared with quotations); dark-mode red is too dark (the app has no dark-mode switch); the push-permission banner makes the app 54 px taller than the window (older than this plan).
 5. Dark mode was not re-measured after the fix round. A check against the real backend by a person is still open.
+
+## Follow-up round after the merge (2026-10-13/14, branch `fix/stock-voucher-form-followups`)
+
+Closes the items left open above. Measured in real Chrome with a mocked API (scrollbars drawn) and, once, against a real backend on a scratch database (`qldonhang_uicheck`, own backend on port 5055, dropped afterwards; the dev and test databases were not touched).
+
+| Item | Change | Measured result |
+|---|---|---|
+| Visible rows on 768p | Grid toolbar moved onto the tab row, tighter title bar, gaps and paddings | 1366×657: 7 rows (was 5 with the scrollbar); 1366×768: 11; 1920×969: 17; 1920×1080: 20 |
+| Debt strip wrapping | One line, the partner label shrinks with a title | 25 px on one line at 1366 and 1280 with a 62-character name |
+| Suggestion list cut by the window | Opens above the input when it does not fit below; never taller than 320 px; the highlighted option is scrolled clear of the sticky header | 30/30 placements inside the viewport on the stock form and `/quotations/new`; unchanged when it fits below |
+| Focus gap after Ctrl+Delete | Focus moves to the surviving row before the row is removed; nothing re-focuses later | Never on `<body>` (96 cases); an arrow, Enter, Tab or Ctrl+S pressed at once is kept |
+| Dark-mode red | Lighter red for negative debt values and the tab error dot | 5–6.6:1 (was 1.8:1) |
+| Also | Ctrl+S works with Caps Lock; "(n ngày)" hint does not wrap; inline keyboard guide only from 1860 px | pass |
+
+Real-backend run: 17 of 19 scenario items passed (create stock-in and stock-out with 15+ lines, debt strip prediction against `GET /api/debt/partner-summary` before and after saving, edit without double counting, server validation and the credit-limit confirmation, other-warehouse line, cancel, permissions, version conflict, draft). One item failed on an older defect (first bullet below) and one was not checked (the seeded WAREHOUSE role, IME and a physical mouse wheel).
+
+Final automated state (HEAD 9c69170 before this report commit): `npx vitest run src/pages/stock-vouchers src/pages/quotations` 212 passed; `npm run test` 3 failed | 958 passed (the 3 baseline failures); typecheck pass; lint 17 problems (baseline); build pass. The last commit (suggestion list measured from its padding box, a 1 px correction) has unit tests only and was not re-measured in the browser.
+
+Still open, all older than the redesign unless noted:
+
+1. After dismissing a 422 confirmation dialog (for example the credit limit), focus is on `<body>`, so Ctrl+S does nothing until the user clicks (`confirm-required-dialog.tsx`, `useDocumentActions.ts`).
+2. A server field error and its red tab dot stay until the next save, even after the user fixes the field.
+3. Other `text-destructive` text on the form (field error messages) is still too dark in dark mode; the app has no dark-mode switch.
+4. A digit typed within about 100 ms after Ctrl+Delete is appended to the cell's old value instead of replacing it (the number cell selects its text one frame after focus).
+5. With focus on "Thêm dòng" (no lines left) Insert does nothing; Enter and Space add a line.
+6. At 1280 px with 10-digit receivable and payable, or at 1024 px, the partner label in the debt strip shrinks to nothing and the strip scrolls sideways.
+7. The push-permission banner still makes the app 54 px taller than the window while it is shown.
+8. Not checked: other browsers, HiDPI or zoom, a physical keyboard with a Vietnamese IME.

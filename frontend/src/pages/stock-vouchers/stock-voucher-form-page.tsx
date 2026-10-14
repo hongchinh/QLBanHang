@@ -225,6 +225,8 @@ interface FormProps {
 function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormProps) {
   const isEdit = !!id;
   const [activeTab, setActiveTab] = useState<StockVoucherTab>('lines');
+  // Slot on the tab row that hosts the grid toolbar.
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
   const labels: StockVoucherLabels = STOCK_VOUCHER_LABELS[type];
   const navigate = useNavigate();
 
@@ -512,7 +514,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
     if (e.defaultPrevented) return;
-    if (e.key === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
+    if (e.key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       submitWithIntent(isEdit ? 'update' : 'save-stay');
       return;
@@ -598,8 +600,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   // The panel minimum therefore propagates up: with room the page fills the window and the grid scrolls
   // inside; in a short window main scrolls and the totals bar sits below the grid.
   return (
-    <div className="flex h-full flex-col gap-2">
-      <div className="sticky top-0 z-30 shrink-0 -mx-4 border-b bg-background/95 px-4 py-3 shadow-sm backdrop-blur md:-mx-3 md:px-3">
+    <div className="flex h-full flex-col gap-1.5">
+      <div className="sticky top-0 z-30 shrink-0 -mx-4 border-b bg-background/95 px-4 py-2 shadow-sm backdrop-blur md:-mx-3 md:px-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
@@ -687,7 +689,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           submitWithIntent(isEdit ? 'update' : 'save-stay');
         }}
         onKeyDown={handleFormKeyDown}
-        className="flex flex-1 flex-col gap-2"
+        className="flex flex-1 flex-col gap-1.5"
       >
         <StockVoucherMainFields
           form={form}
@@ -712,6 +714,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           value={activeTab}
           onValueChange={setActiveTab}
           lineCount={lineCount}
+          toolbarRef={setToolbarSlot}
           errorTabs={errorTabs(errorKeysOf(errors))}
           lines={
             <>
@@ -722,6 +725,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                 computed={computed.lines}
                 stockAt={stockAt}
                 readOnly={readOnly}
+                toolbarSlot={toolbarSlot}
               />
               {linesRootMessage && <p className="shrink-0 px-6 pb-4 pt-2 text-sm text-destructive">{linesRootMessage}</p>}
             </>
@@ -804,7 +808,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                           },
                         })}
                       />
-                      {creditDays != null && <span className="text-xs text-muted-foreground">({creditDays} ngày)</span>}
+                      {creditDays != null && <span className="whitespace-nowrap text-xs text-muted-foreground">({creditDays} ngày)</span>}
                     </div>
                     <FieldError message={errors.dueDate?.message} />
                   </div>

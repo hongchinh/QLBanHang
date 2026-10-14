@@ -61,12 +61,29 @@ describe('PartnerDebtStrip', () => {
     expect(screen.getByTestId('partner-debt-limit')).toHaveTextContent('10.000.000');
     expect(screen.getByTestId('partner-debt-available')).toHaveTextContent('-1.000.000');
     expect(screen.getByTestId('partner-debt-available')).toHaveClass('text-destructive');
+    // The dark theme's destructive red is ~1.8:1 on the card: a lighter red there.
+    expect(screen.getByTestId('partner-debt-available')).toHaveClass('dark:text-red-400');
+    expect(screen.getByTestId('partner-debt-overdue')).toHaveClass('text-destructive', 'dark:text-red-400');
     expect(screen.getByTestId('partner-debt-overdue')).toHaveTextContent('1.500.000');
     expect(screen.getByRole('link', { name: 'Xem' })).toHaveAttribute(
       'href', `/reports/debt-overdue?side=Receivable&partnerId=${P1}`,
     );
     expect(screen.getByTestId('partner-debt-credit-days')).toHaveTextContent('30');
     expect(screen.getByText(/Còn được nợ sau phiếu/)).toBeInTheDocument();
+  });
+
+  it('stays on one line: no wrapping, the partner label is the part that shrinks', () => {
+    summaryMock.mockReturnValue(result(summary({ receivableBalance: 1_234_567_890 })));
+    const label = 'KH0001 — Công ty TNHH Thương mại và Dịch vụ Một Cái Tên Rất Dài';
+    render(<PartnerDebtStrip {...base} partnerLabel={label} current={{ effect: 'ReceivableIncrease', total: 4_000_000, paid: 0 }} />);
+    const name = screen.getByText(label);
+    const strip = name.parentElement!;
+    expect(strip).not.toHaveClass('flex-wrap');
+    expect(strip).toHaveClass('flex-nowrap');
+    expect(name).toHaveClass('min-w-0', 'truncate');
+    expect(name).toHaveAttribute('title', label);
+    // Every other item keeps its width.
+    for (const item of Array.from(strip.children).slice(1)) expect(item).toHaveClass('shrink-0');
   });
 
   it('the overdue link opens in a new tab', () => {

@@ -39,7 +39,7 @@ public class QuotationService : IQuotationService
     private readonly IDateTime _clock;
     private readonly ICurrentUser _currentUser;
     private readonly IQuotationExcelRenderer _excelRenderer;
-    private readonly IQuotationSpreadsheetPdfConverter _pdfConverter;
+    private readonly ISpreadsheetPdfConverter _pdfConverter;
     private readonly IOptionsMonitor<FeatureOptions> _features;
     private readonly IQuotationExportPathResolver _templatePathResolver;
     private readonly IHandoverExcelRenderer _handoverRenderer;
@@ -50,7 +50,7 @@ public class QuotationService : IQuotationService
         IDateTime clock,
         ICurrentUser currentUser,
         IQuotationExcelRenderer excelRenderer,
-        IQuotationSpreadsheetPdfConverter pdfConverter,
+        ISpreadsheetPdfConverter pdfConverter,
         IOptionsMonitor<FeatureOptions> features,
         IQuotationExportPathResolver templatePathResolver,
         IHandoverExcelRenderer handoverRenderer,

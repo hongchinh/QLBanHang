@@ -12,6 +12,7 @@ public class DebtBalanceReportRequestValidator : AbstractValidator<DebtBalanceRe
         RuleFor(x => x.To).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Đến ngày không hợp lệ.");
         RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From).WithMessage("Đến ngày phải sau hoặc bằng từ ngày.");
         RuleFor(x => x.Search).MaximumLength(200).WithMessage("Từ khóa tìm kiếm tối đa 200 ký tự.");
+        RuleFor(x => x.Scope).IsInEnum().WithMessage("Phạm vi không hợp lệ.");
     }
 }
 
@@ -24,6 +25,7 @@ public class DebtLedgerReportRequestValidator : AbstractValidator<DebtLedgerRepo
         RuleFor(x => x.From).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Từ ngày không hợp lệ.");
         RuleFor(x => x.To).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Đến ngày không hợp lệ.");
         RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From).WithMessage("Đến ngày phải sau hoặc bằng từ ngày.");
+        RuleFor(x => x.Scope).IsInEnum().WithMessage("Phạm vi không hợp lệ.");
     }
 }
 
@@ -35,6 +37,7 @@ public class DebtReconciliationReportRequestValidator : AbstractValidator<DebtRe
         RuleFor(x => x.From).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Từ ngày không hợp lệ.");
         RuleFor(x => x.To).InclusiveBetween(ReportDates.Min, ReportDates.Max).WithMessage("Đến ngày không hợp lệ.");
         RuleFor(x => x.To).GreaterThanOrEqualTo(x => x.From).WithMessage("Đến ngày phải sau hoặc bằng từ ngày.");
+        RuleFor(x => x.Scope).IsInEnum().WithMessage("Phạm vi không hợp lệ.");
     }
 }
 

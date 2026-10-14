@@ -1,7 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using OrderMgmt.Application.Dashboards.Executive.Models;
+using OrderMgmt.Application.Inventory.StockReasons.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
@@ -146,6 +148,41 @@ public class SalesSummaryTests : ExecutiveDashboardTestBase
     }
 
     [Fact]
+    public async Task Other_stock_reasons_are_not_sales()
+    {
+        // The one sale (XBH) on 10-04: revenue 600, cost 400. The purchase (NMH) on 10-02 is not a sale either.
+        var (branch, product, _) = await SeedTrackedSaleAsync();
+        // Two reasons a user created, with the direction, partner and debt effect of NTL and of XBH.
+        var userIn = await CreateStockReasonAsync(StockDirection.In, DebtEffect.ReceivableDecrease);
+        var userOut = await CreateStockReasonAsync(StockDirection.Out, DebtEffect.ReceivableIncrease);
+        // The other reasons post the tracked product in the period, after the sale so that its cost stays 400.
+        await PostLineAsync(branch, StockDirection.In, "NKH", "2026-10-08 09:00", branch.CustomerId, product, 2, 100);
+        await PostLineAsync(branch, StockDirection.In, userIn, "2026-10-09 09:00", branch.CustomerId, product, 1, 100);
+        await PostLineAsync(branch, StockDirection.Out, "XKH", "2026-10-10 09:00", branch.CustomerId, product, 1, 500);
+        await PostLineAsync(branch, StockDirection.Out, "XTL", "2026-10-11 09:00", branch.SupplierId, product, 1, 300);
+        await PostLineAsync(branch, StockDirection.Out, userOut, "2026-10-12 09:00", branch.CustomerId, product, 1, 700);
+        var client = branch.Client;
+        var query = $"{October}&branchId={branch.BranchId}";
+
+        var summary = await GetSummaryAsync(client, query);
+        var series = await GetExecAsync<SalesSeriesDto>(client, $"sales/series?{query}&granularity=Day");
+        var customers = await GetExecAsync<List<SalesTopRowDto>>(client, $"sales/top?{query}&by=Customer");
+        var products = await GetExecAsync<List<SalesTopRowDto>>(client, $"sales/top?{query}&by=Product");
+        var branches = await GetExecAsync<List<BranchComparisonRowDto>>(client, $"branches?{query}");
+
+        // Every figure is checked, so a reason that slips in shows on each of them.
+        using var scope = new AssertionScope();
+        (summary.Revenue, summary.Cost, summary.GrossProfit).Should().Be((600m, (decimal?)400m, (decimal?)200m));
+        series.Points.Where(p => p.Revenue != 0m || p.Cost != 0m).Select(p => (p.Date, p.Revenue, p.Cost))
+            .Should().Equal((D(10, 4), 600m, (decimal?)400m));
+        customers.Select(r => (r.Id, r.Revenue, r.GrossProfit))
+            .Should().Equal((branch.CustomerId, 600m, (decimal?)200m));
+        products.Select(r => (r.Id, r.Revenue, r.GrossProfit)).Should().Equal((product, 600m, (decimal?)200m));
+        branches.Select(r => (r.BranchId, r.Revenue, r.MarginPct))
+            .Should().Equal((branch.BranchId, (decimal?)600m, (decimal?)33.33m));
+    }
+
+    [Fact]
     public async Task Requires_dashboard_executive()
     {
         var client = await CreateClientWithPermissionsAsync("profit_only", MainBranchId, Permissions.Reports.Profit);
@@ -160,6 +197,19 @@ public class SalesSummaryTests : ExecutiveDashboardTestBase
             Permissions.Dashboard.Executive);
 
         (await GetExecRawAsync(client, $"sales/summary?{October}")).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    /// A stock reason a user created, for customers, with this direction and debt effect; returns its code.
+    private async Task<string> CreateStockReasonAsync(StockDirection direction, DebtEffect debtEffect)
+    {
+        var code = "LD" + Guid.NewGuid().ToString("N")[..8];
+        var response = await _client.PostAsJsonAsync("/api/stock-reasons", new CreateStockReasonRequest
+        {
+            Code = code, Name = "Lý do thử", Direction = direction, PartnerType = PartnerType.Customer,
+            DebtEffect = debtEffect,
+        });
+        (await ReadDataAsync<StockReasonDto>(response)).IsSystem.Should().BeFalse();
+        return code;
     }
 
     /// An unpaid stock-out voucher (XBH) to KH1 in the main branch; asserts 200.

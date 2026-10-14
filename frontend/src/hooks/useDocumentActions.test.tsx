@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios';
@@ -12,6 +12,7 @@ import { useDocumentActions } from './useDocumentActions';
 vi.mock('@/lib/use-toast', () => ({ toast: vi.fn() }));
 
 type Action = { kind: 'save' | 'delete'; flags: ConfirmFlags };
+type DialogProps = ReturnType<typeof useDocumentActions<Action>>['confirmDialogProps'];
 
 function apiError(status: number, code: string, details?: Record<string, string[]>, token?: string) {
   const config = { headers: new AxiosHeaders(), url: '/x' } as InternalAxiosRequestConfig;
@@ -496,8 +497,6 @@ describe('useDocumentActions focus return', () => {
   // goes; a fast answer to the confirmed resend is there first. jsdom has no animations, so the test plays the dialog:
   // it confirms, lets the resend settle, and then asks.
   describe('the 422 dialog asks for the focus target after its confirmed resend has settled', () => {
-    type DialogProps = ReturnType<typeof useDocumentActions<Action>>['confirmDialogProps'];
-
     // A cancel that needs a confirmation: resolves once the confirmed resend has settled.
     async function cancelConfirmAndSettle(outcome: 'the voucher stays as it was' | 'the voucher is cancelled') {
       let dialogProps!: DialogProps;
@@ -553,6 +552,83 @@ describe('useDocumentActions focus return', () => {
 
       expect(screen.getByRole('button', { name: 'Khôi phục' })).toBeEnabled();
       expect(restoreFocusTo()).toBeNull();
+      expect(document.activeElement).toBe(document.body);
+    });
+  });
+
+  // Browser Back with the 422 dialog open: the page and its dialog go, and the closed dialog still asks where the focus
+  // goes a tick later. The hook of a page that is gone must not put the focus anywhere.
+  describe('once the page was replaced while the 422 dialog was open', () => {
+    // The search box of the app shell stays when the page changes.
+    function Shell({ page, children }: { page: 'form' | 'list'; children: ReactNode }) {
+      return (
+        <>
+          <input aria-label="Tìm kiếm" />
+          <main id="main-content">{page === 'form' ? children : <button type="button">Thêm phiếu</button>}</main>
+        </>
+      );
+    }
+
+    it('the hook names no focus target any more', async () => {
+      let dialogProps!: DialogProps;
+      function FormPage() {
+        const { run, confirmDialogProps } = useDocumentActions<Action>({
+          ...options,
+          perform: async () => {
+            throw apiError(422, 'NEGATIVE_FUND_WARNING');
+          },
+        });
+        dialogProps = confirmDialogProps;
+        return (
+          <button type="button" data-testid="save" onClick={() => void run({ kind: 'save', flags: {} })}>
+            Lưu
+          </button>
+        );
+      }
+      const { rerender } = render(
+        <Shell page="form">
+          <FormPage />
+        </Shell>,
+      );
+      const search = screen.getByLabelText('Tìm kiếm');
+      act(() => search.focus());
+      // A click that leaves the focus where it was, as Safari does for a button.
+      fireEvent.click(screen.getByTestId('save'));
+      await waitFor(() => expect(dialogProps.request).not.toBeNull());
+      expect(dialogProps.restoreFocusTo()).toBe(search);
+
+      rerender(
+        <Shell page="list">
+          <FormPage />
+        </Shell>,
+      );
+
+      expect(dialogProps.restoreFocusTo()).toBeNull();
+    });
+
+    it('nothing is focused: the focus stays where it is', async () => {
+      const perform = vi.fn<(a: Action) => Promise<void>>().mockRejectedValue(apiError(422, 'NEGATIVE_FUND_WARNING'));
+      const { rerender } = render(
+        <Shell page="form">
+          <Harness perform={perform} />
+        </Shell>,
+      );
+      // The user was last in the search box, then clicked on the page: nothing has the focus when the dialog opens.
+      const search = screen.getByLabelText('Tìm kiếm');
+      act(() => search.focus());
+      act(() => search.blur());
+      fireEvent.click(screen.getByTestId('save'));
+      await screen.findByRole('dialog');
+
+      rerender(
+        <Shell page="list">
+          <Harness perform={perform} />
+        </Shell>,
+      );
+      expect(screen.queryByRole('dialog')).toBeNull();
+      // Past the tick in which the closed dialog hands the focus back.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
       expect(document.activeElement).toBe(document.body);
     });
   });

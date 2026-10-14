@@ -1,4 +1,5 @@
 using OrderMgmt.Application.Organization.SampleData.Interfaces;
+using OrderMgmt.Application.Organization.SampleData.Services;
 
 namespace OrderMgmt.WebApi.BackgroundJobs;
 
@@ -20,8 +21,10 @@ public sealed class SampleDataHostedService : BackgroundService
 
     public override async Task StartAsync(CancellationToken cancellationToken)
     {
-        // Awaited before the server takes requests (hosted services start first), so recovery can never fail a demo
-        // branch this process has just created and queued.
+        // Awaited before the server takes requests, so recovery can never fail a demo branch this process has just
+        // created and queued. This rests on two framework defaults: hosted services start one after another
+        // (HostOptions.ServicesStartConcurrently = false), and WebApplicationBuilder registers the web server's hosted
+        // service last. Enabling concurrent start would let requests in before recovery ends.
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
@@ -40,6 +43,11 @@ public sealed class SampleDataHostedService : BackgroundService
     {
         await foreach (var job in _queue.ReadAllAsync(stoppingToken))
         {
+            // ReadAllAsync hands out a queued job without looking at the token: once stopping, leave it alone.
+            if (stoppingToken.IsCancellationRequested)
+                break;
+            // The runner's scope, so the lines of the worker and of the runner for one job share their correlation id.
+            using var logScope = _logger.BeginScope(SampleDataRunner.LogScope(job));
             try
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
@@ -57,7 +65,8 @@ public sealed class SampleDataHostedService : BackgroundService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Sample data job of branch {BranchId} failed", job.BranchId);
+                _logger.LogError(ex, "Sample data job of branch {BranchId} requested by {UserId} failed",
+                    job.BranchId, job.RequestedByUserId);
             }
         }
     }

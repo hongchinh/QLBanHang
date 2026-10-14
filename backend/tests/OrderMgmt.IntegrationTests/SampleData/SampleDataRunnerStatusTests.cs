@@ -1,11 +1,14 @@
+using System.Diagnostics;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Notifications.Interfaces;
 using OrderMgmt.Application.Organization.SampleData.Interfaces;
 using OrderMgmt.Application.Organization.SampleData.Models;
+using OrderMgmt.Application.Organization.SampleData.Services;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Enums;
@@ -41,12 +44,13 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
     private Task<Branch> BranchAsync(Guid branchId) =>
         InDbAsync(db => db.Branches.IgnoreQueryFilters().AsNoTracking().SingleAsync(b => b.Id == branchId));
 
-    private Task SetStatusAsync(Guid branchId, bool isDemo, SampleDataStatus status, int progress) =>
+    private Task SetStatusAsync(Guid branchId, bool isDemo, SampleDataStatus status, int progress, string? error = null) =>
         InDbAsync(db => db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(b => b.IsDemo, isDemo)
                 .SetProperty(b => b.SampleDataStatus, status)
-                .SetProperty(b => b.SampleDataProgress, progress)));
+                .SetProperty(b => b.SampleDataProgress, progress)
+                .SetProperty(b => b.SampleDataError, error)));
 
     [Fact]
     public async Task Invalid_step_fails_with_its_key_and_keeps_earlier_data()
@@ -253,8 +257,6 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
             throw new InvalidOperationException("connection broken");
         });
         var host = TinyPlans.WithService<ISampleDataGenerator>(_factory, generator);
-        // Start the host, and so its startup recovery, before the branch is Running.
-        _ = host.Services;
         var branchId = await CreateBranchAsync("RC02");
         await SetStatusAsync(branchId, isDemo: true, SampleDataStatus.Running, 0);
         var adminId = await TinyPlans.AdminIdAsync(_factory);
@@ -263,12 +265,57 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         {
             var runner = scope.ServiceProvider.GetRequiredService<ISampleDataRunner>();
             var run = () => runner.RunJobAsync(new SampleDataJob(branchId, adminId), stopping.Token);
-            await run.Should().ThrowAsync<Exception>();
+            await run.Should().ThrowAsync<SampleDataPlanException>()
+                .WithInnerExceptionExactly<SampleDataPlanException, InvalidOperationException>();
         }
 
         generator.Inputs.Should().ContainSingle();
         var branch = await BranchAsync(branchId);
         (branch.SampleDataStatus, branch.SampleDataError).Should().Be((SampleDataStatus.Running, (string?)null));
+    }
+
+    /// The same once the plan runs: the first item's scope finds the host gone.
+    [Fact]
+    public async Task Failure_after_cancellation_during_a_run_leaves_the_branch_running()
+    {
+        using var stopping = new CancellationTokenSource();
+        var host = TinyPlans.WithService<IActingIdentity>(_factory, new StoppingIdentity(stopping));
+        var branchId = await CreateBranchAsync("RC04");
+        await TinyPlans.MarkDemoAsync(_factory, branchId);
+        var adminId = await TinyPlans.AdminIdAsync(_factory);
+
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var runner = scope.ServiceProvider.GetRequiredService<ISampleDataRunner>();
+            var run = () => runner.RunPlanAsync(new SampleDataJob(branchId, adminId),
+                TinyPlans.Setup(TinyPlans.OpeningDate), stopping.Token);
+            await run.Should().ThrowAsync<ObjectDisposedException>();
+        }
+
+        var branch = await BranchAsync(branchId);
+        (branch.SampleDataStatus, branch.SampleDataError).Should().Be((SampleDataStatus.Running, (string?)null));
+        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.BranchId == branchId))).Should().BeFalse();
+    }
+
+    /// A rolling deploy can run two instances for a while: the new one's recovery fails a branch the old one may still
+    /// be filling. Only a Running branch is filled or written, so the recovery's verdict stands.
+    [Fact]
+    public async Task Run_on_a_branch_failed_by_recovery_changes_nothing()
+    {
+        var branchId = await CreateBranchAsync("RC03");
+        await SetStatusAsync(branchId, isDemo: true, SampleDataStatus.Failed, 40, InterruptedError);
+        var adminId = await TinyPlans.AdminIdAsync(_factory);
+
+        SampleDataRunResult result;
+        await using (var scope = _factory.Services.CreateAsyncScope())
+            result = await scope.ServiceProvider.GetRequiredService<ISampleDataRunner>()
+                .RunPlanAsync(new SampleDataJob(branchId, adminId), TinyPlans.Setup(TinyPlans.OpeningDate));
+
+        result.Succeeded.Should().BeFalse();
+        var branch = await BranchAsync(branchId);
+        (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
+            .Should().Be((SampleDataStatus.Failed, 40, InterruptedError));
+        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.BranchId == branchId))).Should().BeFalse("nothing ran");
     }
 
     /// S18: a signal that fails or never completes is given up (after 3 s) and does not fail the saved run.
@@ -280,14 +327,33 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         var recorder = new RecordingRealtimeNotifier { ThrowOnDashboardSignal = !stall, StallOnDashboardSignal = stall };
         var host = TinyPlans.WithService<IRealtimeNotifier>(_factory, recorder);
         var branchId = await CreateBranchAsync("RS03");
+        var stopwatch = Stopwatch.StartNew();
 
         var result = await TinyPlans.RunAsync(host, branchId, TinyPlans.Setup(TinyPlans.OpeningDate))
             .WaitAsync(TimeSpan.FromSeconds(60));
 
+        stopwatch.Stop();
         result.Succeeded.Should().BeTrue(result.Error);
+        stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(10), "a stalled signal is given up after 3 s");
         recorder.DashboardSignals.Should().BeEmpty();
         var branch = await BranchAsync(branchId);
         (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
             .Should().Be((SampleDataStatus.Ready, 100, (string?)null));
+    }
+
+    /// The acting identity of a host that is stopping: setting it stops the run's token, then fails as a disposed scope.
+    private sealed class StoppingIdentity : IActingIdentity
+    {
+        private readonly CancellationTokenSource _stopping;
+
+        public StoppingIdentity(CancellationTokenSource stopping) => _stopping = stopping;
+
+        public ActingIdentity? Current => null;
+
+        public void Set(ActingIdentity identity)
+        {
+            _stopping.Cancel();
+            throw new ObjectDisposedException(nameof(IServiceProvider));
+        }
     }
 }

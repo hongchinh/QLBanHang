@@ -31,7 +31,8 @@ namespace OrderMgmt.Application.Organization.SampleData.Services;
 
 /// Turns a SampleDataPlan into real data through the business services (S3–S9): every plan item runs in a fresh scope,
 /// acting as its owner in the demo branch with every permission. Status, progress and error go on the branch row, and
-/// only ever on a demo branch.
+/// only while it is a demo branch in Running: a run never touches a real branch, nor one whose state is already final
+/// (failed by the startup recovery of another instance during a rolling deploy, for example).
 public sealed class SampleDataRunner : ISampleDataRunner
 {
     /// The default cash fund every branch gets at creation (P18): the plan sets its opening amount but never creates it.
@@ -46,7 +47,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
     private const int FailAttempts = 3;
     private const string UniqueViolation = "23505";
     private const string GenericError = "Lỗi hệ thống khi tạo dữ liệu mẫu. Hãy xóa chi nhánh demo và tạo lại.";
-    private const string BranchNotFound = "Không tìm thấy chi nhánh demo để tạo dữ liệu mẫu.";
+    private const string BranchNotFound = "Không tìm thấy chi nhánh demo đang tạo dữ liệu mẫu.";
     private const string InterruptedError = "Bị gián đoạn do ứng dụng khởi động lại. Hãy xóa chi nhánh demo và tạo lại.";
     /// How long the dashboard signal of a finished run may hold the worker before it is given up.
     private static readonly TimeSpan SignalLimit = TimeSpan.FromSeconds(3);
@@ -92,14 +93,17 @@ public sealed class SampleDataRunner : ISampleDataRunner
             _logger.LogWarning("Marked the interrupted sample data of {Count} demo branches failed", count);
     }
 
-    private IDisposable? BeginJobScope(SampleDataJob job) => _logger.BeginScope(new Dictionary<string, object?>
+    /// The log scope of a job, opened by the runner and by the worker around it.
+    public static Dictionary<string, object?> LogScope(SampleDataJob job) => new()
     {
         ["UserId"] = job.RequestedByUserId,
         ["CorrelationId"] = $"sample-data-{job.BranchId:N}",
-    });
+    };
 
-    /// The plan and the owners it was made for. Null when no plan could be made (a missing or real branch, a generator
-    /// failure): the branch is then Failed under KE-HOACH, and a generator failure keeps the generator's own message.
+    private IDisposable? BeginJobScope(SampleDataJob job) => _logger.BeginScope(LogScope(job));
+
+    /// The plan and the owners it was made for. Null when no plan could be made (a branch that is missing, real or no
+    /// longer Running; a generator failure): the branch is then Failed under KE-HOACH, and a generator failure keeps the generator's own message.
     private async Task<(SampleDataPlan Plan, IReadOnlyList<Guid> Owners)?> GenerateAsync(SampleDataJob job,
         CancellationToken ct)
     {
@@ -107,8 +111,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
-            var branchCode = await db.Branches.IgnoreQueryFilters().Where(b => b.Id == job.BranchId && b.IsDemo)
-                    .Select(b => b.Code).SingleOrDefaultAsync(ct)
+            var branchCode = await RunningDemoBranch(db, job.BranchId).Select(b => b.Code).SingleOrDefaultAsync(ct)
                 ?? throw new SampleDataPlanException(BranchNotFound);
             var owners = await ResolveOwnersAsync(db, job.RequestedByUserId, ct);
             var input = new SampleDataGeneratorInput(branchCode, VnTime.ToVnDate(_clock.UtcNow), owners.Count);
@@ -410,17 +413,20 @@ public sealed class SampleDataRunner : ISampleDataRunner
         return code.Length > 50 ? $"{branchCode[..Math.Min(branchCode.Length, 47)]}-{key}" : code;
     }
 
-    /// Every status write targets the branch only while it is demo, so a real branch is never touched.
-    private static IQueryable<Branch> DemoBranch(AsyncServiceScope scope, Guid branchId) =>
-        scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
-            .Where(b => b.Id == branchId && b.IsDemo);
+    /// Every read that starts a run and every status write target the branch only while it is a demo branch in
+    /// Running: a real branch is never touched, and a final state is never overwritten.
+    private static IQueryable<Branch> RunningDemoBranch(IAppDbContext db, Guid branchId) =>
+        db.Branches.IgnoreQueryFilters()
+            .Where(b => b.Id == branchId && b.IsDemo && b.SampleDataStatus == SampleDataStatus.Running);
 
-    /// Running, progress 0, no error. False when the branch is missing or not demo.
+    private static IQueryable<Branch> RunningDemoBranch(AsyncServiceScope scope, Guid branchId) =>
+        RunningDemoBranch(scope.ServiceProvider.GetRequiredService<IAppDbContext>(), branchId);
+
+    /// Progress 0, no error. False when the branch is missing, not demo or no longer Running: then nothing runs.
     private async Task<bool> StartAsync(Guid branchId, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        return await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
-            .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Running)
+        return await RunningDemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
             .SetProperty(b => b.SampleDataProgress, 0)
             .SetProperty(b => b.SampleDataError, (string?)null), ct) > 0;
     }
@@ -428,7 +434,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
     private async Task SetReadyAsync(Guid branchId, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
+        await RunningDemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
             .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Ready)
             .SetProperty(b => b.SampleDataProgress, 100)
             .SetProperty(b => b.SampleDataError, (string?)null), ct);
@@ -459,7 +465,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s.SetProperty(b => b.SampleDataProgress, progress), ct);
+            await RunningDemoBranch(scope, branchId)
+                .ExecuteUpdateAsync(s => s.SetProperty(b => b.SampleDataProgress, progress), ct);
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
@@ -467,8 +474,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
         }
     }
 
-    /// Never throws. A few short retries without a token, so a database blip (or a stopping host) does not leave the
-    /// branch Running; after the last one only the log keeps the error.
+    /// Never throws. A few short retries without a token, so a database blip does not leave the branch Running; after
+    /// the last one only the log keeps the error.
     private async Task FailAsync(Guid branchId, string error)
     {
         for (var attempt = 1; ; attempt++)
@@ -476,7 +483,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
             try
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
-                await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
+                await RunningDemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
                     .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Failed)
                     .SetProperty(b => b.SampleDataError, error));
                 return;

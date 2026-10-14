@@ -71,13 +71,19 @@ public static class TinyPlans
     public static Task<Guid> AdminIdAsync(WebApplicationFactory<Program> factory) =>
         InDbAsync(factory, db => db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync());
 
-    /// S19: a host of the factory's database whose `T` is `instance` (a recorder or a fake).
-    public static WebApplicationFactory<Program> WithService<T>(WebAppFactory factory, T instance) where T : class =>
-        factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+    /// S19: a host of the factory's database whose `T` is `instance` (a recorder or a fake). A derived host would start
+    /// lazily on first use, and its startup recovery fails every Running demo branch of the shared clone database, so
+    /// it is started here: make Running demo branches only after this call.
+    public static WebApplicationFactory<Program> WithService<T>(WebAppFactory factory, T instance) where T : class
+    {
+        var host = factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
         {
             s.RemoveAll<T>();
             s.AddSingleton(instance);
         }));
+        _ = host.Services;
+        return host;
+    }
 
     /// S5, computed independently of the runner: active non-deleted SALES users by username, take 3.
     public static Task<List<Guid>> SalesOwnersAsync(WebApplicationFactory<Program> factory) =>
@@ -88,8 +94,8 @@ public static class TinyPlans
             .Take(3)
             .ToListAsync());
 
-    /// Runs `plan` for the branch as requested by admin, through a scope of the factory. The runner only fills demo
-    /// branches, so the branch is flagged demo first unless `asDemo` is false.
+    /// Runs `plan` for the branch as requested by admin, through a scope of the factory. The runner only fills a demo
+    /// branch that is Running, so the branch is put in that state first unless `asDemo` is false.
     public static async Task<SampleDataRunResult> RunAsync(WebApplicationFactory<Program> factory, Guid branchId,
         SampleDataPlan plan, bool asDemo = true)
     {
@@ -101,9 +107,14 @@ public static class TinyPlans
             .RunPlanAsync(new SampleDataJob(branchId, adminId), plan);
     }
 
+    /// Demo and Running with progress 0, as a branch created with sample data.
     public static Task<int> MarkDemoAsync(WebApplicationFactory<Program> factory, Guid branchId) =>
         InDbAsync(factory, db => db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId)
-            .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsDemo, true)));
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(b => b.IsDemo, true)
+                .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Running)
+                .SetProperty(b => b.SampleDataProgress, 0)
+                .SetProperty(b => b.SampleDataError, (string?)null)));
 
     private static async Task<T> InDbAsync<T>(WebApplicationFactory<Program> factory, Func<AppDbContext, Task<T>> work)
     {

@@ -496,7 +496,9 @@ public class SampleDataRunnerStepTests : CashDebtTestBase
             Allocate("CHKH-0002", At(5), CashVoucherType.Payment, "CHKH", "VCB", "DM-KH01",
                 new SampleAllocationTarget("TKH-0002", null)),
             new SampleCancelStep("HUY-0001", At(6), null, "TKH-0002"),
-            new SampleDebtOffsetStep("BT-0001", At(7), null, "DM-KH01", "CHKH-0002", "OD-02"),
+            // Each side names a skipped step in turn; the other side is a key of the same partner (DM-KH01 has no
+            // payable, and the service, which checks the sides, is never reached).
+            new SampleDebtOffsetStep("BT-0001", At(7), null, "DM-KH01", "CHKH-0002", "TKH-0001"),
             new SampleDebtOffsetStep("BT-0002", At(8), null, "DM-KH01", "OD-01", "TKH-0002"));
 
         var result = await TinyPlans.RunAsync(_factory, branchId, plan);

@@ -1,0 +1,234 @@
+using ClosedXML.Excel;
+using FluentAssertions;
+using OrderMgmt.Application.Tt133.Models;
+using OrderMgmt.Application.Tt133.Vouchers;
+using OrderMgmt.Domain.Enums;
+using OrderMgmt.Infrastructure.Excel.Tt133.Vouchers;
+using Xunit;
+
+namespace OrderMgmt.IntegrationTests.Tt133.Unit.Vouchers;
+
+public class StockVoucherFormTests
+{
+    private const string LongHeader = "Tên, nhãn hiệu, quy cách, phẩm chất vật tư, dụng cụ, sản phẩm, hàng hóa";
+    private static string Dots => VoucherPrintRules.Dots;
+
+    private static Tt133FormContext Context() => new()
+    {
+        CompanyName = "Công ty ABC",
+        BranchName = "Chi nhánh HN",
+        Address = "12 Láng Hạ",
+        TaxCode = "0101234567",
+        ChiefAccountantName = "Trần B",
+        LegalRepresentativeName = "Nguyễn A",
+        PrintDate = new DateOnly(2026, 10, 14),
+    };
+
+    private static StockVoucherPrintModel StockIn(string code = "PN00001") => new()
+    {
+        Type = StockDirection.In,
+        Code = code,
+        Date = new DateOnly(2026, 10, 5),
+        PriceMode = StockPrintPriceMode.Voucher,
+        HandlerName = "Trần Giao",
+        PartnerName = "Công ty XYZ",
+        WarehouseNames = "Kho chính",
+        Lines =
+        [
+            new() { Number = 1, Name = "Hàng A", Code = "A", UnitName = "Tấm", Quantity = 10, UnitPrice = 100_000, Amount = 1_000_000 },
+            new() { Number = 2, Name = "Hàng B", Code = "B", UnitName = "Tấm", Quantity = 5, UnitPrice = 100_000, Amount = 500_000 },
+        ],
+        Totals = [new("Cộng", 1_500_000)],
+        AmountInWords = "Một triệu năm trăm nghìn đồng",
+        PreparerName = "Quản trị hệ thống",
+    };
+
+    private static StockVoucherPrintModel StockOut()
+    {
+        var m = StockIn("PX00001");
+        m.Type = StockDirection.Out;
+        m.PartnerAddress = "Hà Nội";
+        m.ReasonName = "Xuất bán hàng";
+        m.HandlerName = "Lê Nhận";
+        return m;
+    }
+
+    private static XLWorkbook Render(params StockVoucherPrintModel[] models)
+    {
+        var bytes = new VoucherFormRenderer().RenderStockVouchers(Context(), models);
+        return new XLWorkbook(new MemoryStream(bytes));
+    }
+
+    private static List<string> Texts(IXLWorksheet sheet) =>
+        sheet.CellsUsed().Select(c => c.GetString()).ToList();
+
+    private static IXLCell CellWith(IXLWorksheet sheet, string text) =>
+        sheet.CellsUsed().First(c => c.GetString() == text);
+
+    private static int RowOf(IXLWorksheet sheet, string text) => CellWith(sheet, text).Address.RowNumber;
+
+    private static int ColumnOf(IXLWorksheet sheet, string text) => CellWith(sheet, text).Address.ColumnNumber;
+
+    [Fact]
+    public void Stock_in_is_01_VT()
+    {
+        using var wb = Render(StockIn());
+
+        wb.Worksheets.Select(w => w.Name).Should().Equal("PN00001");
+        var ws = wb.Worksheet(1);
+        Texts(ws).Should().Contain([
+            "Mẫu số 01-VT", "PHIẾU NHẬP KHO", "Số: PN00001", $"Nợ: {Dots}", $"Có: {Dots}",
+            "- Họ và tên người giao: Trần Giao",
+            $"- Theo {Dots} số {Dots} ngày {Dots} của Công ty XYZ",
+            $"- Nhập tại kho: Kho chính Địa điểm: {Dots}",
+            "STT", LongHeader, "Mã số", "Đơn vị tính", "Số lượng", "Theo chứng từ", "Thực nhập", "Đơn giá", "Thành tiền",
+            "- Tổng số tiền (viết bằng chữ): Một triệu năm trăm nghìn đồng",
+            $"- Số chứng từ gốc kèm theo: {Dots}",
+        ]);
+
+        var symbolRow = ws.Row(RowOf(ws, "Theo chứng từ") + 1);
+        string[] symbols = ["A", "B", "C", "D", "1", "2", "3", "4"];
+        for (var k = 0; k < symbols.Length; k++) symbolRow.Cell(k + 1).GetString().Should().Be(symbols[k]);
+
+        var row = ws.Row(RowOf(ws, "Hàng A"));
+        row.Cell(1).GetDouble().Should().Be(1);
+        row.Cell(2).GetString().Should().Be("Hàng A");
+        row.Cell(3).GetString().Should().Be("A");
+        row.Cell(4).GetString().Should().Be("Tấm");
+        row.Cell(5).GetDouble().Should().Be(10);
+        row.Cell(6).GetDouble().Should().Be(10);
+        row.Cell(7).GetDouble().Should().Be(100_000);
+        row.Cell(8).GetDouble().Should().Be(1_000_000);
+
+        var total = RowOf(ws, "Cộng");
+        ColumnOf(ws, "Cộng").Should().Be(2);
+        ws.Cell(total, 8).GetDouble().Should().Be(1_500_000);
+
+        string[] titles = ["Người lập phiếu", "Người giao hàng", "Thủ kho", "Kế toán trưởng"];
+        var titleRow = RowOf(ws, titles[0]);
+        var cols = titles.Select(t => ColumnOf(ws, t)).ToList();
+        cols.Should().BeInAscendingOrder().And.OnlyHaveUniqueItems();
+        titles.Select(t => RowOf(ws, t)).Should().OnlyContain(r => r == titleRow);
+        ColumnOf(ws, "Quản trị hệ thống").Should().Be(cols[0]);
+        ColumnOf(ws, "Trần B").Should().Be(cols[3]);
+
+        ws.Row(RowOf(ws, "Theo chứng từ")).Height.Should().BeGreaterThanOrEqualTo(2 * ws.RowHeight);
+
+        ws.PageSetup.PaperSize.Should().Be(XLPaperSize.A4Paper);
+        ws.PageSetup.PageOrientation.Should().Be(XLPageOrientation.Portrait);
+        ws.PageSetup.PagesWide.Should().Be(1);
+        ws.PageSetup.PagesTall.Should().Be(0);
+        ws.PageSetup.FirstRowToRepeatAtTop.Should().Be(RowOf(ws, "STT"));
+    }
+
+    [Fact]
+    public void Stock_out_is_02_VT()
+    {
+        using var wb = Render(StockOut());
+
+        wb.Worksheets.Select(w => w.Name).Should().Equal("PX00001");
+        var ws = wb.Worksheet(1);
+        Texts(ws).Should().Contain([
+            "Mẫu số 02-VT", "PHIẾU XUẤT KHO", "Số: PX00001",
+            "- Họ và tên người nhận hàng: Lê Nhận", "Địa chỉ (bộ phận): Hà Nội", "- Lý do xuất kho: Xuất bán hàng",
+            $"- Xuất tại kho (ngăn lô): Kho chính Địa điểm: {Dots}",
+            "Yêu cầu", "Thực xuất",
+        ]);
+
+        var titleRow = RowOf(ws, "Giám đốc");
+        var expected = new (string Title, int Column)[]
+        {
+            ("Người lập phiếu", 1), ("Người nhận hàng", 3), ("Thủ kho", 4), ("Kế toán trưởng", 6), ("Giám đốc", 8),
+        };
+        foreach (var (title, column) in expected)
+            ws.Cell(titleRow, column).GetString().Should().Be(title);
+        ColumnOf(ws, "Nguyễn A").Should().Be(8);
+    }
+
+    [Fact]
+    public void Totals_rows_and_vat_line()
+    {
+        var m = StockOut();
+        m.Totals =
+        [
+            new("Cộng tiền hàng", 1_000_000), new("Chiết khấu", 60_000), new("Thuế GTGT", 94_000),
+            new("Cước vận chuyển", 20_000), new("Tổng cộng", 1_054_000),
+        ];
+        m.VatIncludedLine = "Trong đó thuế GTGT đã gồm trong giá: 100.000";
+        using var wb = Render(m);
+        var ws = wb.Worksheet(1);
+
+        var first = RowOf(ws, "Cộng tiền hàng");
+        var amounts = new[] { 1_000_000d, 60_000, 94_000, 20_000, 1_054_000 };
+        string[] labels = ["Cộng tiền hàng", "Chiết khấu", "Thuế GTGT", "Cước vận chuyển", "Tổng cộng"];
+        for (var k = 0; k < labels.Length; k++)
+        {
+            RowOf(ws, labels[k]).Should().Be(first + k);
+            ColumnOf(ws, labels[k]).Should().Be(2);
+            ws.Cell(first + k, 8).GetDouble().Should().Be(amounts[k]);
+        }
+        RowOf(ws, "Trong đó thuế GTGT đã gồm trong giá: 100.000").Should().BeGreaterThan(RowOf(ws, "Tổng cộng"));
+    }
+
+    [Fact]
+    public void No_money()
+    {
+        var m = StockIn();
+        foreach (var line in m.Lines) { line.UnitPrice = null; line.Amount = null; }
+        m.Totals = [new("Cộng", null)];
+        m.AmountInWords = null;
+        using var wb = Render(m);
+        var ws = wb.Worksheet(1);
+
+        var row = RowOf(ws, "Hàng A");
+        ws.Cell(row, 7).IsEmpty().Should().BeTrue();
+        ws.Cell(row, 8).IsEmpty().Should().BeTrue();
+        ws.Cell(RowOf(ws, "Cộng"), 8).IsEmpty().Should().BeTrue();
+        Texts(ws).Should().Contain($"- Tổng số tiền (viết bằng chữ): {Dots}");
+    }
+
+    [Fact]
+    public void Several_warehouses_add_the_Kho_column()
+    {
+        var m = StockIn();
+        m.ShowWarehouseColumn = true;
+        m.WarehouseNames = "Kho chính, Kho phụ";
+        m.Lines[0].WarehouseCode = "KHO01";
+        m.Lines[1].WarehouseCode = "KHO02";
+        using var wb = Render(m);
+        var ws = wb.Worksheet(1);
+
+        var kho = CellWith(ws, "Kho");
+        kho.Address.ColumnNumber.Should().Be(ColumnOf(ws, "Đơn vị tính") + 1);
+        kho.Address.ColumnNumber.Should().Be(ColumnOf(ws, "Số lượng") - 1);
+        ws.Cell(RowOf(ws, "Theo chứng từ") + 1, kho.Address.ColumnNumber).GetString().Should().Be("E");
+        ws.Cell(RowOf(ws, "Hàng A"), kho.Address.ColumnNumber).GetString().Should().Be("KHO01");
+        ws.Cell(RowOf(ws, "Hàng B"), kho.Address.ColumnNumber).GetString().Should().Be("KHO02");
+        ColumnOf(ws, "Thành tiền").Should().Be(9);
+        ws.Cell(RowOf(ws, "Cộng"), 9).GetDouble().Should().Be(1_500_000);
+        Texts(ws).Should().Contain($"- Nhập tại kho: Kho chính, Kho phụ Địa điểm: {Dots}");
+    }
+
+    [Fact]
+    public void Notes_and_cancelled()
+    {
+        var m = StockIn();
+        m.IsCancelled = true;
+        m.Notes = ["Phiếu đã hủy, không có giá vốn."];
+        using var wb = Render(m);
+        var ws = wb.Worksheet(1);
+
+        var note = CellWith(ws, "Phiếu đã hủy, không có giá vốn.");
+        note.Style.Font.Italic.Should().BeTrue();
+        RowOf(ws, "ĐÃ HỦY").Should().BeLessThan(note.Address.RowNumber);
+        note.Address.RowNumber.Should().BeLessThan(RowOf(ws, "- Họ và tên người giao: Trần Giao"));
+    }
+
+    [Fact]
+    public void One_sheet_per_voucher()
+    {
+        using var wb = Render(StockIn(), StockOut());
+
+        wb.Worksheets.Select(w => w.Name).Should().Equal("PN00001", "PX00001");
+    }
+}

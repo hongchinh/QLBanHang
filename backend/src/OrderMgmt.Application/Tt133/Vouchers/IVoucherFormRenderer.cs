@@ -6,4 +6,5 @@ namespace OrderMgmt.Application.Tt133.Vouchers;
 public interface IVoucherFormRenderer
 {
     byte[] RenderCashVouchers(Tt133FormContext context, IReadOnlyList<CashVoucherPrintModel> vouchers);
+    byte[] RenderStockVouchers(Tt133FormContext context, IReadOnlyList<StockVoucherPrintModel> vouchers);
 }

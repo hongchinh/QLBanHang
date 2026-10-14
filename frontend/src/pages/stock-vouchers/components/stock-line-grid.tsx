@@ -327,8 +327,13 @@ export interface StockLineGridProps {
 
 export function StockLineGrid({ form, type, warehouses, computed, stockAt, readOnly, toolbarSlot }: StockLineGridProps) {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
-  const watched = useWatch({ control: form.control, name: 'lines' }) as StockLineFormValues[] | undefined;
-  const rows = watched ?? [];
+  // The watch renders the grid on every line change, but the rows are read from the form itself, which always matches
+  // the field array. react-hook-form hands the result of remove() and append() to its watchers only from an effect,
+  // one render after the field array: read from the watched copy, the row that moves up after a delete would first
+  // render the deleted line's values. That write drops the selection a keyboard focus has just made, and a key typed
+  // at once is added to the deleted line's value and saved into the line that moved up.
+  useWatch({ control: form.control, name: 'lines' });
+  const rows = form.getValues('lines') ?? [];
 
   const lineErrors = form.formState.errors.lines;
 
@@ -757,11 +762,10 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
             </tr>
           </thead>
           <tbody>
-            {/* Keyed from the field-array item, not the watched row: right after remove() the watched rows still
-                hold the removed one, and keying from them would unmount the last <tr> instead. field.id is
-                regenerated on every nested setValue, so the item's own _uiKey is the stable key. */}
+            {/* Keyed from the field-array item, so a row keeps its <tr> (and the focus in it) when the rows above it
+                go. field.id is regenerated on every nested setValue, so the item's own _uiKey is the stable key. */}
             {fields.map((field, idx) => {
-              const line = rows[idx] ?? (field as unknown as StockLineFormValues);
+              const line = rows[idx];
               const result = computed[idx];
               return (
                 <tr key={(field as { _uiKey?: string })._uiKey ?? field.id}>

@@ -940,6 +940,87 @@ describe('StockLineGrid', () => {
     expect(focused()).toBe('stock-line-quantity-1');
   });
 
+  // In the browser React renders what a key event changed in a microtask, but react-hook-form hands the result of
+  // remove() to the watched lines only from an effect, and that render comes in a later task: the next key can arrive
+  // in between. Outside act(), as in the browser, these tests type that key into the focused cell at that moment.
+  describe('a key typed at once after a line is deleted', () => {
+    const threeLines = () => [
+      line({ _uiKey: 'a', productCode: 'A', pricingMode: 'PerCubicMeter', sheetCount: 2, length: 4002, width: 100, thickness: 50, discountRate: 5, note: 'ghi chu 1' }),
+      line({ _uiKey: 'b', productCode: 'B', pricingMode: 'PerCubicMeter', sheetCount: 3, length: 4003, width: 120, thickness: 60, discountRate: 6, note: 'ghi chu 2' }),
+      line({ _uiKey: 'c', productCode: 'C', pricingMode: 'PerCubicMeter', sheetCount: 4, length: 4004, width: 140, thickness: 70, discountRate: 7, note: 'ghi chu 3' }),
+    ];
+    const ownValues = (l: StockLineFormValues) => ({
+      productCode: l.productCode,
+      sheetCount: l.sheetCount,
+      length: l.length,
+      width: l.width,
+      thickness: l.thickness,
+      discountRate: l.discountRate,
+      note: l.note,
+    });
+
+    // Runs `steps` outside act(), then lets the renders that follow them land.
+    async function outsideAct(steps: () => Promise<void>) {
+      const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+      const previous = env.IS_REACT_ACT_ENVIRONMENT;
+      env.IS_REACT_ACT_ENVIRONMENT = false;
+      try {
+        await steps();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      } finally {
+        env.IS_REACT_ACT_ENVIRONMENT = previous;
+      }
+    }
+
+    // Only the microtasks run, in which React renders what the event changed: no task, frame or timer.
+    async function eventRendered() {
+      for (let i = 0; i < 5; i++) await Promise.resolve();
+    }
+
+    // A key typed into the focused cell, built from the text the cell shows: it ends up after that text.
+    function typeKey(key: string) {
+      const cell = document.activeElement as HTMLInputElement;
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setValue.call(cell, cell.value + key);
+      cell.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    it.each([
+      ['%CK', 'discount-rate', 'discountRate', '9', 69],
+      ['Dài', 'length', 'length', '9', 40039],
+      ['Ghi chú', 'note', 'note', 'x', 'ghi chu 2x'],
+    ] as const)('Ctrl+Delete on %s: the key starts from the value of the line that moved up', async (_label, cell, field, key, typed) => {
+      showAllColumns();
+      const lines = threeLines();
+      const { values } = renderGrid({ lines });
+      const from = byId(`stock-line-${cell}-0`);
+      act(() => from.focus());
+
+      await outsideAct(async () => {
+        from.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', ctrlKey: true, bubbles: true, cancelable: true }));
+        await eventRendered();
+        typeKey(key);
+      });
+
+      expect(document.activeElement).toBe(byId(`stock-line-${cell}-0`));
+      expect(values().lines.map(ownValues)).toEqual([{ ...ownValues(lines[1]), [field]: typed }, ownValues(lines[2])]);
+    });
+
+    it('the delete button: the key starts from the code of the line that moved up', async () => {
+      const lines = threeLines();
+      const { values } = renderGrid({ lines });
+
+      await outsideAct(async () => {
+        screen.getByRole('button', { name: 'Xóa dòng 1' }).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        await eventRendered();
+        typeKey('x');
+      });
+
+      expect(document.activeElement).toBe(byId('stock-line-product-code-0'));
+      expect(values().lines.map(ownValues)).toEqual([{ ...ownValues(lines[1]), productCode: 'Bx' }, ownValues(lines[2])]);
+    });
+  });
+
   it('Ctrl+Delete does nothing on a read-only grid', async () => {
     const { values } = renderGrid({
       lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' })],

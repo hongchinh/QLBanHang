@@ -79,6 +79,10 @@ public sealed class VoucherFormBuilder
     {
         var first = Table.Row;
         var centre = 0;
+        var rowLines = new Dictionary<int, int>();
+
+        void Track(int row, int lines) =>
+            rowLines[row] = Math.Max(lines, rowLines.GetValueOrDefault(row, 1));
 
         void PutCentre(string text, bool bold = false, bool italic = false, double? size = null)
         {
@@ -88,6 +92,7 @@ public sealed class VoucherFormBuilder
             cell.Style.Font.Italic = italic;
             if (size is { } s) cell.Style.Font.FontSize = s;
             cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            if (size is null) Track(first + centre, Wrap(cell, text, 1, _leftEnd, bold));
             centre++;
         }
 
@@ -101,7 +106,9 @@ public sealed class VoucherFormBuilder
             var cell = Merged(first + i, _rightStart, _columns.Count);
             cell.Value = rightLines[i];
             cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            Track(first + i, Wrap(cell, rightLines[i], _rightStart, _columns.Count, bold: false));
         }
+        foreach (var (row, lines) in rowLines) SetRowLines(row, lines);
 
         Table.Skip(Math.Max(centre, rightLines.Count) + 1);
     }
@@ -116,6 +123,9 @@ public sealed class VoucherFormBuilder
     public void WriteSignatures(DateOnly date, IReadOnlyList<VoucherSigner> signers)
     {
         var count = _columns.Count;
+        if (signers.Count > count)
+            throw new ArgumentOutOfRangeException(nameof(signers), signers.Count,
+                $"A voucher with {count} columns cannot hold {signers.Count} signature blocks.");
         var row = Table.Row + 1;
 
         var dateCell = Merged(row, _rightStart, count);
@@ -155,6 +165,7 @@ public sealed class VoucherFormBuilder
             cell.Style.Font.Bold = bold;
             cell.Style.Font.Italic = italic;
             cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            cell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
             cell.Style.Alignment.WrapText = true;
             lines = Math.Max(lines, Tt133FormBuilder.LineCount(text, Width(first, last), bold));
         }

@@ -11,6 +11,10 @@ namespace OrderMgmt.IntegrationTests.Tt133.Unit.Vouchers;
 public class VoucherFormBuilderTests
 {
     private static readonly DateOnly VoucherDate = new(2026, 10, 5);
+    private const string DateText = "Ngày 05 tháng 10 năm 2026";
+
+    private static readonly string[] CashRightLines =
+        [$"Quyển số: {VoucherPrintRules.Dots}", "Số: PT00001", $"Nợ: {VoucherPrintRules.Dots}", $"Có: {VoucherPrintRules.Dots}"];
 
     private static Tt133FormContext Context() => new()
     {
@@ -43,6 +47,15 @@ public class VoucherFormBuilderTests
 
     private static int ColumnOf(IXLWorksheet sheet, string text) => CellWith(sheet, text).Address.ColumnNumber;
 
+    /// First and last column of the merged range of the cell holding the text (the cell itself when not merged).
+    private static (int First, int Last) SpanOf(IXLWorksheet sheet, string text)
+    {
+        var cell = CellWith(sheet, text);
+        if (!cell.IsMerged()) return (cell.Address.ColumnNumber, cell.Address.ColumnNumber);
+        var range = cell.MergedRange();
+        return (range.FirstColumn().ColumnNumber(), range.LastColumn().ColumnNumber());
+    }
+
     private static VoucherSigner[] FiveSigners(string? secondName = "Trần B") =>
     [
         new("Giám đốc", "(Ký, họ tên, đóng dấu)", "Nguyễn A"),
@@ -60,14 +73,26 @@ public class VoucherFormBuilderTests
         b.WriteHeaderBlock("01-TT");
 
         var texts = Texts(ws);
-        texts.Should().Contain("Đơn vị: Công ty ABC – Chi nhánh HN");
-        texts.Should().Contain("Địa chỉ: 12 Láng Hạ");
-        texts.Should().Contain("Mẫu số 01-TT");
-        texts.Should().Contain("(Ban hành theo Thông tư số 133/2016/TT-BTC");
-        texts.Should().Contain("ngày 26/8/2016 của Bộ Tài chính)");
         texts.Should().NotContain(t => t.StartsWith("MST"));
+
+        RowOf(ws, "Đơn vị: Công ty ABC – Chi nhánh HN").Should().Be(1);
+        RowOf(ws, "Địa chỉ: 12 Láng Hạ").Should().Be(2);
+        RowOf(ws, "Mẫu số 01-TT").Should().Be(1);
+        RowOf(ws, "(Ban hành theo Thông tư số 133/2016/TT-BTC").Should().Be(2);
+        RowOf(ws, "ngày 26/8/2016 của Bộ Tài chính)").Should().Be(3);
+
+        ColumnOf(ws, "Mẫu số 01-TT").Should().Be(7);
+        SpanOf(ws, "Đơn vị: Công ty ABC – Chi nhánh HN").Should().Be((1, 6));
+        SpanOf(ws, "Địa chỉ: 12 Láng Hạ").Should().Be((1, 6));
+        foreach (var right in new[] { "Mẫu số 01-TT", "(Ban hành theo Thông tư số 133/2016/TT-BTC", "ngày 26/8/2016 của Bộ Tài chính)" })
+        {
+            SpanOf(ws, right).Should().Be((7, 10));
+            CellWith(ws, right).Style.Alignment.Horizontal.Should().Be(XLAlignmentHorizontalValues.Center);
+        }
         CellWith(ws, "Mẫu số 01-TT").Style.Font.Bold.Should().BeTrue();
-        ColumnOf(ws, "Mẫu số 01-TT").Should().BeGreaterThan(ColumnOf(ws, "Đơn vị: Công ty ABC – Chi nhánh HN"));
+        CellWith(ws, "(Ban hành theo Thông tư số 133/2016/TT-BTC").Style.Font.Bold.Should().BeFalse();
+
+        b.Table.Row.Should().Be(5); // three rows and one empty row
     }
 
     [Fact]
@@ -77,9 +102,42 @@ public class VoucherFormBuilderTests
 
         b.WriteHeaderBlock("01-TT");
 
-        var texts = Texts(ws);
-        texts.Should().Contain("Đơn vị:");
-        texts.Should().Contain("Địa chỉ:");
+        RowOf(ws, "Đơn vị:").Should().Be(1);
+        RowOf(ws, "Địa chỉ:").Should().Be(2);
+    }
+
+    [Fact]
+    public void Header_with_company_only_or_branch_only()
+    {
+        var company = Context();
+        company.BranchName = null;
+        var (b1, ws1) = NewBuilder(company);
+        b1.WriteHeaderBlock("01-TT");
+        RowOf(ws1, "Đơn vị: Công ty ABC").Should().Be(1);
+
+        var branch = Context();
+        branch.CompanyName = " ";
+        var (b2, ws2) = NewBuilder(branch);
+        b2.WriteHeaderBlock("01-TT");
+        RowOf(ws2, "Đơn vị: Chi nhánh HN").Should().Be(1);
+    }
+
+    [Fact]
+    public void Header_long_address_wraps_and_its_row_is_two_lines_high()
+    {
+        var context = Context();
+        context.Address = "số 12 ngõ 34 đường láng hạ phường thành công quận ba đình thành phố hà nội việt nam";
+        var text = $"Địa chỉ: {context.Address}";
+        Tt133FormBuilder.LineCount(text, 6 * 9.5, bold: false).Should().Be(2); // precondition of the case
+        var (b, ws) = NewBuilder(context);
+
+        b.WriteHeaderBlock("01-TT");
+
+        var cell = CellWith(ws, text);
+        cell.Address.RowNumber.Should().Be(2);
+        cell.Style.Alignment.WrapText.Should().BeTrue();
+        ws.Row(2).Height.Should().BeApproximately(2 * ws.RowHeight, 0.01);
+        b.Table.Row.Should().Be(5);
     }
 
     [Fact]
@@ -87,24 +145,26 @@ public class VoucherFormBuilderTests
     {
         var (b, ws) = NewBuilder(Context());
 
-        b.WriteTitleBlock("PHIẾU THU", VoucherDate, false, [],
-            [$"Quyển số: {VoucherPrintRules.Dots}", "Số: PT00001", $"Nợ: {VoucherPrintRules.Dots}", $"Có: {VoucherPrintRules.Dots}"]);
+        b.WriteTitleBlock("PHIẾU THU", VoucherDate, false, [], CashRightLines);
 
         var title = CellWith(ws, "PHIẾU THU");
         title.Style.Font.Bold.Should().BeTrue();
         title.Style.Font.FontSize.Should().Be(14);
+        title.Style.Alignment.Horizontal.Should().Be(XLAlignmentHorizontalValues.Center);
+        SpanOf(ws, "PHIẾU THU").Should().Be((1, 6));
         var titleRow = title.Address.RowNumber;
 
-        var date = CellWith(ws, "Ngày 05 tháng 10 năm 2026");
+        var date = CellWith(ws, DateText);
         date.Address.RowNumber.Should().Be(titleRow + 1);
         date.Style.Font.Italic.Should().BeTrue();
 
-        RowOf(ws, $"Quyển số: {VoucherPrintRules.Dots}").Should().Be(titleRow);
-        RowOf(ws, "Số: PT00001").Should().Be(titleRow + 1);
-        RowOf(ws, $"Nợ: {VoucherPrintRules.Dots}").Should().Be(titleRow + 2);
-        RowOf(ws, $"Có: {VoucherPrintRules.Dots}").Should().Be(titleRow + 3);
-        ColumnOf(ws, $"Quyển số: {VoucherPrintRules.Dots}").Should().BeGreaterThan(title.Address.ColumnNumber);
-        ColumnOf(ws, "Số: PT00001").Should().BeGreaterThan(title.Address.ColumnNumber);
+        for (var i = 0; i < CashRightLines.Length; i++)
+        {
+            var cell = CellWith(ws, CashRightLines[i]);
+            cell.Address.RowNumber.Should().Be(titleRow + i);
+            cell.Address.ColumnNumber.Should().Be(7);
+            cell.Style.Alignment.Horizontal.Should().Be(XLAlignmentHorizontalValues.Left);
+        }
 
         Texts(ws).Should().NotContain("ĐÃ HỦY");
         b.Table.Row.Should().Be(titleRow + 3 + 2);
@@ -115,15 +175,51 @@ public class VoucherFormBuilderTests
     {
         var (b, ws) = NewBuilder(Context());
 
-        b.WriteTitleBlock("PHIẾU THU", VoucherDate, true, ["Số: PN00001"],
-            [$"Quyển số: {VoucherPrintRules.Dots}", "Số: PT00001", $"Nợ: {VoucherPrintRules.Dots}", $"Có: {VoucherPrintRules.Dots}"]);
+        b.WriteTitleBlock("PHIẾU THU", VoucherDate, true, ["Số: PN00001"], CashRightLines);
 
         var titleRow = RowOf(ws, "PHIẾU THU");
         var cancelled = CellWith(ws, "ĐÃ HỦY");
         cancelled.Address.RowNumber.Should().Be(titleRow + 1);
         cancelled.Style.Font.Bold.Should().BeTrue();
-        RowOf(ws, "Ngày 05 tháng 10 năm 2026").Should().Be(titleRow + 2);
+        RowOf(ws, DateText).Should().Be(titleRow + 2);
         RowOf(ws, "Số: PN00001").Should().Be(titleRow + 3);
+        b.Table.Row.Should().Be(titleRow + 5);
+    }
+
+    [Fact]
+    public void Title_block_with_more_centre_lines_than_right_lines_skips_past_the_centre()
+    {
+        var (b, ws) = NewBuilder(Context());
+
+        b.WriteTitleBlock("PHIẾU NHẬP KHO", VoucherDate, true, ["Số: PN00001", "Kho: Kho chính"], ["Nợ: 156", "Có: 331"]);
+
+        var titleRow = RowOf(ws, "PHIẾU NHẬP KHO");
+        RowOf(ws, "Kho: Kho chính").Should().Be(titleRow + 4);
+        RowOf(ws, "Có: 331").Should().Be(titleRow + 1);
+        b.Table.Row.Should().Be(titleRow + 6);
+    }
+
+    [Fact]
+    public void Title_block_wraps_long_lines_and_sizes_their_rows()
+    {
+        var right = "Số: " + new string('1', 50);
+        var centre = "Kho: " + new string('a', 80);
+        Tt133FormBuilder.LineCount(right, 4 * 9.5, bold: false).Should().Be(2); // preconditions of the case
+        Tt133FormBuilder.LineCount(centre, 6 * 9.5, bold: false).Should().Be(2);
+        var (b, ws) = NewBuilder(Context());
+
+        b.WriteTitleBlock("PHIẾU THU", VoucherDate, false, [centre], ["Quyển số: 1", right]);
+
+        var titleRow = RowOf(ws, "PHIẾU THU");
+        var rightCell = CellWith(ws, right);
+        rightCell.Address.RowNumber.Should().Be(titleRow + 1);
+        rightCell.Style.Alignment.WrapText.Should().BeTrue();
+        ws.Row(titleRow + 1).Height.Should().BeApproximately(2 * ws.RowHeight, 0.01);
+
+        var centreCell = CellWith(ws, centre);
+        centreCell.Address.RowNumber.Should().Be(titleRow + 2);
+        centreCell.Style.Alignment.WrapText.Should().BeTrue();
+        ws.Row(titleRow + 2).Height.Should().BeApproximately(2 * ws.RowHeight, 0.01);
     }
 
     [Fact]
@@ -134,9 +230,8 @@ public class VoucherFormBuilderTests
         b.WriteLine("Địa chỉ:", " Hà Nội ");
         b.WriteLine("Lý do:", null);
 
-        var texts = Texts(ws);
-        texts.Should().Contain("Địa chỉ: Hà Nội");
-        texts.Should().Contain($"Lý do: {VoucherPrintRules.Dots}");
+        RowOf(ws, "Địa chỉ: Hà Nội").Should().Be(1);
+        RowOf(ws, $"Lý do: {VoucherPrintRules.Dots}").Should().Be(2);
     }
 
     [Fact]
@@ -146,12 +241,15 @@ public class VoucherFormBuilderTests
 
         b.WriteSignatures(VoucherDate, FiveSigners());
 
-        var date = CellWith(ws, "Ngày 05 tháng 10 năm 2026");
-        date.Style.Font.Italic.Should().BeTrue();
-
         var signers = FiveSigners();
         var titleRow = RowOf(ws, "Giám đốc");
-        date.Address.RowNumber.Should().BeLessThan(titleRow);
+
+        var date = CellWith(ws, DateText);
+        date.Style.Font.Italic.Should().BeTrue();
+        date.Address.RowNumber.Should().Be(titleRow - 1);
+        date.Style.Alignment.Horizontal.Should().Be(XLAlignmentHorizontalValues.Right);
+        SpanOf(ws, DateText).Should().Be((7, 10));
+        ws.Row(titleRow - 2).CellsUsed().Should().BeEmpty();
 
         int[] expectedColumns = [1, 3, 5, 7, 9];
         for (var k = 0; k < signers.Length; k++)
@@ -163,15 +261,43 @@ public class VoucherFormBuilderTests
 
             var hint = ws.Cell(titleRow + 1, expectedColumns[k]);
             hint.GetString().Should().Be(signers[k].Hint);
+            hint.Style.Font.Italic.Should().BeTrue();
         }
 
         var namesRow = RowOf(ws, "Nguyễn A");
-        namesRow.Should().BeGreaterThan(titleRow + 1);
+        namesRow.Should().Be(titleRow + 6);
         RowOf(ws, "Trần B").Should().Be(namesRow);
         RowOf(ws, "Lê C").Should().Be(namesRow);
         ColumnOf(ws, "Nguyễn A").Should().Be(1);
         ColumnOf(ws, "Trần B").Should().Be(3);
         ColumnOf(ws, "Lê C").Should().Be(7);
+        foreach (var name in new[] { "Nguyễn A", "Trần B", "Lê C" })
+            CellWith(ws, name).Style.Font.Bold.Should().BeTrue();
+
+        ws.Row(titleRow).Height.Should().BeApproximately(ws.RowHeight, 0.01);
+        b.Table.Row.Should().Be(namesRow + 1);
+    }
+
+    [Fact]
+    public void Signature_cells_are_top_aligned()
+    {
+        var (b, ws) = NewBuilder(Context());
+
+        b.WriteSignatures(VoucherDate, FiveSigners());
+
+        foreach (var text in new[] { "Giám đốc", "(Ký, họ tên, đóng dấu)", "Nguyễn A", "Lê C" })
+            CellWith(ws, text).Style.Alignment.Vertical.Should().Be(XLAlignmentVerticalValues.Top, text);
+    }
+
+    [Fact]
+    public void More_signers_than_columns_is_refused()
+    {
+        var columns = Enumerable.Range(1, 4).Select(i => new Tt133Column($"{i}", "", 9.5)).ToArray();
+        var (b, _) = NewBuilder(Context(), VoucherPaper.A4Portrait, columns);
+
+        var act = () => b.WriteSignatures(VoucherDate, FiveSigners());
+
+        act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]
@@ -192,9 +318,8 @@ public class VoucherFormBuilderTests
             title.Address.RowNumber.Should().Be(titleRow);
             title.Address.ColumnNumber.Should().Be(expectedColumns[k]);
 
-            var last = title.IsMerged() ? title.MergedRange().LastColumn().ColumnNumber() : title.Address.ColumnNumber;
-            var blockWidth = widths[(title.Address.ColumnNumber - 1)..last].Sum();
-            blockWidth.Should().BeGreaterThanOrEqualTo(12);
+            var (first, last) = SpanOf(ws, signers[k].Title);
+            widths[(first - 1)..last].Sum().Should().BeGreaterThanOrEqualTo(12);
         }
 
         var name = CellWith(ws, "Nguyễn Văn Trường Giang");

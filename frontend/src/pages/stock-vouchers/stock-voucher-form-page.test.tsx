@@ -1059,7 +1059,7 @@ describe('StockVoucherFormPage', () => {
       expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true');
     });
 
-    it('picking another product on a line clears the server errors of that line', async () => {
+    it('picking another product on a line clears the server error of a cell the pick changed', async () => {
       await saveWithServerErrors({ 'lines[0].quantity': ['Số lượng không hợp lệ'] });
       await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true'));
 

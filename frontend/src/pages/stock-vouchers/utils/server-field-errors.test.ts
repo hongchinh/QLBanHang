@@ -58,7 +58,7 @@ describe('staleServerErrorKeys', () => {
     );
 
     it.each(['discountRate', 'unitPrice', 'quantity', 'sheetCount', 'length', 'width', 'thickness'])(
-      '%s also makes the error of a Tiền CK that follows %%CK stale',
+      '%s also makes the error of a Tiền CK that follows the CK rate stale',
       (field) => {
         const keys = stale(`lines.1.${field}`, [line(), line()]);
         expect(keys).toContain('lines.1.discountAmount');

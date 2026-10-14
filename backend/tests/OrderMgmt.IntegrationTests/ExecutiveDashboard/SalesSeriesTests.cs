@@ -14,8 +14,6 @@ public class SalesSeriesTests : ExecutiveDashboardTestBase
 {
     public SalesSeriesTests(PostgresFixture pg) : base(pg) { }
 
-    private static DateOnly D(int month, int day) => new(2026, month, day);
-
     [Fact]
     public async Task Daily_points_are_zero_filled()
     {

@@ -10,9 +10,9 @@ using Xunit;
 namespace OrderMgmt.IntegrationTests.ExecutiveDashboard;
 
 /// The guards every executive route must keep: the report permission of its domain, the branch scope of a user
-/// without branches.access_all, the own-branch default, and the company-wide default of a user with it. One row of
-/// `Routes` per route carries the route's own expectations: a phase that adds a route adds its row here (and its
-/// documents to `ArrangeAsync`) and the four guards run on it.
+/// without branches.access_all, the own-branch default, the company-wide default of a user with it, and the check of
+/// its query. One row of `Routes` per route carries the route's own expectations: a phase that adds a route adds its
+/// row here (and its documents to `ArrangeAsync`) and the five guards run on it.
 [Collection(nameof(PostgresCollection))]
 public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
 {
@@ -57,6 +57,9 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
 
     public static IEnumerable<object[]> RouteNames => Routes.Select(route => new object[] { route.Route });
 
+    /// Every route that takes a period, with the rest of its query string.
+    public static IEnumerable<object[]> PeriodRoutes => Routes.Select(route => new object[] { route.Route, route.Extra });
+
     [Theory]
     [MemberData(nameof(RouteNames))]
     public async Task Requires_the_domain_permission(string routeName)
@@ -72,10 +75,13 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
     public async Task Foreign_branch_is_refused(string routeName)
     {
         var route = RouteOf(routeName);
-        var ids = await ArrangeAsync();
-        var user = await BranchUserAsync(ids, route);
+        // The refusal needs no document: two branches and a user of the first one.
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var own = await CreateBranchAsync("GA" + suffix);
+        var other = await CreateBranchAsync("GB" + suffix);
+        var user = await BranchUserAsync(own, route);
 
-        (await GetExecRawAsync(user, UrlOf(route, $"&branchId={ids.BranchBId}")))
+        (await GetExecRawAsync(user, UrlOf(route, $"&branchId={other}")))
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
@@ -85,7 +91,7 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
     {
         var route = RouteOf(routeName);
         var ids = await ArrangeAsync();
-        var user = await BranchUserAsync(ids, route);
+        var user = await BranchUserAsync(ids.MainBranchId, route);
 
         var total = await route.ReadTotal(await GetExecRawAsync(user, UrlOf(route)));
 
@@ -104,6 +110,14 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
 
         // An admin without branchId reads every branch.
         total.Should().Be(route.Company);
+    }
+
+    [Theory]
+    [MemberData(nameof(PeriodRoutes))]
+    public async Task Period_that_ends_before_it_starts_is_rejected(string route, string extra)
+    {
+        await AssertBadRequestKeyAsync(CloneAdminClient(), $"{route}?from=2026-10-10&to=2026-10-01{extra}",
+            "to", "Đến ngày phải sau hoặc bằng từ ngày.");
     }
 
     /// The documents the cases read: the report dataset plus one payment of 123 from branch B's cash fund, because the
@@ -126,7 +140,7 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
 
     private static string UrlOf(GuardedRoute route, string more = "") => $"{route.Route}?{OctoberRange}{route.Extra}{more}";
 
-    /// A user without branches.access_all whose default branch is the main branch of the arranged data.
-    private Task<HttpClient> BranchUserAsync(ReportIds ids, GuardedRoute route) =>
-        CreateClientWithPermissionsAsync("branch_user", ids.MainBranchId, Permissions.Dashboard.Executive, route.Permission);
+    /// A user without branches.access_all whose default branch is the given one.
+    private Task<HttpClient> BranchUserAsync(Guid branchId, GuardedRoute route) =>
+        CreateClientWithPermissionsAsync("branch_user", branchId, Permissions.Dashboard.Executive, route.Permission);
 }

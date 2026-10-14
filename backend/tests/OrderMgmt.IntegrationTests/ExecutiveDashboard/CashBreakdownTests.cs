@@ -8,7 +8,7 @@ using Xunit;
 
 namespace OrderMgmt.IntegrationTests.ExecutiveDashboard;
 
-/// cash/breakdown: the totals by reason and the largest documents of the report dataset (Phase 02, Task 2.3).
+/// cash/breakdown: receipts and payments of the period by reason, and the largest documents.
 [Collection(nameof(PostgresCollection))]
 public class CashBreakdownTests : ExecutiveDashboardTestBase
 {
@@ -42,8 +42,7 @@ public class CashBreakdownTests : ExecutiveDashboardTestBase
     public async Task Largest_documents()
     {
         var ids = await ReportDataset.SeedAsync(this);
-        var branchCode = await InDbAsync(db => db.Branches.Where(b => b.Id == ids.MainBranchId)
-            .Select(b => b.Code).SingleAsync());
+        var branchCode = await BranchCodeAsync(ids.MainBranchId);
 
         var breakdown = await GetBreakdownAsync(MainClient(ids), $"{October}&branchId={ids.MainBranchId}");
 

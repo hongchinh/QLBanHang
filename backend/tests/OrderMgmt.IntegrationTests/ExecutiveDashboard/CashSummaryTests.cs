@@ -9,7 +9,7 @@ using Xunit;
 
 namespace OrderMgmt.IntegrationTests.ExecutiveDashboard;
 
-/// cash/summary: receipts, payments and fund balances of the report dataset (Phase 02, Task 2.1).
+/// cash/summary: receipts, payments and net of the period, and the balance of every fund at a date.
 [Collection(nameof(PostgresCollection))]
 public class CashSummaryTests : ExecutiveDashboardTestBase
 {
@@ -19,8 +19,7 @@ public class CashSummaryTests : ExecutiveDashboardTestBase
     public async Task Summary_of_main_branch()
     {
         var ids = await ReportDataset.SeedAsync(this);
-        var branchCode = await InDbAsync(db => db.Branches.Where(b => b.Id == ids.MainBranchId)
-            .Select(b => b.Code).SingleAsync());
+        var branchCode = await BranchCodeAsync(ids.MainBranchId);
 
         var summary = await GetCashSummaryAsync(MainClient(ids), $"{October}&branchId={ids.MainBranchId}");
 
@@ -83,11 +82,16 @@ public class CashSummaryTests : ExecutiveDashboardTestBase
     {
         var ids = await ReportDataset.SeedAsync(this);
         var suffix = ids.Kh1Code[3..];
+        var branchBFund = await CashFundIdAsync(ids.BranchBId);
+        await SetFundOpeningAmountAsync(branchBFund, 700m);
 
         var summary = await GetCashSummaryAsync(MainClient(ids), October);
 
-        summary.Balance.Should().Be(29_300m);
-        summary.Funds.Should().Contain(f => f.BranchId == ids.BranchBId);
+        // 29,300 of the main branch and the 700 branch B's cash fund starts with.
+        summary.Balance.Should().Be(30_000m);
+        summary.CashBalance.Should().Be(20_000m);
+        summary.BankBalance.Should().Be(10_000m);
+        summary.Funds.Single(f => f.FundId == branchBFund).Balance.Should().Be(700m);
         // Branch code first (RB before RD), then kind, then code.
         summary.Funds.Where(f => f.BranchId == ids.MainBranchId || f.BranchId == ids.BranchBId)
             .Select(f => (f.BranchCode, f.Code))

@@ -1,6 +1,9 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.CreditLimits.Models;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
@@ -20,12 +23,43 @@ public abstract class ExecutiveDashboardTestBase : CashDebtTestBase
 
     protected ExecutiveDashboardTestBase(PostgresFixture pg) : base(pg) { }
 
+    /// A day of 2026, the year of the report dataset.
+    protected static DateOnly D(int month, int day) => new(2026, month, day);
+
     /// An admin client whose working branch is the dataset's main branch.
     protected HttpClient MainClient(ReportIds ids)
     {
         var client = CloneAdminClient();
         UseBranch(client, ids.MainBranchId);
         return client;
+    }
+
+    protected Task<string> BranchCodeAsync(Guid branchId) =>
+        InDbAsync(db => db.Branches.Where(b => b.Id == branchId).Select(b => b.Code).SingleAsync());
+
+    /// An unpaid purchase (NMH) of `amount` from the supplier on 10-20 in the dataset's main branch with the given due
+    /// date; one untracked product, quantity 1. `configure` may change the request before it is posted.
+    protected async Task<StockVoucherDto> PostPurchaseAsync(ReportIds ids, Guid supplierId, decimal amount,
+        DateOnly dueDate, Action<UpsertStockVoucherRequest>? configure = null)
+    {
+        var product = await CreateInventoryProductAsync("DUE-" + Guid.NewGuid().ToString("N")[..8], track: false);
+        var request = VoucherRequest(StockDirection.In, await ReasonIdAsync("NMH"), "2026-10-20 09:00",
+            LineRequest(product, 1, amount));
+        request.WarehouseId = ids.MainWarehouseId;
+        request.PartnerId = supplierId;
+        request.DueDate = dueDate;
+        configure?.Invoke(request);
+        var (status, voucher, error) = await PostVoucherAsync(MainClient(ids), request);
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        return voucher!;
+    }
+
+    /// Sets the credit limit of the customer in the working branch of the client.
+    protected static async Task SetLimitAsync(HttpClient client, Guid customerId, decimal amount)
+    {
+        var response = await client.PutAsJsonAsync($"/api/credit-limits/{customerId}",
+            new UpsertCreditLimitRequest { Amount = amount });
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
     }
 
     /// GET /api/dashboard/executive/{pathAndQuery}, success body read as T.

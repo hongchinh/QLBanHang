@@ -1,3 +1,4 @@
+using System.Net;
 using FluentAssertions;
 using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Domain.Enums;
@@ -6,13 +7,11 @@ using Xunit;
 
 namespace OrderMgmt.IntegrationTests.ExecutiveDashboard;
 
-/// cash/series (Phase 02, Task 2.2).
+/// cash/series: receipts and payments per day, week or month of the period.
 [Collection(nameof(PostgresCollection))]
 public class CashSeriesTests : ExecutiveDashboardTestBase
 {
     public CashSeriesTests(PostgresFixture pg) : base(pg) { }
-
-    private static DateOnly D(int month, int day) => new(2026, month, day);
 
     [Fact]
     public async Task Daily_points()
@@ -64,12 +63,13 @@ public class CashSeriesTests : ExecutiveDashboardTestBase
     [Fact]
     public async Task Buckets_follow_vn_dates()
     {
-        var ids = await ReportDataset.SeedAsync(this);
+        var branch = await CreateFreshBranchAsync();
+        var fundId = await CashFundIdAsync(branch.BranchId);
         // 23:30 and 00:30 in Vietnam are on the same UTC day but on two VN days.
-        await InsertCashVoucherAsync(ids.MainBranchId, ids.QtmId, CashVoucherType.Receipt, 100m, Vn("2026-10-20 23:30"));
-        await InsertCashVoucherAsync(ids.MainBranchId, ids.QtmId, CashVoucherType.Payment, 30m, Vn("2026-10-21 00:30"));
+        await InsertCashVoucherAsync(branch.BranchId, fundId, CashVoucherType.Receipt, 100m, Vn("2026-10-20 23:30"));
+        await InsertCashVoucherAsync(branch.BranchId, fundId, CashVoucherType.Payment, 30m, Vn("2026-10-21 00:30"));
 
-        var series = await GetCashSeriesAsync(MainClient(ids), $"{October}&granularity=Day&branchId={ids.MainBranchId}");
+        var series = await GetCashSeriesAsync(branch.Client, $"{October}&granularity=Day&branchId={branch.BranchId}");
 
         series.Points.Single(p => p.Date == D(10, 20)).Receipts.Should().Be(100m);
         series.Points.Single(p => p.Date == D(10, 20)).Payments.Should().Be(0m);
@@ -92,6 +92,18 @@ public class CashSeriesTests : ExecutiveDashboardTestBase
 
         series.Points.Select(p => (p.Date, p.Receipts)).Should().Equal(
             (D(9, 28), 10m), (D(10, 5), 0m), (D(10, 12), 0m), (D(10, 19), 0m), (D(10, 26), 20m));
+    }
+
+    [Fact]
+    public async Task Daily_series_over_a_year_is_rejected()
+    {
+        var client = CloneAdminClient();
+
+        await AssertBadRequestKeyAsync(client, "cash/series?from=2025-01-01&to=2026-10-01&granularity=Day",
+            "granularity", "Biểu đồ theo ngày tối đa 366 ngày. Hãy chọn theo tuần hoặc tháng.");
+
+        (await GetExecRawAsync(client, "cash/series?from=2025-01-01&to=2026-10-01&granularity=Month"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
     private static Task<CashSeriesDto> GetCashSeriesAsync(HttpClient client, string query) =>

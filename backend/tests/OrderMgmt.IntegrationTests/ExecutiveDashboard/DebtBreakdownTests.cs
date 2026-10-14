@@ -1,12 +1,10 @@
 using System.Net;
-using System.Net.Http.Json;
 using FluentAssertions;
+using FluentAssertions.Execution;
 using Microsoft.EntityFrameworkCore;
-using OrderMgmt.Application.CashDebt.CreditLimits.Models;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Application.Inventory.Common;
-using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
@@ -15,14 +13,12 @@ using Xunit;
 
 namespace OrderMgmt.IntegrationTests.ExecutiveDashboard;
 
-/// debt/breakdown: top debtors, credit-limit breaches, the receivable by employee and the payables that fall due soon
-/// (Phase 02, Task 2.6).
+/// debt/breakdown: the customers who owe the most, the credit limits that are exceeded, the receivable by the employee
+/// who owns the documents, and the payables that fall due within thirty days.
 [Collection(nameof(PostgresCollection))]
 public class DebtBreakdownTests : ExecutiveDashboardTestBase
 {
     public DebtBreakdownTests(PostgresFixture pg) : base(pg) { }
-
-    private static DateOnly D(int month, int day) => new(2026, month, day);
 
     [Fact]
     public async Task Top_debtors()
@@ -72,11 +68,12 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
         var ids = await ReportDataset.SeedAsync(this);
         var client = MainClient(ids);
         var suffix = ids.Kh1Code[3..];
-        // Eleven customers beside KH1 (1,500). The two with 9,000 are created in the opposite order of their codes.
+        // Eleven customers beside KH1 (1,500). The five with 9,000 are created in the opposite order of their codes:
+        // only the code can put five equal balances in this order (their ids are random).
         foreach (var (code, amount) in new[]
                  {
-                     ("TIEB", 9_000m), ("TIEA", 9_000m), ("K8000", 8_000m), ("K7000", 7_000m), ("K6000", 6_000m),
-                     ("K5000", 5_000m), ("K4000", 4_000m), ("K3000", 3_000m), ("K2500", 2_500m), ("K2000", 2_000m),
+                     ("TIEE", 9_000m), ("TIED", 9_000m), ("TIEC", 9_000m), ("TIEB", 9_000m), ("TIEA", 9_000m),
+                     ("K8000", 8_000m), ("K7000", 7_000m), ("K6000", 6_000m), ("K5000", 5_000m), ("K4000", 4_000m),
                      ("K1000", 1_000m),
                  })
         {
@@ -89,9 +86,30 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
 
         // KH1 (1,500) and K1000 do not fit in the ten.
         breakdown.TopDebtors.Select(r => (r.PartnerCode, r.Balance)).Should().Equal(
-            ("TIEA" + suffix, 9_000m), ("TIEB" + suffix, 9_000m), ("K8000" + suffix, 8_000m), ("K7000" + suffix, 7_000m),
-            ("K6000" + suffix, 6_000m), ("K5000" + suffix, 5_000m), ("K4000" + suffix, 4_000m), ("K3000" + suffix, 3_000m),
-            ("K2500" + suffix, 2_500m), ("K2000" + suffix, 2_000m));
+            ("TIEA" + suffix, 9_000m), ("TIEB" + suffix, 9_000m), ("TIEC" + suffix, 9_000m), ("TIED" + suffix, 9_000m),
+            ("TIEE" + suffix, 9_000m), ("K8000" + suffix, 8_000m), ("K7000" + suffix, 7_000m), ("K6000" + suffix, 6_000m),
+            ("K5000" + suffix, 5_000m), ("K4000" + suffix, 4_000m));
+    }
+
+    [Fact]
+    public async Task Position_and_overdue_are_as_at_the_given_date()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var adminId = await InDbAsync(db => db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync());
+
+        var breakdown = await GetDebtBreakdownAsync(MainClient(ids), $"at=2026-10-03&branchId={ids.MainBranchId}");
+
+        // On the 3rd HD-OLD is still whole (the receipt of 10-05 is not in yet) and 13 days late. The sale of that day
+        // has 2,000 left after its automatic receipt and falls due that day, so it is not overdue yet. TT-OLD (1,000)
+        // is unmatched money: it lowers the balance and belongs to no employee.
+        using (new AssertionScope())
+        {
+            breakdown.At.Should().Be(D(10, 3));
+            breakdown.TopDebtors.Select(r => (r.PartnerId, r.Balance, r.Overdue))
+                .Should().Equal((ids.Kh1Id, 6_000m, 5_000m));
+            breakdown.ByEmployee.Select(r => (r.OwnerUserId, r.Open, r.Overdue))
+                .Should().Equal(((Guid?)adminId, 2_000m, 0m), (null, 5_000m, 5_000m));
+        }
     }
 
     [Fact]
@@ -114,8 +132,7 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
         var ids = await ReportDataset.SeedAsync(this);
         var client = MainClient(ids);
         var query = $"at=2026-10-31&branchId={ids.MainBranchId}";
-        var branchCode = await InDbAsync(db => db.Branches.Where(b => b.Id == ids.MainBranchId)
-            .Select(b => b.Code).SingleAsync());
+        var branchCode = await BranchCodeAsync(ids.MainBranchId);
 
         await SetLimitAsync(client, ids.Kh1Id, 1_000m);
 
@@ -166,6 +183,33 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
     }
 
     [Fact]
+    public async Task Over_limit_row_of_a_customer_who_owes_nothing_company_wide_keeps_code_and_name()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainClient(ids);
+        var branchB = CloneAdminClient();
+        UseBranch(branchB, ids.BranchBId);
+        var code = "KX" + ids.Kh1Code[3..];
+        var customer = await CreatePartnerAsync(code, isCustomer: true, isSupplier: false);
+        // The customer owes 1,000 in the main branch, over its limit of 400 there, and has paid 1,000 ahead in branch B:
+        // over the whole company it owes nothing, so it is no debtor and only the breach names it.
+        await CreateOpeningDebtAsync(client, customer, DebtSide.Receivable, OpeningDebtKind.Debt, "HD-KX", D(9, 5), 1_000m,
+            dueDate: D(9, 20));
+        await SetLimitAsync(client, customer, 400m);
+        await CreateCashAsync(branchB, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TKH"),
+            await CashFundIdAsync(ids.BranchBId), "2026-10-06 09:00", customer, 1_000m));
+
+        var breakdown = await GetDebtBreakdownAsync(client, "at=2026-10-31");
+
+        breakdown.TopDebtors.Select(r => r.PartnerId).Should().NotContain(customer);
+        var breach = breakdown.OverLimit.Should().ContainSingle(b => b.PartnerId == customer).Which;
+        breach.BranchId.Should().Be(ids.MainBranchId);
+        breach.PartnerCode.Should().Be(code);
+        breach.PartnerName.Should().Be($"Đối tượng {code}");
+        (breach.Balance, breach.Limit, breach.Over).Should().Be((1_000m, 400m, 600m));
+    }
+
+    [Fact]
     public async Task By_employee_equals_the_report()
     {
         var ids = await ReportDataset.SeedAsync(this);
@@ -181,12 +225,7 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
         // money, not documents owed, so they belong to nobody's total.
         breakdown.ByEmployee.Select(r => (r.OwnerUserId, r.OwnerName, r.Open, r.Overdue)).Should().Equal(
             ((Guid?)admin.Id, (string?)admin.FullName, 2_000m, 2_000m), (null, null, 1_000m, 1_000m));
-        foreach (var row in report.Rows)
-        {
-            var mine = breakdown.ByEmployee.Single(r => r.OwnerUserId == row.OwnerUserId);
-            mine.Open.Should().Be(row.ClosingOpen);
-            mine.Overdue.Should().Be(row.ClosingOverdue);
-        }
+        AssertByEmployeeEqualsTheReport(breakdown, report);
     }
 
     [Fact]
@@ -226,21 +265,15 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
             ((Guid?)admin.Id, (string?)admin.FullName, 2_000m, 2_000m),
             ((Guid?)sp2.Id, (string?)sp2.FullName, 500m, 0m),
             (null, null, 1_000m, 1_000m));
-        foreach (var row in report.Rows)
-        {
-            var mine = breakdown.ByEmployee.Single(r => r.OwnerUserId == row.OwnerUserId);
-            mine.Open.Should().Be(row.ClosingOpen);
-            mine.Overdue.Should().Be(row.ClosingOverdue);
-        }
+        AssertByEmployeeEqualsTheReport(breakdown, report);
     }
 
     [Fact]
     public async Task Payables_due_within_thirty_days()
     {
         var ids = await ReportDataset.SeedAsync(this);
-        var branchCode = await InDbAsync(db => db.Branches.Where(b => b.Id == ids.MainBranchId)
-            .Select(b => b.Code).SingleAsync());
-        var purchase = await PostPurchaseAsync(ids, 800m, D(11, 15));
+        var branchCode = await BranchCodeAsync(ids.MainBranchId);
+        var purchase = await PostPurchaseAsync(ids, ids.Ncc1Id, 800m, D(11, 15));
 
         var breakdown = await GetDebtBreakdownAsync(MainClient(ids), $"at=2026-10-21&branchId={ids.MainBranchId}");
 
@@ -262,7 +295,7 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
     public async Task Payables_due_after_thirty_days_are_not_listed()
     {
         var ids = await ReportDataset.SeedAsync(this);
-        await PostPurchaseAsync(ids, 800m, D(11, 25));
+        await PostPurchaseAsync(ids, ids.Ncc1Id, 800m, D(11, 25));
 
         var breakdown = await GetDebtBreakdownAsync(MainClient(ids), $"at=2026-10-21&branchId={ids.MainBranchId}");
 
@@ -273,16 +306,31 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
     public async Task Payables_due_window_runs_from_the_given_day_to_thirty_days_after_it()
     {
         var ids = await ReportDataset.SeedAsync(this);
-        var yesterday = await PostPurchaseAsync(ids, 100m, D(10, 20));
-        var today = await PostPurchaseAsync(ids, 200m, D(10, 21));
-        var lastDay = await PostPurchaseAsync(ids, 300m, D(11, 20));
-        var afterTheWindow = await PostPurchaseAsync(ids, 400m, D(11, 21));
+        var yesterday = await PostPurchaseAsync(ids, ids.Ncc1Id, 100m, D(10, 20));
+        var today = await PostPurchaseAsync(ids, ids.Ncc1Id, 200m, D(10, 21));
+        var lastDay = await PostPurchaseAsync(ids, ids.Ncc1Id, 300m, D(11, 20));
+        var afterTheWindow = await PostPurchaseAsync(ids, ids.Ncc1Id, 400m, D(11, 21));
 
         var breakdown = await GetDebtBreakdownAsync(MainClient(ids), $"at=2026-10-21&branchId={ids.MainBranchId}");
 
         breakdown.PayablesDue.Select(r => (r.DocCode, r.DueDate, r.Open)).Should().Equal(
             (today.Code, D(10, 21), 200m), (lastDay.Code, D(11, 20), 300m));
         breakdown.PayablesDue.Select(r => r.DocCode).Should().NotContain(new[] { yesterday.Code, afterTheWindow.Code });
+    }
+
+    [Fact]
+    public async Task Payables_due_list_only_what_the_company_owes()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainClient(ids);
+        // A customer's debt that falls due on 11-10, inside the thirty days: money owed to the company, not by it.
+        await CreateOpeningDebtAsync(client, ids.Kh1Id, DebtSide.Receivable, OpeningDebtKind.Debt, "HD-DUE", D(9, 5), 600m,
+            dueDate: D(11, 10));
+        var purchase = await PostPurchaseAsync(ids, ids.Ncc1Id, 800m, D(11, 15));
+
+        var breakdown = await GetDebtBreakdownAsync(client, $"at=2026-10-21&branchId={ids.MainBranchId}");
+
+        breakdown.PayablesDue.Select(r => (r.DocCode, r.Open)).Should().Equal((purchase.Code, 800m));
     }
 
     [Fact]
@@ -321,27 +369,17 @@ public class DebtBreakdownTests : ExecutiveDashboardTestBase
         breakdown.At.Should().BeOneOf(before, VnTime.ToVnDate(DateTimeOffset.UtcNow));
     }
 
-    /// An unpaid purchase (NMH) of `amount` from NCC1 on 10-20 in the main branch with the given due date; one untracked
-    /// product, quantity 1.
-    private async Task<StockVoucherDto> PostPurchaseAsync(ReportIds ids, decimal amount, DateOnly dueDate)
+    /// Every owner has the same open and overdue amounts in the report and in the breakdown. An owner whose documents
+    /// are all settled is in the report with zeros and has no row in the breakdown.
+    private static void AssertByEmployeeEqualsTheReport(DebtBreakdownDto breakdown, DebtBySalespersonReportDto report)
     {
-        var product = await CreateInventoryProductAsync("DUE-" + Guid.NewGuid().ToString("N")[..8], track: false);
-        var request = VoucherRequest(StockDirection.In, await ReasonIdAsync("NMH"), "2026-10-20 09:00",
-            LineRequest(product, 1, amount));
-        request.WarehouseId = ids.MainWarehouseId;
-        request.PartnerId = ids.Ncc1Id;
-        request.DueDate = dueDate;
-        var (status, voucher, error) = await PostVoucherAsync(MainClient(ids), request);
-        status.Should().Be(HttpStatusCode.OK, error?.Message);
-        return voucher!;
-    }
-
-    /// Sets the credit limit of the customer in the working branch of the client.
-    private static async Task SetLimitAsync(HttpClient client, Guid customerId, decimal amount)
-    {
-        var response = await client.PutAsJsonAsync($"/api/credit-limits/{customerId}",
-            new UpsertCreditLimitRequest { Amount = amount });
-        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        breakdown.ByEmployee.Select(r => r.OwnerUserId).Should().BeSubsetOf(report.Rows.Select(r => r.OwnerUserId));
+        foreach (var row in report.Rows)
+        {
+            var mine = breakdown.ByEmployee.SingleOrDefault(r => r.OwnerUserId == row.OwnerUserId);
+            (mine?.Open ?? 0m).Should().Be(row.ClosingOpen, $"open of owner {row.OwnerUserId}");
+            (mine?.Overdue ?? 0m).Should().Be(row.ClosingOverdue, $"overdue of owner {row.OwnerUserId}");
+        }
     }
 
     private static Task<DebtBreakdownDto> GetDebtBreakdownAsync(HttpClient client, string query) =>

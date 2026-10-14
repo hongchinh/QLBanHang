@@ -115,8 +115,10 @@ type ShortcutKeyEvent = Pick<
 
 // Ctrl+S saves (with Caps Lock too, not with Shift); Alt+1..4 switch tabs, Alt+4 only on a saved voucher.
 function shortcutOf(e: ShortcutKeyEvent, isEdit: boolean): 'save' | StockVoucherTab | undefined {
-  if (e.key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) return 'save';
-  const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[e.key] : undefined;
+  // Chrome sends a keydown with no key when an autofill entry is picked; React's handler sees 'Unidentified'.
+  const key: string = typeof e.key === 'string' ? e.key : '';
+  if (key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) return 'save';
+  const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[key] : undefined;
   return altTab === 'history' && !isEdit ? undefined : altTab;
 }
 

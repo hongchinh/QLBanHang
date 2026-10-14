@@ -1839,6 +1839,29 @@ describe('StockVoucherFormPage', () => {
       await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
     });
 
+    // Chrome sends a plain keydown Event, with no key, when an autofill entry is picked.
+    it('a keydown with no key is no shortcut and throws nothing, in the form or on <body>', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderInMain();
+      const errors: unknown[] = [];
+      const onError = (e: ErrorEvent) => {
+        errors.push(e.error);
+        e.preventDefault();
+      };
+      window.addEventListener('error', onError);
+      try {
+        act(() => {
+          byId('stock-voucher-note').dispatchEvent(new Event('keydown', { bubbles: true }));
+          document.body.dispatchEvent(new Event('keydown', { bubbles: true }));
+        });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      } finally {
+        window.removeEventListener('error', onError);
+      }
+      expect(errors).toEqual([]);
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
     it('stops listening once the page is gone', async () => {
       createMock.mockResolvedValue(voucher());
       const { unmount } = renderPage('In');

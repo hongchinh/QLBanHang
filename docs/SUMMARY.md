@@ -8,7 +8,7 @@ System design, component interactions, data flows, deployment, and external inte
 
 | File | Description |
 | ---- | ----------- |
-| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile), the executive dashboard (metrics services, scope, routes and permissions, which figures are tested against which report, the real-time `DashboardChanged` SignalR signal), API response, soft-delete/audit, migration/seed, logging and frontend layering |
+| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile), the executive dashboard (metrics services, scope, routes and permissions, which figures are tested against which report, the real-time `DashboardChanged` SignalR signal), demo branches and sample data (create flow through the queue, worker, runner and business services, acting identity, status and start-up recovery, hard delete order and sample catalog cleanup, company scope excluding demo branches, one dashboard signal per seed), API response, soft-delete/audit, migration/seed, logging and frontend layering |
 
 ## Codebase
 
@@ -16,7 +16,7 @@ Directory structure, entry points, API patterns, and key modules.
 
 | File | Description |
 | ---- | ----------- |
-| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms, the executive dashboard and the real-time signal), API controllers, entry points, runtime artifacts and production configuration keys |
+| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms, the executive dashboard, the real-time signal and the demo branches with `Application/Organization/SampleData` and `WebApi/BackgroundJobs`), API controllers, entry points, runtime artifacts and production configuration keys |
 
 ## Code Standard
 
@@ -24,7 +24,7 @@ Conventions, naming rules, tech stack versions, and development workflows.
 
 | File | Description |
 | ---- | ----------- |
-| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets) |
+| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets), demo branch and background job patterns (`IActingIdentity` only in background work, `Channel` queue + `BackgroundService` with start-up recovery, the demo hard delete as the soft-delete exception, company-wide queries skip `IsDemo` branches) and test doubles through `WithWebHostBuilder` + `ConfigureTestServices` |
 
 ## Project PDR
 
@@ -32,7 +32,7 @@ Product goals, use cases, business rules, and constraints.
 
 | File | Description |
 | ---- | ----------- |
-| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms and the executive dashboard), planned Round 3 scope and role dashboards, and non-goals |
+| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms, the executive dashboard and demo branches with sample data, with their limits), planned Round 3 scope and role dashboards, and non-goals |
 
 ## Other
 
@@ -73,7 +73,7 @@ Repository-specific docs outside the standard topic folders.
 | [plans/260522-2326-zalo-send-quotation/SUMMARY.md](plans/260522-2326-zalo-send-quotation/SUMMARY.md) | Plan for sending quotation files to a Zalo group via Zalo OA |
 | [plans/archived/260523-1530-pwa-progressive-web-app/SUMMARY.md](plans/archived/260523-1530-pwa-progressive-web-app/SUMMARY.md) | Implementation plan for PWA — 4 phases: installable, API cache, push backend, push frontend |
 | [plans/260528-1833-product-form-dialog/SUMMARY.md](plans/260528-1833-product-form-dialog/SUMMARY.md) | Plan for create/edit actions in the product catalog dialog |
-| [plans/261014-1616-branch-sample-data/SUMMARY.md](plans/261014-1616-branch-sample-data/SUMMARY.md) | Implementation plan for demo branches with sample data — Branch/Product/Customer flags, acting identity for background work, deterministic dataset generator, background runner calling the business services, demo-branch hard delete with catalog cleanup, company-scope reports excluding demo branches, branches page UI; four parallel lanes |
+| [plans/261014-1616-branch-sample-data/SUMMARY.md](plans/261014-1616-branch-sample-data/SUMMARY.md) | Implementation plan (executed) for demo branches with sample data — Branch/Product/Customer flags, acting identity for background work, deterministic dataset generator, background runner calling the business services, demo-branch hard delete with catalog cleanup, company-scope reports excluding demo branches, branches page UI; four parallel lanes |
 | [plans/archived/261006-2259-inventory-round1/SUMMARY.md](plans/archived/261006-2259-inventory-round1/SUMMARY.md) | Implementation plan for inventory Round 1 — stock vouchers, ledger, costing, reports |
 | [plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md](plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md) | Implementation plan for Round 2A — receipts/payments, funds, fund transfers, receivables/payables with matching and offset, credit limits, debt balance/ledger and cash book reports |
 | [plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md](plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md) | Implementation plan for Round 2B — debt documents, aging, overdue, by-salesperson and reconciliation reports |

@@ -263,3 +263,5 @@ Runner (B) chỉ cần contract của kế hoạch từ lượt 1. Không phải
 
 1. `write-plan` từ brainstorm này. Plan chia phase theo bảng [Chia việc](#chia-việc-cho-nhiều-agent) và liệt kê đủ các truy vấn `ReportScope.Company`.
 2. Thực thi bằng nhiều agent song song ở lượt 2.
+
+Plan: [261014-1616-branch-sample-data](../../plans/261014-1616-branch-sample-data/SUMMARY.md)

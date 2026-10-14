@@ -60,6 +60,31 @@ describe('KpiCard', () => {
     expect(container.querySelector('svg')).toBeNull();
   });
 
+  it('renders a label icon without a tone class', () => {
+    const { container } = render(
+      <KpiCard
+        label="Doanh thu hôm nay"
+        icon="kpiRevenueToday"
+        kpi={{ value: 1, deltaPct: 5, spark: [] }}
+      />,
+    );
+    const icon = container.querySelector('[data-icon="kpiRevenueToday"]');
+    expect(icon).not.toBeNull();
+    expect(icon!.getAttribute('class')).not.toMatch(/text-icon-/);
+  });
+
+  it('renders no icon in the label row when icon is omitted', () => {
+    const { container } = render(
+      <KpiCard
+        label="Doanh thu hôm nay"
+        kpi={{ value: 1, deltaPct: 5, spark: [] }}
+      />,
+    );
+    const labelRow = screen.getByText('Doanh thu hôm nay').parentElement!;
+    expect(labelRow.querySelector('svg[data-icon]')).toBeNull();
+    expect(container.querySelector('[data-icon="kpiRevenueToday"]')).toBeNull();
+  });
+
   it('renders sparkline when spark has data', () => {
     const { container } = render(
       <KpiCard

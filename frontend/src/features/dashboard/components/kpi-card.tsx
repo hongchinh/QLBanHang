@@ -1,5 +1,6 @@
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { cn } from '@/lib/utils';
+import { AppIcon, type IconName } from '@/components/icons';
 import type { Kpi } from '../types';
 import { DeltaArrow } from './delta-arrow';
 import { formatDelta, formatNumber, formatVnd } from '../format';
@@ -10,9 +11,10 @@ interface KpiCardProps {
   kpi?: Kpi;
   loading?: boolean;
   accentColor?: string;
+  icon?: IconName;
 }
 
-export function KpiCard({ label, format = 'number', kpi, loading, accentColor }: KpiCardProps) {
+export function KpiCard({ label, format = 'number', kpi, loading, accentColor, icon }: KpiCardProps) {
   const value = kpi?.value ?? 0;
   const display = format === 'currency' ? formatVnd(value) : formatNumber(value);
   const delta = formatDelta(kpi?.deltaPct);
@@ -24,7 +26,10 @@ export function KpiCard({ label, format = 'number', kpi, loading, accentColor }:
       className="rounded-xl border border-border bg-card p-5 shadow-sm"
       style={accentColor ? { color: accentColor } : undefined}
     >
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
+        {icon && <AppIcon name={icon} className="text-muted-foreground" tone="none" />}
+      </div>
       <div className="mt-2 flex items-baseline justify-between gap-3">
         <div className="text-3xl font-semibold tracking-tight tabular-nums text-foreground">
           {loading ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-muted" /> : display}

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -8,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { giveFocusBack, ignoreKeyRepeat, isFocusLost } from '@/lib/focus';
 import type { ConfirmationRequest } from '@/lib/confirm-required';
 
 interface Props {
@@ -15,14 +17,40 @@ interface Props {
   confirmLabel?: string;
   onConfirm: () => void;
   onClose: () => void;
+  /** Element that gets the focus when the dialog closes; without it the element focused at open is used. */
+  restoreFocusTo?: () => HTMLElement | null;
 }
 
 // Generic dialog for the 422 confirmation codes (P10); open while a request is set.
-export function ConfirmRequiredDialog({ request, confirmLabel = 'Vẫn tiếp tục', onConfirm, onClose }: Props) {
+export function ConfirmRequiredDialog({ request, confirmLabel = 'Vẫn tiếp tục', onConfirm, onClose, restoreFocusTo }: Props) {
   const blocked = request?.blocked ?? false;
+  // The dialog stays mounted and closes when the request is cleared. Unmounted, it went away with its page (browser
+  // Back while it was open), and Radix still asks where the focus goes a tick later.
+  const mountedRef = useRef(false);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   return (
     <Dialog open={request !== null} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent showClose={false} className="max-w-lg">
+      <DialogContent
+        showClose={false}
+        className="max-w-lg"
+        onCloseAutoFocus={(event) => {
+          // Nothing to give the focus back to for a page that is gone, not even what had it when the dialog opened.
+          if (!mountedRef.current) {
+            event.preventDefault();
+            return;
+          }
+          const target = restoreFocusTo?.();
+          if (!target) return;
+          event.preventDefault();
+          // A key still held down (the Escape or Enter that closed the dialog) must not act on that element.
+          if (isFocusLost()) giveFocusBack(target);
+        }}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <AlertTriangle className={blocked ? 'h-5 w-5 text-red-600' : 'h-5 w-5 text-amber-600'} />
@@ -44,7 +72,8 @@ export function ConfirmRequiredDialog({ request, confirmLabel = 'Vẫn tiếp t�
             ))}
           </ul>
         )}
-        <DialogFooter>
+        {/* The press that opened the dialog may still be down: its repeats must not press a button here. */}
+        <DialogFooter onKeyDown={ignoreKeyRepeat}>
           {blocked ? (
             <Button variant="outline" onClick={onClose}>
               Đóng

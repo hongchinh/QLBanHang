@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { PushPermissionPrompt } from './PushPermissionPrompt'
+import { isPushPromptVisible } from './push-prompt-visibility'
 import type { PushState } from '@/hooks/usePushNotification'
 
 describe('PushPermissionPrompt', () => {
@@ -46,5 +47,24 @@ describe('PushPermissionPrompt', () => {
     render(<PushPermissionPrompt state="idle" onEnable={vi.fn()} onDismiss={onDismiss} />)
     fireEvent.click(screen.getByRole('button', { name: /để sau/i }))
     expect(onDismiss).toHaveBeenCalledOnce()
+  })
+
+  // App asks isPushPromptVisible whether the shell gets a banner slot. The prompt has to agree in every state,
+  // or the slot stays empty (or the prompt goes missing).
+  it.each<PushState>(['idle', 'loading', 'error', 'granted', 'denied', 'unsupported'])(
+    'renders something exactly when isPushPromptVisible says so (%s)',
+    (state) => {
+      const { container } = render(<PushPermissionPrompt state={state} onEnable={vi.fn()} onDismiss={vi.fn()} />)
+      expect(container.firstChild !== null).toBe(isPushPromptVisible(state))
+    },
+  )
+
+  // On a 1366x657 window the stock voucher form with its debt strip needs 545 px, and under a one-line banner
+  // of 54 px (py-3) it got 539: the page scrolled by 6 px. With py-2 the line is 46 px. Only a browser can
+  // measure that; this pins the class.
+  it('keeps a one-line banner short with py-2', () => {
+    const { container } = render(<PushPermissionPrompt state="idle" onEnable={vi.fn()} onDismiss={vi.fn()} />)
+    expect(container.firstElementChild).toHaveClass('py-2')
+    expect(container.firstElementChild).not.toHaveClass('py-3')
   })
 })

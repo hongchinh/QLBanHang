@@ -94,4 +94,25 @@ describe('AuthInit', () => {
     expect(meMock).not.toHaveBeenCalled();
     expect(useAuthStore.getState().isAuthenticated()).toBe(false);
   });
+
+  // The viewport height belongs to AppShell (it also holds the push banner). A loader that claimed it again with
+  // h-screen would be taller than the room under the banner and bring the scrollbar back.
+  it('shows a loader that fills the shell while the session boots', async () => {
+    refreshMock.mockResolvedValue({ accessToken: 'tok', accessTokenExpiresAt: new Date(Date.now() + 60_000).toISOString() });
+    meMock.mockResolvedValue(user);
+
+    render(
+      <AuthInit>
+        <div>app-content</div>
+      </AuthInit>,
+    );
+
+    // Nothing was awaited yet, so the refresh is still unanswered and the loader is up.
+    const loader = screen.getByText('Đang tải...');
+    expect(loader).toHaveClass('flex-1');
+    expect(loader).not.toHaveClass('h-screen');
+    expect(loader).not.toHaveClass('min-h-screen');
+
+    await waitFor(() => expect(screen.getByText('app-content')).toBeInTheDocument());
+  });
 });

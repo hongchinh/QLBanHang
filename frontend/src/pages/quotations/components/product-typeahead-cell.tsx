@@ -35,6 +35,9 @@ const DROPDOWN_GAP = 4;
 const WINDOW_MARGIN = 8;
 // The list never grows past this (the max-h-80 class), however many results there are.
 const MAX_LIST_HEIGHT = 320;
+// The full catalog gives the focus back to the box once its close animation has run (well under this); a focus of the
+// box later than this after a pick is the user's own.
+const PICK_FOCUS_BACK_MS = 1000;
 
 interface Placement {
   above: boolean;
@@ -132,12 +135,21 @@ export function ProductTypeaheadCell({
     else if (row.bottom > bottom) list.scrollTop += row.bottom - bottom;
   }, [open, highlightedId]);
 
+  // When the last pick was made (performance.now()), until the box loses or gets the focus. The full catalog gives the
+  // focus back to the box as it closes: the list the pick has just closed must not open again on that focus, or Tab
+  // and Enter would act on it (Enter picks its highlighted row). The focus may go somewhere else while the catalog
+  // closes; a focus of the box that comes later than that is the user's own. A pick that moves on to the next cell
+  // (nextFocusId) leaves the box to the user's next focus.
+  const pickedAtRef = useRef<number | null>(null);
+
   const commit = useCallback(
     (s: ProductSuggestion) => {
       onSelect(s);
       setOpen(false);
       if (nextFocusId) {
         setTimeout(() => document.getElementById(nextFocusId)?.focus(), 0);
+      } else {
+        pickedAtRef.current = performance.now();
       }
     },
     [onSelect, nextFocusId],
@@ -186,7 +198,13 @@ export function ProductTypeaheadCell({
     value,
     onFocus: () => {
       syncDropdownRect();
-      if (openOnFocus) setOpen(true);
+      const pickedAt = pickedAtRef.current;
+      pickedAtRef.current = null;
+      const focusBackFromPick = pickedAt !== null && performance.now() - pickedAt < PICK_FOCUS_BACK_MS;
+      if (openOnFocus && !focusBackFromPick) setOpen(true);
+    },
+    onBlur: () => {
+      pickedAtRef.current = null;
     },
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange(e.target.value);

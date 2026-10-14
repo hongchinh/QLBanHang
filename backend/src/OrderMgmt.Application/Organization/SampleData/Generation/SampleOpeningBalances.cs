@@ -9,6 +9,10 @@ public static class SampleOpeningBalances
     private const decimal ReceivablePrepayment = 20_000_000m;
     private const decimal PayablePrepayment = 30_000_000m;
 
+    /// A prepayment was received (or made) this many days before the opening date.
+    private const int PrepaymentAgeMin = 5;
+    private const int PrepaymentAgeMax = 30;
+
     /// Every opening amount varies from its base by up to this much, in 500,000 steps.
     private const decimal AmountSpread = 5_000_000m;
 
@@ -42,8 +46,10 @@ public static class SampleOpeningBalances
         new("DM-NCC03", 10, 15, 35_000_000m),
     };
 
-    private const string ReceivablePrepaymentCustomer = "DM-KH12";
     private const string PayablePrepaymentSupplier = "DM-NCC04";
+
+    /// The retail customer flagged HasPrepayment in the catalog.
+    private static string ReceivablePrepaymentCustomer => SampleCatalog.CustomerProfiles.Single(p => p.HasPrepayment).Code;
 
     public static List<SampleOpeningStockSpec> BuildStocks(SampleRandom random)
     {
@@ -88,7 +94,7 @@ public static class SampleOpeningBalances
         }
 
         debts.Add(OpeningItem(++number, partners[ReceivablePrepaymentCustomer], DebtSide.Receivable, OpeningDebtKind.Prepayment,
-            "PT-DK-001", openingDate.AddDays(-random.Between(5, 30)), ReceivablePrepayment));
+            "PT-DK-001", openingDate.AddDays(-random.Between(PrepaymentAgeMin, PrepaymentAgeMax)), ReceivablePrepayment));
 
         for (var i = 0; i < PayableRows.Length; i++)
         {
@@ -100,7 +106,7 @@ public static class SampleOpeningBalances
         }
 
         debts.Add(OpeningItem(++number, partners[PayablePrepaymentSupplier], DebtSide.Payable, OpeningDebtKind.Prepayment,
-            "TU-DK-001", openingDate.AddDays(-random.Between(5, 30)), PayablePrepayment));
+            "TU-DK-001", openingDate.AddDays(-random.Between(PrepaymentAgeMin, PrepaymentAgeMax)), PayablePrepayment));
 
         return debts;
     }

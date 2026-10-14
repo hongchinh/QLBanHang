@@ -170,7 +170,7 @@ public class SampleOpeningBalancesTests
     [InlineData("2026-08-31")]
     public void Opening_ages_follow_the_payment_habits(string today)
     {
-        var plan = Generate(today: DateOnly.Parse(today));
+        var plan = Generate(today: SampleDataGeneratorTests.ParseDate(today));
         var partners = PartnersByCode(plan);
         var habits = SampleCatalog.CustomerProfiles.ToDictionary(p => p.Code, p => p.Habit);
 
@@ -201,7 +201,7 @@ public class SampleOpeningBalancesTests
     [InlineData("2026-08-31")]
     public void Bad_debt_customer_has_one_item_61_to_90_days_overdue_at_today_and_one_older(string today)
     {
-        var date = DateOnly.Parse(today);
+        var date = SampleDataGeneratorTests.ParseDate(today);
         var badDebtCode = SampleCatalog.CustomerProfiles.Single(p => p.Habit == PaymentHabit.BadDebt).Code;
 
         var overdue = Generate(today: date).OpeningDebts

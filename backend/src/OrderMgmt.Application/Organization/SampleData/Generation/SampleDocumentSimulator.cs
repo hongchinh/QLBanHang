@@ -55,21 +55,30 @@ internal sealed partial class SampleDocumentSimulator
     private readonly List<SampleStep> _today = new();
 
     private DateOnly _date;
-    private MonthPlan _month = null!; // set on the first day of the loop
+    private MonthPlan? _month;
 
-    private SampleDocumentSimulator(SampleRandom random, SampleDataPlan plan)
+    private SampleDocumentSimulator(SampleRandom random, SampleDataPlan plan, bool netExcludesVat)
     {
         _random = random;
         _plan = plan;
-        _ledger = new SampleLedger(plan);
+        _ledger = new SampleLedger(plan, netExcludesVat);
         _partners = plan.Partners.ToDictionary(p => p.Code);
         _products = plan.Products.ToDictionary(p => p.Code);
         _profiles = SampleCatalog.CustomerProfiles.ToDictionary(p => p.Code);
     }
 
     /// The document steps of `plan` (catalog, dates and opening balances already filled), in strictly increasing time.
-    public static List<SampleStep> Run(SampleRandom random, SampleDataPlan plan) =>
-        new SampleDocumentSimulator(random, plan).Simulate();
+    /// `netExcludesVat` is the branch's inventory setting the voucher totals are estimated with.
+    public static List<SampleStep> Run(SampleRandom random, SampleDataPlan plan, bool netExcludesVat) =>
+        new SampleDocumentSimulator(random, plan, netExcludesVat).Simulate();
+
+    /// The plan of the current month; the day loop sets it before anything reads it.
+    private MonthPlan Month => _month ?? throw new InvalidOperationException("No month is planned yet.");
+
+    /// What `fund` can pay and still keep the margin (S12). A payment the business could postpone (a paid purchase, a
+    /// supplier payment, the VCB → TCB transfer) also leaves the reserve in VCB, which pays the rent and the salaries.
+    private decimal Room(string fund, bool postponable) =>
+        _ledger.Fund(fund) - FundMargin - (postponable && fund == Vcb ? VcbReserve : 0m);
 
     private List<SampleStep> Simulate()
     {
@@ -82,12 +91,13 @@ internal sealed partial class SampleDocumentSimulator
             _date = day;
             if (_month is null || _month.Days[0].Month != day.Month || _month.Days[0].Year != day.Year)
                 _month = PlanMonth(day);
+            var month = _month;
 
-            if (day == _month.Days[0])
+            if (day == month.Days[0])
                 Expense(Vcb, Rent, $"Tiền thuê kho tháng {MonthText(day)}");
             Purchases();
             SupplierPayments();
-            for (var i = _month.SalesPerDay[DayIndex(day)]; i > 0; i--)
+            for (var i = month.SalesPerDay[DayIndex(day)]; i > 0; i--)
                 Sale();
             RunEvents(MonthEvent.SaleReturn);
             RunEvents(MonthEvent.PurchaseReturn);
@@ -100,7 +110,7 @@ internal sealed partial class SampleDocumentSimulator
             RunEvents(MonthEvent.Fuel);
             CancelMistakenIncome();
             CustomerReceipts(); // after the cash expenses, so the deposit day sees what the till really holds
-            if (day == _month.Days[^1])
+            if (day == month.Days[^1])
                 Expense(Vcb, Salary, $"Lương nhân viên tháng {MonthText(day)}");
             RunEvents(MonthEvent.BankTransfer);
             CashDeposit();
@@ -140,11 +150,12 @@ internal sealed partial class SampleDocumentSimulator
 
     private void RunEvents(MonthEvent kind)
     {
-        for (var i = 0; i < _month.Events.Count;)
+        var events = Month.Events;
+        for (var i = 0; i < events.Count;)
         {
-            var (date, eventKind) = _month.Events[i];
+            var (date, eventKind) = events[i];
             if (eventKind == kind && date <= _date && TryEvent(kind))
-                _month.Events.RemoveAt(i);
+                events.RemoveAt(i);
             else
                 i++;
         }
@@ -156,17 +167,18 @@ internal sealed partial class SampleDocumentSimulator
         MonthEvent.PurchaseReturn => PurchaseReturn(),
         MonthEvent.Damaged => Damaged(),
         MonthEvent.Scrap => ScrapIncome(),
-        MonthEvent.Electricity => Expense(CashFund, _random.NextAmount(ElectricityMin, ElectricityMax, 100_000m),
+        MonthEvent.Electricity => Expense(CashFund, _random.NextAmount(ElectricityMin, ElectricityMax, CashAmountStep),
             $"Tiền điện tháng {MonthText(_date)}"),
-        MonthEvent.Fuel => Expense(CashFund, _random.NextAmount(FuelMin, FuelMax, 50_000m), "Xăng xe giao hàng"),
+        MonthEvent.Fuel => Expense(CashFund, _random.NextAmount(FuelMin, FuelMax, FuelAmountStep), "Xăng xe giao hàng"),
         MonthEvent.BankTransfer => BankTransfer(),
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, null),
     };
 
     private int DayIndex(DateOnly day)
     {
-        for (var i = 0; i < _month.Days.Count; i++)
-            if (_month.Days[i] == day)
+        var days = Month.Days;
+        for (var i = 0; i < days.Count; i++)
+            if (days[i] == day)
                 return i;
         throw new InvalidOperationException($"{day} is not a working day of the planned month.");
     }

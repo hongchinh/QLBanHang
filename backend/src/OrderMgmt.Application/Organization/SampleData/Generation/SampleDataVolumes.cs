@@ -78,9 +78,10 @@ public static class SampleDataVolumes
     public const int PurchasesPerDayMax = 2;
 
     /// Purchasing pace: the buyer places about PurchasesPerMonth orders a month, at most PurchaseBurst in a row (a token
-    /// bucket refilled every working day). Due reorders wait, the most urgent (lowest cover) first.
+    /// bucket refilled every working day). Due reorders wait, the most urgent (lowest cover) first. The burst also keeps
+    /// the pace of the first, quiet weeks (opening stock lasts 3–6 weeks), so the first month still reaches 8 purchases.
     public const int PurchasesPerMonth = 11;
-    public const int PurchaseBurst = 3;
+    public const int PurchaseBurst = 5;
 
     /// Share of the purchases placed with the product's alternate supplier, when it has one.
     public const int AltSupplierPercent = 20;
@@ -132,17 +133,18 @@ public static class SampleDataVolumes
     /// Share of the receipts into a bank fund; the rest into cash.
     public const int ReceiptBankPercent = 60;
 
-    /// On the deposit day, while the till holds less than CashKeep + CashDepositMin + CashFloat, paid sales and receipts are
-    /// taken in cash, and customers with an invoice to collect within EarlyCollectionDays pay it early, so every week ends
-    /// with a deposit.
+    /// On the deposit day, while the till holds less than CashKeep + CashDepositMin + CashFloat, that day's sales (but the
+    /// dual-role partner's planned credit sale) and receipts are taken in cash, and customers with an invoice to collect
+    /// within EarlyCollectionDays pay it early, so every week ends with a deposit.
     public const int EarlyCollectionDays = 14;
 
     /// Deliberate partial payments: on or after these days of the window, the next receipt of an on-time customer pays
-    /// PartialPaymentPercent of its first target (rounded down to a million, at least PartialPaymentMinOpen open);
+    /// PartialPaymentPercent of its first target (rounded down to PartialPaymentStep, at least PartialPaymentMinOpen open);
     /// the rest is due again PartialRestDaysMin..Max days later.
     public const int PartialPaymentFirstDay = 30;
     public const int PartialPaymentSecondDay = 60;
     public const int PartialPaymentPercent = 50;
+    public const decimal PartialPaymentStep = 1_000_000m;
     public const decimal PartialPaymentMinOpen = 10_000_000m;
     public const int PartialRestDaysMin = 20;
     public const int PartialRestDaysMax = 40;
@@ -162,7 +164,8 @@ public static class SampleDataVolumes
     /// in VCB, which pays the rent and the salaries.
     public const decimal VcbReserve = 80_000_000m;
 
-    /// Weekly deposit QTM → VCB of the cash above CashKeep, when that is at least CashDepositMin; rounded down to 100,000.
+    /// Weekly deposit QTM → VCB of the cash above CashKeep, when that is at least CashDepositMin; rounded down to
+    /// CashAmountStep.
     public const decimal CashKeep = 30_000_000m;
     public const decimal CashDepositMin = 10_000_000m;
 
@@ -186,6 +189,11 @@ public static class SampleDataVolumes
     public const decimal FuelMax = 1_500_000m;
     public const decimal ScrapMin = 1_000_000m;
     public const decimal ScrapMax = 3_000_000m;
+
+    /// Steps the cash amounts are drawn or rounded on: deposits, electricity, scrap and the mistaken receipt on 100,000;
+    /// fuel on 50,000.
+    public const decimal CashAmountStep = 100_000m;
+    public const decimal FuelAmountStep = 50_000m;
 
     // ---- Once in the whole period (days after the opening date; moved to the next working day) ----
 

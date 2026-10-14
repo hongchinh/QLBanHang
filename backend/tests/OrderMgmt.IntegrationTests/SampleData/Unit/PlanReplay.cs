@@ -53,8 +53,11 @@ public sealed class PlanReplay
     private readonly List<DebtItem> _debtList = new();
     private readonly Dictionary<string, CashEffect> _cashEffects = new();
 
-    private PlanReplay(SampleDataPlan plan)
+    private readonly bool _netExcludesVat;
+
+    private PlanReplay(SampleDataPlan plan, bool netExcludesVat)
     {
+        _netExcludesVat = netExcludesVat;
         _products = plan.Products.ToDictionary(p => p.Code);
         _partners = plan.Partners.ToDictionary(p => p.Code);
         CreditLimits = plan.CreditLimits.ToDictionary(l => l.PartnerCode, l => l.Amount);
@@ -84,9 +87,10 @@ public sealed class PlanReplay
     public decimal CreditBalance(string partnerCode) =>
         _debtList.Where(d => d.PartnerCode == partnerCode && d.Side == DebtSide.Receivable && d.IsIncrease).Sum(d => d.Open);
 
-    public static PlanReplay Run(SampleDataPlan plan, Action<SampleStep, PlanReplay>? afterStep = null)
+    /// `netExcludesVat` is the branch's inventory setting the runner computes real totals with.
+    public static PlanReplay Run(SampleDataPlan plan, Action<SampleStep, PlanReplay>? afterStep = null, bool netExcludesVat = false)
     {
-        var replay = new PlanReplay(plan);
+        var replay = new PlanReplay(plan, netExcludesVat);
         foreach (var step in plan.Steps)
         {
             replay.Apply(step);
@@ -95,9 +99,10 @@ public sealed class PlanReplay
         return replay;
     }
 
-    /// Estimated total of a stock voucher, as the generator rules compute it.
-    public static decimal EstimateTotal(SampleStockVoucherStep step, IReadOnlyDictionary<string, SampleProductSpec> products) =>
-        StockVoucherCalculator.Compute(new StockHeaderInput(step.Type, 0m, 0m, false),
+    /// Estimated total of a stock voucher, as the stock voucher service computes it (no freight, no order discount).
+    public static decimal EstimateTotal(SampleStockVoucherStep step, IReadOnlyDictionary<string, SampleProductSpec> products,
+        bool netExcludesVat = false) =>
+        StockVoucherCalculator.Compute(new StockHeaderInput(step.Type, 0m, 0m, netExcludesVat),
             step.Lines.Select(l => new StockLineInput(products[l.ProductCode].TrackInventory, PricingMode.PerUnit, false,
                 null, null, null, null, l.Quantity, l.UnitPrice, l.DiscountRate, null, false, l.VatRate)).ToList()).Totals.Total;
 
@@ -142,7 +147,7 @@ public sealed class PlanReplay
         foreach (var line in s.Lines.Where(l => _products[l.ProductCode].TrackInventory))
             AddStock(s.WarehouseKey, line.ProductCode, s.Type == StockDirection.In ? line.Quantity : -line.Quantity);
 
-        var total = EstimateTotal(s, _products);
+        var total = EstimateTotal(s, _products, _netExcludesVat);
         LastAmount = total;
         if (s.PartnerCode is null)
             return;

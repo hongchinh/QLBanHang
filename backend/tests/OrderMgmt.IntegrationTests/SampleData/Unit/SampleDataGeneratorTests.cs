@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using FluentAssertions;
 using OrderMgmt.Application.Organization.SampleData.Generation;
@@ -14,10 +15,26 @@ public class SampleDataGeneratorTests
     private const decimal FundMargin = 5_000_000m;
     private const string DualRolePartner = "DM-DT01";
 
-    private static SampleDataPlan Generate(string code = "DEMO01", int ownerCount = 3, DateOnly? today = null) =>
-        new SampleDataGenerator().Generate(new SampleDataGeneratorInput(code, today ?? Today, ownerCount));
+    internal static SampleDataPlan Generate(string code = "DEMO01", int ownerCount = 3, DateOnly? today = null,
+        bool netExcludesVat = false) =>
+        new SampleDataGenerator().Generate(new SampleDataGeneratorInput(code, today ?? Today, ownerCount, netExcludesVat));
 
-    private static DateOnly VnDate(SampleStep step) => DateOnly.FromDateTime(step.At.ToOffset(Vn).DateTime);
+    internal static DateOnly ParseDate(string text) => DateOnly.ParseExact(text, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+
+    internal static DateOnly VnDate(SampleStep step) => DateOnly.FromDateTime(step.At.ToOffset(Vn).DateTime);
+
+    /// The calendar months that lie entirely inside the window.
+    internal static List<(int Year, int Month)> FullMonths(SampleDataPlan plan)
+    {
+        var months = new List<(int, int)>();
+        for (var first = new DateOnly(plan.OpeningDate.Year, plan.OpeningDate.Month, 1); first <= plan.LastDocumentDate;
+             first = first.AddMonths(1))
+        {
+            if (first >= plan.OpeningDate && first.AddMonths(1).AddDays(-1) <= plan.LastDocumentDate)
+                months.Add((first.Year, first.Month));
+        }
+        return months;
+    }
 
     private static List<string> Serialize(SampleDataPlan plan) =>
         plan.Steps.Select(s => JsonSerializer.Serialize(s, s.GetType())).ToList();
@@ -51,7 +68,13 @@ public class SampleDataGeneratorTests
     public void Credit_estimates_stay_under_80_percent() => AssertCreditUnder80Percent(Generate());
 
     [Fact]
-    public void Monthly_volumes_match_the_spec() => AssertMonthlyVolumes(Generate(), new[] { 7, 8, 9 });
+    public void Monthly_volumes_match_the_spec()
+    {
+        var plan = Generate();
+
+        FullMonths(plan).Should().Equal((2026, 7), (2026, 8), (2026, 9));
+        AssertMonthlyVolumes(plan);
+    }
 
     [Fact]
     public void Once_per_period_items() => AssertOncePerPeriodItems(Generate());
@@ -77,25 +100,35 @@ public class SampleDataGeneratorTests
     [Fact]
     public void Depends_on_branch_code() => Serialize(Generate("DEMO02")).Should().NotEqual(Serialize(Generate()));
 
-    [Fact]
-    public void Works_with_one_owner()
+    /// Every invariant and the monthly volumes of every full month, for other codes, dates (February, windows opening on
+    /// any weekday), owner counts and the NetExcludesVat inventory setting.
+    [Theory]
+    [InlineData("DEMO01", "2026-10-14", 1, false)]
+    [InlineData("DEMO01", "2026-10-14", 3, true)]
+    [InlineData("DEMO03", "2026-03-01", 3, false)]
+    [InlineData("CN021", "2026-06-01", 3, false)]
+    [InlineData("CN024", "2026-07-31", 3, false)]
+    [InlineData("CN-DEMO", "2026-12-31", 2, true)]
+    public void Invariants_hold_for_several_inputs(string code, string today, int owners, bool netExcludesVat)
     {
-        var plan = Generate(ownerCount: 1);
+        var plan = Generate(code, owners, ParseDate(today), netExcludesVat);
 
-        plan.Steps.Should().OnlyContain(s => s.OwnerIndex == null || s.OwnerIndex == 0);
-        AssertAllInvariants(plan);
-        AssertMonthlyVolumes(plan, new[] { 7, 8, 9 });
+        plan.Steps.Should().OnlyContain(s => s.OwnerIndex == null || (s.OwnerIndex >= 0 && s.OwnerIndex < owners));
+        AssertAllInvariants(plan, netExcludesVat);
+        FullMonths(plan).Should().HaveCountGreaterThanOrEqualTo(2);
+        AssertMonthlyVolumes(plan);
     }
 
-    internal static void AssertAllInvariants(SampleDataPlan plan)
+    internal static void AssertAllInvariants(SampleDataPlan plan, bool netExcludesVat = false)
     {
         AssertTimes(plan);
         AssertKeysAndTargets(plan);
         AssertReasonsPartnersAndFunds(plan);
         AssertOwners(plan);
-        AssertStockNeverNegative(plan);
-        AssertFundsKeepTheMargin(plan);
-        AssertCreditUnder80Percent(plan);
+        AssertStockNeverNegative(plan, netExcludesVat);
+        AssertFundsKeepTheMargin(plan, netExcludesVat);
+        AssertCreditUnder80Percent(plan, netExcludesVat);
+        AssertAllocationsArePositive(plan, netExcludesVat);
         AssertOncePerPeriodItems(plan);
         AssertSalesRules(plan);
         AssertPurchaseRules(plan);
@@ -131,6 +164,16 @@ public class SampleDataGeneratorTests
             switch (step)
             {
                 case SampleCashVoucherStep c:
+                    c.Targets.Select(t => t.TargetKey).Should().OnlyHaveUniqueItems($"{c.Key} allocates each item once");
+                    // The allocation validator rejects mixed directions: receipts and supplier payments settle invoices
+                    // (Increase items), the refund settles the prepayment (a Decrease item).
+                    var expectIncrease = c.ReasonCode switch
+                    {
+                        "TKH" or "TNCC" => true,
+                        "CHKH" => false,
+                        _ when c.Targets.Count == 0 => true,
+                        _ => throw new InvalidOperationException($"{c.Key}: {c.ReasonCode} must not allocate."),
+                    };
                     foreach (var target in c.Targets)
                     {
                         var because = $"{c.Key} targets {target.TargetKey}";
@@ -139,26 +182,15 @@ public class SampleDataGeneratorTests
                         if (isOpening)
                         {
                             opening!.PartnerCode.Should().Be(c.PartnerCode, because);
-                            var expected = c.ReasonCode switch
-                            {
-                                "TKH" => (DebtSide.Receivable, OpeningDebtKind.Debt),
-                                "TNCC" => (DebtSide.Payable, OpeningDebtKind.Debt),
-                                "CHKH" => (DebtSide.Receivable, OpeningDebtKind.Prepayment),
-                                _ => throw new InvalidOperationException($"{c.Key}: {c.ReasonCode} must not allocate."),
-                            };
-                            (opening.Side, opening.Kind).Should().Be(expected, because);
+                            opening.Side.Should().Be(c.ReasonCode == "TNCC" ? DebtSide.Payable : DebtSide.Receivable, because);
+                            (opening.Kind == OpeningDebtKind.Debt).Should().Be(expectIncrease, because + " in the right direction");
                         }
                         else
                         {
                             var stock = earlier[target.TargetKey].Should().BeOfType<SampleStockVoucherStep>(because).Subject;
                             stock.PartnerCode.Should().Be(c.PartnerCode, because);
-                            var expected = c.ReasonCode switch
-                            {
-                                "TKH" => "XBH",
-                                "TNCC" => "NMH",
-                                _ => "(an opening prepayment, not a document)",
-                            };
-                            stock.ReasonCode.Should().Be(expected, because);
+                            expectIncrease.Should().BeTrue(because + ": only invoices of documents are allocated");
+                            stock.ReasonCode.Should().Be(c.ReasonCode == "TKH" ? "XBH" : "NMH", because);
                         }
                     }
                     break;
@@ -300,34 +332,42 @@ public class SampleDataGeneratorTests
     }
 
     // Replays a non-empty plan, so a check never passes on no steps at all.
-    private static void Replay(SampleDataPlan plan, Action<SampleStep, PlanReplay> afterStep)
+    private static void Replay(SampleDataPlan plan, bool netExcludesVat, Action<SampleStep, PlanReplay> afterStep)
     {
         plan.Steps.Should().NotBeEmpty();
-        PlanReplay.Run(plan, afterStep);
+        PlanReplay.Run(plan, afterStep, netExcludesVat);
     }
 
-    internal static void AssertStockNeverNegative(SampleDataPlan plan) =>
-        Replay(plan, (step, replay) =>
+    internal static void AssertStockNeverNegative(SampleDataPlan plan, bool netExcludesVat = false) =>
+        Replay(plan, netExcludesVat, (step, replay) =>
         {
             var negative = replay.Stock.Where(kv => kv.Value < 0).Select(kv => $"{kv.Key}: {kv.Value}").ToList();
             negative.Should().BeEmpty($"stock after {step.Key}");
         });
 
-    internal static void AssertFundsKeepTheMargin(SampleDataPlan plan)
+    internal static void AssertFundsKeepTheMargin(SampleDataPlan plan, bool netExcludesVat = false)
     {
         plan.Funds.Should().OnlyContain(f => f.OpeningAmount >= FundMargin);
-        Replay(plan, (step, replay) =>
+        Replay(plan, netExcludesVat, (step, replay) =>
         {
             var low = replay.Funds.Where(kv => kv.Value < FundMargin).Select(kv => $"{kv.Key}: {kv.Value:N0}").ToList();
             low.Should().BeEmpty($"funds after {step.Key}");
         });
     }
 
-    internal static void AssertCreditUnder80Percent(SampleDataPlan plan)
+    /// The runner skips a receipt, payment or offset whose computed amount is 0; the plan never relies on that.
+    internal static void AssertAllocationsArePositive(SampleDataPlan plan, bool netExcludesVat = false) =>
+        Replay(plan, netExcludesVat, (step, replay) =>
+        {
+            if (step is SampleCashVoucherStep { Targets.Count: > 0 } or SampleDebtOffsetStep)
+                replay.LastAmount.Should().BeGreaterThan(0m, step.Key);
+        });
+
+    internal static void AssertCreditUnder80Percent(SampleDataPlan plan, bool netExcludesVat = false)
     {
         plan.CreditLimits.Should().NotBeEmpty();
         var creditSales = 0;
-        Replay(plan, (step, replay) =>
+        Replay(plan, netExcludesVat, (step, replay) =>
         {
             if (step is not SampleStockVoucherStep { ReasonCode: "XBH" } sale)
                 return;
@@ -339,16 +379,17 @@ public class SampleDataGeneratorTests
         creditSales.Should().BeGreaterThan(0, "limited customers also buy on credit");
     }
 
-    internal static void AssertMonthlyVolumes(SampleDataPlan plan, IReadOnlyList<int> months)
+    /// The spec volumes of every full month of the window.
+    internal static void AssertMonthlyVolumes(SampleDataPlan plan)
     {
         var cancelled = plan.Steps.OfType<SampleCancelStep>().Select(x => x.TargetKey).ToHashSet();
-        foreach (var month in months)
+        foreach (var (year, month) in FullMonths(plan))
         {
-            var steps = plan.Steps.Where(s => VnDate(s).Month == month).ToList();
+            var steps = plan.Steps.Where(s => VnDate(s).Year == year && VnDate(s).Month == month).ToList();
             var stock = steps.OfType<SampleStockVoucherStep>().ToList();
             var cash = steps.OfType<SampleCashVoucherStep>().ToList();
             var transfers = steps.OfType<SampleFundTransferStep>().ToList();
-            var because = $"month {month}";
+            var because = $"month {year}-{month:00}";
 
             stock.Count(s => s.ReasonCode == "XBH").Should().BeInRange(35, 45, because);
             stock.Count(s => s.ReasonCode == "NMH").Should().BeInRange(8, 14, because);

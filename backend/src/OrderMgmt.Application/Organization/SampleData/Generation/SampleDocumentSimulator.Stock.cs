@@ -89,14 +89,20 @@ internal sealed partial class SampleDocumentSimulator
     }
 
     /// Retail pays cash at once; others pay at once by chance, else buy on credit unless that breaks 80% of their limit.
+    /// The dual-role partner's planned sale before the offset is on credit. On the deposit day, while the till is short,
+    /// sales are paid in cash, so the week ends with a deposit.
     private (string? Method, string? Fund) SalePayment(SampleCustomerProfile customer, decimal total)
     {
         if (customer.Group == CustomerGroup.Retail)
             return ("TM", CashFund);
 
         var paidAtOnce = _random.Chance(PaidSalePercent);
-        if (paidAtOnce && !OffsetNeedsSale())
-            return !DepositIsShort() && _random.Chance(PaidSaleBankPercent) ? ("CK", _random.Pick(BankFunds)) : ("TM", CashFund);
+        if (OffsetNeedsSale())
+            return (null, null);
+        if (DepositIsShort())
+            return ("TM", CashFund);
+        if (paidAtOnce)
+            return _random.Chance(PaidSaleBankPercent) ? ("CK", _random.Pick(BankFunds)) : ("TM", CashFund);
 
         if (customer.CreditLimit is { } limit && _ledger.OpenReceivable(customer.Code) + total > limit * CreditLimitUsePercent / 100m)
             return ("CK", _random.Pick(BankFunds));

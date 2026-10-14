@@ -28,10 +28,20 @@ internal sealed class SampleOpenItem
     public string Source { get; }
 
     public bool IsPrepayment { get; }
-    public decimal Open { get; set; }
+    public decimal Open { get; private set; }
 
     /// First day the partner pays (or is paid); null means never.
-    public DateOnly? PayDate { get; set; }
+    public DateOnly? PayDate { get; private set; }
+
+    /// Takes `amount` off the open amount (never below 0); `payAgain` is when the rest is due to be paid.
+    public void Settle(decimal amount, DateOnly? payAgain = null)
+    {
+        if (amount < 0m || amount > Open)
+            throw new InvalidOperationException($"Cannot settle {amount} of {Key}, which has {Open} open.");
+        Open -= amount;
+        if (payAgain is not null)
+            PayDate = payAgain;
+    }
 }
 
 /// Running state of the document simulation: stock per warehouse and product, estimated fund balances, open items and
@@ -43,9 +53,12 @@ internal sealed class SampleLedger
     private readonly Dictionary<string, decimal> _funds = new();
     private readonly Dictionary<string, int> _counters = new();
     private readonly Dictionary<string, SampleProductSpec> _products;
+    private readonly bool _netExcludesVat;
 
-    public SampleLedger(SampleDataPlan plan)
+    /// `netExcludesVat` is the branch's inventory setting, so estimated totals match the real ones.
+    public SampleLedger(SampleDataPlan plan, bool netExcludesVat)
     {
+        _netExcludesVat = netExcludesVat;
         _products = plan.Products.ToDictionary(p => p.Code);
         foreach (var stock in plan.OpeningStocks)
             foreach (var line in stock.Lines)
@@ -77,10 +90,6 @@ internal sealed class SampleLedger
 
     public void MoveFund(string code, decimal delta) => _funds[code] += delta;
 
-    /// What `fund` can pay and still keep the margin; a payment that could be postponed also leaves the VCB reserve.
-    public decimal Room(string fund, bool postponable) =>
-        Fund(fund) - SampleDataVolumes.FundMargin - (postponable && fund == "VCB" ? SampleDataVolumes.VcbReserve : 0m);
-
     public string NextKey(string prefix)
     {
         var number = _counters.GetValueOrDefault(prefix) + 1;
@@ -90,7 +99,7 @@ internal sealed class SampleLedger
 
     /// Estimated voucher total, as the stock voucher service computes it (no freight, no order discount).
     public decimal Total(StockDirection type, IReadOnlyList<SampleStockLine> lines) =>
-        StockVoucherCalculator.Compute(new StockHeaderInput(type, 0m, 0m, false),
+        StockVoucherCalculator.Compute(new StockHeaderInput(type, 0m, 0m, _netExcludesVat),
             lines.Select(l => new StockLineInput(_products[l.ProductCode].TrackInventory, PricingMode.PerUnit, false,
                 null, null, null, null, l.Quantity, l.UnitPrice, l.DiscountRate, null, false, l.VatRate)).ToList()).Totals.Total;
 

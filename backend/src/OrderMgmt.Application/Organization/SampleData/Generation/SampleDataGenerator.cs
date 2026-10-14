@@ -32,7 +32,7 @@ public sealed class SampleDataGenerator : ISampleDataGenerator
             OpeningStocks = openingStocks,
             OpeningDebts = openingDebts,
         };
-        plan.Steps.AddRange(SampleDocumentSimulator.Run(random, plan));
+        plan.Steps.AddRange(SampleDocumentSimulator.Run(random, plan, input.NetExcludesVat));
         return plan;
     }
 }

@@ -55,13 +55,14 @@ internal sealed partial class SampleDocumentSimulator
             foreach (var item in due)
             {
                 decimal? max = null;
+                DateOnly? payRestOn = null;
                 if (partial && targets.Count == 0)
                 {
-                    max = Math.Floor(item.Open * PartialPaymentPercent / 100m / 1_000_000m) * 1_000_000m;
-                    item.PayDate = _date.AddDays(_random.Between(PartialRestDaysMin, PartialRestDaysMax));
+                    max = Math.Floor(item.Open * PartialPaymentPercent / 100m / PartialPaymentStep) * PartialPaymentStep;
+                    payRestOn = _date.AddDays(_random.Between(PartialRestDaysMin, PartialRestDaysMax));
                 }
                 var amount = Math.Min(item.Open, max ?? item.Open);
-                item.Open -= amount;
+                item.Settle(amount, payRestOn);
                 total += amount;
                 targets.Add(new SampleAllocationTarget(item.Key, max));
             }
@@ -90,7 +91,7 @@ internal sealed partial class SampleDocumentSimulator
                 continue;
 
             var fund = BanksByRoom().First();
-            var room = _ledger.Room(fund, postponable: true);
+            var room = Room(fund, postponable: true);
             var paid = new List<SampleOpenItem>();
             var total = 0m;
             foreach (var item in due)
@@ -106,7 +107,7 @@ internal sealed partial class SampleDocumentSimulator
             Write(new SampleCashVoucherStep(_ledger.NextKey("TNCC"), default, null, CashVoucherType.Payment, "TNCC", fund,
                 supplier.Code, null, "Trả tiền hàng", null, paid.Select(i => new SampleAllocationTarget(i.Key, null)).ToList()));
             foreach (var item in paid)
-                item.Open = 0m;
+                item.Settle(item.Open);
             _ledger.MoveFund(fund, -total);
         }
     }
@@ -116,17 +117,17 @@ internal sealed partial class SampleDocumentSimulator
 
     /// Bank funds, most room for a postponable payment first (VCB on a tie).
     private IEnumerable<string> BanksByRoom() =>
-        _ledger.Room(Tcb, postponable: true) > _ledger.Room(Vcb, postponable: true) ? new[] { Tcb, Vcb } : BankFunds;
+        Room(Tcb, postponable: true) > Room(Vcb, postponable: true) ? new[] { Tcb, Vcb } : BankFunds;
 
     /// The bank fund that pays a postponable `amount` and keeps the margin, or null.
     private string? PayingBank(decimal amount) =>
-        BanksByRoom().FirstOrDefault(f => _ledger.Room(f, postponable: true) >= amount);
+        BanksByRoom().FirstOrDefault(f => Room(f, postponable: true) >= amount);
 
     /// A fixed expense from `preferred`, or from the first fund that keeps the margin. False when no fund can pay it.
     private bool Expense(string preferred, decimal amount, string description)
     {
         var fund = new[] { preferred }.Concat(_plan.Funds.Select(f => f.Code))
-            .FirstOrDefault(f => _ledger.Room(f, postponable: false) >= amount);
+            .FirstOrDefault(f => Room(f, postponable: false) >= amount);
         if (fund is null)
             return false;
         Write(new SampleCashVoucherStep(_ledger.NextKey("CK"), default, null, CashVoucherType.Payment, "CK", fund, null, null,
@@ -137,7 +138,7 @@ internal sealed partial class SampleDocumentSimulator
 
     private bool ScrapIncome()
     {
-        Income(_random.NextAmount(ScrapMin, ScrapMax, 100_000m), "Bán phế liệu");
+        Income(_random.NextAmount(ScrapMin, ScrapMax, CashAmountStep), "Bán phế liệu");
         return true;
     }
 
@@ -152,7 +153,7 @@ internal sealed partial class SampleDocumentSimulator
 
     private bool BankTransfer()
     {
-        if (_ledger.Room(Vcb, postponable: true) < BankTransferAmount)
+        if (Room(Vcb, postponable: true) < BankTransferAmount)
             return false;
         Transfer(Vcb, Tcb, BankTransferAmount, "Chuyển tiền sang tài khoản Techcombank");
         return true;
@@ -166,7 +167,7 @@ internal sealed partial class SampleDocumentSimulator
     {
         if (!IsDepositDay())
             return;
-        var amount = Math.Floor((_ledger.Fund(CashFund) - CashKeep) / 100_000m) * 100_000m;
+        var amount = Math.Floor((_ledger.Fund(CashFund) - CashKeep) / CashAmountStep) * CashAmountStep;
         if (amount >= CashDepositMin)
             Transfer(CashFund, Vcb, amount, "Nộp tiền mặt vào tài khoản Vietcombank");
     }
@@ -185,14 +186,14 @@ internal sealed partial class SampleDocumentSimulator
             return;
         var prepayment = _ledger.Items.First(i => i.IsPrepayment && i.Side == DebtSide.Receivable);
         var amount = Math.Min(prepayment.Open, PrepaymentRefund);
-        var fund = new[] { CashFund }.Concat(BanksByRoom()).FirstOrDefault(f => _ledger.Room(f, postponable: false) >= amount);
+        var fund = new[] { CashFund }.Concat(BanksByRoom()).FirstOrDefault(f => Room(f, postponable: false) >= amount);
         if (fund is null)
             return;
 
         Write(new SampleCashVoucherStep(_ledger.NextKey("CHKH"), default, OwnerOf(prepayment.PartnerCode), CashVoucherType.Payment,
             "CHKH", fund, prepayment.PartnerCode, null, "Hoàn một phần tiền trả trước", null,
             new[] { new SampleAllocationTarget(prepayment.Key, PrepaymentRefund) }));
-        prepayment.Open -= amount;
+        prepayment.Settle(amount);
         _ledger.MoveFund(fund, -amount);
         _refundDone = true;
     }
@@ -202,13 +203,13 @@ internal sealed partial class SampleDocumentSimulator
     {
         if (_mistakeKey != null || _date < _mistakeDate)
             return;
-        _mistakeAmount = _random.NextAmount(MistakenIncomeMin, MistakenIncomeMax, 100_000m);
+        _mistakeAmount = _random.NextAmount(MistakenIncomeMin, MistakenIncomeMax, CashAmountStep);
         _mistakeKey = Income(_mistakeAmount, "Thu khác (lập nhầm)");
     }
 
     private void CancelMistakenIncome()
     {
-        if (_mistakeKey is null || _cancelDone || _ledger.Room(CashFund, postponable: false) < _mistakeAmount)
+        if (_mistakeKey is null || _cancelDone || Room(CashFund, postponable: false) < _mistakeAmount)
             return;
         Write(new SampleCancelStep(_ledger.NextKey("HUY"), default, null, _mistakeKey));
         _ledger.MoveFund(CashFund, -_mistakeAmount);
@@ -231,8 +232,8 @@ internal sealed partial class SampleDocumentSimulator
 
         var amount = Math.Min(receivable.Open, payable.Open);
         Write(new SampleDebtOffsetStep(_ledger.NextKey("BT"), default, null, DualRolePartner, receivable.Key, payable.Key));
-        receivable.Open -= amount;
-        payable.Open -= amount;
+        receivable.Settle(amount);
+        payable.Settle(amount);
         _offsetDone = true;
     }
 

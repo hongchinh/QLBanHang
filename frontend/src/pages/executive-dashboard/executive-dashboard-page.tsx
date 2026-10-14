@@ -11,6 +11,7 @@ import { useExecutiveParams } from '@/features/executive-dashboard/use-executive
 import { useExecutiveScope } from '@/features/executive-dashboard/use-executive-scope';
 import { formatDateOnly } from '@/lib/date-only';
 import { ScopeSelect } from './components/scope-select';
+import { CashTab } from './tabs/cash-tab';
 import { OverviewTab } from './tabs/overview-tab';
 import { SalesTab } from './tabs/sales-tab';
 
@@ -32,6 +33,7 @@ const TAB_LABELS: Record<ExecutiveTab, string> = {
 const PANELS: Partial<Record<ExecutiveTab, ComponentType<TabPanelProps>>> = {
   overview: OverviewTab,
   sales: SalesTab,
+  cash: CashTab,
 };
 
 // Bảng điều hành: sales, cash, debt and inventory of the whole company or one branch, kept live.

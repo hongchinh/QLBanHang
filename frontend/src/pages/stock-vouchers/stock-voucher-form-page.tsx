@@ -159,6 +159,23 @@ function focusIdOf(key: string): string | undefined {
   return key === 'lines' ? 'stock-line-product-code-0' : FIELD_FOCUS_IDS[key];
 }
 
+function productCodeCell(row: number): HTMLElement | null {
+  return document.getElementById(`stock-line-product-code-${row}`);
+}
+
+// A focused cell must not go down with its row: the focus would fall on <body>, where the grid keys do not reach,
+// and after a 422 dialog there would be nothing to give it back to. Call before rows without a product are dropped,
+// while at least one row stays: a focus inside a row that goes moves to the product code of the last row that stays.
+function moveFocusOffBlankRows(lines: readonly StockLineFormValues[]) {
+  const active = document.activeElement;
+  const inBlankRow = lines.some(
+    (line, row) => !line.productId && !!productCodeCell(row)?.closest('tr')?.contains(active),
+  );
+  if (!inBlankRow) return;
+  const lastKept = lines.reduce((last, line, row) => (line.productId ? row : last), -1);
+  productCodeCell(lastKept)?.focus();
+}
+
 export function StockVoucherFormPage({ type }: { type: StockDirection }) {
   const { id } = useParams<{ id: string }>();
   const isEdit = !!id && id !== 'new';
@@ -488,7 +505,9 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   function dropBlankLines() {
     const lines = form.getValues('lines');
     const kept = lines.filter((l) => !!l.productId);
-    if (kept.length > 0 && kept.length < lines.length) form.setValue('lines', kept, { shouldDirty: true });
+    if (kept.length === 0 || kept.length === lines.length) return;
+    moveFocusOffBlankRows(lines);
+    form.setValue('lines', kept, { shouldDirty: true });
   }
 
   function submitWithIntent(intent: SubmitIntent) {
@@ -542,7 +561,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       idx = lines.length;
       form.setValue('lines', [...lines, createEmptyStockLine(idx, form.getValues('warehouseId'))], { shouldDirty: true });
     }
-    setTimeout(() => document.getElementById(`stock-line-product-code-${idx}`)?.focus(), 0);
+    setTimeout(() => productCodeCell(idx)?.focus(), 0);
   }
 
   function handleSelectPartner(p: PartnerSearchItem | null) {

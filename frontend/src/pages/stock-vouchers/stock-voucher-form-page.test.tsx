@@ -5,7 +5,7 @@ import type * as ReactRouterDom from 'react-router-dom';
 import type * as DebtHooks from '@/features/debt/hooks';
 import { StockVoucherFormPage } from './stock-voucher-form-page';
 import { toDateTimeLocalValue } from '@/lib/vn-datetime';
-import { toFormDefaults } from '@/features/stock-vouchers/payload';
+import { createEmptyStockLine, toFormDefaults } from '@/features/stock-vouchers/payload';
 import { useBranchStore } from '@/stores/branch-store';
 import type { Fund } from '@/features/funds/types';
 import type { PaymentMethod } from '@/features/payment-methods/types';
@@ -497,6 +497,105 @@ describe('StockVoucherFormPage', () => {
       await waitFor(() => expect(document.activeElement).toBe(cancelButton));
       expect(document.activeElement).not.toBe(screen.getByRole('button', { name: 'Cập nhật' }));
       expect(cancelMock).toHaveBeenCalledTimes(1);
+    });
+
+    // The usual keyboard save: Enter on the last cell adds a blank row and moves into it, and saving drops that row
+    // again, with the focus in it. A restored draft puts the "Xóa nháp" button first in main#main-content.
+    it('Ctrl+S from a blank last row: after the 422 is dismissed the focus is on a grid cell and Ctrl+S saves again', async () => {
+      localStorage.setItem(
+        'stock_voucher_draft_In_user-test_b1',
+        JSON.stringify({ savedAt: DEFAULT_AT, values: toFormDefaults(undefined, defaultsFor('In')), selectedPartner: null }),
+      );
+      createMock
+        .mockRejectedValueOnce(apiError(422, 'NEGATIVE_STOCK_WARNING', NEGATIVE_DETAILS))
+        .mockResolvedValueOnce(voucher());
+      render(
+        <main id="main-content">
+          <StockVoucherFormPage type="In" />
+        </main>,
+      );
+      const discardDraft = screen.getByRole('button', { name: 'Xóa nháp' });
+      await fillPerUnitLine(3);
+      const price = byId('stock-line-unit-price-0');
+      act(() => price.focus());
+      fireEvent.keyDown(price, { key: 'Enter' });
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-1')));
+
+      fireEvent.keyDown(document.activeElement!, { key: 's', ctrlKey: true });
+      await screen.findByText('Xuất quá tồn kho');
+      // The blank row went before the save was sent.
+      expect(document.getElementById('stock-line-product-code-1')).toBeNull();
+      expect(createMock.mock.calls[0][0].lines).toHaveLength(1);
+
+      fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-0')));
+      expect(document.querySelector('form')).toContainElement(document.activeElement as HTMLElement);
+      expect(document.activeElement).not.toBe(discardDraft);
+      expect(document.activeElement).not.toBe(document.body);
+
+      fireEvent.keyDown(document.activeElement!, { key: 's', ctrlKey: true });
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(2));
+    });
+  });
+
+  // A save drops the rows without a product; the focus must not go with one of them.
+  describe('focus when a save drops the blank rows', () => {
+    it('the focus leaves a blank row for the product code of the last row that stays', async () => {
+      const filled = (productCode: string) => ({
+        ...createEmptyStockLine(0, WH1),
+        productId: P1,
+        productCode,
+        productName: 'Bu lông',
+        unitName: 'Cái',
+        quantity: 2,
+        unitPrice: 50_000,
+        vatRate: 10,
+      });
+      localStorage.setItem(
+        'stock_voucher_draft_In_user-test_b1',
+        JSON.stringify({
+          savedAt: DEFAULT_AT,
+          values: {
+            ...toFormDefaults(undefined, defaultsFor('In')),
+            lines: [filled('SP01'), createEmptyStockLine(1, WH1), filled('SP02')],
+          },
+          selectedPartner: null,
+        }),
+      );
+      createMock.mockReturnValue(new Promise(() => {}));
+      renderPage('In');
+      const lastKept = byId('stock-line-product-code-2');
+      expect(lastKept.value).toBe('SP02');
+      // Any cell of the blank row, not only its product code.
+      const blankPrice = byId('stock-line-unit-price-1');
+      act(() => blankPrice.focus());
+
+      fireEvent.keyDown(blankPrice, { key: 's', ctrlKey: true });
+
+      expect(document.activeElement).toBe(lastKept);
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      expect(createMock.mock.calls[0][0].lines).toHaveLength(2);
+      // The row moved up one place and still has the focus.
+      expect(lastKept.id).toBe('stock-line-product-code-1');
+      expect(document.activeElement).toBe(lastKept);
+    });
+
+    it('the focus stays where it is in a row that is kept', async () => {
+      createMock.mockReturnValue(new Promise(() => {}));
+      renderPage('In');
+      await fillPerUnitLine(3);
+      fireEvent.click(byId('stock-line-add'));
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-1')));
+      const quantity = byId('stock-line-quantity-0');
+      act(() => quantity.focus());
+
+      fireEvent.keyDown(quantity, { key: 's', ctrlKey: true });
+
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      expect(document.getElementById('stock-line-product-code-1')).toBeNull();
+      expect(document.activeElement).toBe(quantity);
     });
   });
 

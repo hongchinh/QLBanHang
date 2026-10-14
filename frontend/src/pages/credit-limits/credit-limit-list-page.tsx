@@ -3,7 +3,7 @@ import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useCreditLimits, useDeleteCreditLimit, useUpsertCreditLimit } from '@/features/credit-limits/hooks';
 import type { CreditLimit } from '@/features/credit-limits/types';
 import { useDebtPartnerSearch } from '@/features/debt/hooks';
@@ -78,7 +78,7 @@ export function CreditLimitListPage() {
                 setDialogOpen(true);
               }}
             >
-              <Pencil className="h-4 w-4 text-blue-600" />
+              <AppIcon name="edit" />
             </Button>
             <Button
               variant="ghost"
@@ -86,7 +86,7 @@ export function CreditLimitListPage() {
               aria-label="Xóa hạn mức"
               onClick={() => setPendingDelete(row.original)}
             >
-              <Trash2 className="h-4 w-4 text-red-600" />
+              <AppIcon name="delete" />
             </Button>
           </div>
         ),
@@ -119,7 +119,7 @@ export function CreditLimitListPage() {
           <p className="text-sm text-muted-foreground">Hạn mức công nợ của khách hàng tại chi nhánh đang làm việc</p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm hạn mức
+          <AppIcon name="add" className="mr-2" /> Thêm hạn mức
         </Button>
       </div>
 
@@ -127,7 +127,7 @@ export function CreditLimitListPage() {
         <CardContent className="p-4">
           <div className="mb-4 flex items-center gap-2">
             <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Tìm theo mã / tên khách hàng..."
                 aria-label="Tìm hạn mức"

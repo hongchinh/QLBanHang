@@ -1,11 +1,16 @@
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
 using ClosedXML.Excel;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common;
+using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.Reports.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Application.Tt133.Vouchers;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using OrderMgmt.IntegrationTests.Inventory;
@@ -253,6 +258,135 @@ public class StockVoucherPrintTests : InventoryTestBase
             var sum = Row("Cộng tiền hàng") - Row("Chiết khấu") + Row("Thuế GTGT") + Row("Cước vận chuyển");
             sum.Should().Be(Amount(ws, "Tổng cộng"), v.Code);
             Amount(ws, "Tổng cộng").Should().Be(v.Total, v.Code);
+        }
+    }
+
+    private const string ProvisionalNote = "Giá vốn tạm tính (kỳ tính giá vốn chưa kết thúc).";
+
+    [Fact]
+    public async Task Cost_of_a_stock_in_is_its_ledger_value()
+    {
+        await SetCompanyAsync();
+        var supplier = await CreatePartnerAsync(NewCode("NCC"), false, true);
+        var aCode = NewCode("A");
+        var a = await CreateInventoryProductAsync(aCode);
+        var uCode = NewCode("U");
+        var u = await CreateInventoryProductAsync(uCode, track: false);
+        var la = LineRequest(a, 10, 100_000);
+        la.VatRate = 10;
+        var v = await CreateVoucherAsync(_client, StockDirection.In, "NMH", "2026-10-05 09:00",
+            r => r.PartnerId = supplier, la, LineRequest(u, 1, 50_000));
+        var ledger = (await LedgerOfAsync(v.Id)).Single();
+        ledger.InValue.Should().Be(1_100_000);
+        var inbound = await InDbAsync(db => db.StockVoucherLines
+            .Where(l => l.StockVoucherId == v.Id && l.ProductId == a).Select(l => l.InboundValue).SingleAsync());
+        inbound.Should().Be(1_000_000);
+
+        var response = await PrintAsync(_client, v.Id, "format=xlsx&priceMode=Cost");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        var ws = wb.Worksheets.Single();
+        Tt133Sheet.Contains(ws, $"Hàng {uCode}").Should().BeFalse();
+        var row = ws.Row(Tt133Sheet.RowOf(ws, $"Hàng {aCode}"));
+        row.Cell(1).GetValue<decimal>().Should().Be(1);
+        row.Cell(7).GetValue<decimal>().Should().Be(110_000);
+        row.Cell(8).GetValue<decimal>().Should().Be(ledger.InValue);
+        Texts(ws).Should().ContainSingle(t => t == "Cộng");
+        Amount(ws, "Cộng").Should().Be(1_100_000);
+        Texts(ws).Should().Contain($"- Tổng số tiền (viết bằng chữ): {VndAmountInWords.Read(1_100_000)}");
+        Tt133Sheet.Contains(ws, ProvisionalNote).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Cost_of_a_stock_out_is_its_ledger_cost()
+    {
+        await SetCompanyAsync();
+        var aCode = NewCode("A");
+        var a = await CreateInventoryProductAsync(aCode);
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-09-02 08:00", LineRequest(a, 10, 100_000));
+        var stockOut = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-09-10 09:00",
+            LineRequest(a, 4, 150_000));
+        var ledger = (await LedgerOfAsync(stockOut.Id)).Single();
+        var card = await ReadDataAsync<StockCardDto>(await _client.GetAsync(
+            $"/api/reports/stock-card?productId={a}&warehouseId={DefaultWarehouseId}&from=2026-09-01&to=2026-09-30"));
+        var cardRow = card.Rows.Single(r => r.SourceId == stockOut.Id);
+
+        var response = await PrintAsync(_client, stockOut.Id, "format=xlsx&priceMode=Cost");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        var ws = wb.Worksheets.Single();
+        var row = ws.Row(Tt133Sheet.RowOf(ws, $"Hàng {aCode}"));
+        row.Cell(7).GetValue<decimal>().Should().Be(ledger.UnitCost!.Value).And.Be(cardRow.UnitCost!.Value);
+        row.Cell(8).GetValue<decimal>().Should().Be(ledger.CostAmount!.Value).And.Be(cardRow.CostAmount!.Value);
+        Amount(ws, "Cộng").Should().Be(ledger.CostAmount!.Value);
+        Tt133Sheet.Contains(ws, ProvisionalNote).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Current_period_cost_is_provisional()
+    {
+        await SetCompanyAsync();
+        var today = VnTime.ToVnDate(DateTimeOffset.UtcNow).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var a = await CreateInventoryProductAsync(NewCode("A"));
+        var stockIn = await CreateVoucherAsync(_client, StockDirection.In, "NKH", $"{today} 00:01", LineRequest(a, 10, 100_000));
+        var stockOut = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", $"{today} 00:02", LineRequest(a, 2, 0));
+
+        var outResponse = await PrintAsync(_client, stockOut.Id, "format=xlsx&priceMode=Cost");
+        var inResponse = await PrintAsync(_client, stockIn.Id, "format=xlsx&priceMode=Cost");
+
+        outResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using (var wb = await Tt133Sheet.OpenAsync(outResponse))
+            Tt133Sheet.Contains(wb.Worksheets.Single(), ProvisionalNote).Should().BeTrue();
+        inResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        using (var wb = await Tt133Sheet.OpenAsync(inResponse))
+            Tt133Sheet.Contains(wb.Worksheets.Single(), ProvisionalNote).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Cost_needs_the_cost_permission()
+    {
+        var a = await CreateInventoryProductAsync(NewCode("A"));
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-01 08:00", LineRequest(a, 10, 100_000));
+        var stockOut = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-05 09:00", LineRequest(a, 2, 0));
+        var client = await CreateClientWithPermissionsAsync("vpc_" + Guid.NewGuid().ToString("N")[..8], MainBranchId,
+            Permissions.StockOut.View);
+
+        var cost = await PrintAsync(client, stockOut.Id, "format=xlsx&priceMode=Cost");
+        var voucher = await PrintAsync(client, stockOut.Id, "format=xlsx&priceMode=Voucher");
+
+        cost.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var error = await cost.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options);
+        error!.Error!.Message.Should().Be("Cần quyền xem giá vốn để in phiếu theo giá vốn.");
+        voucher.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Vat_included_line_only_for_a_stock_out_at_voucher_prices()
+    {
+        await SetCompanyAsync();
+        var p = await CreateInventoryProductAsync(NewCode("V"), priceIncludesVat: true);
+        var inLine = LineRequest(p, 10, 550_000);
+        inLine.VatRate = 10;
+        var stockIn = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-01 08:00", inLine);
+        stockIn.Lines.Single().VatAmount.Should().BeGreaterThan(0);
+        var customer = await CreatePartnerAsync(NewCode("KH"), true, false);
+        var outLine = LineRequest(p, 2, 1_100_000);
+        outLine.VatRate = 10;
+        var stockOut = await CreateVoucherAsync(_client, StockDirection.Out, "XBH", "2026-10-05 09:00",
+            r => r.PartnerId = customer, outLine);
+
+        foreach (var (id, query) in new[]
+                 {
+                     (stockIn.Id, "format=xlsx"),               // a stock-in never gets the line
+                     (stockOut.Id, "format=xlsx&priceMode=Cost"), // nor a print at cost
+                 })
+        {
+            var response = await PrintAsync(_client, id, query);
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var wb = await Tt133Sheet.OpenAsync(response);
+            Texts(wb.Worksheets.Single()).Should().NotContain(t => t.StartsWith("Trong đó thuế GTGT"), query);
         }
     }
 

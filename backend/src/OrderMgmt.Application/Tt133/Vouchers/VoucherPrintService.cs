@@ -7,7 +7,9 @@ using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Application.Tt133.Services;
 using OrderMgmt.Domain.Common;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.CashDebt;
+using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Tt133.Vouchers;
@@ -114,8 +116,10 @@ public class VoucherPrintService : IVoucherPrintService
     public async Task<ExportFile> PrintStockVouchersAsync(IReadOnlyList<Guid> ids, StockPrintPriceMode priceMode,
         ExportFormat format, CancellationToken ct = default)
     {
-        if (priceMode != StockPrintPriceMode.Voucher)
+        if (priceMode == StockPrintPriceMode.None)
             throw new NotSupportedException($"Price mode {priceMode} is not supported yet.");
+        if (priceMode == StockPrintPriceMode.Cost && !_currentUser.HasPermission(Permissions.Inventory.ViewCost))
+            throw new ForbiddenException("Cần quyền xem giá vốn để in phiếu theo giá vốn.");
         var distinct = (ids ?? []).Distinct().ToList();
 
         var (context, models) = await _transaction.RunSnapshotAsync(async token =>
@@ -169,10 +173,26 @@ public class VoucherPrintService : IVoucherPrintService
                 })
                 .ToListAsync(token);
 
+            CostSource? cost = null;
+            if (priceMode == StockPrintPriceMode.Cost)
+            {
+                var settings = await _db.InventorySettings.AsNoTracking().SingleAsync(s => s.Id == 1, token);
+                var voucherIds = rows.Select(r => r.Id).ToList();
+                // Read through the (SourceType, SourceId) index; SourceLineId has none, so lines are matched in memory.
+                var ledger = await _db.InventoryLedger.AsNoTracking()
+                    .Where(e => (e.SourceType == LedgerSourceType.StockIn || e.SourceType == LedgerSourceType.StockOut)
+                        && voucherIds.Contains(e.SourceId))
+                    .ToListAsync(token);
+                cost = new CostSource(
+                    ledger.Where(e => e.SourceLineId != null).ToDictionary(e => e.SourceLineId!.Value),
+                    settings.CostingPeriod,
+                    VnTime.ToVnDate(_clock.UtcNow));
+            }
+
             var list = rows
                 .OrderBy(r => r.VoucherAt)
                 .ThenBy(r => r.Code, StringComparer.Ordinal)
-                .Select(ToStockModel)
+                .Select(r => ToStockModel(r, priceMode, cost))
                 .ToList();
             return (formContext, list);
         }, ct);
@@ -181,7 +201,16 @@ public class VoucherPrintService : IVoucherPrintService
         return await ToFileAsync(xlsx, models.Select(m => m.Code).ToList(), StockBatchPrefix(models), format, ct);
     }
 
-    private static StockVoucherPrintModel ToStockModel(StockVoucherRow r)
+    private static StockVoucherPrintModel ToStockModel(StockVoucherRow r, StockPrintPriceMode priceMode, CostSource? cost)
+    {
+        var model = ToStockHeader(r);
+        if (priceMode == StockPrintPriceMode.Cost) FillAtCost(model, r, cost!);
+        else FillAtVoucherPrices(model, r);
+        return model;
+    }
+
+    /// Everything but the lines, totals and words; the warehouses are those of the voucher's lines.
+    private static StockVoucherPrintModel ToStockHeader(StockVoucherRow r)
     {
         var warehouses = r.Lines.DistinctBy(l => l.WarehouseId).ToList();
         return new StockVoucherPrintModel
@@ -199,24 +228,60 @@ public class VoucherPrintService : IVoucherPrintService
                 ? string.Join(", ", warehouses.Select(l => l.WarehouseName).Distinct())
                 : r.WarehouseName,
             ShowWarehouseColumn = warehouses.Count > 1,
-            Lines = r.Lines.Select((l, i) => new StockVoucherPrintLine
-            {
-                Number = i + 1,
-                Name = VoucherPrintRules.LineName(l.ProductName, l.PricingMode, l.Length, l.Width, l.Thickness, l.SheetCount),
-                Code = l.ProductCode,
-                UnitName = l.UnitName,
-                WarehouseCode = l.WarehouseCode,
-                Quantity = l.Quantity,
-                UnitPrice = l.UnitPrice,
-                Amount = l.Amount,
-            }).ToList(),
-            Totals = VoucherPrintRules.VoucherTotals(r.GoodsAmount, r.LineDiscountTotal, r.OrderDiscount, r.Freight, r.Total)
-                .ToList(),
-            VatIncludedLine = VatIncludedLine(r),
-            AmountInWords = VndAmountInWords.Read(r.Total),
             PreparerName = r.OwnerName,
         };
     }
+
+    /// Every line at its own price; the stored totals under the table.
+    private static void FillAtVoucherPrices(StockVoucherPrintModel model, StockVoucherRow r)
+    {
+        model.PriceMode = StockPrintPriceMode.Voucher;
+        model.Lines = r.Lines.Select((l, i) => PrintLine(l, i + 1, l.UnitPrice, l.Amount)).ToList();
+        model.Totals = VoucherPrintRules.VoucherTotals(r.GoodsAmount, r.LineDiscountTotal, r.OrderDiscount, r.Freight, r.Total)
+            .ToList();
+        model.VatIncludedLine = VatIncludedLine(r);
+        model.AmountInWords = VndAmountInWords.Read(r.Total);
+    }
+
+    /// Tracked lines at their ledger value (stock-in) or cost (stock-out); one "Cộng" row.
+    private static void FillAtCost(StockVoucherPrintModel model, StockVoucherRow r, CostSource cost)
+    {
+        model.PriceMode = StockPrintPriceMode.Cost;
+        var stockIn = r.Type == StockDirection.In;
+        model.Lines = r.Lines.Where(l => l.TrackInventory).Select((l, i) =>
+        {
+            var entry = cost.ByLine.GetValueOrDefault(l.Id);
+            decimal? unitPrice = stockIn
+                ? entry is { QtyIn: > 0 } ? R4(entry.InValue / entry.QtyIn) : null
+                : entry?.UnitCost;
+            decimal? amount = stockIn ? entry?.InValue : entry?.CostAmount;
+            return PrintLine(l, i + 1, unitPrice, amount);
+        }).ToList();
+        var sum = model.Lines.Sum(l => l.Amount ?? 0);
+        model.Totals = [new StockVoucherPrintTotal("Cộng", sum)];
+        model.AmountInWords = VndAmountInWords.Read(sum);
+        if (!stockIn && CostProvisional.IsProvisional(model.Date, cost.Period, cost.Today))
+            model.Notes.Add("Giá vốn tạm tính (kỳ tính giá vốn chưa kết thúc).");
+    }
+
+    private static StockVoucherPrintLine PrintLine(StockVoucherLineRow l, int number, decimal? unitPrice, decimal? amount) =>
+        new()
+        {
+            Number = number,
+            Name = VoucherPrintRules.LineName(l.ProductName, l.PricingMode, l.Length, l.Width, l.Thickness, l.SheetCount),
+            Code = l.ProductCode,
+            UnitName = l.UnitName,
+            WarehouseCode = l.WarehouseCode,
+            Quantity = l.Quantity,
+            UnitPrice = unitPrice,
+            Amount = amount,
+        };
+
+    /// The stock card's rounding of a unit cost.
+    private static decimal R4(decimal x) => Math.Round(x, 4, MidpointRounding.AwayFromZero);
+
+    /// The ledger rows of the printed vouchers by line, and what the provisional-cost note needs.
+    private sealed record CostSource(Dictionary<Guid, InventoryLedgerEntry> ByLine, CostingPeriod Period, DateOnly Today);
 
     /// A stock-out whose prices include VAT shows that VAT under the table, outside the sum.
     private static string? VatIncludedLine(StockVoucherRow r)

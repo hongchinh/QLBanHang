@@ -1739,6 +1739,37 @@ describe('StockVoucherFormPage', () => {
       expect(cancelMock).not.toHaveBeenCalled();
     });
 
+    // The listener hears every key pressed anywhere, each one typed in the grid too. Only a shortcut that it would take
+    // is worth a search of the whole page for an open dialog.
+    it('searches the page for an open dialog only for a shortcut that it would take', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      updateMock.mockResolvedValue(voucher({ version: 8 }));
+      renderInMain();
+      const cell = byId('stock-line-quantity-0');
+      // Outside main, where the app header is.
+      const header = document.body.appendChild(document.createElement('input'));
+      const querySelector = vi.spyOn(document, 'querySelector');
+      const dialogSearches = () =>
+        querySelector.mock.calls.filter(([selector]) => String(selector).includes('dialog')).length;
+      try {
+        // A digit typed in the grid, a key that is no shortcut on <body>, Ctrl+S outside main.
+        fireEvent.keyDown(cell, { key: '5' });
+        pressOnBody({ key: 'a' });
+        pressOnBody({ key: 'c', ctrlKey: true });
+        fireEvent.keyDown(header, { key: 's', ctrlKey: true });
+        expect(dialogSearches()).toBe(0);
+
+        // A shortcut that it takes looks, so that the key can be left to an open dialog.
+        pressOnBody({ key: 's', ctrlKey: true });
+        expect(dialogSearches()).toBe(1);
+      } finally {
+        querySelector.mockRestore();
+        header.remove();
+      }
+      await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+    });
+
     it('stops listening once the page is gone', async () => {
       createMock.mockResolvedValue(voucher());
       const { unmount } = renderPage('In');

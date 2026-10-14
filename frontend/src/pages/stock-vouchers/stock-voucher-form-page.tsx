@@ -107,6 +107,13 @@ type ShortcutKeyEvent = Pick<
   'key' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'repeat' | 'preventDefault'
 >;
 
+// Ctrl+S saves (with Caps Lock too, not with Shift); Alt+1..4 switch tabs, Alt+4 only on a saved voucher.
+function shortcutOf(e: ShortcutKeyEvent, isEdit: boolean): 'save' | StockVoucherTab | undefined {
+  if (e.key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) return 'save';
+  const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[e.key] : undefined;
+  return altTab === 'history' && !isEdit ? undefined : altTab;
+}
+
 const OPEN_DIALOG = '[role="dialog"], [role="alertdialog"]';
 
 const JUMP_IDS: Record<TotalsJumpField, string> = {
@@ -540,25 +547,22 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       });
   }
 
-  // Ctrl+S saves (with Caps Lock too, not with Shift); Alt+1..4 switch tabs, Alt+4 only on a saved voucher. Returns
-  // true when the key was one of them: it is taken from the browser then. A key held down repeats: the repeats are
-  // taken too but run nothing, or a held Ctrl+S would save again each time the save before it ended.
+  // Runs the shortcut of the key (shortcutOf). Returns true when the key was one: it is taken from the browser then.
+  // A key held down repeats: the repeats are taken too but run nothing, or a held Ctrl+S would save again each time
+  // the save before it ended.
   function runShortcut(e: ShortcutKeyEvent): boolean {
-    if (e.key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
-      e.preventDefault();
-      if (!e.repeat) submitWithIntent(isEdit ? 'update' : 'save-stay');
-      return true;
-    }
-    const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[e.key] : undefined;
-    if (altTab && (altTab !== 'history' || isEdit)) {
-      e.preventDefault();
-      if (e.repeat) return true;
-      setActiveTab(altTab);
+    const shortcut = shortcutOf(e, isEdit);
+    if (!shortcut) return false;
+    e.preventDefault();
+    if (e.repeat) return true;
+    if (shortcut === 'save') {
+      submitWithIntent(isEdit ? 'update' : 'save-stay');
+    } else {
+      setActiveTab(shortcut);
       // The focused cell may sit in a panel that is about to be hidden; keep the focus in the form so Ctrl+S / Alt+n keep working.
       setTimeout(() => document.querySelector<HTMLElement>('[role="tab"][data-state="active"]')?.focus(), 0);
-      return true;
     }
-    return false;
+    return true;
   }
 
   function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
@@ -578,14 +582,17 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   runShortcutRef.current = runShortcut;
   useEffect(() => {
     function handleDocumentKeyDown(e: KeyboardEvent) {
-      if (e.defaultPrevented || document.querySelector(OPEN_DIALOG)) return;
+      // Every key pressed anywhere comes here, each one typed in the grid too: the cheap checks go first, and the
+      // search of the whole page for an open dialog last.
+      if (e.defaultPrevented || !shortcutOf(e, isEdit)) return;
       const target = e.target instanceof Element ? e.target : null;
       const inPageOutsideForm = !!target?.closest('main#main-content') && !formRef.current?.contains(target);
-      if (target === document.body || inPageOutsideForm) runShortcutRef.current(e);
+      if (target !== document.body && !inPageOutsideForm) return;
+      if (!document.querySelector(OPEN_DIALOG)) runShortcutRef.current(e);
     }
     document.addEventListener('keydown', handleDocumentKeyDown);
     return () => document.removeEventListener('keydown', handleDocumentKeyDown);
-  }, []);
+  }, [isEdit]);
 
   // Enter from the main area: the first line without a product, or a new one.
   function enterGrid() {

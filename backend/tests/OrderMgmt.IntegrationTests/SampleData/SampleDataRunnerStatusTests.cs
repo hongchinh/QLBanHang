@@ -222,7 +222,8 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
 
         generator.Inputs.Should().ContainSingle();
         var branch = await BranchAsync(branchId);
-        (branch.SampleDataStatus, branch.SampleDataError).Should().Be((SampleDataStatus.Failed, "KE-HOACH: boom"));
+        (branch.SampleDataStatus, branch.SampleDataError).Should().Be((SampleDataStatus.Failed,
+            "KE-HOACH: Không tạo được kế hoạch dữ liệu mẫu. Hãy xóa chi nhánh demo và tạo lại."));
         (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Code == "RJ02-K1"))).Should().BeFalse();
     }
 

@@ -80,11 +80,16 @@ public class SampleDataErrorFormatTests
             .Should().Be("TKH-0001: Kế hoạch tham chiếu khóa không tồn tại: XBH-9999");
     }
 
+    /// The generator's own message is an internal .NET message: the error shows a fixed text, the log keeps the cause.
     [Fact]
-    public void Generator_failure_keeps_the_generator_message()
+    public void Generator_failure_gives_a_generic_message_and_keeps_the_cause()
     {
-        SampleDataRunner.FormatError("KE-HOACH", SampleDataPlanException.GeneratorFailed(new InvalidOperationException("boom")))
-            .Should().Be("KE-HOACH: boom");
+        var cause = new InvalidOperationException("boom");
+        var failure = SampleDataPlanException.GeneratorFailed(cause);
+
+        SampleDataRunner.FormatError("KE-HOACH", failure)
+            .Should().Be("KE-HOACH: Không tạo được kế hoạch dữ liệu mẫu. Hãy xóa chi nhánh demo và tạo lại.");
+        failure.InnerException.Should().BeSameAs(cause);
     }
 
     [Fact]

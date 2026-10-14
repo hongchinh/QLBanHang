@@ -9,7 +9,7 @@ using OrderMgmt.WebApi.Authorization;
 namespace OrderMgmt.WebApi.Controllers;
 
 /// Executive dashboard (Bảng điều hành): read-only. Each action needs dashboard.executive and the report permission
-/// of its domain.
+/// of its domain; the branch comparison needs branches.access_all instead.
 [Route("api/dashboard/executive")]
 [HasPermission(Permissions.Dashboard.Executive)]
 public class ExecutiveDashboardController : ApiControllerBase
@@ -18,18 +18,20 @@ public class ExecutiveDashboardController : ApiControllerBase
     private readonly ICashMetricsService _cash;
     private readonly IDebtMetricsService _debt;
     private readonly IInventoryMetricsService _inventory;
+    private readonly IExecutiveOverviewService _overview;
     private readonly IValidator<ExecutiveQuery> _queryValidator;
     private readonly IValidator<ExecutiveSeriesQuery> _seriesValidator;
     private readonly IValidator<SalesTopQuery> _topValidator;
 
     public ExecutiveDashboardController(ISalesMetricsService sales, ICashMetricsService cash, IDebtMetricsService debt,
-        IInventoryMetricsService inventory, IValidator<ExecutiveQuery> queryValidator,
+        IInventoryMetricsService inventory, IExecutiveOverviewService overview, IValidator<ExecutiveQuery> queryValidator,
         IValidator<ExecutiveSeriesQuery> seriesValidator, IValidator<SalesTopQuery> topValidator)
     {
         _sales = sales;
         _cash = cash;
         _debt = debt;
         _inventory = inventory;
+        _overview = overview;
         _queryValidator = queryValidator;
         _seriesValidator = seriesValidator;
         _topValidator = topValidator;
@@ -123,5 +125,14 @@ public class ExecutiveDashboardController : ApiControllerBase
     {
         await _queryValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _inventory.GetBreakdownAsync(query, ct));
+    }
+
+    [HttpGet("branches")]
+    [HasPermission(Permissions.Branches.AccessAll)]
+    public async Task<ActionResult<ApiResponse<List<BranchComparisonRowDto>>>> Branches(
+        [FromQuery] ExecutiveQuery query, CancellationToken ct)
+    {
+        await _queryValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _overview.GetBranchComparisonAsync(query, ct));
     }
 }

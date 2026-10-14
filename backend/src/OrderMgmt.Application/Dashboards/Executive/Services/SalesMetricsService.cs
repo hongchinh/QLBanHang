@@ -88,7 +88,7 @@ public class SalesMetricsService : ISalesMetricsService
             await BuildCountedQueryAsync(scope, period.Start, period.End, ct), canViewCost, ct);
         var totals = vouchers
             .GroupBy(v => ExecutiveSeries.BucketOf(VnTime.ToVnDate(v.At), query.Granularity))
-            .ToDictionary(g => g.Key, g => new Totals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
+            .ToDictionary(g => g.Key, g => new SalesTotals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
 
         return new SalesSeriesDto
         {
@@ -96,7 +96,7 @@ public class SalesMetricsService : ISalesMetricsService
             Points = ExecutiveSeries.Buckets(period.From, period.To, query.Granularity)
                 .Select(bucket =>
                 {
-                    var total = totals.GetValueOrDefault(bucket) ?? new Totals(0m, 0m);
+                    var total = totals.GetValueOrDefault(bucket) ?? new SalesTotals(0m, 0m);
                     return new SalesPointDto
                     {
                         Date = bucket,
@@ -145,6 +145,18 @@ public class SalesMetricsService : ISalesMetricsService
             .ToList();
     }
 
+    /// Revenue and cost of each branch of the scope in the period, costs always included: the caller decides what the
+    /// user may see. Runs inside the caller's snapshot.
+    public async Task<IReadOnlyDictionary<Guid, SalesTotals>> GetByBranchAsync(ExecutiveScope scope, ExecutivePeriod period,
+        CancellationToken ct = default)
+    {
+        var vouchers = await LoadVouchersAsync(
+            await BuildCountedQueryAsync(scope, period.Start, period.End, ct), withCost: true, ct);
+        return vouchers
+            .GroupBy(v => v.BranchId)
+            .ToDictionary(g => g.Key, g => new SalesTotals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
+    }
+
     /// The query of the counted vouchers of the scope with VoucherAt in [from, to): Active, not deleted, reason XBH or
     /// NTL. Only the reason ids are read here; the vouchers are read when the query is run.
     private async Task<Counted> BuildCountedQueryAsync(ExecutiveScope scope, DateTimeOffset from, DateTimeOffset to,
@@ -179,6 +191,7 @@ public class SalesMetricsService : ISalesMetricsService
             {
                 v.Id,
                 v.VoucherAt,
+                v.BranchId,
                 v.PartnerId,
                 v.OwnerUserId,
                 IsReturn = returnIds.Contains(v.ReasonId),
@@ -206,12 +219,12 @@ public class SalesMetricsService : ISalesMetricsService
         {
             var sign = r.IsReturn ? -1m : 1m;
             var cost = costs is not null && costs.TryGetValue(r.Id, out var c) ? (r.IsReturn ? c.ValueIn : c.CostOut) : 0m;
-            return new VoucherRow(r.Id, r.VoucherAt, r.PartnerId, r.OwnerUserId, sign * r.Revenue, sign * cost);
+            return new VoucherRow(r.Id, r.VoucherAt, r.BranchId, r.PartnerId, r.OwnerUserId, sign * r.Revenue, sign * cost);
         }).ToList();
     }
 
     /// The totals of each customer, employee or product of the counted vouchers, by the grouping of the top list.
-    private async Task<Dictionary<Guid, Totals>> TotalsAsync(
+    private async Task<Dictionary<Guid, SalesTotals>> TotalsAsync(
         SalesTopBy by, Counted counted, bool canViewCost, CancellationToken ct)
     {
         if (by == SalesTopBy.Product)
@@ -228,14 +241,14 @@ public class SalesMetricsService : ISalesMetricsService
     }
 
     /// Customers (the voucher's partner) or employees (the voucher's owner), grouped in memory by `key`.
-    private static Dictionary<Guid, Totals> TotalsByKey(List<VoucherRow> vouchers, Func<VoucherRow, Guid?> key) =>
+    private static Dictionary<Guid, SalesTotals> TotalsByKey(List<VoucherRow> vouchers, Func<VoucherRow, Guid?> key) =>
         // XBH and NTL require a customer, so no counted voucher lacks a partner; the filter only drops a null key.
         vouchers.Where(v => key(v) is not null)
             .GroupBy(v => key(v)!.Value)
-            .ToDictionary(g => g.Key, g => new Totals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
+            .ToDictionary(g => g.Key, g => new SalesTotals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
 
     /// Products: revenue from the voucher lines and cost from the ledger rows, each grouped by product in the database.
-    private async Task<Dictionary<Guid, Totals>> TotalsByProductAsync(Counted counted, bool withCost, CancellationToken ct)
+    private async Task<Dictionary<Guid, SalesTotals>> TotalsByProductAsync(Counted counted, bool withCost, CancellationToken ct)
     {
         var vouchers = counted.Vouchers;
         var returnIds = counted.ReturnIds;
@@ -262,7 +275,7 @@ public class SalesMetricsService : ISalesMetricsService
                 .ToDictionaryAsync(c => c.ProductId, c => c.Cost, ct)
             : new Dictionary<Guid, decimal>();
 
-        return revenues.ToDictionary(r => r.ProductId, r => new Totals(r.Revenue, costs.GetValueOrDefault(r.ProductId)));
+        return revenues.ToDictionary(r => r.ProductId, r => new SalesTotals(r.Revenue, costs.GetValueOrDefault(r.ProductId)));
     }
 
     /// Code and name of each customer, product or employee, from the lookups every metrics service shares.
@@ -289,8 +302,6 @@ public class SalesMetricsService : ISalesMetricsService
     private sealed record Counted(IQueryable<StockVoucher> Vouchers, List<Guid> ReturnIds);
 
     /// Revenue and Cost are signed: a return counts negative.
-    private sealed record VoucherRow(Guid VoucherId, DateTimeOffset At, Guid? PartnerId, Guid OwnerUserId,
+    private sealed record VoucherRow(Guid VoucherId, DateTimeOffset At, Guid BranchId, Guid? PartnerId, Guid OwnerUserId,
         decimal Revenue, decimal Cost);
-
-    private sealed record Totals(decimal Revenue, decimal Cost);
 }

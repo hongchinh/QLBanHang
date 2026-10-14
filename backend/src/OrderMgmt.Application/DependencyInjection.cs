@@ -159,6 +159,7 @@ public static class DependencyInjection
         services.AddScoped<ICashMetricsService, CashMetricsService>();
         services.AddScoped<IDebtMetricsService, DebtMetricsService>();
         services.AddScoped<IInventoryMetricsService, InventoryMetricsService>();
+        services.AddScoped<IExecutiveOverviewService, ExecutiveOverviewService>();
 
         return services;
     }

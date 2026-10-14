@@ -266,6 +266,11 @@ public class InventoryMetricsService : IInventoryMetricsService
             .Select(g => new { g.Id, g.Name })
             .ToDictionaryAsync(g => g.Id, g => g.Name, ct);
 
+    /// The stock value now of each branch of the scope. Runs inside the caller's snapshot.
+    public async Task<IReadOnlyDictionary<Guid, decimal>> GetValueByBranchAsync(ExecutiveScope scope,
+        CancellationToken ct = default) =>
+        (await LoadPairsAsync(scope, ct)).GroupBy(p => p.BranchId).ToDictionary(g => g.Key, g => g.Sum(p => p.Value));
+
     /// The quantities now (kept up to date on every ledger change) of every product and warehouse of the scope.
     private async Task<List<BalanceRow>> LoadBalancesAsync(ExecutiveScope scope, CancellationToken ct)
     {

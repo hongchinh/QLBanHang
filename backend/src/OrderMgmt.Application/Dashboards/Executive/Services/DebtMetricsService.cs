@@ -115,6 +115,15 @@ public class DebtMetricsService : IDebtMetricsService
         };
     }
 
+    /// The receivable balance of each branch of the scope at the end of the given day. Runs inside the caller's
+    /// snapshot.
+    public async Task<IReadOnlyDictionary<Guid, decimal>> GetReceivableByBranchAsync(ExecutiveScope scope, DateOnly at,
+        CancellationToken ct = default)
+    {
+        var receivable = await LoadOpenItemsAsync(scope, DebtSide.Receivable, ExecutiveDay.End(at), ct);
+        return receivable.GroupBy(i => i.BranchId).ToDictionary(g => g.Key, g => DebtPositionMath.Balance(g));
+    }
+
     /// The receivable balance of each customer over every branch of the scope; customers who do not owe are left out.
     private static List<DebtorBalance> DebtorBalances(IEnumerable<OpenDebtItem> receivable, DateOnly at) =>
         receivable

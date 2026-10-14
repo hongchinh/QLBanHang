@@ -64,8 +64,10 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
 
     public static IEnumerable<object[]> RouteNames => Routes.Select(route => new object[] { route.Route });
 
-    /// Every route that takes a period, with the rest of its query string.
-    public static IEnumerable<object[]> PeriodRoutes => Routes.Select(route => new object[] { route.Route, route.Extra });
+    /// Every route that takes a period, with the rest of its query string: the routes of the table and the ones that
+    /// have no domain permission of their own.
+    public static IEnumerable<object[]> PeriodRoutes => Routes.Select(route => new object[] { route.Route, route.Extra })
+        .Append(new object[] { "branches", "" });
 
     [Theory]
     [MemberData(nameof(RouteNames))]

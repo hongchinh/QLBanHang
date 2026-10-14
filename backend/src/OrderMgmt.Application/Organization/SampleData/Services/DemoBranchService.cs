@@ -44,10 +44,11 @@ public sealed class DemoBranchService : IDemoBranchService
     public Task<DemoBranchDeletionResultDto> DeleteAsync(Guid branchId, CancellationToken ct = default)
         => throw new NotImplementedException("Phase 02c");
 
-    /// The guards of the preview and the delete: the branch exists, is a demo one and is not being filled.
+    /// The guards of the preview and the delete: the branch exists, is a demo one and is not being filled. Not tracked,
+    /// so a read behind a lock sees the current row, not an instance the scope already holds.
     private async Task<Branch> LoadDeletableBranchAsync(Guid branchId, CancellationToken ct)
     {
-        var branch = await _db.Branches.FirstOrDefaultAsync(b => b.Id == branchId, ct)
+        var branch = await _db.Branches.AsNoTracking().FirstOrDefaultAsync(b => b.Id == branchId, ct)
             ?? throw new NotFoundException(nameof(Branch), branchId);
         if (!branch.IsDemo)
             throw new ConflictException("NOT_A_DEMO_BRANCH", "Chỉ xóa được chi nhánh demo bằng chức năng này.");

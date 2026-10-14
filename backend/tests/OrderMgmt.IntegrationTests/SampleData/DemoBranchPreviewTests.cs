@@ -1,7 +1,7 @@
 using System.Net;
-using System.Net.Http.Json;
 using FluentAssertions;
-using OrderMgmt.Application.Common.Models;
+using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
@@ -20,18 +20,28 @@ public class DemoBranchPreviewTests : DemoBranchFixture
     [Fact]
     public async Task Preview_counts_documents_and_users()
     {
-        var (branchId, client) = await CreateDemoBranchAsync("DP01");
+        var branch = await CreateDemoBranchAsync("DP01");
         var customer = await CreatePartnerAsync("DPKH01", isCustomer: true, isSupplier: false);
-        var sale = await PostCreditSaleAsync(branchId, client, customer, 3_000m);
-        await PostAllocatedReceiptAsync(branchId, client, customer, sale.Id, 1_000m);
-        await PostFundTransferAsync(branchId, client, "DPNH", 500m);
-        await CreateTestUserAsync("dp_user", "Pass@123", RoleCodes.Sales, defaultBranchId: branchId);
+        var product = await CreateInventoryProductAsync("DPSP01", track: false);
+        var sale = await PostCreditSaleAsync(branch, customer, product, 3_000m);
+        await PostAllocatedReceiptAsync(branch, customer, sale.Id, 1_000m);
+        var bank = await CreateBankFundAsync("DPNH", branch.BranchId, opening: 1_000m);
+        await PostFundTransferAsync(branch, bank, 500m);
+        // Soft-deleted rows go with the branch too, so they count.
+        var deleted = await PostFundTransferAsync(branch, bank, 200m);
+        var (deleteStatus, _, deleteError) = await DeleteTransferAsync(branch.Client, deleted.Id,
+            new CashDocumentActionRequest { Version = deleted.Version });
+        deleteStatus.Should().Be(HttpStatusCode.OK, deleteError?.Message);
+        await CreateTestUserAsync("dp_user", "Pass@123", RoleCodes.Sales, defaultBranchId: branch.BranchId);
+        await CreateTestUserAsync("dp_gone", "Pass@123", RoleCodes.Sales, defaultBranchId: branch.BranchId);
+        await InDbAsync(db => db.Users.Where(u => u.Username == "dp_gone")
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.IsDeleted, true)));
 
-        var response = await _client.GetAsync(PreviewUrl(branchId));
+        var response = await _client.GetAsync(PreviewUrl(branch.BranchId));
 
         var preview = await ReadDataAsync<DemoBranchDeletionPreviewDto>(response);
-        preview.DocumentCount.Should().Be(3);
-        preview.ReassignedUserCount.Should().Be(1);
+        preview.DocumentCount.Should().Be(4);
+        preview.ReassignedUserCount.Should().Be(2);
     }
 
     [Fact]
@@ -41,19 +51,17 @@ public class DemoBranchPreviewTests : DemoBranchFixture
 
         var response = await _client.GetAsync(PreviewUrl(branchId));
 
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await ReadErrorAsync(response)).Code.Should().Be("NOT_A_DEMO_BRANCH");
+        await AssertErrorAsync(response, HttpStatusCode.Conflict, "NOT_A_DEMO_BRANCH");
     }
 
     [Fact]
     public async Task Preview_refuses_a_running_branch()
     {
-        var (branchId, _) = await CreateDemoBranchAsync("DP03", SampleDataStatus.Running);
+        var branch = await CreateDemoBranchAsync("DP03", SampleDataStatus.Running);
 
-        var response = await _client.GetAsync(PreviewUrl(branchId));
+        var response = await _client.GetAsync(PreviewUrl(branch.BranchId));
 
-        response.StatusCode.Should().Be(HttpStatusCode.Conflict);
-        (await ReadErrorAsync(response)).Code.Should().Be("SAMPLE_DATA_RUNNING");
+        await AssertErrorAsync(response, HttpStatusCode.Conflict, "SAMPLE_DATA_RUNNING");
     }
 
     [Fact]
@@ -65,19 +73,25 @@ public class DemoBranchPreviewTests : DemoBranchFixture
     }
 
     [Fact]
-    public async Task Preview_needs_branches_manage()
+    public async Task Preview_of_soft_deleted_branch_is_404()
     {
-        var (branchId, _) = await CreateDemoBranchAsync("DP04");
-        var client = await CreateClientWithPermissionsAsync("dp_noperm", null, Permissions.Reports.Debt);
+        var branch = await CreateDemoBranchAsync("DP05");
+        await InDbAsync(db => db.Branches.Where(b => b.Id == branch.BranchId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsDeleted, true)));
 
-        var response = await client.GetAsync(PreviewUrl(branchId));
+        var response = await _client.GetAsync(PreviewUrl(branch.BranchId));
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
-    private static async Task<ApiError> ReadErrorAsync(HttpResponseMessage response)
+    [Fact]
+    public async Task Preview_needs_branches_manage()
     {
-        var body = await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options);
-        return body!.Error!;
+        var branch = await CreateDemoBranchAsync("DP04");
+        var client = await CreateClientWithPermissionsAsync("dp_noperm", null, Permissions.Reports.Debt);
+
+        var response = await client.GetAsync(PreviewUrl(branch.BranchId));
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 }

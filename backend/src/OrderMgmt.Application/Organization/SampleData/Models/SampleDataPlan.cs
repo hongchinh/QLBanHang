@@ -2,7 +2,8 @@ using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Organization.SampleData.Models;
 
-public sealed record SampleDataGeneratorInput(string BranchCode, DateOnly Today, int OwnerCount);
+/// NetExcludesVat: the branch's InventorySettings.NetExcludesVat, so estimated voucher totals match the real ones.
+public sealed record SampleDataGeneratorInput(string BranchCode, DateOnly Today, int OwnerCount, bool NetExcludesVat = false);
 
 public sealed class SampleDataPlan
 {

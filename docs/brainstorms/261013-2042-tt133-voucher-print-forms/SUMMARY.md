@@ -1,6 +1,6 @@
 # Mẫu in chứng từ TT133 — Phiếu thu, Phiếu chi, Phiếu nhập kho, Phiếu xuất kho
 
-> Brainstorm: 2026-10-13 20:42:09 · Tiếp nối [brainstorm sổ TT133](../261012-2237-tt133-report-forms/SUMMARY.md) (mục non-goal "Mẫu in phiếu thu/chi, phiếu nhập/xuất") và [plan sổ TT133](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md) · Review đối chiếu code: 2026-10-14, đã sửa theo mục [Review đối chiếu code](#review-đối-chiếu-code-2026-10-14) · Trạng thái: thiết kế đã duyệt; plan sổ TT133 đã merge (PR #12), sẵn sàng viết plan
+> Brainstorm: 2026-10-13 20:42:09 · Tiếp nối [brainstorm sổ TT133](../261012-2237-tt133-report-forms/SUMMARY.md) (mục non-goal "Mẫu in phiếu thu/chi, phiếu nhập/xuất") và [plan sổ TT133](../../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md) · Review đối chiếu code: 2026-10-14, đã sửa theo mục [Review đối chiếu code](#review-đối-chiếu-code-2026-10-14) · Trạng thái: **đã hiện thực** theo [plan mẫu in chứng từ TT133](../../plans/261014-1632-tt133-voucher-print-forms/SUMMARY.md); còn chờ kế toán trả lời các câu hỏi và duyệt bản in ([danh sách kiểm tra go-live](../../plans/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md))
 
 ## Problem framing
 
@@ -262,7 +262,7 @@ Kiểm quyền và chi nhánh theo cùng thứ tự với `GetAsync` của màn 
 
 ## Open questions
 
-**Kế toán / PO** (không chặn việc phát triển; là go-live gate):
+**Kế toán / PO** (không chặn việc phát triển; là go-live gate, đã đưa vào [danh sách kiểm tra go-live](../../plans/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md), phần 1; chưa có câu trả lời):
 - Phiếu thu/chi của **quỹ ngân hàng** có in theo 01-TT/02-TT không, hay kế toán chỉ dùng giấy báo Có / ủy nhiệm chi của ngân hàng? Thiết kế hiện cho in cả hai loại quỹ.
 - Có chấp nhận để trống ô Nợ, Có và Quyển số cho kế toán ghi tay không?
 - Cột "Số lượng theo chứng từ / yêu cầu" in bằng số lượng thực nhập/xuất có đúng thực tế không, hay phải để trống cho thủ kho ghi?
@@ -270,9 +270,9 @@ Kiểm quyền và chi nhánh theo cùng thứ tự với `GetAsync` của màn 
 - Hàng tính theo m, m², m³ in quy cách (kích thước, số tấm) trong cột Tên. Cách ghi này có đúng nhu cầu của thủ kho không?
 - Phiếu kho có dòng ở nhiều kho: in tên các kho ở dòng "Nhập/Xuất tại kho" và thêm cột Kho có được không, hay phải tách mỗi kho một phiếu in?
 
-**Kỹ thuật** (chốt khi viết plan):
-- Tên thành phần dùng chung tách từ `Tt133ExportService` và hàm tải blob của frontend.
-- A5 ngang qua LibreOffice: kiểm trên Docker rằng PDF giữ đúng khổ giấy khi một file có nhiều sheet.
+**Kỹ thuật** (đã chốt):
+- Tên thành phần dùng chung: `Tt133ExportSupport` (`Application/Tt133/Services`); hàm tải blob của frontend: `requestBlob` / `saveBlob` (`lib/blob-download.ts`).
+- A5 ngang qua LibreOffice, nhiều sheet trong một file: Kết quả kiểm tra A5 (Task 5.1): <<TO FILL>>
 
 ## Review đối chiếu code (2026-10-14)
 
@@ -295,6 +295,7 @@ Kiểm quyền và chi nhánh theo cùng thứ tự với `GetAsync` của màn 
 
 ## Next steps
 
-1. Gửi kế toán các câu hỏi Kế toán/PO ở trên.
-2. `write-plan` cho 3 phase. Contract đã đối chiếu với code sau khi plan sổ TT133 merge (PR #12).
-3. Cập nhật `docs/project-pdr/product-goals.md` khi plan được duyệt.
+1. ~~Gửi kế toán các câu hỏi Kế toán/PO ở trên.~~ Đã đưa vào [danh sách kiểm tra go-live](../../plans/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md); việc gửi và nhận câu trả lời vẫn mở.
+2. ~~`write-plan` cho 3 phase.~~ Xong: [plan](../../plans/261014-1632-tt133-voucher-print-forms/SUMMARY.md) (6 phase, hiện thực xong).
+3. ~~Cập nhật `docs/project-pdr/product-goals.md`.~~ Xong.
+4. Kế toán trả lời 6 câu hỏi và duyệt bản in từng mẫu so với Phụ lục 3 bản gốc (phần 1 và 2 của danh sách kiểm tra go-live).

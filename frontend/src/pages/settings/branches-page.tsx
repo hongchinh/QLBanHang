@@ -62,16 +62,16 @@ export function BranchesPage() {
         header: 'Loại',
         id: 'kind',
         cell: ({ row }) => {
-          const b = row.original;
-          if (!b.isDemo) return null;
+          const branch = row.original;
+          if (!branch.isDemo) return null;
           return (
             <div className="flex flex-wrap items-center gap-1">
               <Badge variant="info">Demo</Badge>
-              {b.sampleDataStatus === 'Running' && (
-                <Badge variant="warning">Đang tạo dữ liệu {b.sampleDataProgress ?? 0}%</Badge>
+              {branch.sampleDataStatus === 'Running' && (
+                <Badge variant="warning">Đang tạo dữ liệu {branch.sampleDataProgress ?? 0}%</Badge>
               )}
-              {b.sampleDataStatus === 'Failed' && (
-                <Badge variant="destructive" title={b.sampleDataError ?? undefined}>
+              {branch.sampleDataStatus === 'Failed' && (
+                <Badge variant="destructive" title={branch.sampleDataError ?? undefined}>
                   Lỗi tạo dữ liệu
                 </Badge>
               )}
@@ -118,6 +118,7 @@ export function BranchesPage() {
                 variant="ghost"
                 size="icon"
                 aria-label="Xóa chi nhánh demo"
+                className="disabled:pointer-events-auto disabled:cursor-not-allowed"
                 disabled={row.original.sampleDataStatus === 'Running'}
                 title={row.original.sampleDataStatus === 'Running' ? 'Đang tạo dữ liệu mẫu' : undefined}
                 onClick={() => setPendingDemoDelete(row.original)}

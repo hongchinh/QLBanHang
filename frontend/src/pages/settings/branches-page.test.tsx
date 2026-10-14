@@ -10,6 +10,7 @@ import { toast } from '@/lib/use-toast';
 
 const createMock = vi.fn();
 const deleteMock = vi.fn();
+const deleteDemoMock = vi.fn();
 const setOpeningDateMock = vi.fn();
 const BRANCHES: Branch[] = [
   {
@@ -61,8 +62,12 @@ vi.mock('@/features/branches/hooks', () => ({
   useCreateBranch: () => ({ mutateAsync: createMock, isPending: false }),
   useUpdateBranch: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteBranch: () => ({ mutate: deleteMock, isPending: false }),
-  useDemoBranchDeletionPreview: () => ({ data: undefined, isLoading: false, isError: false }),
-  useDeleteDemoBranch: () => ({ mutate: vi.fn(), isPending: false }),
+  useDemoBranchDeletionPreview: () => ({
+    data: { documentCount: 12, reassignedUserCount: 0 },
+    isLoading: false,
+    isError: false,
+  }),
+  useDeleteDemoBranch: () => ({ mutateAsync: deleteDemoMock, isPending: false }),
   useSetBranchOpeningDate: () => ({ mutateAsync: setOpeningDateMock, isPending: false }),
 }));
 
@@ -101,9 +106,14 @@ function renderPage() {
   return { resetSpy };
 }
 
+const rowOf = (code: string) => within(screen.getByRole('row', { name: new RegExp(code) }));
+
 describe('BranchesPage', () => {
   beforeEach(() => {
     createMock.mockReset().mockResolvedValue({});
+    deleteDemoMock
+      .mockReset()
+      .mockResolvedValue({ reassignedUserCount: 0, keptSampleProductCount: 0, keptSamplePartnerCount: 0 });
     deleteMock.mockReset().mockImplementation((_id: string, opts: { onSuccess: () => void }) => opts.onSuccess());
     meMock.mockReset().mockResolvedValue(ME_AFTER_DELETE);
     setOpeningDateMock.mockReset().mockResolvedValue(BRANCHES[1]);
@@ -203,22 +213,20 @@ describe('BranchesPage', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
-  const rowOf = (code: string) => screen.getByText(code).closest('tr') as HTMLElement;
-
   it('shows the demo badges', () => {
     renderPage();
 
-    expect(within(rowOf('DEMO1')).getByText('Demo')).toBeInTheDocument();
-    expect(within(rowOf('DEMO2')).getByText('Đang tạo dữ liệu 45%')).toBeInTheDocument();
-    expect(within(rowOf('DEMO3')).getByText('Lỗi tạo dữ liệu')).toHaveAttribute('title', 'XBH-0012: lỗi');
-    expect(within(rowOf('CN01')).queryByText('Demo')).not.toBeInTheDocument();
+    expect(rowOf('DEMO1').getByText('Demo')).toBeInTheDocument();
+    expect(rowOf('DEMO2').getByText('Đang tạo dữ liệu 45%')).toBeInTheDocument();
+    expect(rowOf('DEMO3').getByText('Lỗi tạo dữ liệu')).toHaveAttribute('title', 'XBH-0012: lỗi');
+    expect(rowOf('CN01').queryByText('Demo')).not.toBeInTheDocument();
   });
 
   it('demo rows use the demo delete action', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const row = within(rowOf('DEMO1'));
+    const row = rowOf('DEMO1');
     expect(row.queryByRole('button', { name: 'Xóa chi nhánh' })).not.toBeInTheDocument();
     await user.click(row.getByRole('button', { name: 'Xóa chi nhánh demo' }));
     expect(await screen.findByRole('dialog', { name: 'Xóa chi nhánh demo?' })).toBeInTheDocument();
@@ -227,14 +235,36 @@ describe('BranchesPage', () => {
   it('demo delete is disabled while seeding', () => {
     renderPage();
 
-    expect(within(rowOf('DEMO2')).getByRole('button', { name: 'Xóa chi nhánh demo' })).toBeDisabled();
+    const button = rowOf('DEMO2').getByRole('button', { name: 'Xóa chi nhánh demo' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', 'Đang tạo dữ liệu mẫu');
+  });
+
+  it('a failed demo fill can still be deleted', () => {
+    renderPage();
+
+    expect(rowOf('DEMO3').getByRole('button', { name: 'Xóa chi nhánh demo' })).toBeEnabled();
+  });
+
+  it('deleting the working demo branch moves to the default branch and closes the dialog', async () => {
+    useBranchStore.setState({ workingBranchId: 'b3' });
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(rowOf('DEMO1').getByRole('button', { name: 'Xóa chi nhánh demo' }));
+    await user.type(await screen.findByLabelText(/Nhập mã chi nhánh/), 'DEMO1');
+    await user.click(screen.getByRole('button', { name: 'Xóa vĩnh viễn' }));
+
+    expect(deleteDemoMock).toHaveBeenCalledWith('b3');
+    await waitFor(() => expect(useBranchStore.getState().workingBranchId).toBe('b1'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('normal rows keep the normal delete', async () => {
     const user = userEvent.setup();
     renderPage();
 
-    const row = within(rowOf('CN01'));
+    const row = rowOf('CN01');
     expect(row.queryByRole('button', { name: 'Xóa chi nhánh demo' })).not.toBeInTheDocument();
     await user.click(row.getByRole('button', { name: 'Xóa chi nhánh' }));
     expect(await screen.findByRole('dialog', { name: 'Xóa chi nhánh?' })).toBeInTheDocument();

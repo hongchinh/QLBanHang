@@ -77,9 +77,14 @@ public static class TinyPlans
             .Take(3)
             .ToListAsync());
 
-    /// Runs `plan` for the branch as requested by admin, through a scope of the factory.
-    public static async Task<SampleDataRunResult> RunAsync(WebAppFactory factory, Guid branchId, SampleDataPlan plan)
+    /// Runs `plan` for the branch as requested by admin, through a scope of the factory. The runner only fills demo
+    /// branches, so the branch is flagged demo first unless `asDemo` is false.
+    public static async Task<SampleDataRunResult> RunAsync(WebAppFactory factory, Guid branchId, SampleDataPlan plan,
+        bool asDemo = true)
     {
+        if (asDemo)
+            await InDbAsync(factory, db => db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId)
+                .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsDemo, true)));
         var adminId = await AdminIdAsync(factory);
         await using var scope = factory.Services.CreateAsyncScope();
         return await scope.ServiceProvider.GetRequiredService<ISampleDataRunner>()

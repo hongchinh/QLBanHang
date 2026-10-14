@@ -1,3 +1,4 @@
+using System.Data.Common;
 using System.Diagnostics;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
@@ -20,20 +21,28 @@ using OrderMgmt.Application.Organization.SampleData.Interfaces;
 using OrderMgmt.Application.Organization.SampleData.Models;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Organization.SampleData.Services;
 
 /// Turns a SampleDataPlan into real data through the business services (S3–S9): every plan item runs in a fresh scope,
-/// acting as its owner in the demo branch with every permission. Status, progress and error go on the branch row.
+/// acting as its owner in the demo branch with every permission. Status, progress and error go on the branch row, and
+/// only ever on a demo branch.
 public sealed class SampleDataRunner : ISampleDataRunner
 {
     /// The default cash fund every branch gets at creation (P18): the plan sets its opening amount but never creates it.
     private const string CashFundCode = "QTM";
+    /// Key of the work before the first item (branch, people, lookups) and of a generator failure.
     private const string PlanKey = "KE-HOACH";
+    /// Key of the final status write.
+    private const string FinishKey = "HOAN-TAT";
     private const int MaxOwners = 3;
     private const int ProgressEvery = 10;
     private const int ErrorMaxLength = 1000;
+    private const int FailAttempts = 3;
+    private const string UniqueViolation = "23505";
+    private const string GenericError = "Lỗi hệ thống khi tạo dữ liệu mẫu. Hãy xóa chi nhánh demo và tạo lại.";
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ISampleDataGenerator _generator;
@@ -52,15 +61,27 @@ public sealed class SampleDataRunner : ISampleDataRunner
 
     public async Task<SampleDataRunResult> RunPlanAsync(SampleDataJob job, SampleDataPlan plan, CancellationToken ct = default)
     {
+        using var logScope = _logger.BeginScope(new Dictionary<string, object?>
+        {
+            ["UserId"] = job.RequestedByUserId,
+            ["CorrelationId"] = $"sample-data-{job.BranchId:N}",
+        });
         var stopwatch = Stopwatch.StartNew();
-        var run = new SampleRunState(job.BranchId, TotalItems(plan));
+        SampleRunState? run = null;
         try
         {
-            await SetStatusAsync(job.BranchId, SampleDataStatus.Running, 0, ct);
+            run = new SampleRunState(job.BranchId, TotalItems(plan), PlanKey);
+            if (!await StartAsync(job.BranchId, ct))
+                throw new SampleDataPlanException("Không tìm thấy chi nhánh demo để tạo dữ liệu mẫu.");
             await PrepareAsync(run, job.RequestedByUserId, ct);
             await RunSetupAsync(run, plan, ct);
+            foreach (var step in plan.Steps)
+                await RunStepAsync(run, step, ct);
 
-            await SetStatusAsync(job.BranchId, SampleDataStatus.Ready, 100, ct);
+            if (run.Done != run.Total)
+                _logger.LogWarning("Sample data of branch {BranchCode} ran {Done} of {Total} items", run.BranchCode, run.Done, run.Total);
+            run.CurrentKey = FinishKey;
+            await SetReadyAsync(job.BranchId, ct);
             _logger.LogInformation(
                 "Sample data of branch {BranchCode} ready: {StepsExecuted} steps executed, {StepsSkipped} skipped in {Elapsed}",
                 run.BranchCode, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed);
@@ -68,31 +89,72 @@ public sealed class SampleDataRunner : ISampleDataRunner
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
-            var error = Truncate($"{run.CurrentKey}: {Describe(ex)}", ErrorMaxLength);
-            _logger.LogError(ex, "Sample data of branch {BranchCode} failed at {ItemKey}", run.BranchCode, run.CurrentKey);
+            var key = run?.CurrentKey ?? PlanKey;
+            var error = FormatError(key, ex);
+            _logger.LogError(ex, "Sample data of branch {BranchId} ({BranchCode}) failed at {ItemKey}",
+                job.BranchId, run?.BranchCode, key);
             await FailAsync(job.BranchId, error);
-            return new SampleDataRunResult(false, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed, error);
+            return new SampleDataRunResult(false, run?.StepsExecuted ?? 0, run?.StepsSkipped ?? 0, stopwatch.Elapsed, error);
         }
     }
 
     public Task RecoverInterruptedAsync(CancellationToken ct = default) => throw new NotImplementedException("Phase 02b");
+
+    /// SampleDataError: "{key}: {reason}", cut to 1000 characters without splitting a surrogate pair. Every signed-in
+    /// user can read it, so the reason follows GlobalExceptionMiddleware and never shows an internal message.
+    public static string FormatError(string key, Exception ex)
+    {
+        var text = $"{key}: {Reason(ex)}";
+        if (text.Length <= ErrorMaxLength)
+            return text;
+        return text[..(char.IsHighSurrogate(text[ErrorMaxLength - 1]) ? ErrorMaxLength - 1 : ErrorMaxLength)];
+    }
+
+    private static string Reason(Exception ex) => ex switch
+    {
+        ValidationException v => v.Errors.FirstOrDefault()?.ErrorMessage ?? "Dữ liệu không hợp lệ.",
+        NegativeStockException e => WithFirstDetail($"{e.Code}: {e.Message}", e.Shortages),
+        ConfirmationRequiredException e => WithFirstDetail($"{e.Code}: {e.Message}", e.Details),
+        DomainException e => e.Message,
+        // The runner's own plan errors, and generator failures (SampleDataPlanException.GeneratorFailed).
+        SampleDataPlanException e => e.Message,
+        DbUpdateConcurrencyException => "Dữ liệu đã được người khác cập nhật. Vui lòng tải lại.",
+        DbUpdateException { InnerException: DbException { SqlState: UniqueViolation } } =>
+            "Dữ liệu bị trùng với bản ghi đã có. Vui lòng tải lại và thử lại.",
+        _ => GenericError,
+    };
+
+    /// "{text} ({key}: {first message})": the product@warehouse short of stock, the fund, the credit limit.
+    private static string WithFirstDetail(string text, IDictionary<string, string[]> details)
+    {
+        foreach (var (key, messages) in details)
+            if (messages.Length > 0)
+                return $"{text} ({key}: {messages[0]})";
+        return text;
+    }
 
     /// Catalog, warehouses, bank funds, opening date, fund openings, opening stock, opening debts, credit limits, steps.
     private static int TotalItems(SampleDataPlan plan) =>
         1 + plan.Warehouses.Count + plan.Funds.Count(f => f.Code != CashFundCode) + 1 + plan.Funds.Count
         + plan.OpeningStocks.Count + plan.OpeningDebts.Count + plan.CreditLimits.Count + plan.Steps.Count;
 
-    /// The branch, its existing funds, the people (S5) and every permission code (S4), read once.
+    /// The branch, its existing funds, the reasons and payment methods, the people (S5) and every permission code (S4),
+    /// read once.
     private async Task PrepareAsync(SampleRunState run, Guid requestedBy, CancellationToken ct)
     {
-        run.CurrentKey = PlanKey;
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
 
         run.BranchCode = await db.Branches.IgnoreQueryFilters().Where(b => b.Id == run.BranchId)
             .Select(b => b.Code).SingleAsync(ct);
-        foreach (var fund in await db.Funds.Where(f => f.BranchId == run.BranchId).Select(f => new { f.Code, f.Id }).ToListAsync(ct))
-            run.Funds[fund.Code] = fund.Id;
+        Fill(run.Funds, await db.Funds.Where(f => f.BranchId == run.BranchId)
+            .Select(f => new { f.Code, f.Id }).ToDictionaryAsync(f => f.Code, f => f.Id, ct));
+        Fill(run.StockReasons, await db.StockReasons
+            .Select(r => new { r.Code, r.Id }).ToDictionaryAsync(r => r.Code, r => r.Id, ct));
+        Fill(run.CashReasons, await db.CashReasons.Where(r => !r.IsAuto)
+            .Select(r => new { r.Code, r.Id }).ToDictionaryAsync(r => r.Code, r => r.Id, ct));
+        Fill(run.PaymentMethods, await db.PaymentMethods
+            .Select(m => new { m.Code, m.Id }).ToDictionaryAsync(m => m.Code, m => m.Id, ct));
 
         run.RequestedBy = requestedBy;
         run.Owners = await ResolveOwnersAsync(db, requestedBy, ct);
@@ -100,10 +162,16 @@ public sealed class SampleDataRunner : ISampleDataRunner
         var users = await db.Users.IgnoreQueryFilters().Where(u => userIds.Contains(u.Id))
             .Select(u => new { u.Id, u.Username, u.FullName }).ToListAsync(ct);
         if (users.All(u => u.Id != requestedBy))
-            throw new InvalidOperationException("Không tìm thấy người tạo chi nhánh demo.");
+            throw new SampleDataPlanException("Không tìm thấy người tạo chi nhánh demo.");
         var permissions = await db.Permissions.Select(p => p.Code).ToListAsync(ct);
         foreach (var user in users)
             run.Identities[user.Id] = new ActingIdentity(user.Id, user.Username, user.FullName, run.BranchId, permissions);
+    }
+
+    private static void Fill(Dictionary<string, Guid> target, Dictionary<string, Guid> source)
+    {
+        foreach (var (code, id) in source)
+            target[code] = id;
     }
 
     /// S5: up to three active, non-deleted SALES users by username; none → the requesting user alone.
@@ -168,7 +236,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
             {
                 var request = new SetFundOpeningBalanceRequest { Amount = spec.OpeningAmount, AcknowledgeNegativeFund = true };
                 await ValidateAsync(sp, request, c);
-                await sp.GetRequiredService<IFundService>().SetOpeningBalanceAsync(Lookup(run.Funds, spec.Code), request, c);
+                await sp.GetRequiredService<IFundService>()
+                    .SetOpeningBalanceAsync(SampleRunState.Lookup(run.Funds, spec.Code), request, c);
             }, ct);
 
         foreach (var spec in plan.OpeningStocks)
@@ -176,11 +245,11 @@ public sealed class SampleDataRunner : ISampleDataRunner
             {
                 var request = new SaveOpeningStockRequest
                 {
-                    WarehouseId = Lookup(run.Warehouses, spec.WarehouseKey),
+                    WarehouseId = SampleRunState.Lookup(run.Warehouses, spec.WarehouseKey),
                     AcknowledgeNegativeStock = true,
                     Lines = spec.Lines.Select(l => new SaveOpeningStockLine
                     {
-                        ProductId = Lookup(run.Products, l.ProductCode),
+                        ProductId = SampleRunState.Lookup(run.Products, l.ProductCode),
                         Quantity = l.Quantity,
                         Amount = l.Amount,
                     }).ToList(),
@@ -194,7 +263,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
             {
                 var request = new UpsertOpeningDebtRequest
                 {
-                    PartnerId = Lookup(run.Partners, spec.PartnerCode),
+                    PartnerId = SampleRunState.Lookup(run.Partners, spec.PartnerCode),
                     Side = spec.Side,
                     Kind = spec.Kind,
                     DocNo = spec.DocNo,
@@ -207,7 +276,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
                 var debt = await sp.GetRequiredService<IOpeningDebtService>().CreateAsync(request, c);
                 run.Entries[spec.Key] = await sp.GetRequiredService<IAppDbContext>().DebtEntries
                     .Where(e => e.SourceType == DebtSourceType.Opening && e.SourceId == debt.Id)
-                    .Select(e => e.Id)
+                    .Select(e => new SampleDebtEntryRef(e.Id, e.Side, e.PartnerId))
                     .SingleAsync(c);
             }, ct);
 
@@ -216,8 +285,28 @@ public sealed class SampleDataRunner : ISampleDataRunner
             {
                 var request = new UpsertCreditLimitRequest { Amount = spec.Amount };
                 await ValidateAsync(sp, request, c);
-                await sp.GetRequiredService<ICreditLimitService>().UpsertAsync(Lookup(run.Partners, spec.PartnerCode), request, c);
+                await sp.GetRequiredService<ICreditLimitService>()
+                    .UpsertAsync(SampleRunState.Lookup(run.Partners, spec.PartnerCode), request, c);
             }, ct);
+    }
+
+    /// One step, acting as its owner: the executor's outcome feeds the counters, and a skip is logged.
+    private async Task RunStepAsync(SampleRunState run, SampleStep step, CancellationToken ct)
+    {
+        var outcome = SampleStepOutcome.Executed;
+        await RunItemAsync(run, step.Key, run.OwnerOf(step.OwnerIndex),
+            async (sp, c) => outcome = await new SampleStepExecutor(sp, run).ExecuteAsync(step, c), ct);
+
+        if (outcome == SampleStepOutcome.Skipped)
+        {
+            run.StepsSkipped++;
+            _logger.LogInformation("Sample data step {StepKey} of branch {BranchCode} skipped: its amount is 0",
+                step.Key, run.BranchCode);
+        }
+        else
+        {
+            run.StepsExecuted++;
+        }
     }
 
     /// One plan item (S7): a fresh scope acting as `userId` in the branch, then the progress every ProgressEvery items.
@@ -233,7 +322,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
 
         run.Done++;
         if (run.Done % ProgressEvery == 0)
-            await SetProgressAsync(run.BranchId, Math.Min(99, run.Done * 100 / run.Total), ct);
+            await TrySetProgressAsync(run.BranchId, Math.Min(99, run.Done * 100 / run.Total), ct);
     }
 
     /// S6: controllers are skipped, so a request goes through its validator first, when one is registered.
@@ -243,9 +332,6 @@ public sealed class SampleDataRunner : ISampleDataRunner
             await validator.ValidateAndThrowAsync(request, ct);
     }
 
-    internal static Guid Lookup(IReadOnlyDictionary<string, Guid> ids, string key) =>
-        ids.TryGetValue(key, out var id) ? id : throw new InvalidOperationException($"Kế hoạch tham chiếu khóa không tồn tại: {key}");
-
     /// `{BranchCode}-{Key}`, the branch code cut to 47 characters when the result is longer than 50 (S13).
     private static string WarehouseCode(string branchCode, string key)
     {
@@ -253,85 +339,68 @@ public sealed class SampleDataRunner : ISampleDataRunner
         return code.Length > 50 ? $"{branchCode[..Math.Min(branchCode.Length, 47)]}-{key}" : code;
     }
 
-    private async Task SetStatusAsync(Guid branchId, SampleDataStatus status, int progress, CancellationToken ct)
+    /// Every status write targets the branch only while it is demo, so a real branch is never touched.
+    private static IQueryable<Branch> DemoBranch(AsyncServiceScope scope, Guid branchId) =>
+        scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
+            .Where(b => b.Id == branchId && b.IsDemo);
+
+    /// Running, progress 0, no error. False when the branch is missing or not demo.
+    private async Task<bool> StartAsync(Guid branchId, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
-            .Where(b => b.Id == branchId)
-            .ExecuteUpdateAsync(s => s
-                .SetProperty(b => b.SampleDataStatus, status)
-                .SetProperty(b => b.SampleDataProgress, progress)
-                .SetProperty(b => b.SampleDataError, (string?)null), ct);
+        return await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
+            .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Running)
+            .SetProperty(b => b.SampleDataProgress, 0)
+            .SetProperty(b => b.SampleDataError, (string?)null), ct) > 0;
     }
 
-    private async Task SetProgressAsync(Guid branchId, int progress, CancellationToken ct)
+    private async Task SetReadyAsync(Guid branchId, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
-            .Where(b => b.Id == branchId)
-            .ExecuteUpdateAsync(s => s.SetProperty(b => b.SampleDataProgress, progress), ct);
+        await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
+            .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Ready)
+            .SetProperty(b => b.SampleDataProgress, 100)
+            .SetProperty(b => b.SampleDataError, (string?)null), ct);
     }
 
-    /// Never throws: RunPlanAsync reports the failure in its result even when the branch row cannot be written.
-    private async Task FailAsync(Guid branchId, string error)
+    /// Best effort: a missed progress write must not fail the run.
+    private async Task TrySetProgressAsync(Guid branchId, int progress, CancellationToken ct)
     {
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
-                .Where(b => b.Id == branchId)
-                .ExecuteUpdateAsync(s => s
+            await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s.SetProperty(b => b.SampleDataProgress, progress), ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            _logger.LogWarning(ex, "Could not write the sample data progress of branch {BranchId}", branchId);
+        }
+    }
+
+    /// Never throws. A few short retries without a token, so a database blip (or a stopping host) does not leave the
+    /// branch Running; after the last one only the log keeps the error.
+    private async Task FailAsync(Guid branchId, string error)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await using var scope = _scopeFactory.CreateAsyncScope();
+                await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
                     .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Failed)
                     .SetProperty(b => b.SampleDataError, error));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Could not mark the sample data of branch {BranchId} failed", branchId);
+                return;
+            }
+            catch (Exception ex) when (attempt < FailAttempts)
+            {
+                _logger.LogWarning(ex, "Could not mark the sample data of branch {BranchId} failed (attempt {Attempt})", branchId, attempt);
+                await Task.Delay(TimeSpan.FromMilliseconds(500 * attempt));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Could not mark the sample data of branch {BranchId} failed: {Error}", branchId, error);
+                return;
+            }
         }
     }
-
-    /// The user-facing reason: every signed-in user can read SampleDataError, so never a stack trace.
-    private static string Describe(Exception ex) => ex switch
-    {
-        ValidationException v => v.Errors.FirstOrDefault()?.ErrorMessage ?? v.Message,
-        NegativeStockException e => $"{e.Code}: {e.Message}",
-        ConfirmationRequiredException e => $"{e.Code}: {e.Message}",
-        _ => ex.Message,
-    };
-
-    private static string Truncate(string value, int max) => value.Length <= max ? value : value[..max];
-}
-
-/// What one run has learned so far: people, ids by plan code or key, counters and the item being run.
-internal sealed class SampleRunState
-{
-    public SampleRunState(Guid branchId, int total)
-    {
-        BranchId = branchId;
-        Total = total;
-    }
-
-    public Guid BranchId { get; }
-    public string BranchCode { get; set; } = "";
-    public int Total { get; }
-    public int Done { get; set; }
-    public int StepsExecuted { get; set; }
-    public int StepsSkipped { get; set; }
-    public string CurrentKey { get; set; } = "";
-
-    public Guid RequestedBy { get; set; }
-    public IReadOnlyList<Guid> Owners { get; set; } = Array.Empty<Guid>();
-    public Dictionary<Guid, ActingIdentity> Identities { get; } = new();
-
-    public Dictionary<string, Guid> Products { get; } = new();
-    public Dictionary<string, Guid> Partners { get; } = new();
-    /// Warehouse ids by plan key (K1, K2).
-    public Dictionary<string, Guid> Warehouses { get; } = new();
-    /// Fund ids of the branch by code.
-    public Dictionary<string, Guid> Funds { get; } = new();
-    /// Debt entry ids by plan key (opening debts, then the documents that post one).
-    public Dictionary<string, Guid> Entries { get; } = new();
-
-    /// S5: `index` picks among the owners (wrapping); null is the requesting user.
-    public Guid OwnerOf(int? index) => index is { } i ? Owners[i % Owners.Count] : RequestedBy;
 }

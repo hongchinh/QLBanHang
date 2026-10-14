@@ -11,10 +11,12 @@ namespace OrderMgmt.Application.Organization.SampleData.Services;
 internal sealed record SampleCatalogIds(IReadOnlyDictionary<string, Guid> Products, IReadOnlyDictionary<string, Guid> Partners);
 
 /// The shared sample catalog (S13): group DM, products and partners written straight through IAppDbContext, because
-/// the create requests carry no IsSample. Rows that already exist are reused.
+/// the create requests carry no IsSample. Sample rows that already exist are reused and made usable again; a code
+/// held by real data fails the run.
 internal static class SampleCatalogWriter
 {
     private const string GroupCode = "DM";
+    private const string GroupName = "Dữ liệu mẫu";
 
     public static async Task<SampleCatalogIds> WriteAsync(IAppDbContext db, SampleDataPlan plan, CancellationToken ct)
     {
@@ -25,54 +27,38 @@ internal static class SampleCatalogWriter
         return new SampleCatalogIds(products, partners);
     }
 
+    /// A DM group is the sample group only when it carries the sample name; any other DM group is real data.
     private static async Task<Guid> GroupIdAsync(IAppDbContext db, CancellationToken ct)
     {
-        var group = await db.ProductGroups.IgnoreQueryFilters()
-            .Where(g => g.Code == GroupCode)
-            .OrderBy(g => g.IsDeleted)
-            .FirstOrDefaultAsync(ct);
+        var rows = await db.ProductGroups.IgnoreQueryFilters().Where(g => g.Code == GroupCode).ToListAsync(ct);
+        var group = ReuseSample(rows, g => g.Name == GroupName, $"Mã nhóm {GroupCode} đã được dùng cho dữ liệu thật.");
         if (group is null)
         {
-            group = new ProductGroup { Code = GroupCode, Name = "Dữ liệu mẫu", SortOrder = 98, IsActive = true };
+            group = new ProductGroup { Code = GroupCode, Name = GroupName, SortOrder = 98 };
             db.ProductGroups.Add(group);
         }
-        else
-        {
-            Restore(group);
-        }
+        group.IsActive = true;
         return group.Id;
-    }
-
-    /// A sample row is reused (and brought back if soft-deleted); a row of real data keeps its code.
-    private static void Reuse<T>(T row, string code, bool isSample) where T : ISoftDeletable
-    {
-        if (!isSample)
-            throw new ConflictException($"Mã {code} đã được dùng cho dữ liệu thật.");
-        Restore(row);
-    }
-
-    private static void Restore(ISoftDeletable row)
-    {
-        row.IsDeleted = false;
-        row.DeletedAt = null;
-        row.DeletedBy = null;
     }
 
     private static async Task<Dictionary<string, Guid>> WriteProductsAsync(IAppDbContext db,
         IReadOnlyCollection<SampleProductSpec> specs, Guid groupId, CancellationToken ct)
     {
         var codes = specs.Select(s => s.Code).ToList();
-        var existing = await ExistingAsync(db.Products.IgnoreQueryFilters().Where(p => codes.Contains(p.Code)), p => p.Code,
-            p => p.IsDeleted, ct);
+        var existing = (await db.Products.IgnoreQueryFilters().Where(p => codes.Contains(p.Code)).ToListAsync(ct))
+            .ToLookup(p => p.Code);
         var unitCodes = specs.Select(s => s.UnitCode).Distinct().ToList();
         var units = await db.Units.Where(u => unitCodes.Contains(u.Code)).ToDictionaryAsync(u => u.Code, u => u.Id, ct);
 
         var ids = new Dictionary<string, Guid>();
         foreach (var spec in specs)
         {
-            if (existing.TryGetValue(spec.Code, out var product))
+            var product = ReuseSample(existing[spec.Code], p => p.IsSample, RealDataMessage(spec.Code));
+            if (product is not null)
             {
-                Reuse(product, spec.Code, product.IsSample);
+                // A user may have stopped using it or deleted its group; the plan's documents need it active.
+                product.Status = ProductStatus.Active;
+                product.ProductGroupId ??= groupId;
                 ids[spec.Code] = product.Id;
                 continue;
             }
@@ -85,7 +71,7 @@ internal static class SampleCatalogWriter
                 ProductGroupId = groupId,
                 UnitId = units.TryGetValue(spec.UnitCode, out var unitId)
                     ? unitId
-                    : throw new InvalidOperationException($"Không tìm thấy đơn vị tính {spec.UnitCode}."),
+                    : throw new SampleDataPlanException($"Không tìm thấy đơn vị tính {spec.UnitCode}."),
                 Length = spec.Length,
                 Width = spec.Width,
                 Thickness = spec.Thickness,
@@ -108,15 +94,19 @@ internal static class SampleCatalogWriter
         IReadOnlyCollection<SamplePartnerSpec> specs, CancellationToken ct)
     {
         var codes = specs.Select(s => s.Code).ToList();
-        var existing = await ExistingAsync(db.Customers.IgnoreQueryFilters().Where(c => codes.Contains(c.Code)), c => c.Code,
-            c => c.IsDeleted, ct);
+        var existing = (await db.Customers.IgnoreQueryFilters().Where(c => codes.Contains(c.Code)).ToListAsync(ct))
+            .ToLookup(c => c.Code);
 
         var ids = new Dictionary<string, Guid>();
         foreach (var spec in specs)
         {
-            if (existing.TryGetValue(spec.Code, out var partner))
+            var partner = ReuseSample(existing[spec.Code], c => c.IsSample, RealDataMessage(spec.Code));
+            if (partner is not null)
             {
-                Reuse(partner, spec.Code, partner.IsSample);
+                // Active again, and at least the roles the plan's documents need.
+                partner.Status = CustomerStatus.Active;
+                partner.IsCustomer |= spec.IsCustomer;
+                partner.IsSupplier |= spec.IsSupplier;
                 ids[spec.Code] = partner.Id;
                 continue;
             }
@@ -142,10 +132,25 @@ internal static class SampleCatalogWriter
         return ids;
     }
 
-    /// One tracked row per code, soft-deleted rows included; a live row wins over soft-deleted ones.
-    private static async Task<Dictionary<string, T>> ExistingAsync<T>(IQueryable<T> rows, Func<T, string> code,
-        Func<T, bool> isDeleted, CancellationToken ct)
-        => (await rows.ToListAsync(ct))
-            .GroupBy(code)
-            .ToDictionary(g => g.Key, g => g.OrderBy(isDeleted).First());
+    /// The tracked row a sample code maps to, among every row with that code: the live row decides (sample → reused,
+    /// real → ConflictException); without one, the latest soft-deleted sample row is restored. Null (insert a new row)
+    /// when there is none or only soft-deleted real rows, which no longer hold the code (filtered unique index).
+    private static T? ReuseSample<T>(IEnumerable<T> rows, Func<T, bool> isSample, string conflictMessage) where T : BaseEntity
+    {
+        var candidates = rows.ToList();
+        var live = candidates.FirstOrDefault(r => !r.IsDeleted);
+        if (live is not null)
+            return isSample(live) ? live : throw new ConflictException(conflictMessage);
+
+        var deleted = candidates.Where(isSample).OrderByDescending(r => r.DeletedAt).FirstOrDefault();
+        if (deleted is not null)
+        {
+            deleted.IsDeleted = false;
+            deleted.DeletedAt = null;
+            deleted.DeletedBy = null;
+        }
+        return deleted;
+    }
+
+    private static string RealDataMessage(string code) => $"Mã {code} đã được dùng cho dữ liệu thật.";
 }

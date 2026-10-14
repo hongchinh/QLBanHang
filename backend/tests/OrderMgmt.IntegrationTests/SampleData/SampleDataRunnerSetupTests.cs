@@ -1,6 +1,8 @@
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Organization.SampleData.Models;
+using OrderMgmt.Domain.Common;
+using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -21,8 +23,11 @@ public class SampleDataRunnerSetupTests : CashDebtTestBase
     {
         var branchId = await CreateBranchAsync("RS01");
         var adminId = await TinyPlans.AdminIdAsync(_factory);
-        // The clone may already hold SALES users, so the expected owner comes from the S5 query.
-        var expectedOwner = (await TinyPlans.SalesOwnersAsync(_factory)).Cast<Guid?>().FirstOrDefault() ?? adminId;
+        // A SALES user exists, so OD-01 (OwnerIndex 0) is not owned by the requesting admin. The clone may hold other
+        // SALES users, so the expected owner comes from the S5 query.
+        await CreateTestUserAsync("sd_owner_a", "Pass@123", RoleCodes.Sales);
+        var owners = await TinyPlans.SalesOwnersAsync(_factory);
+        owners.Should().NotBeEmpty();
 
         var result = await RunPlanAsync(branchId, TinyPlans.Setup(TinyPlans.OpeningDate));
 
@@ -93,7 +98,8 @@ public class SampleDataRunnerSetupTests : CashDebtTestBase
         od01.Amount.Should().Be(3_000_000m);
         od01.DocDate.Should().Be(TinyPlans.OpeningDate.AddDays(-20));
         od01.DueDate.Should().Be(TinyPlans.OpeningDate.AddDays(10));
-        od01.OwnerUserId.Should().Be(expectedOwner);
+        od01.OwnerUserId.Should().Be(owners[0]);
+        od01.OwnerUserId.Should().NotBe(adminId);
         var od02 = debts["HDM-DK-01"];
         od02.PartnerId.Should().Be(partners["DM-NCC01"].Id);
         od02.Side.Should().Be(DebtSide.Payable);
@@ -126,13 +132,16 @@ public class SampleDataRunnerSetupTests : CashDebtTestBase
     public async Task Soft_deleted_sample_rows_are_restored()
     {
         (await RunPlanAsync(await CreateBranchAsync("RS04"), TinyPlans.Setup(TinyPlans.OpeningDate))).Succeeded.Should().BeTrue();
+        // The group goes through the real delete, which also clears the group of its products.
+        var groupId = await InDbAsync(db => db.ProductGroups.Where(g => g.Code == "DM").Select(g => g.Id).SingleAsync());
+        var deleted = await _client.DeleteAsync($"/api/product-groups/{groupId}");
+        deleted.IsSuccessStatusCode.Should().BeTrue(await deleted.Content.ReadAsStringAsync());
         await InDbAsync(async db =>
         {
             var deletedAt = DateTimeOffset.UtcNow;
-            var group = await db.ProductGroups.SingleAsync(g => g.Code == "DM");
             var product = await db.Products.SingleAsync(p => p.Code == "DM-SP01");
             var partner = await db.Customers.SingleAsync(c => c.Code == "DM-KH01");
-            foreach (var row in new OrderMgmt.Domain.Common.BaseEntity[] { group, product, partner })
+            foreach (var row in new BaseEntity[] { product, partner })
             {
                 row.IsDeleted = true;
                 row.DeletedAt = deletedAt;
@@ -140,18 +149,65 @@ public class SampleDataRunnerSetupTests : CashDebtTestBase
             }
             await db.SaveChangesAsync();
         });
+        (await InDbAsync(db => db.Products.IgnoreQueryFilters().AnyAsync(p => p.ProductGroupId == groupId)))
+            .Should().BeFalse("the group delete cleared the products' group");
 
         var result = await RunPlanAsync(await CreateBranchAsync("RS05"), TinyPlans.Setup(TinyPlans.OpeningDate));
 
         result.Succeeded.Should().BeTrue(result.Error);
-        var group2 = await InDbAsync(db => db.ProductGroups.IgnoreQueryFilters().AsNoTracking().SingleAsync(g => g.Code == "DM"));
+        var group = await InDbAsync(db => db.ProductGroups.IgnoreQueryFilters().AsNoTracking().SingleAsync(g => g.Code == "DM"));
         var product2 = await InDbAsync(db => db.Products.IgnoreQueryFilters().AsNoTracking().SingleAsync(p => p.Code == "DM-SP01"));
         var partner2 = await InDbAsync(db => db.Customers.IgnoreQueryFilters().AsNoTracking().SingleAsync(c => c.Code == "DM-KH01"));
-        foreach (var row in new OrderMgmt.Domain.Common.BaseEntity[] { group2, product2, partner2 })
+        group.Id.Should().Be(groupId);
+        foreach (var row in new BaseEntity[] { group, product2, partner2 })
         {
             row.IsDeleted.Should().BeFalse();
             row.DeletedAt.Should().BeNull();
             row.DeletedBy.Should().BeNull();
         }
+        product2.ProductGroupId.Should().Be(groupId, "a reused sample product gets its group back");
+        (await InDbAsync(db => db.Products.Where(p => p.Code.StartsWith("DM-")).AllAsync(p => p.ProductGroupId == groupId)))
+            .Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Reused_sample_rows_are_usable_again()
+    {
+        (await RunPlanAsync(await CreateBranchAsync("RS07"), TinyPlans.Setup(TinyPlans.OpeningDate))).Succeeded.Should().BeTrue();
+        // A user stops using the sample rows and drops the supplier role of the dual partner.
+        await InDbAsync(async db =>
+        {
+            (await db.ProductGroups.SingleAsync(g => g.Code == "DM")).IsActive = false;
+            (await db.Products.SingleAsync(p => p.Code == "DM-SP01")).Status = ProductStatus.Inactive;
+            (await db.Customers.SingleAsync(c => c.Code == "DM-KH01")).Status = CustomerStatus.Inactive;
+            (await db.Customers.SingleAsync(c => c.Code == "DM-DT01")).IsSupplier = false;
+            await db.SaveChangesAsync();
+        });
+
+        var result = await RunPlanAsync(await CreateBranchAsync("RS08"), TinyPlans.Setup(TinyPlans.OpeningDate));
+
+        result.Succeeded.Should().BeTrue(result.Error);
+        (await InDbAsync(db => db.ProductGroups.SingleAsync(g => g.Code == "DM"))).IsActive.Should().BeTrue();
+        (await InDbAsync(db => db.Products.SingleAsync(p => p.Code == "DM-SP01"))).Status.Should().Be(ProductStatus.Active);
+        (await InDbAsync(db => db.Customers.SingleAsync(c => c.Code == "DM-KH01"))).Status.Should().Be(CustomerStatus.Active);
+        var dual = await InDbAsync(db => db.Customers.SingleAsync(c => c.Code == "DM-DT01"));
+        (dual.IsCustomer, dual.IsSupplier).Should().Be((true, true));
+    }
+
+    [Fact]
+    public async Task Branch_that_is_not_demo_is_refused()
+    {
+        var branchId = await CreateBranchAsync("RS09");
+
+        var result = await TinyPlans.RunAsync(_factory, branchId, TinyPlans.Setup(TinyPlans.OpeningDate), asDemo: false);
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Should().StartWith("KE-HOACH: ").And.Contain("chi nhánh demo");
+        var branch = await InDbAsync(db => db.Branches.AsNoTracking().SingleAsync(b => b.Id == branchId));
+        branch.SampleDataStatus.Should().Be(SampleDataStatus.None, "a real branch's status is never touched");
+        branch.SampleDataError.Should().BeNull();
+        branch.OpeningDate.Should().BeNull();
+        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.BranchId == branchId))).Should().BeFalse();
+        (await InDbAsync(db => db.Products.IgnoreQueryFilters().AnyAsync(p => p.Code.StartsWith("DM-")))).Should().BeFalse();
     }
 }

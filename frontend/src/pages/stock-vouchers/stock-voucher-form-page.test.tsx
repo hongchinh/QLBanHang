@@ -1,6 +1,7 @@
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type * as ReactHookForm from 'react-hook-form';
 import type * as ReactRouterDom from 'react-router-dom';
 import type * as DebtHooks from '@/features/debt/hooks';
 import { StockVoucherFormPage } from './stock-voucher-form-page';
@@ -36,6 +37,35 @@ vi.mock('react-router-dom', async () => {
       return null;
     },
   };
+});
+
+// The real react-hook-form, counting the form.watch(callback) subscriptions still open, so a test can see that the
+// page closes its own when it unmounts.
+const watchSubscriptions = vi.hoisted(() => ({ open: 0 }));
+vi.mock('react-hook-form', async (importOriginal) => {
+  const actual = await importOriginal<typeof ReactHookForm>();
+  const counted = new WeakSet<object>();
+  const useForm: typeof actual.useForm = (...args) => {
+    const form = actual.useForm(...args);
+    if (!counted.has(form)) {
+      counted.add(form);
+      const watch = form.watch as (...watchArgs: unknown[]) => unknown;
+      form.watch = ((...watchArgs: unknown[]) => {
+        const result = watch(...watchArgs);
+        if (typeof watchArgs[0] !== 'function') return result;
+        const subscription = result as { unsubscribe: () => void };
+        watchSubscriptions.open += 1;
+        return {
+          unsubscribe: () => {
+            watchSubscriptions.open -= 1;
+            subscription.unsubscribe();
+          },
+        };
+      }) as typeof form.watch;
+    }
+    return form;
+  };
+  return { ...actual, useForm };
 });
 
 // null grants every permission.
@@ -113,6 +143,8 @@ const R_OUT_GIFT = '22222222-2222-4222-8222-222222222226';
 const PM1 = '33333333-3333-4333-8333-333333333333';
 const PM_BANK = '33333333-3333-4333-8333-333333333334';
 const PM_NONE = '33333333-3333-4333-8333-333333333335';
+// A second cash method; in PAYMENT_METHODS only where a test adds it.
+const PM_CASH2 = '33333333-3333-4333-8333-333333333336';
 const FUND_CASH = '88888888-8888-4888-8888-888888888881';
 const FUND_CASH2 = '88888888-8888-4888-8888-888888888882';
 const FUND_BANK = '88888888-8888-4888-8888-888888888883';
@@ -120,6 +152,7 @@ const FUND_CASH_OFF = '88888888-8888-4888-8888-888888888884';
 const P1 = '44444444-4444-4444-8444-444444444444';
 const V1 = '55555555-5555-4555-8555-555555555555';
 const L1 = '66666666-6666-4666-8666-666666666666';
+const L2 = '66666666-6666-4666-8666-666666666667';
 
 const warehouses: Warehouse[] = [
   { id: WH1, code: 'KHO01', name: 'Kho chính', branchId: 'b1', branchCode: 'CN01', branchName: 'CN 1', isActive: true },
@@ -937,6 +970,72 @@ describe('StockVoucherFormPage', () => {
       expect(screen.queryByTestId('tab-error-payment')).toBeNull();
     });
 
+    // The errors below go with the field that drives them although their own value stays the same.
+
+    // Another cash method keeps the same default fund and the same paid amount: only the method changed.
+    it('the fund error goes away when another method of the same kind keeps the same fund', async () => {
+      paymentMethodsState.data = [...PAYMENT_METHODS, { id: PM_CASH2, code: 'TM2', name: 'Tiền mặt quầy 2', fundKind: 'Cash' }];
+      await saveWithServerErrors({ fundId: ['Quỹ không hợp lệ'] });
+      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+      const paid = byId('stock-paid-amount').value;
+
+      fireEvent.change(byId('stock-payment-method'), { target: { value: PM_CASH2 } });
+
+      await waitFor(() => expect(screen.queryByText('Quỹ không hợp lệ')).toBeNull());
+      expect(screen.queryByTestId('tab-error-payment')).toBeNull();
+      expect(byId('stock-fund').value).toBe(FUND_CASH);
+      expect(byId('stock-paid-amount').value).toBe(paid);
+    });
+
+    // The fund field goes, and the paid amount is locked at 0 with it.
+    it('the fund error and the tab dot go away when the new payment method needs no fund', async () => {
+      await saveWithServerErrors({ fundId: ['Quỹ không hợp lệ'] });
+      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-payment-method'), { target: { value: PM_NONE } });
+
+      await waitFor(() => expect(document.getElementById('stock-fund')).toBeNull());
+      expect(screen.queryByTestId('tab-error-payment')).toBeNull();
+    });
+
+    // Cash and bank both make the paid amount follow the total: the amount itself does not change.
+    it('the paid amount error goes away when the payment method changes', async () => {
+      await saveWithServerErrors({ paidAmount: ['Số tiền thanh toán không hợp lệ'] });
+      expect(await screen.findByText('Số tiền thanh toán không hợp lệ')).toBeInTheDocument();
+      const paid = byId('stock-paid-amount').value;
+
+      fireEvent.change(byId('stock-payment-method'), { target: { value: PM_BANK } });
+
+      await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_BANK));
+      expect(byId('stock-paid-amount').value).toBe(paid);
+      expect(screen.queryByText('Số tiền thanh toán không hợp lệ')).toBeNull();
+      expect(screen.queryByTestId('tab-error-payment')).toBeNull();
+    });
+
+    // No partner, so no credit days: the due date stays empty and only the voucher date can clear its error.
+    it('the due date error goes away when the voucher date changes', async () => {
+      await saveWithServerErrors({ dueDate: ['Hạn thanh toán không hợp lệ'] });
+      expect(await screen.findByText('Hạn thanh toán không hợp lệ')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-voucher-at'), { target: { value: '2026-10-08T09:00' } });
+
+      await waitFor(() => expect(screen.queryByText('Hạn thanh toán không hợp lệ')).toBeNull());
+      expect(screen.queryByTestId('tab-error-payment')).toBeNull();
+      expect(byId('stock-due-date').value).toBe('');
+    });
+
+    it('the due date error and the tab dot go away when the new reason has no due date', async () => {
+      await saveWithServerErrors({ dueDate: ['Hạn thanh toán không hợp lệ'] });
+      expect(await screen.findByText('Hạn thanh toán không hợp lệ')).toBeInTheDocument();
+      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN2 } });
+
+      await waitFor(() => expect(document.getElementById('stock-due-date')).toBeNull());
+      expect(screen.queryByTestId('tab-error-payment')).toBeNull();
+    });
+
     it('a line error goes away when that cell changes, and an unrelated error stays', async () => {
       await saveWithServerErrors({ 'lines[0].quantity': ['Số lượng không hợp lệ'], fundId: ['Quỹ không hợp lệ'] });
       await screen.findByText('Quỹ không hợp lệ');
@@ -989,6 +1088,43 @@ describe('StockVoucherFormPage', () => {
       expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
     });
 
+    // The same cell in error on two lines: what changes on one line leaves the other line's mark alone.
+    async function updateTwoLinesWithQuantityErrors() {
+      routeParams.id = V1;
+      voucherState.data = voucher({ lines: [voucher().lines[0], { ...voucher().lines[0], id: L2, sortOrder: 1 }] });
+      updateMock.mockRejectedValueOnce(
+        apiError(400, 'VALIDATION', {
+          'lines[0].quantity': ['Số lượng dòng 1 không hợp lệ'],
+          'lines[1].quantity': ['Số lượng dòng 2 không hợp lệ'],
+        }),
+      );
+      renderPage('In');
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+      await waitFor(() => expect(byId('stock-line-quantity-1').getAttribute('aria-invalid')).toBe('true'));
+      expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true');
+    }
+
+    it('a line error on the same cell of another line stays when this cell changes', async () => {
+      await updateTwoLinesWithQuantityErrors();
+
+      fireEvent.change(byId('stock-line-quantity-0'), { target: { value: '4' } });
+
+      await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBeNull());
+      expect(byId('stock-line-quantity-1').getAttribute('aria-invalid')).toBe('true');
+      expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
+    });
+
+    it('picking another product on a line keeps the server errors of the other lines', async () => {
+      await updateTwoLinesWithQuantityErrors();
+
+      fireEvent.change(byId('stock-line-product-code-0'), { target: { value: 'SP0' } });
+      fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('SP01'));
+
+      // The pick puts SL of the first line back to 0.
+      await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBeNull());
+      expect(byId('stock-line-quantity-1').getAttribute('aria-invalid')).toBe('true');
+    });
+
     // Nothing is paid: the fund is neither shown nor sent, so its error has nothing left to describe.
     it('the fund error and the tab dot go away when the paid amount becomes 0', async () => {
       await saveWithServerErrors({ fundId: ['Quỹ không hợp lệ'] });
@@ -1024,7 +1160,6 @@ describe('StockVoucherFormPage', () => {
     // The user cannot edit such a cell (or its value is replaced by the computed one), so its error must go when a
     // cell it is computed from changes.
     describe('on a cell computed from other cells of its line', () => {
-      const L2 = '66666666-6666-4666-8666-666666666667';
       // SL of a line priced by dimensions is read-only: 2 × 3000 × 100 × 50 mm = 0.03 m³.
       const cubicLine = (overrides: Partial<StockVoucherLine> = {}): StockVoucherLine => ({
         ...voucher().lines[0],
@@ -1189,6 +1324,33 @@ describe('StockVoucherFormPage', () => {
       await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_BANK));
 
       expect(screen.getByText('Phí vận chuyển không được âm')).toBeInTheDocument();
+    });
+
+    // The payment method drives the paid amount, but only a server error goes with it: the resolver's error describes
+    // the value as it is now, and the amount is still -5.
+    it('a client schema error on the paid amount stays when the payment method changes', async () => {
+      renderPage('In');
+      await fillPerUnitLine(3);
+      fireEvent.change(byId('stock-paid-amount'), { target: { value: '-5' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+      expect(await screen.findByText('Giá trị phải >= 0')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-payment-method'), { target: { value: PM_BANK } });
+      await waitFor(() => expect(byId('stock-payment-method').value).toBe(PM_BANK));
+
+      expect(screen.getByText('Giá trị phải >= 0')).toBeInTheDocument();
+      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('unmounting the form closes its watch subscriptions', () => {
+      const before = watchSubscriptions.open;
+      const { unmount } = renderPage('In');
+      expect(watchSubscriptions.open).toBeGreaterThan(before);
+
+      unmount();
+
+      expect(watchSubscriptions.open).toBe(before);
     });
   });
 

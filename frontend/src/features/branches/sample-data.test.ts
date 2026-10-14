@@ -27,5 +27,7 @@ describe('branchesRefetchInterval', () => {
   it('stops polling otherwise', () => {
     expect(branchesRefetchInterval([branch('Ready')])).toBe(false);
     expect(branchesRefetchInterval(undefined)).toBe(false);
+    expect(branchesRefetchInterval([])).toBe(false);
+    expect(branchesRefetchInterval([branch('Failed'), branch(undefined)])).toBe(false);
   });
 });

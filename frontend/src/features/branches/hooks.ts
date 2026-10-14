@@ -55,7 +55,7 @@ export function useDeleteBranch() {
 
 export function useDemoBranchDeletionPreview(id: string | null) {
   return useQuery({
-    queryKey: [...branchKeys.all, 'demo-deletion', id],
+    queryKey: branchKeys.demoDeletion(id),
     queryFn: () => branchesApi.deletionPreview(id!),
     enabled: !!id,
     staleTime: 0,

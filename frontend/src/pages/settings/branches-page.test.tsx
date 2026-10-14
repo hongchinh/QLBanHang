@@ -97,6 +97,7 @@ describe('BranchesPage', () => {
         code: 'CN02',
         name: 'Chi nhánh 2',
         address: '2 Hai Bà Trưng',
+        withSampleData: false,
       }),
     );
   });

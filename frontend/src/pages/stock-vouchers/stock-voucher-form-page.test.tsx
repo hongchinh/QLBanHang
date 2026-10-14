@@ -1645,6 +1645,20 @@ describe('StockVoucherFormPage', () => {
       expect(createMock).toHaveBeenCalledTimes(1);
     });
 
+    // A key inside the form is the form's alone. A scripted key event cannot be cancelled, so the form taking it does
+    // not show in defaultPrevented: only the "outside the form" check keeps the document from running it again.
+    it('a key inside the form runs its shortcut once, even when the event cannot be cancelled', () => {
+      renderInMain();
+      const field = byId('stock-voucher-at');
+      const event = createEvent.keyDown(field, { key: '3', altKey: true, cancelable: false });
+      const preventDefault = vi.spyOn(event, 'preventDefault');
+
+      fireEvent(field, event);
+
+      expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active');
+      expect(preventDefault).toHaveBeenCalledTimes(1);
+    });
+
     it('Alt+3 on <body> opens the payment tab and puts the focus on it; Alt+4 needs a saved voucher', async () => {
       renderPage('In');
       blur();

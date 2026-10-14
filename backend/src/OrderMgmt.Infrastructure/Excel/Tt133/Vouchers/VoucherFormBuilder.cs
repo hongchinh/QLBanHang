@@ -24,6 +24,8 @@ public sealed class VoucherFormBuilder
     private const double PointsPerWidthUnit = 5.56;
     // The estimate may be a few percent off: the block is kept whole for every page height within this share of it.
     private const double PageHeightTolerance = 0.03;
+    // The sheet font size set by Tt133FormBuilder; Sheet.RowHeight is the height of a row of it.
+    private const double DefaultFontSize = 11;
 
     private readonly Tt133FormContext _context;
     private readonly IReadOnlyList<Tt133Column> _columns;
@@ -118,7 +120,12 @@ public sealed class VoucherFormBuilder
             cell.Value = text;
             cell.Style.Font.Bold = bold;
             cell.Style.Font.Italic = italic;
-            if (size is { } s) cell.Style.Font.FontSize = s;
+            if (size is { } s)
+            {
+                cell.Style.Font.FontSize = s;
+                // An explicit height for the larger font: LibreOffice would grow the row itself, past the page estimate.
+                Sheet.Row(first + centre).Height = Sheet.RowHeight * s / DefaultFontSize;
+            }
             cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             if (size is null) Track(first + centre, Wrap(cell, text, 1, _leftEnd, bold));
             centre++;
@@ -181,7 +188,7 @@ public sealed class VoucherFormBuilder
     public void Finish()
     {
         Table.Finish(repeatTableHeader: Table.TableHeaderFirstRow > 0);
-        if (_paper != VoucherPaper.A5Landscape)
+        if (_paper == VoucherPaper.A4Portrait)
         {
             KeepSignaturesOnOnePage();
             return;

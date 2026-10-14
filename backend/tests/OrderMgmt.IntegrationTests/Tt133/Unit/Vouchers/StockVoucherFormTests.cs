@@ -290,6 +290,23 @@ public class StockVoucherFormTests
     }
 
     [Fact]
+    public void Voucher_whose_end_sits_inside_a_later_page_has_no_page_break()
+    {
+        using var wb = Render(StockInWithLines(70));
+
+        wb.Worksheet(1).PageSetup.RowBreaks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Signature_block_that_would_cross_a_later_page_starts_a_new_page()
+    {
+        using var wb = Render(StockInWithLines(98));
+        var ws = wb.Worksheet(1);
+
+        ws.PageSetup.RowBreaks.Should().Equal(RowOf(ws, "Hàng 97") - 1);
+    }
+
+    [Fact]
     public void Short_voucher_has_no_page_break()
     {
         using var wb = Render(StockIn());

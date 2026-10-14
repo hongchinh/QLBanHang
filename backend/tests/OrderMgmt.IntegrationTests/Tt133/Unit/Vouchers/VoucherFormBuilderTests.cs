@@ -185,6 +185,7 @@ public class VoucherFormBuilderTests
         var title = CellWith(ws, "PHIẾU THU");
         title.Style.Font.Bold.Should().BeTrue();
         title.Style.Font.FontSize.Should().Be(14);
+        ws.Row(title.Address.RowNumber).Height.Should().BeApproximately(ws.RowHeight * 14 / 11, 0.01);
         title.Style.Alignment.Horizontal.Should().Be(XLAlignmentHorizontalValues.Center);
         SpanOf(ws, "PHIẾU THU").Should().Be((1, 6));
         var titleRow = title.Address.RowNumber;

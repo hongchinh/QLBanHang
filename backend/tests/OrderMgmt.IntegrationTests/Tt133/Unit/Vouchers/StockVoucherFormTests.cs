@@ -106,19 +106,32 @@ public class StockVoucherFormTests
 
         string[] titles = ["Người lập phiếu", "Người giao hàng", "Thủ kho", "Kế toán trưởng"];
         var titleRow = RowOf(ws, titles[0]);
-        var cols = titles.Select(t => ColumnOf(ws, t)).ToList();
-        cols.Should().BeInAscendingOrder().And.OnlyHaveUniqueItems();
-        titles.Select(t => RowOf(ws, t)).Should().OnlyContain(r => r == titleRow);
-        ColumnOf(ws, "Quản trị hệ thống").Should().Be(cols[0]);
-        ColumnOf(ws, "Trần B").Should().Be(cols[3]);
+        int[] titleColumns = [1, 3, 5, 8];
+        for (var k = 0; k < titles.Length; k++)
+            ws.Cell(titleRow, titleColumns[k]).GetString().Should().Be(titles[k]);
+        var nameRow = RowOf(ws, "Quản trị hệ thống");
+        nameRow.Should().BeGreaterThan(titleRow);
+        RowOf(ws, "Trần B").Should().Be(nameRow);
+        ColumnOf(ws, "Quản trị hệ thống").Should().Be(1);
+        ColumnOf(ws, "Trần B").Should().Be(8);
 
-        ws.Row(RowOf(ws, "Theo chứng từ")).Height.Should().BeGreaterThanOrEqualTo(2 * ws.RowHeight);
+        var headerRow = RowOf(ws, "STT");
+        var group = CellWith(ws, "Số lượng");
+        group.Address.RowNumber.Should().Be(headerRow);
+        group.IsMerged().Should().BeTrue();
+        group.MergedRange().FirstColumn().ColumnNumber().Should().Be(5);
+        group.MergedRange().LastColumn().ColumnNumber().Should().Be(6);
+        ws.Cell(headerRow + 1, 5).GetString().Should().Be("Theo chứng từ");
+        ws.Cell(headerRow + 1, 6).GetString().Should().Be("Thực nhập");
+
+        ws.Row(headerRow + 1).Height.Should().Be(2 * ws.RowHeight);
 
         ws.PageSetup.PaperSize.Should().Be(XLPaperSize.A4Paper);
         ws.PageSetup.PageOrientation.Should().Be(XLPageOrientation.Portrait);
         ws.PageSetup.PagesWide.Should().Be(1);
         ws.PageSetup.PagesTall.Should().Be(0);
         ws.PageSetup.FirstRowToRepeatAtTop.Should().Be(RowOf(ws, "STT"));
+        ws.PageSetup.LastRowToRepeatAtTop.Should().Be(RowOf(ws, "STT") + 2);
     }
 
     [Fact]
@@ -143,6 +156,7 @@ public class StockVoucherFormTests
         foreach (var (title, column) in expected)
             ws.Cell(titleRow, column).GetString().Should().Be(title);
         ColumnOf(ws, "Nguyễn A").Should().Be(8);
+        ws.Row(RowOf(ws, "STT") + 1).Height.Should().Be(1 * ws.RowHeight);
     }
 
     [Fact]
@@ -167,7 +181,9 @@ public class StockVoucherFormTests
             ColumnOf(ws, labels[k]).Should().Be(2);
             ws.Cell(first + k, 8).GetDouble().Should().Be(amounts[k]);
         }
-        RowOf(ws, "Trong đó thuế GTGT đã gồm trong giá: 100.000").Should().BeGreaterThan(RowOf(ws, "Tổng cộng"));
+        var vat = CellWith(ws, "Trong đó thuế GTGT đã gồm trong giá: 100.000");
+        vat.Address.RowNumber.Should().Be(RowOf(ws, "Tổng cộng") + 1);
+        vat.Style.Font.Italic.Should().BeTrue();
     }
 
     [Fact]
@@ -207,6 +223,29 @@ public class StockVoucherFormTests
         ColumnOf(ws, "Thành tiền").Should().Be(9);
         ws.Cell(RowOf(ws, "Cộng"), 9).GetDouble().Should().Be(1_500_000);
         Texts(ws).Should().Contain($"- Nhập tại kho: Kho chính, Kho phụ Địa điểm: {Dots}");
+
+        var headerRow = RowOf(ws, "STT");
+        var group = CellWith(ws, "Số lượng");
+        group.MergedRange().FirstColumn().ColumnNumber().Should().Be(6);
+        group.MergedRange().LastColumn().ColumnNumber().Should().Be(7);
+        ws.Cell(headerRow + 1, 6).GetString().Should().Be("Theo chứng từ");
+        ws.Cell(headerRow + 1, 7).GetString().Should().Be("Thực nhập");
+
+        var titleRow = RowOf(ws, "Người lập phiếu");
+        string[] titles = ["Người lập phiếu", "Người giao hàng", "Thủ kho", "Kế toán trưởng"];
+        int[] titleColumns = [1, 3, 5, 8];
+        for (var k = 0; k < titles.Length; k++)
+            ws.Cell(titleRow, titleColumns[k]).GetString().Should().Be(titles[k]);
+    }
+
+    [Fact]
+    public void Missing_partner_prints_dots()
+    {
+        var m = StockIn();
+        m.PartnerName = null;
+        using var wb = Render(m);
+
+        Texts(wb.Worksheet(1)).Should().Contain($"- Theo {Dots} số {Dots} ngày {Dots} của {Dots}");
     }
 
     [Fact]

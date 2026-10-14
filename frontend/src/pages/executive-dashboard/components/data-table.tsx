@@ -1,11 +1,14 @@
 import type { ReactNode } from 'react';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 export interface DataColumn<T> {
   key: string;
   header: string;
   // 'right' adds text-right and tabular-nums to the header and the cells (numbers and money).
   align?: 'left' | 'right';
+  // More classes on the header and the cells (e.g. whitespace-nowrap).
+  className?: string;
   cell: (row: T) => ReactNode;
 }
 
@@ -17,7 +20,8 @@ interface DataTableProps<T> {
   footer?: ReactNode;
 }
 
-const alignClass = (align: DataColumn<unknown>['align']) => (align === 'right' ? 'text-right tabular-nums' : undefined);
+const columnClass = (column: Pick<DataColumn<unknown>, 'align' | 'className'>) =>
+  cn(column.align === 'right' && 'text-right tabular-nums', column.className) || undefined;
 
 // A small table of a dashboard tile, on the shared table look.
 export function DataTable<T>({ columns, rows, rowKey, footer }: DataTableProps<T>) {
@@ -26,7 +30,7 @@ export function DataTable<T>({ columns, rows, rowKey, footer }: DataTableProps<T
       <TableHeader>
         <TableRow>
           {columns.map((column) => (
-            <TableHead key={column.key} className={alignClass(column.align)}>
+            <TableHead key={column.key} className={columnClass(column)}>
               {column.header}
             </TableHead>
           ))}
@@ -36,7 +40,7 @@ export function DataTable<T>({ columns, rows, rowKey, footer }: DataTableProps<T
         {rows.map((row, index) => (
           <TableRow key={rowKey(row, index)}>
             {columns.map((column) => (
-              <TableCell key={column.key} className={alignClass(column.align)}>
+              <TableCell key={column.key} className={columnClass(column)}>
                 {column.cell(row)}
               </TableCell>
             ))}

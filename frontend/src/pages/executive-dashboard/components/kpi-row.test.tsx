@@ -99,11 +99,10 @@ function renderRow(params: ExecutiveParams = PARAMS) {
   );
 }
 
-// The tile around a label: its link, or the box of a tile without one.
+// The tile of a label: its link (the label comes first in it), or the group a tile without a link is.
 function tileOf(label: string): HTMLElement {
-  const element = screen.getByText(label).closest('a, .rounded-lg');
-  if (!(element instanceof HTMLElement)) throw new Error(`no tile for ${label}`);
-  return element;
+  const link = screen.queryAllByRole('link').find((a) => a.textContent?.startsWith(label));
+  return link ?? screen.getByRole('group', { name: label });
 }
 
 const LABELS = [
@@ -159,6 +158,46 @@ describe('KpiRow', () => {
     }
   });
 
+  it('each group heading spans the tiles of its own group, also with some domains missing', () => {
+    state.access = { sales: false, cash: true, debt: true, inventory: false, tabs: ['overview', 'cash', 'debt'] };
+    renderRow();
+
+    const period = screen.getByRole('group', { name: 'Trong kỳ' });
+    const now = screen.getByRole('group', { name: 'Hiện tại' });
+    // On wide screens each group is a box of the row as wide as its tiles, which share its columns.
+    expect(period).toHaveClass('grid-cols-subgrid', 'xl:col-span-1');
+    expect(now).toHaveClass('grid-cols-subgrid', 'xl:col-span-3');
+    for (const group of [period, now]) {
+      expect(group).not.toHaveClass('contents');
+      const heading = within(group).getByRole('heading');
+      expect(heading).toHaveClass('col-span-full');
+      expect(heading.className).not.toMatch(/xl:col-span-\d/);
+    }
+    expect(period).toContainElement(tileOf('Thu − chi ròng'));
+    for (const label of ['Tồn quỹ', 'Phải thu', 'Phải trả']) {
+      expect(now).toContainElement(tileOf(label));
+      expect(period).not.toContainElement(tileOf(label));
+    }
+  });
+
+  it('with every domain the groups are three and four columns wide', () => {
+    renderRow();
+
+    expect(screen.getByRole('group', { name: 'Trong kỳ' })).toHaveClass('xl:col-span-3');
+    expect(screen.getByRole('group', { name: 'Hiện tại' })).toHaveClass('xl:col-span-4');
+  });
+
+  it('figures of the previous period or scope are dimmed while the new ones load', () => {
+    answer(useSalesSummary, ok(SALES, { isPlaceholderData: true }));
+    renderRow();
+
+    expect(tileOf('Doanh thu xuất bán')).toHaveAttribute('aria-busy', 'true');
+    expect(within(tileOf('Doanh thu xuất bán')).getByText('2,84 tỷ')).toHaveClass('opacity-60');
+    expect(tileOf('Lãi gộp')).toHaveAttribute('aria-busy', 'true');
+    expect(tileOf('Tồn quỹ')).not.toHaveAttribute('aria-busy');
+    expect(within(tileOf('Tồn quỹ')).getByText('1,26 tỷ')).not.toHaveClass('opacity-60');
+  });
+
   it('shows the hints and the deltas', () => {
     renderRow();
 
@@ -191,6 +230,20 @@ describe('KpiRow', () => {
       expect(hint).toHaveTextContent('Tỷ suất 14,5%');
       expect(hint).toHaveTextContent('▲ 0,8 điểm');
       expect(hint.textContent).toBe('Tỷ suất 14,5% (▲ 0,8 điểm)');
+    });
+
+    it('rounds the change to one decimal', () => {
+      answer(useSalesSummary, ok({ ...SALES, marginPct: 14.56, prevMarginPct: 13.71 }));
+      renderRow();
+
+      expect(within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/).textContent).toBe('Tỷ suất 14,6% (▲ 0,9 điểm)');
+    });
+
+    it('rounds a fall the same way as a rise', () => {
+      answer(useSalesSummary, ok({ ...SALES, marginPct: 13.71, prevMarginPct: 14.56 }));
+      renderRow();
+
+      expect(within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/).textContent).toBe('Tỷ suất 13,7% (▼ 0,9 điểm)');
     });
 
     it('a lower margin than before is ▼', () => {

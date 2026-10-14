@@ -20,6 +20,8 @@ interface StatTileProps {
   // Tooltip of the link.
   title?: string;
   loading?: boolean;
+  // The figures belong to the previous period or scope while the new ones load: dimmed.
+  stale?: boolean;
   // The tile's query failed and has no data.
   error?: boolean;
   onRetry?: () => void;
@@ -33,6 +35,7 @@ const HINT_TONE: Record<HintTone, string> = {
 };
 
 const TILE_CLASS = 'block rounded-lg border border-border bg-card px-3 py-2.5 shadow-sm';
+const STALE_CLASS = 'opacity-60';
 
 // A compact KPI tile: seven of them fit one row at 1366 px (KpiCard, with its sparkline, does not).
 export function StatTile({
@@ -45,10 +48,12 @@ export function StatTile({
   to,
   title,
   loading,
+  stale,
   error,
   onRetry,
 }: StatTileProps) {
   const canOpenLink = useCanOpenLink();
+  const busy = loading || stale || undefined;
 
   // Seven tiles share a row at 1366 px: a label or a hint that does not fit is cut on its line (the title
   // carries the full text) instead of wrapping and pushing this tile's value below the others.
@@ -63,11 +68,16 @@ export function StatTile({
       {loading ? (
         <div className="mt-1 h-7 w-20 animate-pulse rounded bg-muted" />
       ) : (
-        <div className="mt-1 text-xl font-semibold leading-7 tracking-tight tabular-nums text-foreground">
+        <div
+          className={cn(
+            'mt-1 text-xl font-semibold leading-7 tracking-tight tabular-nums text-foreground',
+            stale && STALE_CLASS,
+          )}
+        >
           {error ? '—' : (value ?? '—')}
         </div>
       )}
-      <div className="mt-0.5 flex min-h-4 items-center gap-x-1.5 whitespace-nowrap text-xs">
+      <div className={cn('mt-0.5 flex min-h-4 items-center gap-x-1.5 whitespace-nowrap text-xs', stale && STALE_CLASS)}>
         {delta !== undefined && <DeltaBadge delta={delta} />}
         {error ? (
           <button type="button" onClick={() => onRetry?.()} className="text-primary hover:underline">
@@ -93,7 +103,7 @@ export function StatTile({
       <Link
         to={to}
         title={title}
-        aria-busy={loading || undefined}
+        aria-busy={busy}
         className={cn(TILE_CLASS, 'transition-colors hover:bg-accent')}
       >
         {content}
@@ -101,7 +111,8 @@ export function StatTile({
     );
   }
   return (
-    <div aria-busy={loading || undefined} className={TILE_CLASS}>
+    // A group named by its label, so the tile can be found and announced as one.
+    <div role="group" aria-label={label} aria-busy={busy} className={TILE_CLASS}>
       {content}
     </div>
   );

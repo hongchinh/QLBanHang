@@ -11,7 +11,11 @@ import { useExecutiveParams } from '@/features/executive-dashboard/use-executive
 import { useExecutiveScope } from '@/features/executive-dashboard/use-executive-scope';
 import { formatDateOnly } from '@/lib/date-only';
 import { ScopeSelect } from './components/scope-select';
+import { CashTab } from './tabs/cash-tab';
+import { DebtTab } from './tabs/debt-tab';
+import { InventoryTab } from './tabs/inventory-tab';
 import { OverviewTab } from './tabs/overview-tab';
+import { SalesTab } from './tabs/sales-tab';
 
 interface TabPanelProps {
   params: ExecutiveParams;
@@ -30,6 +34,10 @@ const TAB_LABELS: Record<ExecutiveTab, string> = {
 // The tabs that exist. The bar shows those the user may open (useExecutiveAccess), in the order of access.tabs.
 const PANELS: Partial<Record<ExecutiveTab, ComponentType<TabPanelProps>>> = {
   overview: OverviewTab,
+  sales: SalesTab,
+  cash: CashTab,
+  debt: DebtTab,
+  inventory: InventoryTab,
 };
 
 // Bảng điều hành: sales, cash, debt and inventory of the whole company or one branch, kept live.
@@ -69,7 +77,8 @@ export function ExecutiveDashboardPage() {
 
       {/* Only the active panel is mounted (TabsContent default), so the queries of the other tabs do not run. */}
       <Tabs value={activeTab} onValueChange={(value) => setTab(value as ExecutiveTab)}>
-        <TabsList>
+        {/* Five tabs are wider than a phone: the bar scrolls sideways, from its first tab. */}
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           {panels.map(({ key }) => (
             <TabsTrigger key={key} value={key}>
               {TAB_LABELS[key]}

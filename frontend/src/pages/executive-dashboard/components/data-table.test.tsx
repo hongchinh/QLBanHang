@@ -36,6 +36,19 @@ describe('DataTable', () => {
     expect(within(rows[2]).getAllByRole('cell').map((c) => c.textContent)).toEqual(['Ngân hàng', '10.000']);
   });
 
+  it('puts the class of a column on its header and its cells, next to the alignment', () => {
+    const columns: DataColumn<Fund>[] = [
+      { key: 'name', header: 'Quỹ', className: 'whitespace-nowrap', cell: (row) => row.name },
+      { key: 'balance', header: 'Số dư', align: 'right', className: 'w-32', cell: (row) => String(row.balance) },
+    ];
+    render(<DataTable columns={columns} rows={ROWS} rowKey={(row) => row.id} />);
+
+    expect(screen.getByRole('columnheader', { name: 'Quỹ' })).toHaveClass('whitespace-nowrap');
+    expect(screen.getByRole('cell', { name: 'Ngân hàng' })).toHaveClass('whitespace-nowrap');
+    expect(screen.getByRole('columnheader', { name: 'Số dư' })).toHaveClass('w-32', 'text-right', 'tabular-nums');
+    expect(screen.getByRole('cell', { name: '19300' })).toHaveClass('w-32', 'text-right', 'tabular-nums');
+  });
+
   it('right-aligns a numeric column in tabular figures, header and cells', () => {
     renderTable();
 

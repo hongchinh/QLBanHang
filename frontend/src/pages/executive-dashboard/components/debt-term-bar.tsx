@@ -22,7 +22,17 @@ interface Term {
 const COLOURS = ['bg-primary', 'bg-amber-400', 'bg-orange-500', 'bg-rose-500', 'bg-rose-700'];
 
 const COLUMNS: DataColumn<Term & { share: number }>[] = [
-  { key: 'term', header: 'Nhóm', cell: (term) => term.label },
+  {
+    key: 'term',
+    header: 'Nhóm',
+    // The bar is hidden from assistive technology; the swatch ties a label to its segment on screen.
+    cell: (term) => (
+      <>
+        <span aria-hidden="true" data-swatch className={cn('mr-1.5 inline-block h-2.5 w-2.5 rounded-sm align-middle', term.colour)} />
+        {term.label}
+      </>
+    ),
+  },
   { key: 'amount', header: 'Số tiền', align: 'right', cell: (term) => formatNumber(term.amount) },
   { key: 'share', header: '%', align: 'right', cell: (term) => `${term.share}%` },
 ];

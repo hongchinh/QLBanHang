@@ -25,8 +25,8 @@ const mockBuild = vi.fn().mockReturnValue(connection)
 const invalidateQueries = vi.fn()
 // One client for every render, as the real useQueryClient returns: the hook's effect depends on it.
 const queryClient = { invalidateQueries }
-// The token of the signed-in user: a test changes it and renders again.
-const auth = { accessToken: 'test-token' as string | null }
+// The token and the id of the signed-in user: a test changes them and renders again.
+const auth = { accessToken: 'test-token' as string | null, userId: 'u1' as string | null }
 
 vi.mock('@microsoft/signalr', async (importOriginal) => {
   const actual = await importOriginal<typeof SignalR>()
@@ -44,8 +44,8 @@ vi.mock('@microsoft/signalr', async (importOriginal) => {
 
 vi.mock('@/stores/auth-store', () => ({
   useAuthStore: Object.assign(
-    vi.fn((selector: (s: { accessToken: string | null }) => unknown) =>
-      selector({ accessToken: auth.accessToken })
+    vi.fn((selector: (s: { accessToken: string | null; user: { id: string } | null }) => unknown) =>
+      selector({ accessToken: auth.accessToken, user: auth.userId ? { id: auth.userId } : null })
     ),
     { getState: () => ({ accessToken: auth.accessToken }) },
   ),
@@ -108,6 +108,7 @@ describe('useNotificationHub: dashboard signal and connection status', () => {
     realtimeBus.setStatus('connecting')
     connection.state = HubConnectionState.Disconnected
     auth.accessToken = 'test-token'
+    auth.userId = 'u1'
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -294,6 +295,8 @@ describe('useNotificationHub: dashboard signal and connection status', () => {
 
     expect(mockStart).toHaveBeenCalledTimes(1)
     expect(realtimeBus.getStatus()).toBe('connected')
+    // A start stopped by the unmount (StrictMode, leaving the page) is not reported as a failure.
+    expect(console.error).not.toHaveBeenCalled()
   })
 
   describe('a connection that closes while the hook is mounted', () => {
@@ -441,6 +444,32 @@ describe('useNotificationHub: dashboard signal and connection status', () => {
       expect(mockBuild).toHaveBeenCalledTimes(2)
       expect(mockStart).toHaveBeenCalledTimes(2)
       await connected()
+    })
+
+    it('another user signing in rebuilds the connection under that user', async () => {
+      const { rerender } = renderHook(() => useNotificationHub())
+      await connected()
+
+      auth.accessToken = 'token-of-u2'
+      auth.userId = 'u2'
+      rerender()
+
+      expect(mockStop).toHaveBeenCalledTimes(1)
+      expect(mockBuild).toHaveBeenCalledTimes(2)
+      expect(mockStart).toHaveBeenCalledTimes(2)
+      await connected()
+    })
+
+    it('waits for the user before connecting', () => {
+      auth.userId = null
+      const { rerender } = renderHook(() => useNotificationHub())
+      expect(mockBuild).not.toHaveBeenCalled()
+
+      auth.userId = 'u1'
+      rerender()
+
+      expect(mockBuild).toHaveBeenCalledTimes(1)
+      expect(mockStart).toHaveBeenCalledTimes(1)
     })
 
     it('does not connect without a token', () => {

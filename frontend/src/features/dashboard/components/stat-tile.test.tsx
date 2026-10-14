@@ -188,6 +188,38 @@ describe('StatTile', () => {
     });
   });
 
+  describe('stale figures (the previous period or scope while the new one loads)', () => {
+    it('dims the value and the hint and marks the tile busy', () => {
+      renderTile({ stale: true, hint: 'Quá hạn 420 tr' });
+
+      expect(screen.getByRole('group', { name: 'Phải thu' })).toHaveAttribute('aria-busy', 'true');
+      expect(screen.getByText('3,10 tỷ')).toHaveClass('opacity-60');
+      expect(screen.getByText('Quá hạn 420 tr').parentElement).toHaveClass('opacity-60');
+      expect(screen.getByText('Phải thu')).not.toHaveClass('opacity-60');
+    });
+
+    it('marks the link busy when the tile is one', () => {
+      signIn(['reports.debt']);
+      renderTile({ stale: true, to: OVERDUE_LINK });
+
+      expect(screen.getByRole('link')).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('fresh figures are neither dimmed nor busy', () => {
+      renderTile({ hint: 'Quá hạn 420 tr' });
+
+      expect(screen.getByText('3,10 tỷ')).not.toHaveClass('opacity-60');
+      expect(screen.getByText('Quá hạn 420 tr').parentElement).not.toHaveClass('opacity-60');
+      expect(document.querySelector('[aria-busy]')).toBeNull();
+    });
+  });
+
+  it('a tile without a link is a group named by its label', () => {
+    renderTile();
+
+    expect(screen.getByRole('group', { name: 'Phải thu' })).toHaveTextContent('3,10 tỷ');
+  });
+
   describe('error', () => {
     it('shows "—" and a retry button in place of the hint', () => {
       const onRetry = vi.fn();

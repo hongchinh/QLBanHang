@@ -124,6 +124,22 @@ public class DebtMetricsService : IDebtMetricsService
         return receivable.GroupBy(i => i.BranchId).ToDictionary(g => g.Key, g => DebtPositionMath.Balance(g));
     }
 
+    /// What needs action at the end of the given day: the overdue receivables, the credit limits exceeded and the
+    /// payables that fall due within the next seven days. Runs inside the caller's snapshot.
+    public async Task<DebtAttention> GetAttentionAsync(ExecutiveScope scope, DateOnly at, CancellationToken ct = default)
+    {
+        var atEnd = ExecutiveDay.End(at);
+        var receivable = await LoadOpenItemsAsync(scope, DebtSide.Receivable, atEnd, ct);
+        var payable = await LoadOpenItemsAsync(scope, DebtSide.Payable, atEnd, ct);
+        var limits = await LoadLimitsAsync(scope, ct);
+
+        var receivableTotals = DebtPositionMath.Totals(receivable, at, DebtAging.DefaultBoundaries);
+        var payableTotals = DebtPositionMath.Totals(payable, at, DebtAging.DefaultBoundaries);
+        var breaches = LimitBreaches(receivable, limits);
+        return new DebtAttention(receivableTotals.OverduePartnerCount, receivableTotals.Overdue,
+            breaches.Count, breaches.Sum(b => b.Over), payableTotals.DueSoonCount, payableTotals.DueSoon);
+    }
+
     /// The receivable balance of each customer over every branch of the scope; customers who do not owe are left out.
     private static List<DebtorBalance> DebtorBalances(IEnumerable<OpenDebtItem> receivable, DateOnly at) =>
         receivable

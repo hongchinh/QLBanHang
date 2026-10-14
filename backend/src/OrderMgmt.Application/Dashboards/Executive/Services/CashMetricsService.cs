@@ -216,6 +216,16 @@ public class CashMetricsService : ICashMetricsService
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Only receipts and payments are documents."),
     };
 
+    /// The funds of the scope whose balance at the end of the given day is below zero: how many, and how far below
+    /// zero they are together. Runs inside the caller's snapshot.
+    public async Task<NegativeFunds> GetNegativeFundsAsync(ExecutiveScope scope, DateOnly at, CancellationToken ct = default)
+    {
+        var funds = await LoadFundsAsync(scope, ct);
+        var balances = BalancesAt(await LoadMovementsAsync(funds, ct), ExecutiveDay.End(at));
+        var negative = funds.Select(f => balances.GetValueOrDefault(f.Id)).Where(balance => balance < 0m).ToList();
+        return new NegativeFunds(negative.Count, negative.Sum(balance => -balance));
+    }
+
     /// The funds of the scope, active or not: an inactive fund keeps its history and its balance.
     private async Task<List<FundRow>> LoadFundsAsync(ExecutiveScope scope, CancellationToken ct)
     {

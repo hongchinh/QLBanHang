@@ -9,7 +9,8 @@ using OrderMgmt.WebApi.Authorization;
 namespace OrderMgmt.WebApi.Controllers;
 
 /// Executive dashboard (Bảng điều hành): read-only. Each action needs dashboard.executive and the report permission
-/// of its domain; the branch comparison needs branches.access_all instead.
+/// of its domain; the branch comparison needs branches.access_all instead. The attention list needs nothing more: it
+/// shows only the parts the user may read.
 [Route("api/dashboard/executive")]
 [HasPermission(Permissions.Dashboard.Executive)]
 public class ExecutiveDashboardController : ApiControllerBase
@@ -134,5 +135,12 @@ public class ExecutiveDashboardController : ApiControllerBase
     {
         await _queryValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _overview.GetBranchComparisonAsync(query, ct));
+    }
+
+    [HttpGet("attention")]
+    public async Task<ActionResult<ApiResponse<AttentionDto>>> Attention([FromQuery] ExecutiveQuery query, CancellationToken ct)
+    {
+        await _queryValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _overview.GetAttentionAsync(query, ct));
     }
 }

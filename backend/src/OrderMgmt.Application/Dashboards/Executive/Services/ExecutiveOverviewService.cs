@@ -88,6 +88,41 @@ public class ExecutiveOverviewService : IExecutiveOverviewService
             .ToList();
     }
 
+    public Task<AttentionDto> GetAttentionAsync(ExecutiveQuery query, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildAttentionAsync(query, c), ct);
+
+    private async Task<AttentionDto> BuildAttentionAsync(ExecutiveQuery query, CancellationToken ct)
+    {
+        var today = VnTime.ToVnDate(_clock.UtcNow);
+        var scope = await _scopes.ResolveAsync(query.BranchId, ct);
+        var at = query.At ?? today;
+        var attention = new AttentionDto { At = at };
+
+        if (_currentUser.HasPermission(Permissions.Reports.Debt))
+        {
+            var debt = await _debt.GetAttentionAsync(scope, at, ct);
+            attention.OverdueReceivables = new AttentionItemDto { Count = debt.OverduePartners, Amount = debt.OverdueAmount };
+            attention.OverCreditLimit = new AttentionItemDto { Count = debt.OverLimitCount, Amount = debt.OverLimitAmount };
+            attention.PayablesDueSoon = new AttentionItemDto
+            {
+                Count = debt.PayablesDueSoonCount,
+                Amount = debt.PayablesDueSoonAmount,
+            };
+        }
+
+        // Stock has a count and no amount: the pairs below zero are not worth a sum.
+        if (_currentUser.HasPermission(Permissions.Reports.Inventory))
+            attention.NegativeStock = new AttentionItemDto { Count = await _inventory.CountNegativeStockAsync(scope, ct) };
+
+        if (_currentUser.HasPermission(Permissions.Reports.Cash))
+        {
+            var funds = await _cash.GetNegativeFundsAsync(scope, at, ct);
+            attention.NegativeFunds = new AttentionItemDto { Count = funds.Count, Amount = funds.Amount };
+        }
+
+        return attention;
+    }
+
     /// Code and name of each branch. A deleted branch keeps them: this is a lookup by id with the query filters off.
     private async Task<Dictionary<Guid, (string Code, string Name)>> LoadBranchNamesAsync(
         IReadOnlyCollection<Guid> ids, CancellationToken ct) =>

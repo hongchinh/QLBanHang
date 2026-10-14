@@ -1,3 +1,5 @@
+import type { ReportScope } from '@/lib/report-scope';
+
 // Mirrors backend Inventory/Reports/Models/InventoryReportDtos.cs (Phase 06 Tasks 6.4 and 6.5).
 export interface StockOnHandParams {
   /** ISO instant; omitted = now. */
@@ -75,4 +77,47 @@ export interface StockCard {
   closingQty: number;
   closingValue?: number | null;
   rows: StockCardRow[];
+}
+
+export interface StockSummaryParams {
+  /** VN dates `yyyy-MM-dd`. */
+  from: string;
+  to: string;
+  scope: ReportScope;
+  /** Branch scope only. */
+  warehouseId?: string;
+  productGroupId?: string;
+  search?: string;
+}
+
+export interface StockSummaryRow {
+  productId: string;
+  productCode: string;
+  productName: string;
+  unitName: string;
+  productGroupName?: string | null;
+  openingQty: number;
+  openingValue?: number | null;
+  inQty: number;
+  inValue?: number | null;
+  outQty: number;
+  outValue?: number | null;
+  closingQty: number;
+  closingValue?: number | null;
+}
+
+export interface StockSummaryReport {
+  from: string;
+  to: string;
+  scope: ReportScope;
+  warehouseId?: string | null;
+  isProvisional: boolean;
+  canViewCost: boolean;
+  /** A warehouse filter under Branch costing: quantities only. */
+  valuesAtScopeOnly: boolean;
+  rows: StockSummaryRow[];
+  totalOpeningValue?: number | null;
+  totalInValue?: number | null;
+  totalOutValue?: number | null;
+  totalClosingValue?: number | null;
 }

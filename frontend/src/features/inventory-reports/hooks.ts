@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { inventoryReportsApi } from './api';
 import { inventoryReportKeys } from './keys';
-import type { StockCardParams, StockOnHandParams } from './types';
+import type { StockCardParams, StockOnHandParams, StockSummaryParams } from './types';
 
 export function useStockOnHand(params: StockOnHandParams) {
   return useQuery({
@@ -16,5 +16,13 @@ export function useStockCard(params: StockCardParams, options: { enabled?: boole
     queryKey: inventoryReportKeys.stockCard(params),
     queryFn: () => inventoryReportsApi.stockCard(params),
     enabled: !!params.productId && (options.enabled ?? true),
+  });
+}
+
+export function useStockSummary(params: StockSummaryParams, options: { enabled?: boolean } = {}) {
+  return useQuery({
+    queryKey: inventoryReportKeys.stockSummary(params),
+    queryFn: () => inventoryReportsApi.stockSummary(params),
+    enabled: options.enabled ?? true,
   });
 }

@@ -4,12 +4,15 @@ using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.CashDebt.Funds.Interfaces;
 using OrderMgmt.Application.CashDebt.Funds.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.WebApi.Authorization;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
 [Route("api/funds")]
+[DashboardSignal(DashboardDomains.Cash)]
 public class FundsController : ApiControllerBase
 {
     private readonly IFundService _service;

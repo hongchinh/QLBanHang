@@ -2,17 +2,19 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatDateYmd } from '../format';
-import type { RangePreset } from '../use-dashboard-params';
+import { computePreset, matchActivePreset } from '@/lib/date-range-presets';
+import type { PresetOption, RangePreset } from '@/lib/date-range-presets';
 
 interface RangePickerProps {
   from: string;
   to: string;
   onChange: (from: string, to: string) => void;
   onPreset?: (preset: RangePreset) => void;
+  // The chips in front of "Tuỳ chỉnh"; default DEFAULT_PRESETS.
+  presets?: PresetOption[];
 }
 
-const PRESETS: { key: RangePreset; label: string }[] = [
+const DEFAULT_PRESETS: PresetOption[] = [
   { key: 'today', label: 'Hôm nay' },
   { key: '7d', label: '7N' },
   { key: '30d', label: '30N' },
@@ -20,7 +22,7 @@ const PRESETS: { key: RangePreset; label: string }[] = [
   { key: 'last-month', label: 'Tháng trước' },
 ];
 
-export function RangePicker({ from, to, onChange, onPreset }: RangePickerProps) {
+export function RangePicker({ from, to, onChange, onPreset, presets = DEFAULT_PRESETS }: RangePickerProps) {
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
@@ -42,7 +44,7 @@ export function RangePicker({ from, to, onChange, onPreset }: RangePickerProps) 
     return () => document.removeEventListener('mousedown', handleClick);
   }, [open]);
 
-  const matchPreset = matchActivePreset(from, to);
+  const matchPreset = matchActivePreset(from, to, presets.map((p) => p.key));
 
   const handlePresetClick = (preset: RangePreset) => {
     if (onPreset) onPreset(preset);
@@ -61,7 +63,7 @@ export function RangePicker({ from, to, onChange, onPreset }: RangePickerProps) 
 
   return (
     <div className="flex flex-wrap items-center gap-2" ref={wrapRef}>
-      {PRESETS.map((p) => (
+      {presets.map((p) => (
         <button
           key={p.key}
           type="button"
@@ -127,41 +129,4 @@ export function RangePicker({ from, to, onChange, onPreset }: RangePickerProps) 
       </span>
     </div>
   );
-}
-
-function computePreset(preset: RangePreset): { from: string; to: string } {
-  const today = new Date();
-  let start: Date;
-  let end: Date = today;
-  switch (preset) {
-    case 'today':
-      start = new Date(today);
-      break;
-    case '7d':
-      start = new Date(today);
-      start.setDate(start.getDate() - 6);
-      break;
-    case '30d':
-      start = new Date(today);
-      start.setDate(start.getDate() - 29);
-      break;
-    case 'this-month':
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-      break;
-    case 'last-month':
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      end = new Date(today.getFullYear(), today.getMonth(), 0);
-      break;
-    default:
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-  }
-  return { from: formatDateYmd(start), to: formatDateYmd(end) };
-}
-
-function matchActivePreset(from: string, to: string): RangePreset | null {
-  for (const p of PRESETS) {
-    const expected = computePreset(p.key);
-    if (expected.from === from && expected.to === to) return p.key;
-  }
-  return null;
 }

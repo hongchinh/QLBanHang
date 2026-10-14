@@ -4,13 +4,13 @@
 
 QLBanHang is a quotation-first sales management system. The quotation is the primary document through the sales lifecycle; revenue is recognized when a quotation reaches `Confirmed`.
 
-The scope is being expanded (approved 2026-10-06) to replace the stock voucher workflow of the legacy F-SALE.NET software: stock-in/stock-out vouchers, stock and costing, then cash vouchers and receivables/payables. The business is a trading company (EPS/XPS foam sheets, mineral wool, ...); it does not manufacture or cut goods. Until the planned quotation → sales voucher conversion ships, revenue stays based on confirmed quotations.
+The scope is being expanded (approved 2026-10-06) to replace the stock voucher workflow of the legacy F-SALE.NET software: stock-in/stock-out vouchers, stock and costing, then cash vouchers and receivables/payables. The business is a trading company (EPS/XPS foam sheets, mineral wool, ...); it does not manufacture or cut goods. Until the planned quotation → sales voucher conversion ships, revenue stays based on confirmed quotations, except on the executive dashboard, which counts sales from stock-out vouchers.
 
 ## Target Users
 
 - **Sales**: create quotations, maintain customer/product details, send quotations, confirm successful deals and manage their own quotation templates.
-- **Manager/Admin**: view cross-user quotations, transfer ownership, manage users/roles, configure lock rules, cancel confirmed quotations and monitor revenue.
-- **Accounting/Reporting users**: view revenue reports when granted report permissions; lock periods per branch and recalculate costs. Cash and debt (Round 2A): receipts/payments, fund transfers, document matching and debt offset, opening debts and fund opening balances, credit limits, cash/debt settings and the debt and cash book reports.
+- **Manager/Admin**: view cross-user quotations, transfer ownership, manage users/roles, configure lock rules, cancel confirmed quotations and monitor revenue. Directors and managers follow sales, cash, debt and stock of the whole company or one branch on the executive dashboard (Bảng điều hành).
+- **Accounting/Reporting users**: view revenue reports when granted report permissions; lock periods per branch and recalculate costs. Cash and debt (Round 2A): receipts/payments, fund transfers, document matching and debt offset, opening debts and fund opening balances, credit limits, cash/debt settings and the debt and cash book reports. They also fill in the company profile (Thông tin đơn vị) and export the cash, stock and debt books in the TT133 layout.
 - **Warehouse staff**: stock-in/stock-out vouchers, opening stock and stock reports.
 
 ## Current Scope
@@ -24,7 +24,7 @@ The scope is being expanded (approved 2026-10-06) to replace the stock voucher w
 - Per-user quotation settings, including lock-at status and template upload.
 - Admin user CRUD, password reset, account status update and bulk quotation transfer.
 - Role-permission matrix management.
-- Dashboard summary, revenue series, top customers/products, recent activity and sales leaderboard.
+- Quotation dashboards (`/` and `/admin/dashboard`): summary, revenue series, top customers/products, recent activity and sales leaderboard.
 - Sales revenue report.
 - Global search, system branding and notifications.
 - VietQR payment-QR generation: pick/save a receiving bank account, enter an amount and transfer
@@ -48,18 +48,33 @@ The scope is being expanded (approved 2026-10-06) to replace the stock voucher w
   - Customer credit limits (Hạn mức nợ) with a customer debt panel on the stock-out form; credit-limit and negative-fund policies.
   - Branch opening date (Ngày đầu kỳ) shared by opening stock, opening debts and fund opening balances.
   - Reports: Số dư công nợ, Sổ chi tiết công nợ and Sổ quỹ.
-- **Round 2B — Debt reports** (implemented; goes live after Round 3). Plan: [Round 2B plan](../plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md). Five on-screen reports behind `reports.debt`, all scoped to the working branch (its print form comes in Round 3):
+- **Round 2B — Debt reports** (implemented; goes live after Round 3). Plan: [Round 2B plan](../plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md). Five on-screen reports behind `reports.debt`, all scoped to the working branch:
   - Công nợ theo chứng từ (open amount per document as at a date), Tuổi nợ (aging buckets per partner, default 30/60/90 days) and Nợ quá hạn (overdue buckets per partner; the unallocated amount is shown, not subtracted).
   - Công nợ theo nhân viên: opening, increase, settled, closing and overdue per employee, where the employee is the creator of the source voucher (B1), or the owner picked on an opening debt (the opening-debt form and list gain a "Nhân viên" column). An entry without an owner shows as "Không xác định". If the BA later wants a separate salesperson on the voucher, only what is written to the entry owner changes.
-  - Biên bản đối chiếu: the partner's receivable and payable ledgers of the period with the net balance, on screen.
+  - Biên bản đối chiếu: the partner's receivable and payable ledgers of the period with the net balance, on screen (its print form is one of the TT133 report forms below).
   - The stock-out customer debt panel links to the Nợ quá hạn report (new tab, filtered to the customer) when the customer is overdue and the user holds `reports.debt` (B2: that report is the overdue warning list; there is no dashboard widget or save-time warning).
   - The documents, aging and by-employee totals equal the Số dư công nợ closing balance (B4).
+- **TT133 report forms** (implemented; goes live after Round 3 and after the accountant's sign-off). Design: [TT133 report forms brainstorm](../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md); plan: [TT133 report forms plan](../plans/archived/261013-1926-tt133-report-forms/SUMMARY.md); rules: [Mẫu biểu TT133](#mẫu-biểu-tt133):
+  - Excel and PDF exports of eight forms in the layout of Circular 133/2016/TT-BTC (Phụ lục 4), from the "Xuất theo mẫu TT133" button of the report pages: S04a-DNN Sổ quỹ tiền mặt and S05-DNN Sổ tiền gửi ngân hàng (on Sổ quỹ), S06-DNN Sổ chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa and S08-DNN Thẻ kho (on Thẻ kho), S07-DNN Bảng tổng hợp chi tiết vật liệu, dụng cụ, sản phẩm, hàng hóa (on Tổng hợp nhập xuất tồn), S12-DNN Sổ chi tiết thanh toán với người mua (người bán) (on Sổ chi tiết công nợ), Bảng tổng hợp chi tiết thanh toán (on Số dư công nợ) and Biên bản đối chiếu công nợ.
+  - S06, S08 and S12 export one, several or all partners / products with activity in the period, one sheet each.
+  - Thông tin đơn vị (Cài đặt): company name, address, tax code, chief accountant, legal representative and an optional accounting-service note, printed in the header and signature blocks.
+  - New report Tổng hợp nhập xuất tồn: opening, in, out and closing quantity and value per product for a period, on screen and as S07.
+  - Branch or company scope (Chi nhánh đang làm việc / Toàn công ty) on Số dư công nợ, Sổ chi tiết công nợ, Biên bản đối chiếu and Tổng hợp nhập xuất tồn.
+  - New columns on screen: Lý do on Sổ quỹ and Sổ chi tiết công nợ, Hạn TT on Sổ chi tiết công nợ; month / quarter / year presets for the report period.
+- **Executive dashboard — Bảng điều hành** (implemented; its figures fill in once inventory, cash and debt go live after Round 3; until then the page shows zeros and empty lists). Design: [executive dashboard brainstorm](../brainstorms/261013-2247-executive-dashboard/SUMMARY.md). The first of the role dashboards: it also builds the shared base (tiles, live refresh) that the later ones reuse.
+  - One page, `/dashboard/executive` (Báo cáo → Tổng hợp → Điều hành), for the whole company or one branch, over a chosen period (Hôm nay, Tuần này, Tháng này, Năm nay or a custom range), compared with the previous period of the same length.
+  - Tổng quan: seven KPI tiles (for the period: Doanh thu xuất bán, Lãi gộp, Thu − chi ròng; now: Tồn quỹ, Phải thu, Phải trả, Giá trị tồn kho), the revenue–cost–gross profit chart, cash flow with fund balances, the receivable term structure, the branch comparison, top customers, "Cần chú ý" (overdue customers, customers over their credit limit, negative stock, payables due within 7 days, negative funds) and "Vừa phát sinh" (receipts, payments and stock vouchers created today).
+  - Deep-dive tabs: Kinh doanh (chart; top customers, products and employees by revenue or gross profit; branch comparison), Tiền (fund balances, cash flow, receipts and payments by reason, largest documents), Công nợ (receivable and payable term structure, top debtors, customers over their limit, debt by employee, payables due within 30 days) and Kho (stock value by warehouse and product group, in and out of the period, top products by value, negative stock).
+  - Every figure equals its report and links to it. The figures refresh within a second or two after a document is saved, and the header shows whether the page is live ("Trực tiếp" / "Mất kết nối").
+  - Who sees it: users with `dashboard.executive` (ADMIN and MANAGER by default; ACCOUNTANT not yet, chờ kế toán/BA xác nhận). Each part also needs its report permission (Kinh doanh `reports.profit`, Tiền `reports.cash`, Công nợ `reports.debt`, Kho `reports.inventory`), cost, gross profit and stock value need `inventory.view_cost`, and the branch select and the branch comparison need `branches.access_all`; other users see their own branch. Choosing a branch on the dashboard also makes it the working branch.
+  - Revenue here is sales from stock-out vouchers: the system reason XBH minus customer returns NTL, before VAT, freight excluded; cost is the issue cost of the stock ledger, and a return reduces it by the value at which the goods re-enter stock (chờ kế toán/BA xác nhận). The quotation dashboards and the Doanh thu reports keep confirmed-quotation revenue.
 
 ## Planned Scope
 
 Approved but not yet implemented. Go-live happens after Round 3. Design: [stock voucher brainstorm](../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md), [cash & debt brainstorm](../brainstorms/261007-2252-cash-debt-round2/SUMMARY.md).
 
-- **Round 3 — Output and productivity**: template-based print/Excel export of vouchers (forms 01-VT/02-VT, receipts/payments, Biên bản đối chiếu), Excel import of voucher lines and voucher copy. The cut-over decides whether opening debts are typed in or imported from Excel.
+- **Round 3 — Output and productivity**: print/Excel export of vouchers (forms 01-VT/02-VT for stock in/out, 01-TT/02-TT for receipts/payments; design: [voucher print forms brainstorm](../brainstorms/261013-2042-tt133-voucher-print-forms/SUMMARY.md)), Excel import of voucher lines and voucher copy. The print/Excel of the cash, stock and debt reports, Biên bản đối chiếu included, is delivered (TT133 report forms above). The cut-over decides whether opening debts are typed in or imported from Excel.
+- **Role dashboards** (sub-projects 2–4 of the [executive dashboard brainstorm](../brainstorms/261013-2247-executive-dashboard/SUMMARY.md), each with its own design and plan): the accountant dashboard (cash and debt), the warehouse dashboard and the sales dashboard (the quotation dashboard rebuilt on the new base). They reuse the tiles, the executive endpoints and the live refresh of the executive dashboard. Open: whether ACCOUNTANT gets `dashboard.executive` before its own dashboard, and whether the executive dashboard replaces `/admin/dashboard` as the landing page of ADMIN and MANAGER.
 - **Backlog**: FIFO costing, warehouse transfer, stocktake, returns and quotation → sales voucher conversion.
 
 ## Core Business Rules
@@ -108,6 +123,19 @@ Approved but not yet implemented. Go-live happens after Round 3. Design: [stock 
 - The period lock also covers receipts/payments, fund transfers, offsets, matching, opening debts and fund opening balances. Automatic matches dated in a locked period stay as they are and are refreshed when the lock moves earlier or is cleared.
 - **Permissions** (P5/P6, chờ kế toán/BA xác nhận): ADMIN, MANAGER and ACCOUNTANT get every cash and debt permission. SALES gets only `debt.partner_summary` (the customer debt panel on the stock-out form). WAREHOUSE gets nothing new; automatic vouchers follow the stock voucher permissions.
 
+### Mẫu biểu TT133
+
+- The forms follow Circular 133/2016/TT-BTC, which does not fix the structure of detail books. Each form presents a report the screen already shows with the same filters, so the file always equals the screen; no form has numbers of its own.
+- There is no chart of accounts: the "TK đối ứng" column is replaced by "Lý do" (the reason of the voucher), and "Thời hạn được chiết khấu" of S12 by "Hạn thanh toán" (chờ kế toán/BA xác nhận).
+- Debit and credit on S12 and the debt summary: a receivable increase is Nợ and a decrease Có; a payable increase is Có and a decrease Nợ; a balance against its side moves to the opposite column.
+- The company is the accounting unit; branches have no tax code of their own (chờ kế toán/BA xác nhận). The working branch is the default scope and the header prints "company – branch". "Toàn công ty" adds every branch, needs `branches.access_all`, and prints the company alone. Matching stays inside a branch. Sổ quỹ, S06 and S08 are always per working branch.
+- Document numbers repeat across branches, so a company-wide ledger shows the branch code in brackets in front of "Diễn giải", on screen and on paper. A summary exported with a search text prints the filter as a "Điều kiện lọc" line.
+- Tổng hợp nhập xuất tồn follows the stock card: opening + in − out = closing for every product, and opening stock entered on the opening date shows under "Nhập trong kỳ" in the first period. Values need the cost permission; S06 cannot be exported without it. For S06 and S07 per warehouse to carry values, the costing scope is switched to warehouse at go-live (chờ kế toán/BA xác nhận).
+- An export without any partner or product is refused, and so is one with more than 300 books in one file (configurable). When the PDF conversion fails the user is told to use Excel.
+- An empty company profile does not block an export: the header stays empty and the page shows "Chưa có thông tin đơn vị". Editing the profile needs `settings.company` (ADMIN, MANAGER and ACCOUNTANT by default).
+- The reconciliation record ends with the balance in digits and in words. A company-specific template ("căn cứ" and reply clauses) is not written yet (chờ kế toán/BA xác nhận).
+- Go-live gate: the accountant compares a printed sample of each form with the original Phụ lục 4 and signs it off ([go-live checklist](../plans/archived/261013-1926-tt133-report-forms/GO-LIVE-CHECKLIST.md)).
+
 ## Non-Goals
 
 - No separate order document workflow.
@@ -118,7 +146,8 @@ Approved but not yet implemented. Go-live happens after Round 3. Design: [stock 
 - No payment confirmation, bank webhook, or reconciliation for generated VietQR codes — the app has
   no way to know whether a transfer actually happened.
 - No direct email/Zalo sending from the app.
-- No full accounting module (no chart of accounts or general ledger).
+- No full accounting module (no chart of accounts or general ledger): no "TK đối ứng", journals, financial statements or VAT books.
+- No forms of Circular 99/2025/TT-BTC (TT99), no foreign-currency books (S13, S14), no admin-editable print templates and no HTML print pages.
 
 ## Related Docs
 
@@ -127,4 +156,6 @@ Approved but not yet implemented. Go-live happens after Round 3. Design: [stock 
 - Quotation pivot brainstorm: [../brainstorms/260515-1249-quotation-only-pivot/SUMMARY.md](../brainstorms/260515-1249-quotation-only-pivot/SUMMARY.md)
 - Stock voucher brainstorm: [../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md](../brainstorms/261006-2139-stock-voucher-clone/SUMMARY.md)
 - Cash & debt brainstorm: [../brainstorms/261007-2252-cash-debt-round2/SUMMARY.md](../brainstorms/261007-2252-cash-debt-round2/SUMMARY.md)
+- TT133 report forms brainstorm: [../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md](../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md)
+- Executive dashboard brainstorm: [../brainstorms/261013-2247-executive-dashboard/SUMMARY.md](../brainstorms/261013-2247-executive-dashboard/SUMMARY.md)
 - Archived original BD: [../bd/archived/phan-tich-yeu-cau-phan-mem-quan-ly-don-hang.md](../bd/archived/phan-tich-yeu-cau-phan-mem-quan-ly-don-hang.md)

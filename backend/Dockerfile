@@ -42,7 +42,15 @@ RUN sed -i 's/^Components: main$/Components: main contrib/' /etc/apt/sources.lis
         fonts-noto \
         fonts-noto-cjk \
         ttf-mscorefonts-installer \
+        locales \
+ && sed -i 's/^# *vi_VN UTF-8/vi_VN UTF-8/' /etc/locale.gen \
+ && locale-gen \
  && rm -rf /var/lib/apt/lists/*
+
+# LibreOffice prints numbers with the separators of its locale. The wrapper runs it in vi_VN, so PDFs
+# show 1.250.000 like Excel on a Vietnamese Windows. Only soffice gets the locale, not the .NET process.
+RUN printf '#!/bin/sh\nLC_ALL=vi_VN.UTF-8 LANG=vi_VN.UTF-8 exec /usr/bin/soffice "$@"\n' > /usr/local/bin/soffice-vi \
+ && chmod +x /usr/local/bin/soffice-vi
 
 COPY fonts/ /usr/share/fonts/truetype/project/
 RUN fc-cache -fv
@@ -53,7 +61,7 @@ ENV ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
     DOTNET_GCServer=1 \
     PORT=8080 \
-    QuotationExport__LibreOfficePath=/usr/bin/soffice
+    QuotationExport__LibreOfficePath=/usr/local/bin/soffice-vi
 
 # Railway injects $PORT at runtime. ASP.NET Core listens on ASPNETCORE_URLS,
 # so we expand $PORT into the URL at container start.

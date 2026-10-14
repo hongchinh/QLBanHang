@@ -3,12 +3,15 @@ using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.CashDebt.CreditLimits.Interfaces;
 using OrderMgmt.Application.CashDebt.CreditLimits.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.WebApi.Authorization;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
 [Route("api/credit-limits")]
+[DashboardSignal(DashboardDomains.Debt)]
 public class CreditLimitsController : ApiControllerBase
 {
     private readonly ICreditLimitService _service;

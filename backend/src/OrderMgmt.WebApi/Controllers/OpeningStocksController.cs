@@ -1,14 +1,18 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
 using OrderMgmt.Application.Inventory.OpeningStocks.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.WebApi.Authorization;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
+/// Opening stock changes costs, so the sales figures (cost, gross profit) change with the inventory ones.
 [Route("api/inventory/opening-stock")]
+[DashboardSignal(DashboardDomains.Inventory | DashboardDomains.Sales)]
 public class OpeningStocksController : ApiControllerBase
 {
     private readonly IOpeningStockService _service;

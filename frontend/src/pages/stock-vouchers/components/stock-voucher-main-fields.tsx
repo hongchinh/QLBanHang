@@ -93,7 +93,7 @@ export function StockVoucherMainFields({
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Enter walks the main fields.
     <fieldset
       disabled={readOnly}
-      className="m-0 min-w-0 shrink-0 space-y-[6px] rounded-md border bg-card px-3 py-2"
+      className="m-0 min-w-0 shrink-0 space-y-[6px] rounded-md border bg-card px-3 py-1.5"
       onKeyDown={handleKeyDown}
     >
       <div className="form-inline-grid form-cols-stock-main-1">

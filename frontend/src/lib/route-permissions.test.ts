@@ -97,9 +97,10 @@ describe('inventory routes', () => {
     expectRule('/inventory/opening-stock', 'inventory.opening_stock');
   });
 
-  it('/inventory/stock-on-hand và /inventory/stock-card cần reports.inventory', () => {
+  it('/inventory/stock-on-hand, /inventory/stock-card và /inventory/stock-summary cần reports.inventory', () => {
     expectRule('/inventory/stock-on-hand', 'reports.inventory');
     expectRule('/inventory/stock-card', 'reports.inventory');
+    expectRule('/inventory/stock-summary', 'reports.inventory');
   });
 
   it('/suppliers cần suppliers.view; /suppliers/new cần create, /suppliers/:id cần update', () => {
@@ -213,5 +214,18 @@ describe('cash and debt routes', () => {
     expectRule('/credit-limits', 'credit_limit.manage');
     expectRule('/settings/cash', 'cash.settings');
     expect(canAccessRoute('/settings/cash', ['inventory.settings'], [])).toBe(false);
+  });
+
+  it('/settings/company cần settings.company', () => {
+    expectRule('/settings/company', 'settings.company');
+    expect(canAccessRoute('/settings/company', ['cash.settings'], [])).toBe(false);
+  });
+
+  it('/dashboard/executive needs dashboard.executive', () => {
+    expectRule('/dashboard/executive', 'dashboard.executive');
+    // The quotation dashboard permission does not open it.
+    expect(canAccessRoute('/dashboard/executive', ['quotations.view_all'], ['ADMIN'])).toBe(false);
+    const codes: readonly string[] = PERMISSIONS;
+    expect(codes).toContain('dashboard.executive');
   });
 });

@@ -1,11 +1,12 @@
 import { inventoryKeys } from '@/features/stock-vouchers/keys';
-import type { StockCardParams, StockOnHandParams } from './types';
+import type { StockCardParams, StockOnHandParams, StockSummaryParams } from './types';
 
 // Under the shared inventory root, so voucher and opening-stock saves refresh every report.
 export const inventoryReportKeys = {
   all: [...inventoryKeys.all, 'reports'] as const,
   stockOnHand: (params: StockOnHandParams) => [...inventoryReportKeys.all, 'stock-on-hand', params] as const,
   stockCard: (params: StockCardParams) => [...inventoryReportKeys.all, 'stock-card', params] as const,
+  stockSummary: (params: StockSummaryParams) => [...inventoryReportKeys.all, 'stock-summary', params] as const,
 };
 
 export const openingStockKeys = {

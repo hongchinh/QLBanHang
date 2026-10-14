@@ -27,6 +27,7 @@ const RULES: RouteRule[] = [
   { pattern: /^\/admin\/users(\/[^/]+)?$/, permission: 'user_settings.manage' },
   { pattern: /^\/admin\/roles$/, permission: 'roles.view' },
   { pattern: /^\/admin\/dashboard$/, permission: 'quotations.view_all' },
+  { pattern: /^\/dashboard\/executive$/, permission: 'dashboard.executive' },
   { pattern: /^\/reports\/sales-performance$/, permission: 'quotations.view_all' },
   { pattern: /^\/reports\/(revenue|sales-revenue|vehicle-revenue)$/, permission: 'reports.revenue' },
   { pattern: /^\/reports\/sales-revenue\/[^/]+$/, permission: 'reports.revenue' },
@@ -40,7 +41,7 @@ const RULES: RouteRule[] = [
   ...listNewDetail('stock-in', 'stock_in.view', 'stock_in.create', 'stock_in.view'),
   ...listNewDetail('stock-out', 'stock_out.view', 'stock_out.create', 'stock_out.view'),
   { pattern: /^\/inventory\/opening-stock$/, permission: 'inventory.opening_stock' },
-  { pattern: /^\/inventory\/(stock-on-hand|stock-card)$/, permission: 'reports.inventory' },
+  { pattern: /^\/inventory\/(stock-on-hand|stock-card|stock-summary)$/, permission: 'reports.inventory' },
   { pattern: /^\/(warehouses|stock-reasons|payment-methods)$/, permission: 'inventory.catalogs.manage' },
   { pattern: /^\/settings\/quotation$/, permission: 'system.manage_settings' },
   { pattern: /^\/settings\/branches$/, permission: 'branches.manage' },
@@ -62,6 +63,7 @@ const RULES: RouteRule[] = [
   { pattern: /^\/funds$/, anyPermission: ['cash.catalogs.manage', 'cash.opening_balance'] },
   { pattern: /^\/credit-limits$/, permission: 'credit_limit.manage' },
   { pattern: /^\/settings\/cash$/, permission: 'cash.settings' },
+  { pattern: /^\/settings\/company$/, permission: 'settings.company' },
 ];
 
 export function canAccessRouteWith(

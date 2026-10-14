@@ -6,6 +6,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Identity.Models;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
@@ -190,7 +191,7 @@ public class QuotationExportTests : QuotationTestBase
 }
 
 /// <summary>
-/// WebAppFactory variant that replaces IQuotationSpreadsheetPdfConverter with a stub
+/// WebAppFactory variant that replaces ISpreadsheetPdfConverter with a stub
 /// returning a minimal PDF-like byte array, so PDF export tests run without LibreOffice.
 /// </summary>
 file sealed class WebAppFactoryWithFakePdfConverter : WebAppFactory
@@ -204,15 +205,15 @@ file sealed class WebAppFactoryWithFakePdfConverter : WebAppFactory
         {
             // Replace real converter with a no-op stub.
             var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(IQuotationSpreadsheetPdfConverter));
+                d => d.ServiceType == typeof(ISpreadsheetPdfConverter));
             if (descriptor is not null)
                 services.Remove(descriptor);
-            services.AddScoped<IQuotationSpreadsheetPdfConverter, FakePdfConverter>();
+            services.AddScoped<ISpreadsheetPdfConverter, FakePdfConverter>();
         });
     }
 }
 
-file sealed class FakePdfConverter : IQuotationSpreadsheetPdfConverter
+file sealed class FakePdfConverter : ISpreadsheetPdfConverter
 {
     // Minimal valid PDF header so the response has non-empty bytes.
     private static readonly byte[] FakePdf = "%PDF-1.0 fake\n"u8.ToArray();

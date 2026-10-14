@@ -48,7 +48,7 @@ QLBanHang/
 | Roles/permissions | `Application/Identity/Admin`, `AdminRolesController.cs`, `Domain/Constants/Permissions.cs` |
 | User quotation settings | `Application/Identity/UserSettings`, `AdminUserSettingsController.cs`, `MeQuotationSettingsController.cs` |
 | Quotations | `Application/Sales/Quotations`, `Domain/Entities/Sales`, `QuotationsController.cs` |
-| Dashboard | `Application/Sales/Quotations/Services`, `DashboardController.cs` |
+| Quotation dashboard | `Application/Sales/Quotations/Services`, `DashboardController.cs` |
 | Reports | `Application/Reports/SalesRevenue`, `ReportsController.cs` |
 | Search | `Application/Search`, `SearchController.cs` |
 | Branding | `Domain/Branding`, `Application/Branding`, `SettingsController.cs` |
@@ -62,15 +62,19 @@ QLBanHang/
 | Ledger, costing and posting engine | `Application/Inventory/{Common,Ledger,Costing,Posting,Interfaces}`, `Infrastructure/Inventory` (advisory locks, document counter), `Infrastructure/Persistence/EfTransactionRunner.cs` |
 | Opening stock | `Application/Inventory/OpeningStocks`, `OpeningStocksController.cs` |
 | Cost recalculation | `Application/Inventory/Costing` (`InventoryRecalcService`), `InventoryCostController.cs` |
-| Inventory reports | `Application/Inventory/Reports`, `InventoryReportsController.cs` |
+| Inventory reports | `Application/Inventory/Reports` (stock-on-hand, stock-card and the in–out–balance summary `stock-summary`), `InventoryReportsController.cs` |
 | Cash & debt domain (Round 2A) | `Domain/Entities/CashDebt` (`CashReason`, `Fund`, `CashVoucher`/`CashVoucherLine`, `FundTransfer`, `DebtEntry`, `DebtSettlement`, `DebtOffsetVoucher`, `OpeningDebt`, `CreditLimit`, `CashDocumentActivity`, `CashDebtSettings`), `Domain/Enums/CashDebtEnums.cs`, `Infrastructure/Persistence/Configurations/CashDebtConfiguration.cs` |
 | Cash & debt shared engine | `Application/CashDebt/Common` (`CashDocuments` shared by the three cash document services, `DebtEffectRules`, `DebtSettlementMath`, `AllocationValidator`, `RunningBalance`, `DebtBalanceSign`, `LimitPolicyDecision`), `Application/CashDebt/Ledger` (`IDebtLedgerService`, `IDebtQueryService`, `IDebtActivityLog`, `SettlementRemovalConfirmation` for the 422 token, `SettlementChangeCollector` for the removed settlements of a request), `Application/CashDebt/Guards` (`CreditLimitGuard`, `FundBalanceGuard`, `FundMovementQuery`), `Application/CashDebt/Interfaces/ICashDebtLock.cs`, `Infrastructure/CashDebt/PostgresCashDebtLock.cs` |
 | Cash settings and catalogs | `Application/CashDebt/{Settings,CashReasons,Funds,CreditLimits}`, `CashSettingsController.cs`, `CashReasonsController.cs`, `FundsController.cs`, `CreditLimitsController.cs` |
 | Receipts/payments and fund transfers | `Application/CashDebt/{CashVouchers,FundTransfers}`, `CashVouchersController.cs`, `FundTransfersController.cs` |
 | Automatic receipt/payment of stock vouchers | `Application/CashDebt/AutoVouchers` (`IAutoCashVoucherService`; `AutoRecomputeHook` recomputes the `Auto` settlements before the commit of every request that removed settlements) |
 | Opening debts, matching and offsets | `Application/CashDebt/{OpeningDebts,Debt,DebtOffsets}`, `OpeningDebtsController.cs`, `DebtController.cs`, `DebtOffsetsController.cs` |
-| Cross-feature application helpers | `Application/Common/LikePattern.cs` (ILike escaping), `Application/Common/References` (`IReferenceUsage`: every "is used" check of partners, payment methods, branches and funds), `Application/Common/Interfaces/IBeforeCommitHook.cs` (run by `EfTransactionRunner` before the outermost commit) |
+| Cross-feature application helpers | `Application/Common/LikePattern.cs` (ILike escaping), `Application/Common/References` (`IReferenceUsage`: every "is used" check of partners, payment methods, branches and funds), `Application/Common/Interfaces/IBeforeCommitHook.cs` (run by `EfTransactionRunner` before the outermost commit), `Application/Common/Interfaces/ISpreadsheetPdfConverter.cs` (xlsx → PDF, implemented by `Infrastructure/Excel/LibreOfficeSpreadsheetPdfConverter.cs`; shared by the quotation and TT133 exports), `Application/Common/VndAmountInWords.cs` (a VND amount in Vietnamese words), `Application/Common/ReportScope.cs` (`ReportScope` Branch / Company and `ReportScopeGuard`) |
 | Cash & debt reports | `Application/CashDebt/Reports`, `CashDebtReportsController.cs` |
+| Company profile | `Domain/Entities/Organization/CompanyProfile.cs` (one row, `Id = 1`), `Application/Organization/Company`, `Infrastructure/Persistence/Configurations/CompanyProfileConfiguration.cs`, `CompanyProfileController.cs` |
+| TT133 report forms | `Application/Tt133` (`ITt133ExportService` / `Tt133ExportService`, `ITt133FormRenderer`, `Models/Tt133ExportModels.cs`, `Validators`, `Tt133ExportOptions`), `Infrastructure/Excel/Tt133` (`Tt133FormBuilder`, `Tt133Column`, `Tt133FormRenderer` and one class per form: `CashBookForm`, `DebtLedgerForm`, `DebtSummaryForm`, `DebtReconciliationForm`, `StockSummaryForm`, `StockDetailForm`, `StockCardForm`), `Tt133ExportController.cs` |
+| Executive dashboard | `Application/Dashboards/Executive`: `Models` (`ExecutiveModels.cs` with the queries, then `SalesModels`, `CashModels`, `DebtModels`, `InventoryModels`, `OverviewModels`), `Common` (`ExecutiveScope`, `ExecutivePeriod`, `ExecutiveDay`, `ExecutiveMath`, `ExecutiveSeries`, `DebtPositionMath`, `OpenDebtItem`), `Interfaces` (`IExecutiveScopeResolver` and one interface per service), `Services` (`SalesMetricsService`, `CashMetricsService`, `DebtMetricsService`, `InventoryMetricsService`, `ExecutiveOverviewService`, `ExecutiveScopeResolver`, `ExecutiveLookups`), `Validators/ExecutiveQueryValidators.cs`, `Realtime/DashboardDomains.cs`; helpers shared with the inventory reports `Application/Inventory/Common/CostProvisional.cs` and `StockValueSplit.cs`; `Domain/Constants/StockReasonCodes.cs` (`XBH`, `NTL`); `ExecutiveDashboardController.cs`; tests in `tests/OrderMgmt.IntegrationTests/ExecutiveDashboard` (pure tests in `ExecutiveDashboard/Unit`, base class `ExecutiveDashboardTestBase`) |
+| Real-time signals | `WebApi/Hubs` (`NotificationHub` at `/hubs/notifications` with the `user-{id}` and dashboard groups, `SignalRNotifier` implementing `Application/Notifications/Interfaces/IRealtimeNotifier`, `DashboardGroups.cs` with the event and group names), `WebApi/Filters/DashboardSignalAttribute.cs` (`[DashboardSignal]`, `[SkipDashboardSignal]`, `DashboardSignalFilter`) |
 
 ## API Controllers
 
@@ -81,6 +85,7 @@ QLBanHang/
 | `ProductsController` | `/api/products`, `/api/products/search` |
 | `QuotationsController` | `/api/quotations`, status transition, Excel/PDF export, clone, owner transfer |
 | `DashboardController` | `/api/dashboard/summary`, revenue series, top lists, recent activity, sales leaderboard |
+| `ExecutiveDashboardController` | GET `/api/dashboard/executive/` `sales/summary`, `sales/series`, `sales/top`, `cash/summary`, `cash/series`, `cash/breakdown`, `debt/summary`, `debt/breakdown`, `inventory/summary`, `inventory/breakdown`, `branches`, `attention`, `recent` |
 | `ReportsController` | `/api/reports/sales-revenue` |
 | `AdminUsersController` | `/api/admin/users` CRUD, reset password and status updates |
 | `AdminRolesController` | `/api/admin/roles`, `/api/admin/permissions` |
@@ -103,7 +108,7 @@ QLBanHang/
 | `StockVouchersController` | `/api/stock-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/owners`, `/defaults`, `/stock-at`, `/partners` |
 | `OpeningStocksController` | `/api/inventory/opening-stock` (GET grid, PUT save) |
 | `InventoryCostController` | `/api/inventory/recalc-cost` |
-| `InventoryReportsController` | `/api/reports/stock-on-hand`, `/api/reports/stock-card` |
+| `InventoryReportsController` | `/api/reports/stock-on-hand`, `/api/reports/stock-card`, `/api/reports/stock-summary` |
 | `CashSettingsController` | `/api/cash/settings` (credit-limit and negative-fund policies) |
 | `CashReasonsController` | `/api/cash-reasons` CRUD (`includeAuto` shows the automatic reasons) |
 | `FundsController` | `/api/funds` CRUD, `/{id}/opening-balance`, scoped to the working branch |
@@ -113,7 +118,9 @@ QLBanHang/
 | `FundTransfersController` | `/api/fund-transfers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults` |
 | `DebtController` | `/api/debt/partner-summary`, `/open-items`, `/partners`, `/settlements` (GET, POST), `DELETE /settlements/{id}`, `DELETE /settlement-batches/{batchId}` |
 | `DebtOffsetsController` | `/api/debt-offsets` list/create/view, `/{id}/cancel`, `DELETE /{id}`, `/{id}/activities`, `/defaults` |
-| `CashDebtReportsController` | `/api/reports/debt-balance`, `/api/reports/debt-ledger`, `/api/reports/cash-book` |
+| `CashDebtReportsController` | `/api/reports/debt-balance`, `/api/reports/debt-ledger`, `/api/reports/debt-reconciliation`, `/api/reports/cash-book` |
+| `CompanyProfileController` | `/api/settings/company` — GET for any signed-in user, PUT with `settings.company` |
+| `Tt133ExportController` | TT133 forms as Excel/PDF (`?format=xlsx\|pdf`): GET `/api/reports/cash-book/export`, `/debt-balance/export`, `/debt-reconciliation/export`, `/stock-summary/export`; POST `/api/reports/debt-ledger/export`, `/stock-card/export`, `/stock-detail/export` |
 
 ## Frontend Structure
 
@@ -130,7 +137,10 @@ frontend/src/
 │   │                            # sidebar-pin-chips, sidebar-group, sidebar-item, nav-search.ts (pure filter/highlight/active item)
 │   ├── money-cell/              # MoneyCell, CellError: editable money cell of the line and allocation grids
 │   ├── partner-autocomplete/    # customer/supplier picker for cash and debt screens
+│   ├── period-preset-select/    # PeriodPresetSelect: month / quarter / year presets of a report date range
+│   ├── report-scope-select/     # ReportScopeSelect and useReportScope: Branch / Company scope of a report, kept in the URL
 │   ├── search-combobox/         # generic search combobox behind DebtPartnerPicker and the ledger PartnerPicker
+│   ├── tt133-export/            # Tt133ExportButton ("Xuất theo mẫu TT133"), ExportTargetsDialog (one / several / all with activity)
 │   └── ui/                      # shadcn-style primitives
 ├── features/
 │   ├── admin-roles/
@@ -146,14 +156,18 @@ frontend/src/
 │   ├── cash-reports/            # debt balance, debt ledger and cash book queries
 │   ├── cash-settings/           # credit-limit and negative-fund policies
 │   ├── cash-vouchers/           # receipts/payments, allocation helpers, schema, payload
+│   ├── company-profile/         # Thông tin đơn vị: GET/PUT /settings/company
 │   ├── credit-limits/
 │   ├── customers/
-│   ├── dashboard/
+│   ├── dashboard/               # quotation dashboards; format.ts (also compact money and percent) and the shared tiles
+│   │                            # in components/: TileCard, StatTile, LiveStatus, RangePicker (optional `presets`)
 │   ├── debt/                    # partner summary, open items, matching helpers, settlements
 │   ├── debt-offsets/
+│   ├── executive-dashboard/     # types, api, keys (['executive']), hooks (executiveQueryOptions), presets, links, period,
+│   │                            # use-executive-params / -scope / -access / -live
 │   ├── fund-transfers/
 │   ├── funds/
-│   ├── inventory-reports/       # stock-on-hand and stock-card queries
+│   ├── inventory-reports/       # stock-on-hand, stock-card and stock-summary queries
 │   ├── inventory-settings/      # costing settings, numbering, cost recalculation
 │   ├── me-settings/
 │   ├── notifications/
@@ -168,6 +182,7 @@ frontend/src/
 │   ├── stock-reasons/
 │   ├── stock-vouchers/          # voucher module, schema, payload, draft store
 │   ├── suppliers/
+│   ├── tt133-export/            # downloadTt133, useTt133Download, Tt133ExportForm, tt133FileBase
 │   └── warehouses/              # warehouse queries, selectableWarehouses
 ├── pages/
 │   ├── admin/
@@ -177,23 +192,30 @@ frontend/src/
 │   ├── credit-limits/
 │   ├── customers/
 │   ├── debt/                    # /debt/opening, /debt/matching, /debt/offsets list + form
+│   ├── executive-dashboard/     # /dashboard/executive: page shell; components/ (KPI row, charts, DataTable, BranchDocumentLink,
+│   │                            # ScopeSelect, attention list, recent feed); tabs/ (overview, sales, cash, debt, inventory)
 │   ├── fund-transfers/          # /fund-transfers list + form
 │   ├── funds/                   # funds and fund opening balance
-│   ├── inventory/               # opening stock, stock-on-hand, stock card
+│   ├── inventory/               # opening stock, stock-on-hand, stock card, stock summary (/inventory/stock-summary, Tổng hợp nhập xuất tồn)
 │   ├── payment-methods/
 │   ├── payment-qr/              # /qr-thanh-toan standalone page
 │   ├── products/
 │   ├── quotations/
 │   ├── reports/
-│   ├── settings/                # also branches (period lock, opening date), inventory and cash settings, numbering, recalc
+│   ├── settings/                # also branches (period lock, opening date), inventory and cash settings, numbering, recalc,
+│   │                            # company profile (/settings/company, Thông tin đơn vị)
 │   ├── stock-reasons/
 │   ├── stock-vouchers/          # /stock-in and /stock-out list + form (main fields, tabs, line grid, totals bar, partner debt strip)
 │   ├── suppliers/
 │   └── warehouses/
 ├── hooks/                       # useDocumentActions (shared save flow of the four document forms), route access hooks
+│                                # (useCanAccessRoute, useCanOpenLink for links with a query string), useNotificationHub
+│                                # (the one SignalR connection: notifications, dashboard signal, connection status)
 ├── routes/
 ├── stores/
-├── lib/                         # includes date-only.ts, to-number.ts, money-input.ts, vn-datetime.ts
+├── lib/                         # includes date-only.ts, to-number.ts, money-input.ts, vn-datetime.ts,
+│                                # report-scope.ts, period-presets.ts, blob-error.ts, date-range-presets.ts (dashboard
+│                                # and quotation range presets), realtime-bus.ts (hub status and dashboard signal)
 ├── styles/
 └── test/
 ```
@@ -241,5 +263,7 @@ Template paths configured as relative values are resolved from `AppContext.BaseD
 | `Database__AutoMigrateAndSeed` | Enables automatic migration/seed; usually `false` outside controlled deployments |
 | `Cors__Origins__0`, `Cors__Origins__1` | Allowed frontend origins |
 | `AuthCookie__SameSite`, `AuthCookie__Secure` | Refresh cookie behavior |
-| `QuotationExport__LibreOfficePath` | Optional explicit LibreOffice executable path for PDF conversion |
+| `QuotationExport__LibreOfficePath` | Optional explicit LibreOffice executable path for PDF conversion; the TT133 PDF exports use the same converter. The backend image sets it to `/usr/local/bin/soffice-vi`, a wrapper that runs `soffice` in the `vi_VN` locale so PDFs print `1.250.000` |
+| `QuotationExport__ConversionTimeoutSeconds` | Optional; seconds one PDF conversion may take before its LibreOffice process is killed (130 in `appsettings.json`, set from the 300-sheet S06 measurement). Serves the quotation and the TT133 PDF exports |
+| `Tt133Export__MaxSheets` | Optional; the most sheets one TT133 export may hold (default 300) |
 | `VITE_API_BASE_URL` | Frontend build-time backend API URL |

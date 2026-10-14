@@ -1,0 +1,30 @@
+using OrderMgmt.Application.CashDebt.Reports.Models;
+using OrderMgmt.Application.Inventory.Reports.Models;
+using OrderMgmt.Application.Tt133.Models;
+
+namespace OrderMgmt.Application.Tt133.Interfaces;
+
+/// Exports the report forms of Circular 133/2016/TT-BTC as Excel or PDF.
+public interface ITt133ExportService
+{
+    /// S04a-DNN for kind Cash, S05-DNN for kind Bank.
+    Task<ExportFile> ExportCashBookAsync(CashBookReportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// S12-DNN: one sheet per partner of the request.
+    Task<ExportFile> ExportDebtLedgerAsync(DebtLedgerExportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// Bảng tổng hợp chi tiết thanh toán với người mua / người bán, for every partner (a partnerId is refused).
+    Task<ExportFile> ExportDebtSummaryAsync(DebtBalanceReportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// Biên bản đối chiếu công nợ of one partner.
+    Task<ExportFile> ExportDebtReconciliationAsync(DebtReconciliationReportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// S07-DNN, the stock in-out-balance summary as the screen shows it (same filters, same cost masking).
+    Task<ExportFile> ExportStockSummaryAsync(StockSummaryRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// S08-DNN: one sheet per product x warehouse (T20), quantities only.
+    Task<ExportFile> ExportStockCardsAsync(StockCardExportRequest request, ExportFormat format, CancellationToken ct = default);
+
+    /// S06-DNN: one sheet per product x warehouse (T20), with values; needs inventory.view_cost.
+    Task<ExportFile> ExportStockDetailAsync(StockCardExportRequest request, ExportFormat format, CancellationToken ct = default);
+}

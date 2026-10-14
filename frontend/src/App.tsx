@@ -47,8 +47,10 @@ import { NumberingSettingsPage } from '@/pages/settings/numbering-settings-page'
 import { RecalcCostPage } from '@/pages/settings/recalc-cost-page';
 // Round 2A: 10.8 cash settings
 import { CashSettingsPage } from '@/pages/settings/cash-settings-page';
+import { CompanyProfilePage } from '@/pages/settings/company-profile-page';
 import { OpeningStockPage } from '@/pages/inventory/opening-stock-page';
 import { StockOnHandPage } from '@/pages/inventory/stock-on-hand-page';
+import { StockSummaryPage } from '@/pages/inventory/stock-summary-page';
 import { StockCardPage } from '@/pages/inventory/stock-card-page';
 // Round 2A: 11.5 fund transfers
 import { FundTransferListPage } from '@/pages/fund-transfers/fund-transfer-list-page';
@@ -62,6 +64,7 @@ import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
 import { AdminDashboardPage } from '@/pages/admin/admin-dashboard-page';
+import { ExecutiveDashboardPage } from '@/pages/executive-dashboard/executive-dashboard-page';
 import { RolesMatrixPage } from '@/pages/admin/roles-matrix-page';
 import { RevenuePage } from '@/pages/reports/revenue-page';
 import { SalesPerformancePage } from '@/pages/reports/sales-performance-page';
@@ -438,6 +441,14 @@ export function App() {
                     </ProtectedRoute>
                   }
                 />
+                <Route
+                  path="inventory/stock-summary"
+                  element={
+                    <ProtectedRoute permission="reports.inventory">
+                      <StockSummaryPage />
+                    </ProtectedRoute>
+                  }
+                />
                 {/* Round 2A: 11.5 fund transfers */}
                 <Route path="fund-transfers">
                   <Route
@@ -566,6 +577,14 @@ export function App() {
                   }
                 />
                 <Route
+                  path="settings/company"
+                  element={
+                    <ProtectedRoute permission="settings.company">
+                      <CompanyProfilePage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
                   path="admin/users"
                   element={
                     <ProtectedRoute permission="user_settings.manage">
@@ -602,6 +621,14 @@ export function App() {
                   element={
                     <ProtectedRoute permission="quotations.view_all">
                       <AdminDashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="dashboard/executive"
+                  element={
+                    <ProtectedRoute permission="dashboard.executive">
+                      <ExecutiveDashboardPage />
                     </ProtectedRoute>
                   }
                 />

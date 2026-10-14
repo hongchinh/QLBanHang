@@ -158,6 +158,8 @@ public class VoucherPrintService : IVoucherPrintService
                         Quantity = l.Quantity,
                         UnitPrice = l.UnitPrice,
                         Amount = l.Amount,
+                        VatAmount = l.VatAmount,
+                        PriceIncludesVat = l.PriceIncludesVat,
                         WarehouseId = l.WarehouseId,
                         WarehouseCode = l.Warehouse!.Code,
                         WarehouseName = l.Warehouse.Name,
@@ -208,9 +210,18 @@ public class VoucherPrintService : IVoucherPrintService
             }).ToList(),
             Totals = VoucherPrintRules.VoucherTotals(r.GoodsAmount, r.LineDiscountTotal, r.OrderDiscount, r.Freight, r.Total)
                 .ToList(),
+            VatIncludedLine = VatIncludedLine(r),
             AmountInWords = VndAmountInWords.Read(r.Total),
             PreparerName = r.OwnerName,
         };
+    }
+
+    /// A stock-out whose prices include VAT shows that VAT under the table, outside the sum.
+    private static string? VatIncludedLine(StockVoucherRow r)
+    {
+        if (r.Type != StockDirection.Out) return null;
+        var vat = r.Lines.Where(l => l.PriceIncludesVat).Sum(l => l.VatAmount);
+        return vat > 0 ? $"Trong đó thuế GTGT đã gồm trong giá: {VoucherPrintRules.Money(vat)}" : null;
     }
 
     /// One voucher → `{Code}`; several → `{prefix}_{yyyyMMdd-HHmm}` (VN time).
@@ -273,6 +284,8 @@ public class VoucherPrintService : IVoucherPrintService
         public decimal Quantity { get; init; }
         public decimal UnitPrice { get; init; }
         public decimal Amount { get; init; }
+        public decimal VatAmount { get; init; }
+        public bool PriceIncludesVat { get; init; }
         public Guid WarehouseId { get; init; }
         public string WarehouseCode { get; init; } = default!;
         public string WarehouseName { get; init; } = default!;

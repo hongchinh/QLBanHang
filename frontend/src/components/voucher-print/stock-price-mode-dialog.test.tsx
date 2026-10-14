@@ -27,6 +27,7 @@ describe('StockPriceModeDialog', () => {
     const user = userEvent.setup();
     const { onConfirm, onOpenChange, view } = setup();
     expect(screen.getByText('Chọn giá in')).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: 'Chọn giá in' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Giá trên phiếu' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Không in tiền' })).toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Giá vốn' }));

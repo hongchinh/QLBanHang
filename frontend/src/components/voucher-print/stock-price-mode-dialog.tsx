@@ -17,7 +17,7 @@ interface Props {
   onConfirm: (mode: StockPrintPriceMode) => void;
 }
 
-function Body({ onConfirm, onCancel }: { onConfirm: (mode: StockPrintPriceMode) => void; onCancel: () => void }) {
+function Body({ onConfirm, onClose }: { onConfirm: (mode: StockPrintPriceMode) => void; onClose: () => void }) {
   const userId = useAuthStore((s) => s.user?.id);
   const canViewCost = useAuthStore((s) => s.hasPermission('inventory.view_cost'));
   const [mode, setMode] = useState<StockPrintPriceMode>(() => readPriceMode(userId, canViewCost));
@@ -31,12 +31,12 @@ function Body({ onConfirm, onCancel }: { onConfirm: (mode: StockPrintPriceMode) 
   const confirm = () => {
     writePriceMode(userId, mode);
     onConfirm(mode);
-    onCancel();
+    onClose();
   };
 
   return (
     <>
-      <div className="space-y-3" role="radiogroup">
+      <div className="space-y-3" role="radiogroup" aria-label="Chọn giá in">
         {options.map((o) => (
           <label key={o.value} className="flex items-center gap-2 text-sm">
             <input
@@ -50,7 +50,7 @@ function Body({ onConfirm, onCancel }: { onConfirm: (mode: StockPrintPriceMode) 
         ))}
       </div>
       <DialogFooter>
-        <Button variant="outline" onClick={onCancel}>
+        <Button variant="outline" onClick={onClose}>
           Hủy
         </Button>
         <Button onClick={confirm}>In</Button>
@@ -63,11 +63,11 @@ function Body({ onConfirm, onCancel }: { onConfirm: (mode: StockPrintPriceMode) 
 export function StockPriceModeDialog({ open, onOpenChange, onConfirm }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm" onClick={(e) => e.stopPropagation()}>
+      <DialogContent className="max-w-sm" aria-describedby={undefined} onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
           <DialogTitle>Chọn giá in</DialogTitle>
         </DialogHeader>
-        <Body onConfirm={onConfirm} onCancel={() => onOpenChange(false)} />
+        <Body onConfirm={onConfirm} onClose={() => onOpenChange(false)} />
       </DialogContent>
     </Dialog>
   );

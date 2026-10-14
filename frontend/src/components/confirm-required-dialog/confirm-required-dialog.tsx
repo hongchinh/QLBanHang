@@ -8,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ignoreKeyRepeat, isFocusLost } from '@/lib/focus';
+import { giveFocusBack, ignoreKeyRepeat, isFocusLost } from '@/lib/focus';
 import type { ConfirmationRequest } from '@/lib/confirm-required';
 
 interface Props {
@@ -32,7 +32,8 @@ export function ConfirmRequiredDialog({ request, confirmLabel = 'Vẫn tiếp t�
           const target = restoreFocusTo?.();
           if (!target) return;
           event.preventDefault();
-          if (isFocusLost()) target.focus();
+          // A key still held down (the Escape or Enter that closed the dialog) must not act on that element.
+          if (isFocusLost()) giveFocusBack(target);
         }}
       >
         <DialogHeader>

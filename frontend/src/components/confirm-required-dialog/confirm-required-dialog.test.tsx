@@ -131,4 +131,30 @@ describe('ConfirmRequiredDialog', () => {
       target.remove();
     }
   });
+
+  // A grid cell moves on Enter by itself: a long press that dismissed the dialog must not walk the grid once the focus
+  // is back in the cell.
+  it('the repeats of a key still held down do not reach the element it gives the focus to', async () => {
+    const cell = document.createElement('input');
+    const onCellKeyDown = vi.fn();
+    cell.addEventListener('keydown', onCellKeyDown);
+    document.body.appendChild(cell);
+    try {
+      const { rerender } = render(
+        <ConfirmRequiredDialog request={warning} onConfirm={vi.fn()} onClose={vi.fn()} restoreFocusTo={() => cell} />,
+      );
+      rerender(<ConfirmRequiredDialog request={null} onConfirm={vi.fn()} onClose={vi.fn()} restoreFocusTo={() => cell} />);
+      await waitFor(() => expect(document.activeElement).toBe(cell));
+
+      fireEvent.keyDown(cell, { key: 'Enter', repeat: true });
+      expect(onCellKeyDown).not.toHaveBeenCalled();
+
+      // Released and pressed again: the cell has it.
+      fireEvent.keyUp(cell, { key: 'Enter' });
+      fireEvent.keyDown(cell, { key: 'Enter' });
+      expect(onCellKeyDown).toHaveBeenCalledTimes(1);
+    } finally {
+      cell.remove();
+    }
+  });
 });

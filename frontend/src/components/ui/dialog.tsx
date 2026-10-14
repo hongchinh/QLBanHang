@@ -1,7 +1,7 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { canTakeFocus, currentFocus, isFocusLost } from '@/lib/focus';
+import { canTakeFocus, currentFocus, giveFocusBack, isFocusLost } from '@/lib/focus';
 import { cn } from '@/lib/utils';
 
 const Dialog = DialogPrimitive.Root;
@@ -55,8 +55,9 @@ const DialogContent = React.forwardRef<
         const opener = openerRef.current;
         if (!canTakeFocus(opener)) return;
         event.preventDefault();
-        // Radix fires this a tick after the unmount: never take the focus from where the user went meanwhile.
-        if (isFocusLost()) opener.focus();
+        // Radix fires this a tick after the unmount: never take the focus from where the user went meanwhile. A key
+        // still held down (the Enter that opened the dialog) must not press the opener again.
+        if (isFocusLost()) giveFocusBack(opener);
       }}
       className={cn(
         'fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg rounded-lg',

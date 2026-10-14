@@ -49,6 +49,32 @@ describe('Dialog focus return', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  // Enter held on the opener: the press opens the dialog, a repeat presses its first button, which closes it, and the
+  // focus is back on the opener. jsdom has no keyboard activation: a browser clicks a focused button on every Enter
+  // keydown that was not cancelled, the auto-repeated ones of a held key included.
+  it('a key still held down when the focus is back on the opener does not open the dialog again', async () => {
+    const pressEnter = (button: HTMLElement, init: { repeat?: boolean } = {}) => {
+      if (fireEvent.keyDown(button, { key: 'Enter', ...init })) fireEvent.click(button);
+    };
+    render(<StateDialog />);
+    const opener = screen.getByTestId('opener');
+    act(() => opener.focus());
+    pressEnter(opener);
+    await screen.findByText('Tiêu đề');
+    pressEnter(screen.getByRole('button', { name: 'Xong' }), { repeat: true });
+    await waitFor(() => expect(screen.queryByText('Tiêu đề')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(opener));
+
+    pressEnter(opener, { repeat: true });
+    pressEnter(opener, { repeat: true });
+    expect(screen.queryByText('Tiêu đề')).toBeNull();
+
+    // Released and pressed again: the user opens it.
+    fireEvent.keyUp(opener, { key: 'Enter' });
+    pressEnter(opener);
+    await screen.findByText('Tiêu đề');
+  });
+
   // jsdom ignores focus() on a disabled button, so where the focus ends up cannot show whether the dialog tried to give
   // it to the opener: the test watches the focus calls themselves.
   it('does not focus an opener that is disabled when the dialog closes', async () => {

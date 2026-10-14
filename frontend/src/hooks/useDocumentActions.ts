@@ -6,7 +6,7 @@ import {
   type ConfirmationRequest,
   type ConfirmFlags,
 } from '@/lib/confirm-required';
-import { canTakeFocus, giveFocusBack, isFocusLost } from '@/lib/focus';
+import { canTakeFocus, DIALOG_SELECTOR, giveFocusBack, isFocusLost, PAGE_AREA_SELECTOR } from '@/lib/focus';
 import { toast } from '@/lib/use-toast';
 
 /** `flags` are the confirmations (P10) already given for the action; a resend keeps them all. */
@@ -31,12 +31,23 @@ interface Options<A extends DocumentAction> {
   concurrencyReloadFailedMessage: string;
 }
 
-const DIALOG = '[role="dialog"], [role="alertdialog"]';
+/**
+ * Whether a focus on `el` tells where the user is in the page. A dialog comes and goes, and so do the focus guards
+ * Radix puts at the edges of <body> while a dialog, menu or popover is open. The app header and the sidebar lie outside
+ * the page area: the header search, left with Escape, must not get the focus when an action started from <body> ends
+ * (Ctrl+S saves there). A form rendered without the app layout has no page area to keep to.
+ */
+function isInPage(el: HTMLElement): boolean {
+  if (el.closest(DIALOG_SELECTOR) || el.hasAttribute('data-radix-focus-guard')) return false;
+  const pageArea = document.querySelector(PAGE_AREA_SELECTOR);
+  return !pageArea || pageArea.contains(el);
+}
 
 /**
- * Where the focus may go back to after an action or its 422 dialog: the element the user was last on outside any
- * dialog since the form opened, while it is on the page and enabled. Never another control: a blind Enter there would
- * run an action the user did not ask for (a save button comes first in a form, "Xóa nháp" on a new stock voucher).
+ * Where the focus may go back to after an action or its 422 dialog: the element the user was last on in the page
+ * (see isInPage) since the form opened, while it is on the page and enabled. Never another control: a blind Enter there
+ * would run an action the user did not ask for (a save button comes first in a form, "Xóa nháp" on a new stock
+ * voucher).
  *
  * A dialog comes and goes, so nothing inside one can take the focus back later. A cancel / delete / restore starts
  * from the button of a confirm dialog that is closing, and the 422 dialog is opened from state: neither leaves Radix a
@@ -51,13 +62,13 @@ function useFocusReturnTarget(): () => HTMLElement | null {
     // with, a control outside the form.
     const onFocusIn = (event: FocusEvent) => {
       const target = event.target;
-      if (target instanceof HTMLElement && !target.closest(DIALOG)) lastFocusRef.current = target;
+      if (target instanceof HTMLElement && isInPage(target)) lastFocusRef.current = target;
     };
     // Capture phase: a control that stops its own focus event must not hide where the user is.
     document.addEventListener('focusin', onFocusIn, true);
     return () => {
       // The page is gone (browser Back with the 422 dialog open). The closed dialog still asks for a target a tick
-      // later, and an element that outlives the page, like the search box of the app shell, must not get the focus.
+      // later, and nothing may get the focus then, not even an element that outlives the page.
       mountedRef.current = false;
       document.removeEventListener('focusin', onFocusIn, true);
     };

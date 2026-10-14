@@ -1,3 +1,9 @@
+/** Any open dialog: Radix Dialog content has role="dialog", an AlertDialog role="alertdialog". */
+export const DIALOG_SELECTOR = '[role="dialog"], [role="alertdialog"]';
+
+/** The page area of the app layout, where the routed page lives. The app header and the sidebar are outside it. */
+export const PAGE_AREA_SELECTOR = 'main#main-content';
+
 /** True when nothing has the focus (it fell back on <body>), e.g. after the focused element was disabled or removed. */
 export function isFocusLost(): boolean {
   const active = document.activeElement;

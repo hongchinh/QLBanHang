@@ -565,6 +565,103 @@ describe('useDocumentActions focus return', () => {
     await waitFor(() => expect(document.activeElement).toBe(first));
   });
 
+  // The app header and the sidebar sit outside main#main-content. Escape takes the focus off the header search, and
+  // Ctrl+S on <body> saves (the stock voucher page): the header is not where the user was in the page.
+  describe('a control outside the page area', () => {
+    function WithHeader({ children }: { children: ReactNode }) {
+      return (
+        <>
+          <input aria-label="Tìm kiếm" />
+          <main id="main-content">{children}</main>
+        </>
+      );
+    }
+
+    function leaveHeaderSearch() {
+      const search = screen.getByLabelText('Tìm kiếm');
+      act(() => search.focus());
+      act(() => search.blur());
+    }
+
+    it('does not get the focus when an action started from <body> ends', async () => {
+      const perform = vi.fn(async () => {});
+      render(
+        <WithHeader>
+          <Harness perform={perform} />
+        </WithHeader>,
+      );
+      leaveHeaderSearch();
+
+      // As Ctrl+S on <body>: nothing has the focus when the action starts.
+      fireEvent.click(screen.getByTestId('save'));
+      await waitFor(() => expect(perform).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByTestId('save')).toBeEnabled());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(document.activeElement).toBe(document.body);
+    });
+
+    it('does not get the focus when the 422 dialog of such an action is dismissed', async () => {
+      const perform = vi.fn<(a: Action) => Promise<void>>().mockRejectedValue(apiError(422, 'NEGATIVE_FUND_WARNING'));
+      render(
+        <WithHeader>
+          <Harness perform={perform} />
+        </WithHeader>,
+      );
+      leaveHeaderSearch();
+
+      fireEvent.click(screen.getByTestId('save'));
+      await screen.findByRole('dialog');
+      fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      // Past the tick in which the closed dialog hands the focus back.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(document.activeElement).toBe(document.body);
+    });
+
+    it('does not count: the focus goes back to where the user was in the page before', async () => {
+      const perform = vi.fn(async () => {});
+      render(
+        <WithHeader>
+          <Harness perform={perform} />
+        </WithHeader>,
+      );
+      const save = screen.getByTestId('save');
+      act(() => save.focus());
+      leaveHeaderSearch();
+
+      fireEvent.click(save);
+
+      await waitFor(() => expect(document.activeElement).toBe(save));
+      expect(perform).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // While a dialog, menu or popover is open, Radix puts focus guards at the edges of <body>. A Tab can land on one
+  // (from the browser toolbar) before the focus trap moves it on: that is not where the user was either.
+  it('never takes a Radix focus guard for where the user was', async () => {
+    const perform = vi
+      .fn<(a: Action) => Promise<void>>()
+      .mockImplementationOnce(blurAndReject('NEGATIVE_FUND_WARNING'))
+      .mockImplementationOnce(async () => {
+        (document.activeElement as HTMLElement | null)?.blur();
+      });
+    render(<Harness perform={perform} />);
+    const save = screen.getByTestId('save');
+    act(() => save.focus());
+    fireEvent.click(save);
+    await screen.findByRole('dialog');
+    const guard = document.querySelector<HTMLElement>('[data-radix-focus-guard]');
+    expect(guard).not.toBeNull();
+    act(() => guard!.focus());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Vẫn lưu' }));
+
+    await waitFor(() => expect(perform).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(document.activeElement).toBe(save));
+  });
+
   // In a browser the dialog stays on the page for its exit animation (about 150 ms) and only then asks where the focus
   // goes; a fast answer to the confirmed resend is there first. jsdom has no animations, so the test plays the dialog:
   // it confirms, lets the resend settle, and then asks.
@@ -631,17 +728,21 @@ describe('useDocumentActions focus return', () => {
   // Browser Back with the 422 dialog open: the page and its dialog go, and the closed dialog still asks where the focus
   // goes a tick later. The hook of a page that is gone must not put the focus anywhere.
   describe('once the page was replaced while the 422 dialog was open', () => {
-    // The search box of the app shell stays when the page changes.
+    // The search box of the app shell stays when the page changes, and so would a control kept in the page area
+    // around the routed page (the filter box here).
     function Shell({ page, children }: { page: 'form' | 'list'; children: ReactNode }) {
       return (
         <>
           <input aria-label="Tìm kiếm" />
-          <main id="main-content">{page === 'form' ? children : <button type="button">Thêm phiếu</button>}</main>
+          <main id="main-content">
+            <input aria-label="Lọc" />
+            {page === 'form' ? children : <button type="button">Thêm phiếu</button>}
+          </main>
         </>
       );
     }
 
-    it('the hook names no focus target any more', async () => {
+    it('the hook names no focus target any more, not even a control still in the page area', async () => {
       let dialogProps!: DialogProps;
       function FormPage() {
         const { run, confirmDialogProps } = useDocumentActions<Action>({
@@ -662,12 +763,12 @@ describe('useDocumentActions focus return', () => {
           <FormPage />
         </Shell>,
       );
-      const search = screen.getByLabelText('Tìm kiếm');
-      act(() => search.focus());
+      const filter = screen.getByLabelText('Lọc');
+      act(() => filter.focus());
       // A click that leaves the focus where it was, as Safari does for a button.
       fireEvent.click(screen.getByTestId('save'));
       await waitFor(() => expect(dialogProps.request).not.toBeNull());
-      expect(dialogProps.restoreFocusTo()).toBe(search);
+      expect(dialogProps.restoreFocusTo()).toBe(filter);
 
       rerender(
         <Shell page="list">

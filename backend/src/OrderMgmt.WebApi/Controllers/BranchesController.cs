@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Models;
+using OrderMgmt.Application.Organization.SampleData.Interfaces;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.WebApi.Authorization;
 
@@ -13,17 +14,20 @@ namespace OrderMgmt.WebApi.Controllers;
 public class BranchesController : ApiControllerBase
 {
     private readonly IBranchService _service;
+    private readonly IDemoBranchService _demoBranches;
     private readonly IValidator<CreateBranchRequest> _createValidator;
     private readonly IValidator<UpdateBranchRequest> _updateValidator;
     private readonly IValidator<SetOpeningDateRequest> _openingDateValidator;
 
     public BranchesController(
         IBranchService service,
+        IDemoBranchService demoBranches,
         IValidator<CreateBranchRequest> createValidator,
         IValidator<UpdateBranchRequest> updateValidator,
         IValidator<SetOpeningDateRequest> openingDateValidator)
     {
         _service = service;
+        _demoBranches = demoBranches;
         _createValidator = createValidator;
         _updateValidator = updateValidator;
         _openingDateValidator = openingDateValidator;
@@ -64,6 +68,18 @@ public class BranchesController : ApiControllerBase
         await _service.DeleteAsync(id, ct);
         return Success();
     }
+
+    [HttpGet("{id:guid}/demo-deletion")]
+    [HasPermission(Permissions.Branches.Manage)]
+    public async Task<ActionResult<ApiResponse<DemoBranchDeletionPreviewDto>>> PreviewDemoDeletion(
+        Guid id, CancellationToken ct)
+        => Success(await _demoBranches.PreviewDeletionAsync(id, ct));
+
+    [HttpDelete("{id:guid}/demo")]
+    [HasPermission(Permissions.Branches.Manage)]
+    public async Task<ActionResult<ApiResponse<DemoBranchDeletionResultDto>>> DeleteDemo(
+        Guid id, CancellationToken ct)
+        => Success(await _demoBranches.DeleteAsync(id, ct));
 
     [HttpPut("{id:guid}/lock")]
     [HasPermission(Permissions.PeriodLock.Manage)]

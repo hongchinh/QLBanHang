@@ -28,11 +28,12 @@ public static class StockVoucherForm
         var columns = new List<Tt133Column>
         {
             new("A", "STT", 5, Tt133CellKind.Quantity),
-            new("B", NameHeader, 34),
+            // The Kho column takes 3 of the name column's units, so the table keeps its width.
+            new("B", NameHeader, m.ShowWarehouseColumn ? 31 : 34),
             new("C", "Mã số", 12),
             new("D", "Đơn vị tính", 8),
         };
-        if (m.ShowWarehouseColumn) columns.Add(new Tt133Column("E", "Kho", 8));
+        if (m.ShowWarehouseColumn) columns.Add(new Tt133Column("E", "Kho", 11));
         columns.Add(new Tt133Column("1", stockIn ? "Theo chứng từ" : "Yêu cầu", 10, Tt133CellKind.Quantity, QuantityGroup));
         columns.Add(new Tt133Column("2", stockIn ? "Thực nhập" : "Thực xuất", 10, Tt133CellKind.Quantity, QuantityGroup));
         columns.Add(new Tt133Column("3", "Đơn giá", 13, Tt133CellKind.Money));

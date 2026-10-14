@@ -125,6 +125,7 @@ public class StockVoucherFormTests
         ws.Cell(headerRow + 1, 6).GetString().Should().Be("Thực nhập");
 
         ws.Row(headerRow + 1).Height.Should().Be(2 * ws.RowHeight);
+        ws.Column(2).Width.Should().BeApproximately(34, 0.01);
 
         ws.PageSetup.PaperSize.Should().Be(XLPaperSize.A4Paper);
         ws.PageSetup.PageOrientation.Should().Be(XLPageOrientation.Portrait);
@@ -231,9 +232,12 @@ public class StockVoucherFormTests
         ws.Cell(headerRow + 1, 6).GetString().Should().Be("Theo chứng từ");
         ws.Cell(headerRow + 1, 7).GetString().Should().Be("Thực nhập");
 
+        ws.Column(kho.Address.ColumnNumber).Width.Should().BeApproximately(11, 0.01);
+        ws.Column(2).Width.Should().BeApproximately(31, 0.01);
+
         var titleRow = RowOf(ws, "Người lập phiếu");
         string[] titles = ["Người lập phiếu", "Người giao hàng", "Thủ kho", "Kế toán trưởng"];
-        int[] titleColumns = [1, 3, 5, 8];
+        int[] titleColumns = [1, 3, 6, 8];
         for (var k = 0; k < titles.Length; k++)
             ws.Cell(titleRow, titleColumns[k]).GetString().Should().Be(titles[k]);
     }

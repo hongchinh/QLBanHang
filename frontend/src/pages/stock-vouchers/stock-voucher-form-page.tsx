@@ -68,6 +68,7 @@ import { StockVoucherMainFields, FieldError, SELECT_CLASS } from './components/s
 import { StockVoucherPaymentTab } from './components/stock-voucher-payment-tab';
 import { StockVoucherTabs } from './components/stock-voucher-tabs';
 import { savedImpactOf } from './utils/debt-after-voucher';
+import { HEADER_ERROR_FIELDS, LINE_ERROR_FIELDS, staleServerErrorKeys } from './utils/server-field-errors';
 import { errorTabs, firstErrorTab, tabOfField, type StockVoucherTab } from './utils/voucher-tabs';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
@@ -97,24 +98,6 @@ const CONCURRENCY_MESSAGE =
   'Phiếu đã được người khác cập nhật. Đã tải lại dữ liệu — các thay đổi chưa lưu đã bị bỏ.';
 const CONCURRENCY_RELOAD_FAILED_MESSAGE =
   'Phiếu đã được người khác cập nhật nhưng không tải lại được dữ liệu. Các thay đổi của bạn vẫn được giữ — vui lòng thử lại.';
-
-// Header fields that show their own error message.
-const HEADER_ERROR_FIELDS = new Set<string>(['fundId', 'dueDate', 'paidAmount', 'paymentMethodId']);
-
-const LINE_ERROR_FIELDS = new Set<string>([
-  'productId',
-  'warehouseId',
-  'sheetCount',
-  'length',
-  'width',
-  'thickness',
-  'quantity',
-  'unitPrice',
-  'discountRate',
-  'discountAmount',
-  'vatRate',
-  'note',
-]);
 
 const ALT_TABS: Record<string, StockVoucherTab> = { '1': 'lines', '2': 'other', '3': 'payment', '4': 'history' };
 
@@ -164,41 +147,6 @@ function errorKeysOf(errors: FieldErrors<StockVoucherFormValues>): string[] {
     }
   }
   return keys;
-}
-
-// Header fields whose server error also goes away when the listed field changes (it is what drives them).
-const SERVER_ERROR_DRIVERS: Record<string, string[]> = {
-  fundId: ['paymentMethodId'],
-  paidAmount: ['paymentMethodId'],
-  dueDate: ['voucherAt', 'reasonId'],
-};
-
-// The same inside one line, for a cell whose value is computed from other cells of that line: SL of a line priced by
-// dimensions (read-only there) from Số tấm and the dimensions; Tiền CK from %CK (editing the rate turns a hand-typed
-// amount off).
-const LINE_SERVER_ERROR_DRIVERS: Record<string, string[]> = {
-  quantity: ['sheetCount', 'length', 'width', 'thickness'],
-  discountAmount: ['discountRate'],
-};
-
-// Fields of `drivers` that the changed field drives.
-function drivenBy(drivers: Record<string, string[]>, changed: string): string[] {
-  return Object.entries(drivers)
-    .filter(([, list]) => list.includes(changed))
-    .map(([field]) => field);
-}
-
-// Keys whose server error is stale once `changed` has a new value.
-function staleServerErrorKeys(changed: string): string[] {
-  const cell = /^lines\.(\d+)\.(\w+)$/.exec(changed);
-  if (cell) {
-    return [changed, ...drivenBy(LINE_SERVER_ERROR_DRIVERS, cell[2]).map((field) => `lines.${cell[1]}.${field}`)];
-  }
-  // A whole line replaced at once (a product picked): every field of it was rewritten.
-  const row = /^lines\.(\d+)$/.exec(changed);
-  if (row) return [...LINE_ERROR_FIELDS].map((field) => `lines.${row[1]}.${field}`);
-  const driven = drivenBy(SERVER_ERROR_DRIVERS, changed);
-  return HEADER_ERROR_FIELDS.has(changed) ? [changed, ...driven] : driven;
 }
 
 // Accepts form keys and server keys (`lines[3].width`).
@@ -314,12 +262,17 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   // A server error describes the value that was sent: it goes as soon as that value (or what drives it) changes.
   // Client (zod) errors are left to the resolver.
   useEffect(() => {
+    const copyLines = () => form.getValues('lines').map((line) => ({ ...line }));
+    // The lines before the change being handled: a product pick replaces a whole line at once.
+    let previousLines = copyLines();
     const subscription = form.watch((_values, { name }) => {
-      if (!name) return;
-      for (const key of staleServerErrorKeys(name)) {
-        const path = key as FieldPath<StockVoucherFormValues>;
-        if (form.getFieldState(path).error?.type === 'server') form.clearErrors(path);
+      if (name) {
+        for (const key of staleServerErrorKeys(name, form.getValues(), previousLines)) {
+          const path = key as FieldPath<StockVoucherFormValues>;
+          if (form.getFieldState(path).error?.type === 'server') form.clearErrors(path);
+        }
       }
+      previousLines = copyLines();
     });
     return () => subscription.unsubscribe();
   }, [form]);

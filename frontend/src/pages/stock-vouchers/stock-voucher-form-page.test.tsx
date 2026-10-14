@@ -808,6 +808,14 @@ describe('StockVoucherFormPage', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
     }
 
+    // A hidden optional column shows only while it has an error: with every column on, a cell stays to be asserted
+    // on after its error has gone. Call before rendering.
+    const showEveryColumn = () =>
+      localStorage.setItem(
+        stockGridPrefsKey('user-test', 'In'),
+        JSON.stringify({ version: 1, hiddenColumns: [], enterStops: {} }),
+      );
+
     it('the fund error and the tab dot go away when a new payment method auto-fills a fund', async () => {
       await saveWithServerErrors({ fundId: ['Chi nhánh chưa có quỹ mặc định loại ngân hàng.'] });
       expect(await screen.findByText('Chi nhánh chưa có quỹ mặc định loại ngân hàng.')).toBeInTheDocument();
@@ -861,6 +869,57 @@ describe('StockVoucherFormPage', () => {
       fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('SP01'));
 
       await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBeNull());
+    });
+
+    // A product pick rewrites the whole line at once; only what it really changed lost the value the server saw.
+    it('picking another product keeps the server error of a cell the pick did not change', async () => {
+      showEveryColumn();
+      await saveWithServerErrors({
+        'lines[0].quantity': ['Số lượng không hợp lệ'],
+        'lines[0].warehouseId': ['Kho không thuộc chi nhánh đang làm việc.'],
+      });
+      await waitFor(() => expect(byId('stock-line-warehouse-0').getAttribute('aria-invalid')).toBe('true'));
+      expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBe('true');
+
+      fireEvent.change(byId('stock-line-product-code-0'), { target: { value: 'SP0' } });
+      fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('SP01'));
+
+      // The pick puts SL back to 0 and leaves the warehouse as it was.
+      await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBeNull());
+      expect(byId('stock-line-warehouse-0').getAttribute('aria-invalid')).toBe('true');
+      expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
+    });
+
+    // Nothing is paid: the fund is neither shown nor sent, so its error has nothing left to describe.
+    it('the fund error and the tab dot go away when the paid amount becomes 0', async () => {
+      await saveWithServerErrors({ fundId: ['Quỹ không hợp lệ'] });
+      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-paid-amount'), { target: { value: '0' } });
+
+      await waitFor(() => expect(document.getElementById('stock-fund')).toBeNull());
+      expect(screen.queryByTestId('tab-error-payment')).toBeNull();
+
+      // Paying again brings the fund back without the old message.
+      fireEvent.change(byId('stock-paid-amount'), { target: { value: '100000' } });
+      await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
+      expect(screen.queryByText('Quỹ không hợp lệ')).toBeNull();
+    });
+
+    // The paid amount follows the total until it is typed, so any line edit changes it: the fund is as wrong as before.
+    it('the fund error stays while an amount is still paid, following the total or typed', async () => {
+      await saveWithServerErrors({ fundId: ['Quỹ không hợp lệ'] });
+      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+
+      // 4 × 50,000 + 10% VAT.
+      fireEvent.change(byId('stock-line-quantity-0'), { target: { value: '4' } });
+      await waitFor(() => expect(byId('stock-paid-amount').value).toBe('220.000'));
+      expect(screen.getByText('Quỹ không hợp lệ')).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-paid-amount'), { target: { value: '100000' } });
+      expect(screen.getByText('Quỹ không hợp lệ')).toBeInTheDocument();
+      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
     });
 
     // The user cannot edit such a cell (or its value is replaced by the computed one), so its error must go when a
@@ -935,10 +994,7 @@ describe('StockVoucherFormPage', () => {
 
       // Editing %CK turns a hand-typed Tiền CK off: the cell shows the amount computed from the rate again.
       it('the error on a hand-typed Tiền CK goes away when %CK changes, not when %VAT does', async () => {
-        localStorage.setItem(
-          stockGridPrefsKey('user-test', 'In'),
-          JSON.stringify({ version: 1, hiddenColumns: [], enterStops: {} }),
-        );
+        showEveryColumn();
         await updateWithServerErrors([{ ...voucher().lines[0], discountManual: true, discountAmount: 20_000 }], {
           'lines[0].discountAmount': ['Tiền chiết khấu phải từ 0 đến thành tiền.'],
         });
@@ -959,6 +1015,66 @@ describe('StockVoucherFormPage', () => {
         await waitFor(() => expect(amount.value).toBe('10.000'));
         expect(invalid('stock-line-discount-amount-0')).toBeNull();
         expect(screen.queryByTestId('tab-error-lines')).toBeNull();
+      });
+
+      // Until it is typed by hand, Tiền CK is %CK of Số tiền (SL × Đơn giá): 2 × 50,000 × 10% = 10,000.
+      const discountedLine = (overrides: Partial<StockVoucherLine> = {}): StockVoucherLine => ({
+        ...voucher().lines[0],
+        discountRate: 10,
+        discountAmount: 10_000,
+        discountManual: false,
+        ...overrides,
+      });
+      // 0.03 m³ × 50,000 × 10%.
+      const discountedCubicLine = () => cubicLine({ discountRate: 10, discountAmount: 150 });
+      const DISCOUNT_MESSAGE = ['Tiền chiết khấu phải từ 0 đến thành tiền.'];
+
+      it.each<[string, StockVoucherLine, string, string]>([
+        ['%CK', discountedLine(), 'discount-rate', '5'],
+        ['Đơn giá', discountedLine(), 'unit-price', '60000'],
+        ['SL', discountedLine(), 'quantity', '4'],
+        ['Số tấm', discountedCubicLine(), 'sheet-count', '3'],
+        ['Dài', discountedCubicLine(), 'length', '2000'],
+      ])('the error on a Tiền CK that follows the rate and the tab dot go away when %s changes', async (_label, line, cell, next) => {
+        showEveryColumn();
+        await updateWithServerErrors([line], { 'lines[0].discountAmount': DISCOUNT_MESSAGE });
+        expect(invalid('stock-line-discount-amount-0')).toBe('true');
+
+        fireEvent.change(byId(`stock-line-${cell}-0`), { target: { value: next } });
+
+        await waitFor(() => expect(invalid('stock-line-discount-amount-0')).toBeNull());
+        expect(screen.queryByTestId('tab-error-lines')).toBeNull();
+      });
+
+      it('a cell clears the error on the computed Tiền CK of its own line only', async () => {
+        showEveryColumn();
+        await updateWithServerErrors([discountedLine(), discountedLine({ id: L2, sortOrder: 1 })], {
+          'lines[0].discountAmount': DISCOUNT_MESSAGE,
+          'lines[1].discountAmount': DISCOUNT_MESSAGE,
+        });
+        expect(invalid('stock-line-discount-amount-1')).toBe('true');
+
+        fireEvent.change(byId('stock-line-unit-price-1'), { target: { value: '60000' } });
+
+        await waitFor(() => expect(invalid('stock-line-discount-amount-1')).toBeNull());
+        expect(invalid('stock-line-discount-amount-0')).toBe('true');
+        expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
+      });
+
+      // A typed amount does not follow the price or the quantity, so the value the server refused is still there.
+      // (Editing %CK is different: it turns the typed amount off, see the test above.)
+      it('the error on a hand-typed Tiền CK stays when Đơn giá or SL changes', async () => {
+        showEveryColumn();
+        await updateWithServerErrors([discountedLine({ discountManual: true, discountAmount: 20_000 })], {
+          'lines[0].discountAmount': DISCOUNT_MESSAGE,
+        });
+        expect(invalid('stock-line-discount-amount-0')).toBe('true');
+
+        fireEvent.change(byId('stock-line-unit-price-0'), { target: { value: '60000' } });
+        fireEvent.change(byId('stock-line-quantity-0'), { target: { value: '4' } });
+
+        expect(invalid('stock-line-discount-amount-0')).toBe('true');
+        expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
       });
     });
 

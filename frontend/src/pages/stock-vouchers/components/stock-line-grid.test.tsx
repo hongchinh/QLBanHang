@@ -410,6 +410,8 @@ describe('StockLineGrid', () => {
 
   const enter = (id: string, shift = false) => fireEvent.keyDown(byId(id), { key: 'Enter', shiftKey: shift });
   const focused = () => document.activeElement?.id;
+  // Resolves after the frame callbacks the grid has requested so far have run.
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
   it('picking a m² product focuses Số tấm, then Enter walks Dài, Rộng, Đơn giá and opens a new line', async () => {
     renderGrid({ lines: [createEmptyStockLine(0, WH1)] });
@@ -527,6 +529,28 @@ describe('StockLineGrid', () => {
       expect(select).not.toHaveBeenCalled();
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
       expect(select.mock.contexts).toEqual([cell]);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  // The mouse path selects one frame after the focus event, and by then the focus may be somewhere else. Chrome's
+  // select() also focuses the element, so without the "still the active element" check of that late select the
+  // cell the user has already left would take the focus back.
+  it('of two number cells clicked within one frame, only the one that still has the focus is selected', async () => {
+    renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b', quantity: 7 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      const first = byId('stock-line-quantity-0');
+      const second = byId('stock-line-quantity-1');
+      fireEvent.mouseDown(first);
+      act(() => first.focus());
+      fireEvent.mouseDown(second);
+      act(() => second.focus());
+      // Both arrived by mouse: neither is selected yet, both selects wait for the frame.
+      expect(select).not.toHaveBeenCalled();
+      await nextFrame();
+      expect(select.mock.contexts).toEqual([second]);
     } finally {
       select.mockRestore();
     }

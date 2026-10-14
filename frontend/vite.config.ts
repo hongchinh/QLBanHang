@@ -2,6 +2,7 @@ import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'node:path'
 import { VitePWA } from 'vite-plugin-pwa'
+import { brandingIconUrl, iconLinkTags } from './src/lib/pwa-icons'
 
 const vendorChunks: Record<string, string> = {
   'react/': 'react',
@@ -19,11 +20,11 @@ export default defineConfig(({ mode }) => {
   // In dev: apiBase is empty, Vite proxy forwards /api/* to backend.
   // In prod: apiBase = 'https://backend.railway.app/api' (absolute URL).
   const apiBase = env.VITE_API_BASE_URL ?? env.VITE_API_BASE ?? ''
-  const iconSrc = (size: number) =>
-    apiBase ? `${apiBase}/settings/branding/icon/${size}` : `/api/settings/branding/icon/${size}`
 
   return {
     plugins: [
+      // Favicon and apple-touch-icon point at the API origin, like the manifest icons.
+      { name: 'branding-icon-links', transformIndexHtml: () => iconLinkTags(apiBase) },
       react(),
       VitePWA({
         registerType: 'prompt',
@@ -39,8 +40,8 @@ export default defineConfig(({ mode }) => {
           background_color: '#ffffff',
           start_url: '/',
           icons: [
-            { src: iconSrc(192), sizes: '192x192', type: 'image/png' },
-            { src: iconSrc(512), sizes: '512x512', type: 'image/png' },
+            { src: brandingIconUrl(apiBase, 192), sizes: '192x192', type: 'image/png' },
+            { src: brandingIconUrl(apiBase, 512), sizes: '512x512', type: 'image/png' },
           ],
         },
         devOptions: {

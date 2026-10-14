@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import type { ProductSuggestion } from '@/features/products/types';
@@ -25,7 +26,8 @@ const sheet: ProductSuggestion = {
 
 vi.mock('@/features/products/hooks', () => ({
   useProductSearch: () => ({ data: [sheet], isLoading: false, isError: false }),
-  useProducts: () => ({ data: { items: [], totalPages: 1 }, isLoading: false }),
+  // The list of the full catalog ("Xem danh mục đầy đủ").
+  useProducts: () => ({ data: { items: [sheet], totalPages: 1, totalItems: 1 }, isLoading: false }),
   useProductGroups: () => ({ data: [] }),
   useProduct: () => ({ data: undefined, isLoading: false }),
 }));
@@ -70,6 +72,87 @@ describe('ProductTypeaheadCell', () => {
     expect(onSelect).toHaveBeenCalledWith(sheet);
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
     expect(screen.getByRole('dialog', { name: 'Chọn mặt hàng' })).toBeInTheDocument();
+  });
+
+  // The full catalog gives the focus back to the box as it closes. A pick there has just closed the list: open again,
+  // it would take Tab and Enter (Enter picks its highlighted row, which may not be the product just picked).
+  describe('a pick in the full catalog', () => {
+    function Page({ nextFocusId }: { nextFocusId?: string }) {
+      const [text, setText] = useState('TON');
+      return (
+        <>
+          <ProductTypeaheadCell
+            value={text}
+            onChange={setText}
+            onSelect={(s) => setText(s.code)}
+            inputId="code"
+            nextFocusId={nextFocusId}
+          />
+          <input id="name" aria-label="Tên hàng" />
+        </>
+      );
+    }
+
+    async function pickInCatalog() {
+      const input = screen.getByRole('combobox');
+      act(() => input.focus());
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      fireEvent.mouseDown(screen.getByRole('button', { name: /Xem danh mục đầy đủ/ }));
+      const catalog = await screen.findByRole('dialog');
+      fireEvent.doubleClick(within(catalog).getByText('TON01'));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      return input;
+    }
+
+    it('gives the focus back to the box with the list closed', async () => {
+      render(<Page />);
+      const input = await pickInCatalog();
+
+      await waitFor(() => expect(document.activeElement).toBe(input));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(input).toHaveValue('TON01');
+      expect(screen.queryByRole('listbox')).toBeNull();
+      expect(input).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('leaves the next focus of the box to open the list as usual', async () => {
+      render(<Page />);
+      const input = await pickInCatalog();
+      await waitFor(() => expect(document.activeElement).toBe(input));
+
+      act(() => input.blur());
+      act(() => input.focus());
+
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+    });
+
+    // The quotation grid moves on to the name cell after a pick; coming back to the box later is a focus like any other.
+    it('that moves on to the next cell leaves the box opening its list when the user comes back', async () => {
+      render(<Page nextFocusId="name" />);
+      const input = await pickInCatalog();
+      await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Tên hàng')));
+      // Past the tick in which the closed catalog could hand the focus back.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      act(() => input.focus());
+
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+    });
+  });
+
+  it('a pick from the list closes it, and the next focus of the box opens it again', () => {
+    const onSelect = vi.fn();
+    render(<ProductTypeaheadCell value="TON" onChange={vi.fn()} onSelect={onSelect} inputId="code" />);
+    const input = screen.getByRole('combobox');
+    act(() => input.focus());
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onSelect).toHaveBeenCalledWith(sheet);
+    expect(screen.queryByRole('listbox')).toBeNull();
+
+    act(() => input.blur());
+    act(() => input.focus());
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
   });
 
   it('keeps the highlighted option clear of the sticky header and of the list bottom', () => {

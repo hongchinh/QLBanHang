@@ -132,12 +132,19 @@ export function ProductTypeaheadCell({
     else if (row.bottom > bottom) list.scrollTop += row.bottom - bottom;
   }, [open, highlightedId]);
 
+  // Up from a pick until the box loses the focus. The full catalog gives the focus back to the box as it closes: the
+  // list the pick has just closed must not open again on that focus, or Tab and Enter would act on it (Enter picks
+  // its highlighted row). A pick that moves on to the next cell (nextFocusId) leaves the box to the user's next focus.
+  const pickedRef = useRef(false);
+
   const commit = useCallback(
     (s: ProductSuggestion) => {
       onSelect(s);
       setOpen(false);
       if (nextFocusId) {
         setTimeout(() => document.getElementById(nextFocusId)?.focus(), 0);
+      } else {
+        pickedRef.current = true;
       }
     },
     [onSelect, nextFocusId],
@@ -186,7 +193,10 @@ export function ProductTypeaheadCell({
     value,
     onFocus: () => {
       syncDropdownRect();
-      if (openOnFocus) setOpen(true);
+      if (openOnFocus && !pickedRef.current) setOpen(true);
+    },
+    onBlur: () => {
+      pickedRef.current = false;
     },
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange(e.target.value);

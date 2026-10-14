@@ -6,6 +6,8 @@ import type { AgingBucket } from '@/features/cash-reports/types';
 // The API writes null values, so a nullable backend property is `| null` here (never left out).
 
 export type ExecutiveDomain = 'sales' | 'cash' | 'debt' | 'inventory';
+// Every domain, in the order of the tabs.
+export const EXECUTIVE_DOMAINS: readonly ExecutiveDomain[] = ['sales', 'cash', 'debt', 'inventory'];
 export type ExecutiveTab = 'overview' | ExecutiveDomain;
 export type ExecutiveScopeMode = 'company' | 'branch';
 export type SeriesGranularity = 'Day' | 'Week' | 'Month';

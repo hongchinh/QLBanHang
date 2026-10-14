@@ -39,7 +39,7 @@ export function HeaderBranchSwitcher() {
       <SelectTrigger
         aria-label="Chi nhánh làm việc"
         title="Chi nhánh làm việc"
-        className="h-9 w-40 border-transparent bg-white text-sm text-foreground md:w-56"
+        className="h-9 min-w-0 flex-1 border-transparent bg-white text-sm text-foreground md:w-56 md:flex-none"
       >
         <SelectValue />
       </SelectTrigger>

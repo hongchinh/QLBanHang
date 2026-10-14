@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './dialog';
 
@@ -49,17 +49,27 @@ describe('Dialog focus return', () => {
     expect(document.activeElement).toBe(opener);
   });
 
+  // jsdom ignores focus() on a disabled button, so where the focus ends up cannot show whether the dialog tried to give
+  // it to the opener: the test watches the focus calls themselves.
   it('does not focus an opener that is disabled when the dialog closes', async () => {
     render(<StateDialog opener="disable" />);
     const opener = screen.getByTestId('opener');
     act(() => opener.focus());
     fireEvent.click(opener);
     await screen.findByText('Tiêu đề');
+    expect(opener).toBeDisabled();
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Xong' }));
 
-    fireEvent.click(screen.getByRole('button', { name: 'Xong' }));
-
-    await waitFor(() => expect(screen.queryByText('Tiêu đề')).toBeNull());
-    expect(document.activeElement).not.toBe(opener);
+      await waitFor(() => expect(screen.queryByText('Tiêu đề')).toBeNull());
+      // Past the tick in which the closed dialog hands the focus back.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(focus.mock.contexts).not.toContain(opener);
+      expect(document.activeElement).toBe(document.body);
+    } finally {
+      focus.mockRestore();
+    }
   });
 
   // The product and customer catalog dialogs: their search box takes the focus as the dialog renders, and Radix then
@@ -104,9 +114,20 @@ describe('Dialog focus return', () => {
     await screen.findByText('Tiêu đề');
 
     fireEvent.click(screen.getByRole('button', { name: 'Gỡ' }));
-    fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
-
-    await waitFor(() => expect(screen.queryByText('Tiêu đề')).toBeNull());
     expect(opener.isConnected).toBe(false);
+    // focus() on an element that left the page does nothing either: the test watches the calls themselves.
+    const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+    try {
+      fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+
+      await waitFor(() => expect(screen.queryByText('Tiêu đề')).toBeNull());
+      // Past the tick in which the closed dialog hands the focus back.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(focus.mock.contexts).not.toContain(opener);
+      // Nothing has it, not even the other button of the page.
+      expect(document.activeElement).toBe(document.body);
+    } finally {
+      focus.mockRestore();
+    }
   });
 });

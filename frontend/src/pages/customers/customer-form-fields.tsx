@@ -1,7 +1,7 @@
 import { Controller, useForm, type Resolver, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   customerSchema,
   supplierSchema,
@@ -123,7 +123,7 @@ export function CustomerFormFields({
       {showHeader && (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
-            <Link to={text.backTo}><ArrowLeft className="h-4 w-4 text-slate-500" /></Link>
+            <Link to={text.backTo}><AppIcon name="back" /></Link>
           </Button>
           <h1 className="text-2xl font-bold">{isEdit ? 'Chỉnh sửa' : 'Thêm'} {text.noun}</h1>
         </div>

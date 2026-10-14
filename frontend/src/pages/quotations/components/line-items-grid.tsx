@@ -1,6 +1,6 @@
 import { forwardRef, useImperativeHandle, useRef, useState, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
-import { Plus, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import type {
   QuotationFormParsed,
@@ -506,7 +506,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                         if (activeRowIndex === idx) setActiveRowIndex(null);
                       }}
                     >
-                      <Trash2 className="h-4 w-4 text-red-600" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+                      <AppIcon name="delete" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
                     </button>
                   </td>
                 </tr>
@@ -538,11 +538,11 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
 
       <div className="line-items-toolbar">
         <button type="button" className="lib-btn" onClick={addLine}>
-          <Plus className="h-4 w-4 text-cyan-600" />
+          <AppIcon name="add" />
           Thêm dòng
         </button>
         <button type="button" className="lib-btn lib-btn-danger" onClick={handleClearAll} disabled={fields.length === 0}>
-          <Trash2 className="h-4 w-4 text-red-600" />
+          <AppIcon name="delete" />
           Xóa tất cả dòng
         </button>
       </div>

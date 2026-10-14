@@ -31,3 +31,15 @@ export function parsePushPayload(text: string | null | undefined): PushPayload {
 export function notificationTag(payload: PushPayload): string {
   return payload.tag ?? payload.url
 }
+
+export function resolveTargetUrl(url: string | undefined, origin: string): string {
+  if (!url) return '/'
+  try {
+    const target = new URL(url, origin)
+    if (target.origin !== origin) return '/'
+    if (target.protocol !== 'https:' && target.protocol !== 'http:') return '/'
+    return target.pathname + target.search + target.hash
+  } catch {
+    return '/'
+  }
+}

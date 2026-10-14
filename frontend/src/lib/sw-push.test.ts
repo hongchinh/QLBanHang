@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { DEFAULT_PUSH_TITLE, notificationTag, parsePushPayload } from './sw-push'
+import { DEFAULT_PUSH_TITLE, notificationTag, parsePushPayload, resolveTargetUrl } from './sw-push'
 
 describe('parsePushPayload', () => {
   it('reads title, body and url from the backend payload', () => {
@@ -39,5 +39,30 @@ describe('notificationTag', () => {
 
   it('falls back to the url', () => {
     expect(notificationTag({ title: 't', body: 'b', url: '/quotations/1' })).toBe('/quotations/1')
+  })
+})
+
+describe('resolveTargetUrl', () => {
+  const origin = 'https://app.example.com'
+
+  it.each([
+    ['/quotations/1', '/quotations/1'],
+    ['/reports/cash-book?fundId=2#top', '/reports/cash-book?fundId=2#top'],
+    ['quotations/1', '/quotations/1'],
+    ['https://app.example.com/customers?q=a', '/customers?q=a'],
+  ])('keeps same-origin %s as %s', (url, expected) => {
+    expect(resolveTargetUrl(url, origin)).toBe(expected)
+  })
+
+  it.each([
+    'https://evil.example.com/phish',
+    '//evil.example.com/phish',
+    'javascript:alert(1)',
+    'data:text/html,hi',
+    'http://[bad',
+    '',
+    undefined,
+  ])('falls back to / for %s', (url) => {
+    expect(resolveTargetUrl(url, origin)).toBe('/')
   })
 })

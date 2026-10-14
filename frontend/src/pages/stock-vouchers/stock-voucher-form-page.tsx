@@ -173,15 +173,31 @@ const SERVER_ERROR_DRIVERS: Record<string, string[]> = {
   dueDate: ['voucherAt', 'reasonId'],
 };
 
+// The same inside one line, for a cell whose value is computed from other cells of that line: SL of a line priced by
+// dimensions (read-only there) from Số tấm and the dimensions; Tiền CK from %CK (editing the rate turns a hand-typed
+// amount off).
+const LINE_SERVER_ERROR_DRIVERS: Record<string, string[]> = {
+  quantity: ['sheetCount', 'length', 'width', 'thickness'],
+  discountAmount: ['discountRate'],
+};
+
+// Fields of `drivers` that the changed field drives.
+function drivenBy(drivers: Record<string, string[]>, changed: string): string[] {
+  return Object.entries(drivers)
+    .filter(([, list]) => list.includes(changed))
+    .map(([field]) => field);
+}
+
 // Keys whose server error is stale once `changed` has a new value.
 function staleServerErrorKeys(changed: string): string[] {
-  if (/^lines\.\d+\.\w+$/.test(changed)) return [changed];
+  const cell = /^lines\.(\d+)\.(\w+)$/.exec(changed);
+  if (cell) {
+    return [changed, ...drivenBy(LINE_SERVER_ERROR_DRIVERS, cell[2]).map((field) => `lines.${cell[1]}.${field}`)];
+  }
   // A whole line replaced at once (a product picked): every field of it was rewritten.
   const row = /^lines\.(\d+)$/.exec(changed);
   if (row) return [...LINE_ERROR_FIELDS].map((field) => `lines.${row[1]}.${field}`);
-  const driven = Object.entries(SERVER_ERROR_DRIVERS)
-    .filter(([, drivers]) => drivers.includes(changed))
-    .map(([field]) => field);
+  const driven = drivenBy(SERVER_ERROR_DRIVERS, changed);
   return HEADER_ERROR_FIELDS.has(changed) ? [changed, ...driven] : driven;
 }
 

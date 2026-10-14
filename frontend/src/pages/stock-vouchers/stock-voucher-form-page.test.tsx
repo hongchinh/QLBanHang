@@ -12,7 +12,13 @@ import type { PaymentMethod } from '@/features/payment-methods/types';
 import type { ProductSuggestion } from '@/features/products/types';
 import type { StockReason } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
-import type { PartnerSearchItem, StockVoucher, StockVoucherDefaults } from '@/features/stock-vouchers/types';
+import type {
+  PartnerSearchItem,
+  StockVoucher,
+  StockVoucherDefaults,
+  StockVoucherLine,
+} from '@/features/stock-vouchers/types';
+import { stockGridPrefsKey } from './utils/use-stock-grid-prefs';
 
 const routeParams: { id: string } = { id: 'new' };
 const navigateMock = vi.fn();
@@ -821,6 +827,105 @@ describe('StockVoucherFormPage', () => {
       fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('SP01'));
 
       await waitFor(() => expect(byId('stock-line-quantity-0').getAttribute('aria-invalid')).toBeNull());
+    });
+
+    // The user cannot edit such a cell (or its value is replaced by the computed one), so its error must go when a
+    // cell it is computed from changes.
+    describe('on a cell computed from other cells of its line', () => {
+      const L2 = '66666666-6666-4666-8666-666666666667';
+      // SL of a line priced by dimensions is read-only: 2 × 3000 × 100 × 50 mm = 0.03 m³.
+      const cubicLine = (overrides: Partial<StockVoucherLine> = {}): StockVoucherLine => ({
+        ...voucher().lines[0],
+        pricingMode: 'PerCubicMeter',
+        unitName: 'm³',
+        sheetCount: 2,
+        length: 3000,
+        width: 100,
+        thickness: 50,
+        quantity: 0.03,
+        ...overrides,
+      });
+      const invalid = (id: string) => byId(id).getAttribute('aria-invalid');
+
+      async function updateWithServerErrors(lines: StockVoucherLine[], details: Record<string, string[]>) {
+        routeParams.id = V1;
+        voucherState.data = voucher({ lines });
+        updateMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', details));
+        renderPage('In');
+        fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+        await waitFor(() => expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument());
+      }
+
+      it.each([
+        ['Số tấm', 'sheet-count', '3'],
+        ['Dài', 'length', '2000'],
+        ['Rộng', 'width', '120'],
+        ['Dày', 'thickness', '40'],
+      ])('the error on a computed SL and the tab dot go away when %s changes', async (_label, cell, next) => {
+        await updateWithServerErrors([cubicLine()], { 'lines[0].quantity': ['Số lượng quá lớn.'] });
+        expect(byId('stock-line-quantity-0')).toBeDisabled();
+        expect(invalid('stock-line-quantity-0')).toBe('true');
+
+        fireEvent.change(byId(`stock-line-${cell}-0`), { target: { value: next } });
+
+        await waitFor(() => expect(invalid('stock-line-quantity-0')).toBeNull());
+        expect(screen.queryByTestId('tab-error-lines')).toBeNull();
+      });
+
+      it('a dimension clears the SL error of its own line only: another line and another cell keep theirs', async () => {
+        await updateWithServerErrors([cubicLine(), cubicLine({ id: L2, sortOrder: 1 })], {
+          'lines[0].quantity': ['Số lượng quá lớn.'],
+          'lines[1].quantity': ['Số lượng quá lớn.'],
+          'lines[1].unitPrice': ['Thành tiền quá lớn.'],
+        });
+        expect(invalid('stock-line-quantity-1')).toBe('true');
+
+        fireEvent.change(byId('stock-line-length-1'), { target: { value: '2000' } });
+
+        await waitFor(() => expect(invalid('stock-line-quantity-1')).toBeNull());
+        expect(invalid('stock-line-unit-price-1')).toBe('true');
+        expect(invalid('stock-line-quantity-0')).toBe('true');
+        expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
+      });
+
+      it('the error on a computed SL stays when a cell that SL is not computed from changes', async () => {
+        await updateWithServerErrors([cubicLine()], { 'lines[0].quantity': ['Số lượng quá lớn.'] });
+
+        fireEvent.change(byId('stock-line-unit-price-0'), { target: { value: '60000' } });
+        fireEvent.change(byId('stock-line-discount-rate-0'), { target: { value: '2' } });
+        fireEvent.change(byId('stock-line-vat-rate-0'), { target: { value: '8' } });
+
+        expect(invalid('stock-line-quantity-0')).toBe('true');
+        expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
+      });
+
+      // Editing %CK turns a hand-typed Tiền CK off: the cell shows the amount computed from the rate again.
+      it('the error on a hand-typed Tiền CK goes away when %CK changes, not when %VAT does', async () => {
+        localStorage.setItem(
+          stockGridPrefsKey('user-test', 'In'),
+          JSON.stringify({ version: 1, hiddenColumns: [], enterStops: {} }),
+        );
+        await updateWithServerErrors([{ ...voucher().lines[0], discountManual: true, discountAmount: 20_000 }], {
+          'lines[0].discountAmount': ['Tiền chiết khấu phải từ 0 đến thành tiền.'],
+        });
+        const amount = byId('stock-line-discount-amount-0');
+        // The save put the focus on the erroring cell; the user walks on to %VAT, then to %CK.
+        await waitFor(() => expect(document.activeElement).toBe(amount));
+        expect(invalid('stock-line-discount-amount-0')).toBe('true');
+
+        act(() => byId('stock-line-vat-rate-0').focus());
+        fireEvent.change(byId('stock-line-vat-rate-0'), { target: { value: '8' } });
+        expect(amount.value).toBe('20.000');
+        expect(invalid('stock-line-discount-amount-0')).toBe('true');
+
+        act(() => byId('stock-line-discount-rate-0').focus());
+        fireEvent.change(byId('stock-line-discount-rate-0'), { target: { value: '10' } });
+
+        // 2 × 50,000 × 10%.
+        await waitFor(() => expect(amount.value).toBe('10.000'));
+        expect(invalid('stock-line-discount-amount-0')).toBeNull();
+        expect(screen.queryByTestId('tab-error-lines')).toBeNull();
+      });
     });
 
     it('a client schema error is not cleared by an unrelated change', async () => {

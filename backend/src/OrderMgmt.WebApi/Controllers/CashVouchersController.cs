@@ -56,7 +56,7 @@ public class CashVouchersController : ApiControllerBase
     public async Task<IActionResult> PrintMany(
         [FromBody] CashVoucherPrintRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
     {
-        var file = await _print.PrintCashVouchersAsync(request.Ids, format, ct);
+        var file = await _print.PrintCashVouchersAsync(request.Ids ?? [], format, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 

@@ -1,10 +1,13 @@
 using Microsoft.EntityFrameworkCore;
+using OrderMgmt.Application.CashDebt.CashVouchers.Services;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Application.Tt133.Services;
+using OrderMgmt.Domain.Common;
+using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Tt133.Vouchers;
@@ -39,7 +42,9 @@ public class VoucherPrintService : IVoucherPrintService
 
     public async Task<ExportFile> PrintCashVouchersAsync(IReadOnlyList<Guid> ids, ExportFormat format, CancellationToken ct = default)
     {
-        var distinct = ids.Distinct().ToList();
+        // A JSON null binds Ids to null; it counts as empty.
+        var distinct = (ids ?? []).Distinct().ToList();
+        _support.EnsureSheetCount(distinct.Count, VouchersTooMany);
 
         var (context, models) = await _transaction.RunSnapshotAsync(async token =>
         {
@@ -69,6 +74,18 @@ public class VoucherPrintService : IVoucherPrintService
                 })
                 .ToListAsync(token);
 
+            var branchId = await _currentBranch.GetIdAsync(token);
+            var byId = rows.ToDictionary(r => r.Id);
+            foreach (var id in distinct)
+            {
+                if (!byId.TryGetValue(id, out var row))
+                    throw new NotFoundException(nameof(CashVoucher), id);
+                if (!_currentUser.HasPermission(CashVoucherPermissions.View(row.Type)))
+                    throw new ForbiddenException();
+                if (row.BranchId != branchId)
+                    throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
+            }
+
             var list = rows
                 .OrderBy(r => r.VoucherAt)
                 .ThenBy(r => r.Code, StringComparer.Ordinal)
@@ -96,6 +113,9 @@ public class VoucherPrintService : IVoucherPrintService
             : VoucherPrintRules.BatchFileBase(CashBatchPrefix(models), _clock.UtcNow);
         return await _support.ToFileAsync(xlsx, baseName, format, ct);
     }
+
+    private static string VouchersTooMany(int count, int max) =>
+        $"Số phiếu cần in ({count}) vượt giới hạn {max}. Hãy chọn ít phiếu hơn.";
 
     private static string CashBatchPrefix(IReadOnlyList<CashVoucherPrintModel> models)
     {

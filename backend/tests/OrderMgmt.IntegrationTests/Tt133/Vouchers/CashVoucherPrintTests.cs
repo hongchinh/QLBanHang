@@ -5,6 +5,7 @@ using ClosedXML.Excel;
 using FluentAssertions;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.Common.Interfaces;
@@ -28,9 +29,7 @@ public class CashVoucherPrintTests : CashDebtTestBase
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static readonly DateOnly Oct1 = new(2026, 10, 1);
 
-    private readonly PostgresFixture _pg;
-
-    public CashVoucherPrintTests(PostgresFixture pg) : base(pg) => _pg = pg;
+    public CashVoucherPrintTests(PostgresFixture pg) : base(pg) { }
 
     [Fact]
     public async Task Prints_a_receipt_as_01_TT()
@@ -254,8 +253,8 @@ public class CashVoucherPrintTests : CashDebtTestBase
         await ((IAsyncLifetime)factory).InitializeAsync();
         try
         {
-            // The factory shares the test database, so the code is unique per run.
-            var code = "PTPDF" + Guid.NewGuid().ToString("N")[..6];
+            // The factory clones its own database, so a fixed code is safe.
+            var code = "PTPDF1";
             Guid id;
             await using (var scope = factory.Services.CreateAsyncScope())
             {
@@ -296,6 +295,130 @@ public class CashVoucherPrintTests : CashDebtTestBase
         {
             await ((IAsyncLifetime)factory).DisposeAsync();
         }
+    }
+
+    [Fact]
+    public async Task Unknown_or_deleted_voucher_is_404()
+    {
+        await SetCompanyAsync();
+        var (_, client, fundId, _) = await BranchClientAsync();
+        var v = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TK"), fundId,
+            "2026-10-05 09:00", null, 1_000m));
+        var (status, _, error) = await DeleteCashAsync(client, v.Id, new CashDocumentActionRequest { Version = v.Version });
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+
+        (await PrintAsync(client, Guid.NewGuid())).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await PrintAsync(client, v.Id)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task One_unknown_id_fails_the_batch()
+    {
+        await SetCompanyAsync();
+        var (_, client, fundId, _) = await BranchClientAsync();
+        var v = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TK"), fundId,
+            "2026-10-05 09:00", null, 1_000m));
+
+        var response = await client.PostAsJsonAsync("/api/cash-vouchers/print?format=xlsx",
+            new CashVoucherPrintRequest { Ids = [v.Id, Guid.NewGuid()] });
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Missing_view_permission_is_403()
+    {
+        await SetCompanyAsync();
+        var (branchId, client, fundId, _) = await BranchClientAsync();
+        var reasonId = await CashReasonIdAsync("TK");
+        var receipt = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, reasonId, fundId,
+            "2026-10-05 09:00", null, 1_000m));
+        var payment = await CreateCashAsync(client, CashRequest(CashVoucherType.Payment, await CashReasonIdAsync("CK"), fundId,
+            "2026-10-05 09:00", null, 1_000m));
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var payer = await CreateClientWithPermissionsAsync("vpp_" + suffix, branchId, Permissions.Payments.View);
+        UseBranch(payer, branchId);
+        var viewer = await CreateClientWithPermissionsAsync("vpr_" + suffix, branchId, Permissions.Receipts.View);
+        UseBranch(viewer, branchId);
+
+        (await PrintAsync(payer, receipt.Id)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var batch = await payer.PostAsJsonAsync("/api/cash-vouchers/print?format=xlsx",
+            new CashVoucherPrintRequest { Ids = [payment.Id, receipt.Id] });
+        batch.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        (await PrintAsync(viewer, receipt.Id)).StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task Another_branch_is_403()
+    {
+        await SetCompanyAsync();
+        var (_, clientA, fundA, _) = await BranchClientAsync();
+        var (_, clientB, _, _) = await BranchClientAsync();
+        var v = await CreateCashAsync(clientA, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TK"), fundA,
+            "2026-10-05 09:00", null, 1_000m));
+
+        var response = await PrintAsync(clientB, v.Id);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options);
+        body!.Error!.Message.Should().Be("Phiếu thuộc chi nhánh khác.");
+    }
+
+    [Fact]
+    public async Task Empty_batch_is_422()
+    {
+        var client = CloneAdminClient();
+
+        var response = await client.PostAsJsonAsync("/api/cash-vouchers/print?format=xlsx",
+            new CashVoucherPrintRequest { Ids = [] });
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Code.Should().Be("EXPORT_NO_TARGETS");
+    }
+
+    [Fact]
+    public async Task Null_ids_is_422()
+    {
+        var client = CloneAdminClient();
+        using var content = new StringContent("{\"ids\":null}", System.Text.Encoding.UTF8, "application/json");
+
+        var response = await client.PostAsync("/api/cash-vouchers/print?format=xlsx", content);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, await response.Content.ReadAsStringAsync());
+        (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Code.Should().Be("EXPORT_NO_TARGETS");
+    }
+
+    [Fact]
+    public async Task Too_many_is_422()
+    {
+        var limited = new WebAppFactoryWithOneSheet(_pg);
+        await ((IAsyncLifetime)limited).InitializeAsync();
+        try
+        {
+            using var client = await AdminClientAsync(limited);
+
+            var response = await client.PostAsJsonAsync("/api/cash-vouchers/print?format=xlsx",
+                new CashVoucherPrintRequest { Ids = [Guid.NewGuid(), Guid.NewGuid()] });
+
+            response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+            var error = (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!;
+            error.Code.Should().Be("EXPORT_TOO_MANY_SHEETS");
+            error.Message.Should().Be("Số phiếu cần in (2) vượt giới hạn 1. Hãy chọn ít phiếu hơn.");
+        }
+        finally
+        {
+            await ((IAsyncLifetime)limited).DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Bad_format_is_400()
+    {
+        var client = CloneAdminClient();
+
+        var response = await client.GetAsync($"/api/cash-vouchers/{Guid.NewGuid()}/print?format=docx");
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
     private static async Task<HttpClient> AdminClientAsync(WebAppFactory factory)
@@ -369,5 +492,18 @@ file sealed class RecordingConverter : ISpreadsheetPdfConverter
     {
         Received = xlsxBytes;
         return Task.FromResult(_pdf);
+    }
+}
+
+/// Tt133Export:MaxSheets = 1, so a second voucher is one sheet too many.
+file sealed class WebAppFactoryWithOneSheet : WebAppFactory
+{
+    public WebAppFactoryWithOneSheet(PostgresFixture pg) : base(pg) { }
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureAppConfiguration((_, config) =>
+            config.AddInMemoryCollection(new Dictionary<string, string?> { ["Tt133Export:MaxSheets"] = "1" }));
     }
 }

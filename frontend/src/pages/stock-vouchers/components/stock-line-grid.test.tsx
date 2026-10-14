@@ -886,7 +886,7 @@ describe('StockLineGrid', () => {
     const original = Node.prototype.removeChild;
     const spy = vi.spyOn(Node.prototype, 'removeChild').mockImplementation(function <T extends Node>(this: Node, child: T): T {
       const result = original.call(this, child) as T;
-      if ((child as Element).tagName === 'TR') resting.push(document.activeElement);
+      if ((child as unknown as Element).tagName === 'TR') resting.push(document.activeElement);
       return result;
     });
     try {

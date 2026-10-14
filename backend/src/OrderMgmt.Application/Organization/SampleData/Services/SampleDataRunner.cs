@@ -69,7 +69,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
         _logger = logger;
     }
 
-    /// The generator's plan for the branch, VN today and the S5 owner count, then RunPlanAsync with the same owners.
+    /// The generator's plan for the branch, VN today, the S5 owner count and the inventory NetExcludesVat setting, then
+    /// RunPlanAsync with the same owners.
     public async Task RunJobAsync(SampleDataJob job, CancellationToken ct = default)
     {
         using var logScope = BeginJobScope(job);
@@ -123,7 +124,11 @@ public sealed class SampleDataRunner : ISampleDataRunner
                 return null;
             }
             var owners = await ResolveOwnersAsync(db, job.RequestedByUserId, ct);
-            var input = new SampleDataGeneratorInput(branchCode, VnTime.ToVnDate(_clock.UtcNow), owners.Count);
+            // The generator's voucher totals follow the stock voucher service, which leaves VAT out of the net amount
+            // when this is set: the cash it plans must be the cash the real vouchers move.
+            var netExcludesVat = await db.InventorySettings.AsNoTracking()
+                .Where(s => s.Id == 1).Select(s => s.NetExcludesVat).SingleAsync(ct);
+            var input = new SampleDataGeneratorInput(branchCode, VnTime.ToVnDate(_clock.UtcNow), owners.Count, netExcludesVat);
             try
             {
                 return (_generator.Generate(input), owners);

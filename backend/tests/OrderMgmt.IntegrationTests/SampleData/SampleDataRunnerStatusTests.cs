@@ -184,6 +184,29 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Code == "RJ01-K1"))).Should().BeTrue("the plan ran");
     }
 
+    /// The generator estimates voucher totals as the stock voucher service computes them, so it gets the inventory
+    /// setting that leaves VAT out of the net amount; false is the default setting, left untouched.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Run_job_passes_the_inventory_vat_setting(bool netExcludesVat)
+    {
+        if (netExcludesVat)
+            await UpdateInventorySettingsAsync(s => s.NetExcludesVat = true);
+        var generator = new FakeSampleDataGenerator(_ => TinyPlans.Setup(TinyPlans.OpeningDate));
+        var host = TinyPlans.WithService<ISampleDataGenerator>(_factory, generator);
+        var branchId = await CreateBranchAsync("RJ05");
+        await TinyPlans.MarkDemoAsync(_factory, branchId);
+        var adminId = await TinyPlans.AdminIdAsync(_factory);
+
+        await using (var scope = host.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<ISampleDataRunner>()
+                .RunJobAsync(new SampleDataJob(branchId, adminId));
+
+        generator.Inputs.Should().ContainSingle().Which.NetExcludesVat.Should().Be(netExcludesVat);
+        (await BranchAsync(branchId)).SampleDataStatus.Should().Be(SampleDataStatus.Ready);
+    }
+
     [Fact]
     public async Task Generator_failure_fails_the_job()
     {

@@ -17,17 +17,19 @@ public class ExecutiveDashboardController : ApiControllerBase
     private readonly ISalesMetricsService _sales;
     private readonly ICashMetricsService _cash;
     private readonly IDebtMetricsService _debt;
+    private readonly IInventoryMetricsService _inventory;
     private readonly IValidator<ExecutiveQuery> _queryValidator;
     private readonly IValidator<ExecutiveSeriesQuery> _seriesValidator;
     private readonly IValidator<SalesTopQuery> _topValidator;
 
     public ExecutiveDashboardController(ISalesMetricsService sales, ICashMetricsService cash, IDebtMetricsService debt,
-        IValidator<ExecutiveQuery> queryValidator, IValidator<ExecutiveSeriesQuery> seriesValidator,
-        IValidator<SalesTopQuery> topValidator)
+        IInventoryMetricsService inventory, IValidator<ExecutiveQuery> queryValidator,
+        IValidator<ExecutiveSeriesQuery> seriesValidator, IValidator<SalesTopQuery> topValidator)
     {
         _sales = sales;
         _cash = cash;
         _debt = debt;
+        _inventory = inventory;
         _queryValidator = queryValidator;
         _seriesValidator = seriesValidator;
         _topValidator = topValidator;
@@ -103,5 +105,14 @@ public class ExecutiveDashboardController : ApiControllerBase
     {
         await _queryValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _debt.GetBreakdownAsync(query, ct));
+    }
+
+    [HttpGet("inventory/summary")]
+    [HasPermission(Permissions.Reports.Inventory)]
+    public async Task<ActionResult<ApiResponse<InventorySummaryDto>>> InventorySummary(
+        [FromQuery] ExecutiveQuery query, CancellationToken ct)
+    {
+        await _queryValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _inventory.GetSummaryAsync(query, ct));
     }
 }

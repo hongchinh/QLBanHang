@@ -111,6 +111,35 @@ public abstract class ExecutiveDashboardTestBase : CashDebtTestBase
         return (branch, product, sale);
     }
 
+    /// The stock of the inventory tests: a fresh branch with two warehouses (W1 is the branch's first one, W2's code sorts
+    /// after it) and two tracked products, VAT 0: A keeps the group the product helper gives it, B has none. NMH A
+    /// 10 × 100 into W1 and into W2 and NMH B 5 × 200 into W1 on 10-02, XBH A 4 × 150 from W1 on 10-04. Costs are
+    /// written on posting: A is worth 2,000 − 400 = 1,600 (W1 6, W2 10) and B 1,000 (W1 5), 2,600 in all.
+    protected sealed record StockScenario(FreshBranch Branch, Guid W1, Guid W2, Guid ProductA, string ProductACode,
+        Guid ProductB, string ProductBCode, Guid GroupId);
+
+    protected async Task<StockScenario> SeedStockScenarioAsync()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var w2 = await CreateWarehouseAsync(branch.BranchId, "FZ" + suffix);
+        var codeA = "STA" + suffix;
+        var codeB = "STB" + suffix;
+        var productA = await CreateInventoryProductAsync(codeA);
+        var productB = await CreateInventoryProductAsync(codeB);
+        var groupId = await InDbAsync(db => db.Products.Where(p => p.Id == productA)
+            .Select(p => p.ProductGroupId!.Value).SingleAsync());
+        await InDbAsync(db => db.Products.Where(p => p.Id == productB)
+            .ExecuteUpdateAsync(s => s.SetProperty(p => p.ProductGroupId, (Guid?)null)));
+
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, productA, 10, 100);
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, productA, 10, 100,
+            request => request.WarehouseId = w2);
+        await PostLineAsync(branch, StockDirection.In, "NMH", "2026-10-02 09:00", branch.SupplierId, productB, 5, 200);
+        await PostLineAsync(branch, StockDirection.Out, "XBH", "2026-10-04 09:00", branch.CustomerId, productA, 4, 150);
+        return new StockScenario(branch, branch.WarehouseId, w2, productA, codeA, productB, codeB, groupId);
+    }
+
     protected static Task<SalesSummaryDto> GetSummaryAsync(HttpClient client, string query) =>
         GetExecAsync<SalesSummaryDto>(client, $"sales/summary?{query}");
 

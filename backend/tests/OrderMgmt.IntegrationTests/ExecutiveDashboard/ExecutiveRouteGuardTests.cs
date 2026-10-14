@@ -1,5 +1,6 @@
 using System.Net;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
@@ -51,6 +52,9 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
         new("debt/breakdown", "&at=2026-10-31", Permissions.Reports.Debt,
             async response => (await ReadDataAsync<DebtBreakdownDto>(response)).TopDebtors.Sum(row => row.Balance),
             OwnBranch: 1_500m, Company: 11_499m),
+        new("inventory/summary", "", Permissions.Reports.Inventory,
+            async response => (await ReadDataAsync<InventorySummaryDto>(response)).ProductCount,
+            OwnBranch: 1m, Company: 2m),
     };
 
     public ExecutiveRouteGuardTests(PostgresFixture pg) : base(pg) { }
@@ -121,8 +125,10 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
     }
 
     /// The documents the cases read: the report dataset plus one payment of 123 from branch B's cash fund, because the
-    /// dataset has no cash document in branch B. Its reason CK has no debt effect, so the sales and debt figures of
-    /// the dataset stay as they are.
+    /// dataset has no cash document in branch B, and one purchase of a tracked product in each branch (1 × 77 in the
+    /// main branch, 1 × 50 in branch B), because the dataset holds no tracked stock. The payment's reason CK has no
+    /// debt effect and the purchases add to the payable only, so the sales, cash and receivable figures of the dataset
+    /// stay as they are.
     private async Task<ReportIds> ArrangeAsync()
     {
         var ids = await ReportDataset.SeedAsync(this);
@@ -133,7 +139,24 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
         payment.PersonName = "Nguyễn B";
         payment.AcknowledgeNegativeFund = true;
         await CreateCashAsync(branchB, payment);
+
+        var branchBWarehouse = await InDbAsync(db => db.Warehouses.Where(w => w.BranchId == ids.BranchBId)
+            .Select(w => w.Id).SingleAsync());
+        await PostTrackedPurchaseAsync(MainClient(ids), ids.MainWarehouseId, ids.Ncc1Id, 77m);
+        await PostTrackedPurchaseAsync(branchB, branchBWarehouse, ids.Ncc1Id, 50m);
         return ids;
+    }
+
+    /// An unpaid purchase (NMH) of one unit of a new tracked product into the warehouse, on 10-07.
+    private async Task PostTrackedPurchaseAsync(HttpClient client, Guid warehouseId, Guid supplierId, decimal price)
+    {
+        var product = await CreateInventoryProductAsync("GRD-" + Guid.NewGuid().ToString("N")[..8]);
+        var request = VoucherRequest(StockDirection.In, await ReasonIdAsync("NMH"), "2026-10-07 09:00",
+            LineRequest(product, 1, price));
+        request.WarehouseId = warehouseId;
+        request.PartnerId = supplierId;
+        var (status, _, error) = await PostVoucherAsync(client, request);
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
     }
 
     private static GuardedRoute RouteOf(string routeName) => Routes.Single(route => route.Route == routeName);

@@ -60,6 +60,14 @@ public class SalesTopQueryValidator : AbstractValidator<SalesTopQuery>
     }
 }
 
+public class RecentQueryValidator : AbstractValidator<RecentQuery>
+{
+    public RecentQueryValidator()
+    {
+        RuleFor(x => x.Limit).InclusiveBetween(1, 50).WithMessage("Số dòng từ 1 đến 50.");
+    }
+}
+
 internal static class ResolvedPeriod
 {
     /// The period the query resolves to, or null when From or To is outside the accepted range: the date rules

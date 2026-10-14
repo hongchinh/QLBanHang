@@ -5,6 +5,7 @@ using OrderMgmt.Application.Dashboards.Executive.Interfaces;
 using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Constants;
+using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Dashboards.Executive.Services;
 
@@ -123,6 +124,104 @@ public class ExecutiveOverviewService : IExecutiveOverviewService
         return attention;
     }
 
+    public Task<List<RecentDocumentDto>> GetRecentAsync(RecentQuery query, CancellationToken ct = default) =>
+        _transaction.RunSnapshotAsync(c => BuildRecentAsync(query, c), ct);
+
+    private async Task<List<RecentDocumentDto>> BuildRecentAsync(RecentQuery query, CancellationToken ct)
+    {
+        var today = VnTime.ToVnDate(_clock.UtcNow);
+        var scope = await _scopes.ResolveAsync(query.BranchId, ct);
+        var startOfToday = VnTime.ToUtc(VnTime.StartOfDay(today));
+
+        var rows = new List<RecentRow>();
+        if (_currentUser.HasPermission(Permissions.Reports.Cash))
+            rows.AddRange(await LoadRecentCashAsync(scope, startOfToday, query.Limit, ct));
+        if (_currentUser.HasPermission(Permissions.Reports.Inventory))
+            rows.AddRange(await LoadRecentStockAsync(scope, startOfToday, query.Limit, ct));
+
+        var latest = rows
+            .OrderByDescending(r => r.CreatedAt)
+            .ThenBy(r => r.Code, StringComparer.Ordinal)
+            .ThenBy(r => r.Id)
+            .Take(query.Limit)
+            .ToList();
+        var users = await _lookups.UserNamesAsync(latest.Select(r => r.OwnerUserId).Distinct().ToList(), ct);
+        var branchCodes = await _lookups.BranchCodesAsync(latest.Select(r => r.BranchId).Distinct().ToList(), ct);
+
+        return latest
+            .Select(r => new RecentDocumentDto
+            {
+                Kind = r.Kind,
+                Id = r.Id,
+                Code = r.Code,
+                CreatedAt = r.CreatedAt,
+                BranchCode = branchCodes.TryGetValue(r.BranchId, out var code) ? code : string.Empty,
+                PartnerName = r.PartnerName,
+                OwnerName = users.TryGetValue(r.OwnerUserId, out var name) ? name : null,
+                Amount = r.Amount,
+            })
+            .ToList();
+    }
+
+    /// Receipts and payments created today, active and not deleted. An automatic voucher is left out: its stock voucher
+    /// is the document the user created. A voucher without a partner shows the person who paid or was paid.
+    private async Task<List<RecentRow>> LoadRecentCashAsync(ExecutiveScope scope, DateTimeOffset startOfToday, int limit,
+        CancellationToken ct)
+    {
+        var branchIds = scope.BranchIds;
+        var vouchers = await _db.CashVouchers.AsNoTracking()
+            .Where(v => v.Status == DocumentStatus.Active && v.SourceStockVoucherId == null
+                && branchIds.Contains(v.BranchId) && v.CreatedAt >= startOfToday)
+            .OrderByDescending(v => v.CreatedAt)
+            .ThenBy(v => v.Code)
+            .ThenBy(v => v.Id)
+            .Take(limit)
+            .Select(v => new
+            {
+                v.Type, v.Id, v.Code, v.CreatedAt, v.BranchId, PartnerName = v.PartnerName ?? v.PersonName,
+                v.OwnerUserId, v.Total,
+            })
+            .ToListAsync(ct);
+        return vouchers
+            .Select(v => new RecentRow(KindOf(v.Type), v.Id, v.Code, v.CreatedAt, v.BranchId, v.PartnerName,
+                v.OwnerUserId, v.Total))
+            .ToList();
+    }
+
+    /// Stock-in and stock-out vouchers created today, active and not deleted.
+    private async Task<List<RecentRow>> LoadRecentStockAsync(ExecutiveScope scope, DateTimeOffset startOfToday, int limit,
+        CancellationToken ct)
+    {
+        var branchIds = scope.BranchIds;
+        var vouchers = await _db.StockVouchers.AsNoTracking()
+            .Where(v => v.Status == StockVoucherStatus.Active && branchIds.Contains(v.BranchId)
+                && v.CreatedAt >= startOfToday)
+            .OrderByDescending(v => v.CreatedAt)
+            .ThenBy(v => v.Code)
+            .ThenBy(v => v.Id)
+            .Take(limit)
+            .Select(v => new { v.Type, v.Id, v.Code, v.CreatedAt, v.BranchId, v.PartnerName, v.OwnerUserId, v.Total })
+            .ToListAsync(ct);
+        return vouchers
+            .Select(v => new RecentRow(KindOf(v.Type), v.Id, v.Code, v.CreatedAt, v.BranchId, v.PartnerName,
+                v.OwnerUserId, v.Total))
+            .ToList();
+    }
+
+    private static RecentDocumentKind KindOf(CashVoucherType type) => type switch
+    {
+        CashVoucherType.Receipt => RecentDocumentKind.Receipt,
+        CashVoucherType.Payment => RecentDocumentKind.Payment,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown cash voucher type."),
+    };
+
+    private static RecentDocumentKind KindOf(StockDirection type) => type switch
+    {
+        StockDirection.In => RecentDocumentKind.StockIn,
+        StockDirection.Out => RecentDocumentKind.StockOut,
+        _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Unknown stock voucher type."),
+    };
+
     /// Code and name of each branch. A deleted branch keeps them: this is a lookup by id with the query filters off.
     private async Task<Dictionary<Guid, (string Code, string Name)>> LoadBranchNamesAsync(
         IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
@@ -130,4 +229,7 @@ public class ExecutiveOverviewService : IExecutiveOverviewService
             .Where(b => ids.Contains(b.Id))
             .Select(b => new { b.Id, b.Code, b.Name })
             .ToDictionaryAsync(b => b.Id, b => (b.Code, b.Name), ct);
+
+    private sealed record RecentRow(RecentDocumentKind Kind, Guid Id, string Code, DateTimeOffset CreatedAt, Guid BranchId,
+        string? PartnerName, Guid OwnerUserId, decimal Amount);
 }

@@ -21,7 +21,8 @@ describe('KpiCard', () => {
         kpi={{ value: 10, deltaPct: 12.5, spark: [] }}
       />,
     );
-    const badge = screen.getByText(/▲\s*12\.5%/);
+    const badge = screen.getByText('12.5%');
+    expect(screen.getByRole('img', { name: 'tăng' })).toBeInTheDocument();
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain('emerald');
   });
@@ -33,7 +34,8 @@ describe('KpiCard', () => {
         kpi={{ value: 10, deltaPct: -3.2, spark: [] }}
       />,
     );
-    const badge = screen.getByText(/▼\s*3\.2%/);
+    const badge = screen.getByText('3.2%');
+    expect(screen.getByRole('img', { name: 'giảm' })).toBeInTheDocument();
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain('rose');
   });

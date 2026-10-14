@@ -1,6 +1,7 @@
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
 import { cn } from '@/lib/utils';
 import type { Kpi } from '../types';
+import { DeltaArrow } from './delta-arrow';
 import { formatDelta, formatNumber, formatVnd } from '../format';
 
 interface KpiCardProps {
@@ -28,7 +29,7 @@ export function KpiCard({ label, format = 'number', kpi, loading, accentColor }:
         <div className="text-3xl font-semibold tracking-tight tabular-nums text-foreground">
           {loading ? <span className="inline-block h-7 w-24 animate-pulse rounded bg-muted" /> : display}
         </div>
-        <DeltaBadge tone={delta.tone} text={delta.text} />
+        <DeltaBadge tone={delta.tone} text={delta.text} direction={delta.direction} />
       </div>
       {sparkData.length > 0 && (
         <div className="mt-3 h-16">
@@ -57,16 +58,25 @@ export function KpiCard({ label, format = 'number', kpi, loading, accentColor }:
   );
 }
 
-function DeltaBadge({ tone, text }: { tone: 'positive' | 'negative' | 'neutral'; text: string }) {
+function DeltaBadge({
+  tone,
+  text,
+  direction,
+}: {
+  tone: 'positive' | 'negative' | 'neutral';
+  text: string;
+  direction: 'up' | 'down' | null;
+}) {
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium',
+        'inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-medium',
         tone === 'positive' && 'bg-emerald-50 text-emerald-700',
         tone === 'negative' && 'bg-rose-50 text-rose-700',
         tone === 'neutral' && 'bg-muted text-muted-foreground',
       )}
     >
+      {direction && <DeltaArrow direction={direction} />}
       {text}
     </span>
   );

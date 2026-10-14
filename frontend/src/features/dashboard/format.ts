@@ -50,14 +50,15 @@ export function formatPct(value: number | null | undefined, digits = 1): string 
 export function formatDelta(deltaPct: number | null | undefined): {
   text: string;
   tone: 'positive' | 'negative' | 'neutral';
+  direction: 'up' | 'down' | null;
 } {
   if (deltaPct == null || !Number.isFinite(deltaPct)) {
-    return { text: '—', tone: 'neutral' };
+    return { text: '—', tone: 'neutral', direction: null };
   }
-  const sign = deltaPct >= 0 ? '▲' : '▼';
   return {
-    text: `${sign} ${Math.abs(deltaPct).toFixed(1)}%`,
+    text: `${Math.abs(deltaPct).toFixed(1)}%`,
     tone: deltaPct >= 0 ? 'positive' : 'negative',
+    direction: deltaPct >= 0 ? 'up' : 'down',
   };
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatPct, formatSignedCompact, formatVndCompact } from './format';
+import { formatDelta, formatPct, formatSignedCompact, formatVndCompact } from './format';
 
 describe('formatVndCompact', () => {
   it.each([
@@ -86,4 +86,13 @@ describe('formatPct', () => {
     expect(formatPct(14.56, 0)).toBe('15%');
     expect(formatPct(14.5, 2)).toBe('14,5%');
   });
+});
+
+describe('formatDelta', () => {
+  it.each([
+    [12.5, { text: '12.5%', tone: 'positive', direction: 'up' }],
+    [0, { text: '0.0%', tone: 'positive', direction: 'up' }],
+    [-3.2, { text: '3.2%', tone: 'negative', direction: 'down' }],
+    [null, { text: '—', tone: 'neutral', direction: null }],
+  ])('%s', (input, expected) => expect(formatDelta(input)).toEqual(expected));
 });

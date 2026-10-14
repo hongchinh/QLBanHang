@@ -18,6 +18,7 @@ import { RangePicker } from '@/features/dashboard/components/range-picker';
 import { useLeaderboard } from '@/features/dashboard/hooks';
 import { useDashboardParams } from '@/features/dashboard/use-dashboard-params';
 import type { SalesLeaderboardItem } from '@/features/dashboard/types';
+import { DeltaArrow } from '@/features/dashboard/components/delta-arrow';
 import { formatDelta, formatNumber, formatVnd, formatVndShort } from '@/features/dashboard/format';
 
 type SortKey = 'rank' | 'revenue' | 'confirmedCount' | 'conversionRate' | 'deltaPct';
@@ -121,7 +122,10 @@ export function SalesPerformancePage() {
                         delta.tone === 'negative' && 'text-rose-600',
                       )}
                     >
-                      {delta.text}
+                      <span className="inline-flex items-center gap-0.5">
+                        {delta.direction && <DeltaArrow direction={delta.direction} />}
+                        {delta.text}
+                      </span>
                     </TableCell>
                   </TableRow>
                 );

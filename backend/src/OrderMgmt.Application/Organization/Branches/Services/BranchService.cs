@@ -138,6 +138,9 @@ public class BranchService : IBranchService
 
         if (branch.Id == BranchDefaults.MainBranchId)
             throw new ConflictException("Không thể xóa chi nhánh chính.");
+        // A demo branch has its own hard delete; a soft delete here would strand the rows the sample-data worker writes.
+        if (branch.IsDemo)
+            throw new ConflictException("DEMO_BRANCH_USE_DEMO_DELETE", "Chi nhánh demo phải xóa bằng chức năng Xóa chi nhánh demo.");
         // Soft-deleted users count too: their rows still reference the branch (review finding).
         if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.DefaultBranchId == id, ct))
             throw new ConflictException("Chi nhánh đang là chi nhánh mặc định của người dùng, không thể xóa.");

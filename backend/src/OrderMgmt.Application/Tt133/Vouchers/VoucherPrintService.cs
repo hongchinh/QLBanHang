@@ -116,8 +116,6 @@ public class VoucherPrintService : IVoucherPrintService
     public async Task<ExportFile> PrintStockVouchersAsync(IReadOnlyList<Guid> ids, StockPrintPriceMode priceMode,
         ExportFormat format, CancellationToken ct = default)
     {
-        if (priceMode == StockPrintPriceMode.None)
-            throw new NotSupportedException($"Price mode {priceMode} is not supported yet.");
         if (priceMode == StockPrintPriceMode.Cost && !_currentUser.HasPermission(Permissions.Inventory.ViewCost))
             throw new ForbiddenException("Cần quyền xem giá vốn để in phiếu theo giá vốn.");
         var distinct = (ids ?? []).Distinct().ToList();
@@ -184,6 +182,7 @@ public class VoucherPrintService : IVoucherPrintService
                         && voucherIds.Contains(e.SourceId))
                     .ToListAsync(token);
                 cost = new CostSource(
+                    // One ledger row per voucher line (the engine posts each line once); a duplicate would be a ledger bug.
                     ledger.Where(e => e.SourceLineId != null).ToDictionary(e => e.SourceLineId!.Value),
                     settings.CostingPeriod,
                     VnTime.ToVnDate(_clock.UtcNow));
@@ -203,23 +202,47 @@ public class VoucherPrintService : IVoucherPrintService
 
     private static StockVoucherPrintModel ToStockModel(StockVoucherRow r, StockPrintPriceMode priceMode, CostSource? cost)
     {
-        var model = ToStockHeader(r);
-        if (priceMode == StockPrintPriceMode.Cost) FillAtCost(model, r, cost!);
-        else FillAtVoucherPrices(model, r);
+        var cancelled = r.Status == StockVoucherStatus.Cancelled;
+        // A cancelled voucher has no ledger rows left: at cost it prints without money.
+        var mode = priceMode == StockPrintPriceMode.Cost && cancelled ? StockPrintPriceMode.None : priceMode;
+        var printed = mode == StockPrintPriceMode.Voucher ? r.Lines : r.Lines.Where(l => l.TrackInventory).ToList();
+        var model = ToStockHeader(r, printed);
+        model.PriceMode = mode;
+        if (priceMode == StockPrintPriceMode.Cost && cancelled) model.Notes.Add("Phiếu đã hủy, không có giá vốn.");
+
+        switch (mode)
+        {
+            case StockPrintPriceMode.Voucher:
+                FillAtVoucherPrices(model, r);
+                break;
+            case StockPrintPriceMode.Cost:
+                FillAtCost(model, r, printed, cost!);
+                break;
+            default:
+                model.Lines = printed.Select((l, i) => PrintLine(l, i + 1, null, null)).ToList();
+                model.Totals = [new StockVoucherPrintTotal("Cộng", null)];
+                break;
+        }
+
+        if (mode != StockPrintPriceMode.Voucher && printed.Count == 0)
+        {
+            model.Totals = [new StockVoucherPrintTotal("Cộng", null)];
+            model.AmountInWords = null;
+            model.Notes.Add("Phiếu không có hàng theo dõi tồn kho.");
+        }
         return model;
     }
 
-    /// Everything but the lines, totals and words; the warehouses are those of the voucher's lines.
-    private static StockVoucherPrintModel ToStockHeader(StockVoucherRow r)
+    /// Everything but the lines, totals and words; the warehouses are those of the printed lines, else the voucher's.
+    private static StockVoucherPrintModel ToStockHeader(StockVoucherRow r, IReadOnlyList<StockVoucherLineRow> printed)
     {
-        var warehouses = r.Lines.DistinctBy(l => l.WarehouseId).ToList();
+        var warehouses = printed.DistinctBy(l => l.WarehouseId).ToList();
         return new StockVoucherPrintModel
         {
             Type = r.Type,
             Code = r.Code,
             Date = VnTime.ToVnDate(r.VoucherAt),
             IsCancelled = r.Status == StockVoucherStatus.Cancelled,
-            PriceMode = StockPrintPriceMode.Voucher,
             HandlerName = VoucherPrintRules.FirstFilled(r.HandlerName, r.PartnerName),
             PartnerName = VoucherPrintRules.FirstFilled(r.PartnerName),
             PartnerAddress = VoucherPrintRules.FirstFilled(r.PartnerAddress),
@@ -235,7 +258,6 @@ public class VoucherPrintService : IVoucherPrintService
     /// Every line at its own price; the stored totals under the table.
     private static void FillAtVoucherPrices(StockVoucherPrintModel model, StockVoucherRow r)
     {
-        model.PriceMode = StockPrintPriceMode.Voucher;
         model.Lines = r.Lines.Select((l, i) => PrintLine(l, i + 1, l.UnitPrice, l.Amount)).ToList();
         model.Totals = VoucherPrintRules.VoucherTotals(r.GoodsAmount, r.LineDiscountTotal, r.OrderDiscount, r.Freight, r.Total)
             .ToList();
@@ -243,12 +265,13 @@ public class VoucherPrintService : IVoucherPrintService
         model.AmountInWords = VndAmountInWords.Read(r.Total);
     }
 
-    /// Tracked lines at their ledger value (stock-in) or cost (stock-out); one "Cộng" row.
-    private static void FillAtCost(StockVoucherPrintModel model, StockVoucherRow r, CostSource cost)
+    /// Tracked lines at their ledger value (stock-in) or cost (stock-out); one "Cộng" row. A line without a ledger
+    /// row prints with an empty price and amount.
+    private static void FillAtCost(StockVoucherPrintModel model, StockVoucherRow r,
+        IReadOnlyList<StockVoucherLineRow> printed, CostSource cost)
     {
-        model.PriceMode = StockPrintPriceMode.Cost;
         var stockIn = r.Type == StockDirection.In;
-        model.Lines = r.Lines.Where(l => l.TrackInventory).Select((l, i) =>
+        model.Lines = printed.Select((l, i) =>
         {
             var entry = cost.ByLine.GetValueOrDefault(l.Id);
             decimal? unitPrice = stockIn

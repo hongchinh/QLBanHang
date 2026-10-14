@@ -390,6 +390,104 @@ public class StockVoucherPrintTests : InventoryTestBase
         }
     }
 
+    [Fact]
+    public async Task None_prints_quantities_only()
+    {
+        await SetCompanyAsync();
+        var aCode = NewCode("A");
+        var a = await CreateInventoryProductAsync(aCode);
+        var uCode = NewCode("U");
+        var u = await CreateInventoryProductAsync(uCode, track: false);
+        var la = LineRequest(a, 10, 100_000);
+        la.VatRate = 10;
+        var v = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-05 09:00", la, LineRequest(u, 1, 50_000));
+
+        var response = await PrintAsync(_client, v.Id, "format=xlsx&priceMode=None");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        var ws = wb.Worksheets.Single();
+        Tt133Sheet.Contains(ws, $"Hàng {uCode}").Should().BeFalse();
+        var row = ws.Row(Tt133Sheet.RowOf(ws, $"Hàng {aCode}"));
+        row.Cell(5).GetValue<decimal>().Should().Be(10);
+        row.Cell(7).IsEmpty().Should().BeTrue();
+        row.Cell(8).IsEmpty().Should().BeTrue();
+        Texts(ws).Should().ContainSingle(t => t == "Cộng");
+        ws.Cell(Tt133Sheet.RowOf(ws, "Cộng"), 8).IsEmpty().Should().BeTrue();
+        Texts(ws).Should().Contain($"- Tổng số tiền (viết bằng chữ): {Dots}");
+        Texts(ws).Should().NotContain(t => t.StartsWith("Trong đó thuế GTGT"));
+    }
+
+    [Fact]
+    public async Task Cancelled_voucher_at_cost_prints_without_money()
+    {
+        await SetCompanyAsync();
+        var aCode = NewCode("A");
+        var a = await CreateInventoryProductAsync(aCode);
+        var v = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-05 09:00", LineRequest(a, 4, 120_000));
+        await ActionAsync(v.Id, "cancel", v.Version);
+
+        var response = await PrintAsync(_client, v.Id, "format=xlsx&priceMode=Cost");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        var ws = wb.Worksheets.Single();
+        Texts(ws).Should().Contain(new[]
+        {
+            "ĐÃ HỦY", "Phiếu đã hủy, không có giá vốn.", $"- Tổng số tiền (viết bằng chữ): {Dots}",
+        });
+        var row = ws.Row(Tt133Sheet.RowOf(ws, $"Hàng {aCode}"));
+        row.Cell(7).IsEmpty().Should().BeTrue();
+        row.Cell(8).IsEmpty().Should().BeTrue();
+        ws.Cell(Tt133Sheet.RowOf(ws, "Cộng"), 8).IsEmpty().Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Voucher_without_tracked_lines()
+    {
+        await SetCompanyAsync();
+        var uCode = NewCode("U");
+        var u = await CreateInventoryProductAsync(uCode, track: false);
+        var v = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-05 09:00", LineRequest(u, 1, 50_000));
+        var kho01 = await WarehouseNameAsync(DefaultWarehouseId);
+
+        var response = await PrintAsync(_client, v.Id, "format=xlsx&priceMode=None");
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        var ws = wb.Worksheets.Single();
+        Tt133Sheet.Contains(ws, $"Hàng {uCode}").Should().BeFalse();
+        Tt133Sheet.RowOf(ws, "Cộng").Should().Be(Tt133Sheet.RowOf(ws, "STT") + 3, "the table has no item row");
+        ws.Cell(Tt133Sheet.RowOf(ws, "Cộng"), 8).IsEmpty().Should().BeTrue();
+        Texts(ws).Should().Contain(new[]
+        {
+            "Phiếu không có hàng theo dõi tồn kho.", $"- Nhập tại kho: {kho01} Địa điểm: {Dots}",
+        });
+    }
+
+    [Fact]
+    public async Task Warehouses_of_the_printed_lines_only()
+    {
+        await SetCompanyAsync();
+        var second = await CreateWarehouseAsync(MainBranchId, NewCode("KH"));
+        var a = await CreateInventoryProductAsync(NewCode("A"));
+        var u = await CreateInventoryProductAsync(NewCode("U"), track: false);
+        var lu = LineRequest(u, 1, 50_000);
+        lu.WarehouseId = second;
+        var v = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-05 09:00", LineRequest(a, 2, 100_000), lu);
+        var kho01 = await WarehouseNameAsync(DefaultWarehouseId);
+
+        foreach (var mode in new[] { "Cost", "None" })
+        {
+            var response = await PrintAsync(_client, v.Id, $"format=xlsx&priceMode={mode}");
+            response.StatusCode.Should().Be(HttpStatusCode.OK);
+            using var wb = await Tt133Sheet.OpenAsync(response);
+            var ws = wb.Worksheets.Single();
+            Texts(ws).Should().Contain($"- Nhập tại kho: {kho01} Địa điểm: {Dots}", mode);
+            Tt133Sheet.Contains(ws, "Kho").Should().BeFalse(mode);
+        }
+    }
+
     /// The stock-in of `Prints_a_stock_in_with_its_totals`: line discount, order discount, VAT and freight.
     private async Task<(StockVoucherDto Voucher, string SupplierCode, string ACode)> StockInWithTotalsAsync()
     {

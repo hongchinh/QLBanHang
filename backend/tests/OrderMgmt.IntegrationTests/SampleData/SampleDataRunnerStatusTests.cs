@@ -12,6 +12,7 @@ using OrderMgmt.Application.Organization.SampleData.Services;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Enums;
+using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.ExecutiveDashboard;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -318,6 +319,60 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.BranchId == branchId))).Should().BeFalse("nothing ran");
     }
 
+    /// The same overlap at the end of a run: the other instance's recovery fails the branch while it is being filled.
+    /// Its verdict stands: no progress, no Ready, no dashboard signal, and the run does not count as a success.
+    [Fact]
+    public async Task Branch_failed_by_recovery_during_the_run_stays_failed()
+    {
+        var branchId = await CreateBranchAsync("RC05");
+        var recorder = new RecordingRealtimeNotifier();
+        var identity = new InterruptingIdentity(() => FailAsRecoveryWould(branchId));
+        var host = TinyPlans.WithServices(_factory, s =>
+        {
+            TinyPlans.Replace<IRealtimeNotifier>(s, recorder);
+            TinyPlans.Replace<IActingIdentity>(s, identity);
+        });
+
+        // TinyPlans.Setup has 10 items, so the run writes its progress once, after the branch was failed.
+        var result = await TinyPlans.RunAsync(host, branchId, TinyPlans.Setup(TinyPlans.OpeningDate));
+
+        result.Succeeded.Should().BeFalse();
+        var branch = await BranchAsync(branchId);
+        (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
+            .Should().Be((SampleDataStatus.Failed, 0, InterruptedError));
+        recorder.DashboardSignals.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Run_job_on_a_branch_failed_by_recovery_makes_no_plan()
+    {
+        var generator = new FakeSampleDataGenerator(_ => TinyPlans.Setup(TinyPlans.OpeningDate));
+        var host = TinyPlans.WithService<ISampleDataGenerator>(_factory, generator);
+        var branchId = await CreateBranchAsync("RJ04");
+        await SetStatusAsync(branchId, isDemo: true, SampleDataStatus.Failed, 40, InterruptedError);
+        var adminId = await TinyPlans.AdminIdAsync(_factory);
+
+        await using (var scope = host.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<ISampleDataRunner>()
+                .RunJobAsync(new SampleDataJob(branchId, adminId));
+
+        generator.Inputs.Should().BeEmpty();
+        var branch = await BranchAsync(branchId);
+        (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
+            .Should().Be((SampleDataStatus.Failed, 40, InterruptedError));
+    }
+
+    /// What the startup recovery of another instance does to the branch, synchronously (it runs inside Set).
+    private void FailAsRecoveryWould(Guid branchId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        scope.ServiceProvider.GetRequiredService<AppDbContext>().Branches.IgnoreQueryFilters()
+            .Where(b => b.Id == branchId)
+            .ExecuteUpdate(s => s
+                .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Failed)
+                .SetProperty(b => b.SampleDataError, InterruptedError));
+    }
+
     /// S18: a signal that fails or never completes is given up (after 3 s) and does not fail the saved run.
     [Theory]
     [InlineData(false)]
@@ -339,6 +394,22 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         var branch = await BranchAsync(branchId);
         (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
             .Should().Be((SampleDataStatus.Ready, 100, (string?)null));
+    }
+
+    /// The acting identity, which lets `onFirstSet` run on its first Set, as another instance would meanwhile.
+    private sealed class InterruptingIdentity : IActingIdentity
+    {
+        private Action? _onFirstSet;
+
+        public InterruptingIdentity(Action onFirstSet) => _onFirstSet = onFirstSet;
+
+        public ActingIdentity? Current { get; private set; }
+
+        public void Set(ActingIdentity identity)
+        {
+            Interlocked.Exchange(ref _onFirstSet, null)?.Invoke();
+            Current = identity;
+        }
     }
 
     /// The acting identity of a host that is stopping: setting it stops the run's token, then fails as a disposed scope.

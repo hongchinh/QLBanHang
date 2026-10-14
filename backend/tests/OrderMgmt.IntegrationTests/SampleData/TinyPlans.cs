@@ -74,15 +74,21 @@ public static class TinyPlans
     /// S19: a host of the factory's database whose `T` is `instance` (a recorder or a fake). A derived host would start
     /// lazily on first use, and its startup recovery fails every Running demo branch of the shared clone database, so
     /// it is started here: make Running demo branches only after this call.
-    public static WebApplicationFactory<Program> WithService<T>(WebAppFactory factory, T instance) where T : class
+    public static WebApplicationFactory<Program> WithService<T>(WebAppFactory factory, T instance) where T : class =>
+        WithServices(factory, s => Replace(s, instance));
+
+    /// As WithService, for several services: `configure` replaces them with Replace.
+    public static WebApplicationFactory<Program> WithServices(WebAppFactory factory, Action<IServiceCollection> configure)
     {
-        var host = factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
-        {
-            s.RemoveAll<T>();
-            s.AddSingleton(instance);
-        }));
+        var host = factory.WithWebHostBuilder(b => b.ConfigureTestServices(configure));
         _ = host.Services;
         return host;
+    }
+
+    public static void Replace<T>(IServiceCollection services, T instance) where T : class
+    {
+        services.RemoveAll<T>();
+        services.AddSingleton(instance);
     }
 
     /// S5, computed independently of the runner: active non-deleted SALES users by username, take 3.

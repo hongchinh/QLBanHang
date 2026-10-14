@@ -17,11 +17,11 @@ public class SampleDataHostedServiceUnitTests
 
     private static SampleDataJob Job() => new(Guid.NewGuid(), Guid.NewGuid());
 
-    private static SampleDataHostedService Worker(ISampleDataRunner runner, SampleDataQueue queue, RecordingLogger logger)
-    {
-        var services = new ServiceCollection().AddScoped(_ => runner).BuildServiceProvider();
-        return new SampleDataHostedService(queue, services.GetRequiredService<IServiceScopeFactory>(), logger);
-    }
+    private static ServiceProvider Services(ISampleDataRunner runner) =>
+        new ServiceCollection().AddScoped(_ => runner).BuildServiceProvider();
+
+    private static SampleDataHostedService Worker(ServiceProvider services, SampleDataQueue queue, RecordingLogger logger) =>
+        new(queue, services.GetRequiredService<IServiceScopeFactory>(), logger);
 
     [Fact]
     public async Task Failing_job_is_logged_and_the_next_jobs_run()
@@ -46,7 +46,8 @@ public class SampleDataHostedServiceUnitTests
         foreach (var job in new[] { job1, job2, job3 })
             queue.Enqueue(job);
         var logger = new RecordingLogger();
-        using var worker = Worker(runner, queue, logger);
+        await using var services = Services(runner);
+        using var worker = Worker(services, queue, logger);
 
         await worker.StartAsync(CancellationToken.None);
         await done.Task.WaitAsync(Wait);
@@ -87,7 +88,8 @@ public class SampleDataHostedServiceUnitTests
         var queue = new SampleDataQueue();
         foreach (var job in new[] { job1, job2, job3 })
             queue.Enqueue(job);
-        using var worker = Worker(runner, queue, new RecordingLogger());
+        await using var services = Services(runner);
+        using var worker = Worker(services, queue, new RecordingLogger());
 
         await worker.StartAsync(CancellationToken.None);
         await done.Task.WaitAsync(Wait);
@@ -115,7 +117,8 @@ public class SampleDataHostedServiceUnitTests
         var queue = new SampleDataQueue();
         var job = Job();
         queue.Enqueue(job);
-        using var worker = Worker(runner, queue, new RecordingLogger());
+        await using var services = Services(runner);
+        using var worker = Worker(services, queue, new RecordingLogger());
 
         var start = worker.StartAsync(CancellationToken.None);
         await Task.Delay(200);
@@ -156,7 +159,8 @@ public class SampleDataHostedServiceUnitTests
         var job = Job();
         queue.Enqueue(job);
         var logger = new RecordingLogger();
-        using var worker = Worker(runner, queue, logger);
+        await using var services = Services(runner);
+        using var worker = Worker(services, queue, logger);
 
         await worker.StartAsync(CancellationToken.None);
         await started.Task.WaitAsync(Wait);
@@ -195,7 +199,8 @@ public class SampleDataHostedServiceUnitTests
         queue.Enqueue(job1);
         queue.Enqueue(job2);
         var logger = new RecordingLogger();
-        using var worker = Worker(runner, queue, logger);
+        await using var services = Services(runner);
+        using var worker = Worker(services, queue, logger);
 
         await worker.StartAsync(CancellationToken.None);
         await started.Task.WaitAsync(Wait);

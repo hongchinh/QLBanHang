@@ -95,7 +95,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
     }
 
     /// The log scope of a job, opened by the runner and by the worker around it.
-    public static Dictionary<string, object?> LogScope(SampleDataJob job) => new()
+    public static IReadOnlyDictionary<string, object?> LogScope(SampleDataJob job) => new Dictionary<string, object?>
     {
         ["UserId"] = job.RequestedByUserId,
         ["CorrelationId"] = $"sample-data-{job.BranchId:N}",
@@ -103,8 +103,9 @@ public sealed class SampleDataRunner : ISampleDataRunner
 
     private IDisposable? BeginJobScope(SampleDataJob job) => _logger.BeginScope(LogScope(job));
 
-    /// The plan and the owners it was made for. Null when no plan could be made (a branch that is missing, real or no
-    /// longer Running; a generator failure): the branch is then Failed under KE-HOACH, and a generator failure keeps the generator's own message.
+    /// The plan and the owners it was made for. Null when no plan was made: for a branch that is missing, real or no
+    /// longer Running nothing is written; a generator failure fails the branch under KE-HOACH with the generator's own
+    /// message.
     private async Task<(SampleDataPlan Plan, IReadOnlyList<Guid> Owners)?> GenerateAsync(SampleDataJob job,
         CancellationToken ct)
     {
@@ -112,8 +113,12 @@ public sealed class SampleDataRunner : ISampleDataRunner
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
-            var branchCode = await RunningDemoBranch(db, job.BranchId).Select(b => b.Code).SingleOrDefaultAsync(ct)
-                ?? throw new SampleDataPlanException(BranchNotFound);
+            var branchCode = await RunningDemoBranch(db, job.BranchId).Select(b => b.Code).SingleOrDefaultAsync(ct);
+            if (branchCode is null)
+            {
+                _logger.LogWarning("Sample data of branch {BranchId}: not a Running demo branch; skipped", job.BranchId);
+                return null;
+            }
             var owners = await ResolveOwnersAsync(db, job.RequestedByUserId, ct);
             var input = new SampleDataGeneratorInput(branchCode, VnTime.ToVnDate(_clock.UtcNow), owners.Count);
             try
@@ -146,7 +151,10 @@ public sealed class SampleDataRunner : ISampleDataRunner
         {
             run = new SampleRunState(job.BranchId, TotalItems(plan), PlanKey);
             if (!await StartAsync(job.BranchId, ct))
-                throw new SampleDataPlanException(BranchNotFound);
+            {
+                _logger.LogWarning("Sample data of branch {BranchId}: not a Running demo branch; skipped", job.BranchId);
+                return LeftUnchanged(run, stopwatch);
+            }
             await PrepareAsync(run, job.RequestedByUserId, owners, ct);
             await RunSetupAsync(run, plan, ct);
             foreach (var step in plan.Steps)
@@ -155,7 +163,14 @@ public sealed class SampleDataRunner : ISampleDataRunner
             if (run.Done != run.Total)
                 _logger.LogWarning("Sample data of branch {BranchCode} ran {Done} of {Total} items", run.BranchCode, run.Done, run.Total);
             run.CurrentKey = FinishKey;
-            await SetReadyAsync(job.BranchId, ct);
+            if (!await SetReadyAsync(job.BranchId, ct))
+            {
+                // Failed meanwhile, by the startup recovery of another instance during a rolling deploy for example.
+                _logger.LogWarning(
+                    "Sample data of branch {BranchId} ({BranchCode}): no longer a Running demo branch; left unchanged",
+                    job.BranchId, run.BranchCode);
+                return LeftUnchanged(run, stopwatch);
+            }
             await TrySignalDashboardsAsync(job.BranchId, ct);
             _logger.LogInformation(
                 "Sample data of branch {BranchCode} ready: {StepsExecuted} steps executed, {StepsSkipped} skipped in {Elapsed}",
@@ -173,6 +188,11 @@ public sealed class SampleDataRunner : ISampleDataRunner
             return new SampleDataRunResult(false, run?.StepsExecuted ?? 0, run?.StepsSkipped ?? 0, stopwatch.Elapsed, error);
         }
     }
+
+    /// A run on a branch that is missing, real or no longer Running: nothing was written to its row.
+    private static SampleDataRunResult LeftUnchanged(SampleRunState run, Stopwatch stopwatch) =>
+        new(false, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed,
+            FormatError(run.CurrentKey, new SampleDataPlanException(BranchNotFound)));
 
     /// SampleDataError: "{key}: {reason}", cut to 1000 characters without splitting a surrogate pair. Every signed-in
     /// user can read it, so the reason follows GlobalExceptionMiddleware and never shows an internal message.
@@ -433,13 +453,14 @@ public sealed class SampleDataRunner : ISampleDataRunner
             .SetProperty(b => b.SampleDataError, (string?)null), ct) > 0;
     }
 
-    private async Task SetReadyAsync(Guid branchId, CancellationToken ct)
+    /// False when the branch is no longer a Running demo branch: it is then left as it is.
+    private async Task<bool> SetReadyAsync(Guid branchId, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        await RunningDemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
+        return await RunningDemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
             .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Ready)
             .SetProperty(b => b.SampleDataProgress, 100)
-            .SetProperty(b => b.SampleDataError, (string?)null), ct);
+            .SetProperty(b => b.SampleDataError, (string?)null), ct) > 0;
     }
 
     /// S18: the controllers' signal is skipped, so a finished run tells the open dashboards once that every domain of
@@ -477,7 +498,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
     }
 
     /// Never throws. A few short retries without a token, so a database blip does not leave the branch Running; after
-    /// the last one only the log keeps the error.
+    /// the last one only the log keeps the error. A branch that is no longer a Running demo branch is left as it is.
     private async Task FailAsync(Guid branchId, string error)
     {
         for (var attempt = 1; ; attempt++)
@@ -485,9 +506,12 @@ public sealed class SampleDataRunner : ISampleDataRunner
             try
             {
                 await using var scope = _scopeFactory.CreateAsyncScope();
-                await RunningDemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
+                var rows = await RunningDemoBranch(scope, branchId).ExecuteUpdateAsync(s => s
                     .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Failed)
                     .SetProperty(b => b.SampleDataError, error));
+                if (rows == 0)
+                    _logger.LogWarning("Sample data of branch {BranchId}: not a Running demo branch; error not written: {Error}",
+                        branchId, error);
                 return;
             }
             catch (Exception ex) when (attempt < FailAttempts)

@@ -5,13 +5,16 @@ using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Domain.Enums;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
 /// Type-specific permissions (receipts.* / payments.*) are checked by the service.
 [Route("api/cash-vouchers")]
 [Authorize]
+[DashboardSignal(DashboardDomains.Cash | DashboardDomains.Debt)]
 [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
 public class CashVouchersController : ApiControllerBase
 {

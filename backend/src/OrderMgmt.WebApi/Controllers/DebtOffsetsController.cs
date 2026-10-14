@@ -4,13 +4,16 @@ using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.CashDebt.DebtOffsets.Interfaces;
 using OrderMgmt.Application.CashDebt.DebtOffsets.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.WebApi.Authorization;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
 /// Debt offset vouchers (P23): create, view, cancel and delete; no edit and no restore.
 [Route("api/debt-offsets")]
+[DashboardSignal(DashboardDomains.Debt)]
 public class DebtOffsetsController : ApiControllerBase
 {
     private readonly IDebtOffsetService _service;

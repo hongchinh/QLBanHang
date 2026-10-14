@@ -25,6 +25,24 @@ const segments = (container: HTMLElement) =>
   }));
 
 describe('DebtTermBar', () => {
+  // The bar is hidden from assistive technology: each label carries the colour of its segment.
+  it('puts a swatch in the colour of its segment in front of each label', () => {
+    render(<DebtTermBar side={side({ notDue: 500, overdue: 2_500, overdueAmounts: [2_000, 500, 0, 0] })} buckets={BUCKETS} />);
+
+    const swatches = bodyRows().map((row) => {
+      const swatch = within(row).getAllByRole('cell')[0].querySelector<HTMLElement>('[data-swatch]');
+      return swatch && { hidden: swatch.getAttribute('aria-hidden'), colour: Array.from(swatch.classList).find((c) => c.startsWith('bg-')) };
+    });
+    expect(swatches).toEqual([
+      { hidden: 'true', colour: 'bg-primary' },
+      { hidden: 'true', colour: 'bg-amber-400' },
+      { hidden: 'true', colour: 'bg-orange-500' },
+      { hidden: 'true', colour: 'bg-rose-500' },
+      { hidden: 'true', colour: 'bg-rose-700' },
+    ]);
+    expect(cells(bodyRows()[1])[0]).toBe('Quá hạn 1–30 ngày');
+  });
+
   it('lists "Trong hạn" and each overdue bucket with its amount and its whole-percent share', () => {
     render(<DebtTermBar side={side()} buckets={BUCKETS} />);
 

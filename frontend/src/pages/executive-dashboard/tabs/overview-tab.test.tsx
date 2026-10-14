@@ -335,6 +335,51 @@ describe('OverviewTab', () => {
     expect(screen.getByText('1,26 tỷ')).toBeInTheDocument();
   });
 
+  describe('the cash flow tile reads two queries', () => {
+    it('is dimmed while the fund balances of the previous key are on screen', () => {
+      answer(useCashSummary, ok(CASH_SUMMARY, { isPlaceholderData: true }));
+      renderTab();
+
+      expect(tile('Dòng tiền thu – chi')).toHaveAttribute('aria-busy', 'true');
+      expect(tile('Cơ cấu nợ phải thu')).not.toHaveAttribute('aria-busy');
+    });
+
+    it('is not dimmed when both are fresh', () => {
+      renderTab();
+
+      expect(tile('Dòng tiền thu – chi')).not.toHaveAttribute('aria-busy');
+    });
+
+    it('a failed fund summary shows its error under the chart, with a retry', () => {
+      const summary = failed();
+      answer(useCashSummary, summary);
+      renderTab();
+
+      const cash = tile('Dòng tiền thu – chi');
+      expect(cash.querySelector('svg.recharts-surface')).not.toBeNull();
+      expect(within(cash).getByText('Máy chủ không phản hồi.')).toBeInTheDocument();
+      fireEvent.click(within(cash).getByRole('button', { name: 'Thử lại' }));
+      expect(summary.refetch).toHaveBeenCalled();
+    });
+
+    it('a failed fund summary is shown also when the period has no movement', () => {
+      answer(useCashSeries, ok({ granularity: 'Day', points: [] }));
+      answer(useCashSummary, failed());
+      renderTab();
+
+      expect(within(tile('Dòng tiền thu – chi')).getByText('Máy chủ không phản hồi.')).toBeInTheDocument();
+    });
+
+    it('a failed refresh of the fund summary keeps the funds and shows no error', () => {
+      answer(useCashSummary, ok(CASH_SUMMARY, { isError: true, error: new Error('Máy chủ không phản hồi.') }));
+      renderTab();
+
+      const cash = tile('Dòng tiền thu – chi');
+      expect(within(cash).getByText('CN01 · QTM – Tiền mặt')).toBeInTheDocument();
+      expect(within(cash).queryByText('Máy chủ không phản hồi.')).not.toBeInTheDocument();
+    });
+  });
+
   describe('report links', () => {
     it('in company scope with three branches "Sổ quỹ →" says which branch the report opens for', () => {
       renderTab();
@@ -418,6 +463,20 @@ describe('OverviewTab', () => {
       state.access = { ...allDomains(), sales: false, tabs: ['overview', 'cash', 'debt', 'inventory'] };
       renderTab();
 
+      fireEvent.click(within(tile('Dòng tiền thu – chi')).getByRole('button', { name: 'Tháng' }));
+
+      expect(granularities(useCashSeries).at(-1)).toEqual(['2026-10-01', 'Month']);
+    });
+
+    it.each([
+      ['has no figure', ok({ granularity: 'Day', points: [{ date: '2026-10-01', revenue: 0, cost: 0, grossProfit: 0 }] })],
+      ['loads', ok(undefined, { isLoading: true })],
+      ['failed', failed()],
+    ])('when the profit chart %s the cash chart has the toggle', (_case, sales) => {
+      answer(useSalesSeries, sales);
+      renderTab();
+
+      expect(within(tile('Doanh thu – giá vốn – lãi gộp')).queryByRole('button', { name: 'Ngày' })).not.toBeInTheDocument();
       fireEvent.click(within(tile('Dòng tiền thu – chi')).getByRole('button', { name: 'Tháng' }));
 
       expect(granularities(useCashSeries).at(-1)).toEqual(['2026-10-01', 'Month']);

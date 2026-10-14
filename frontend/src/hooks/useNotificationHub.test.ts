@@ -294,6 +294,8 @@ describe('useNotificationHub: dashboard signal and connection status', () => {
 
     expect(mockStart).toHaveBeenCalledTimes(1)
     expect(realtimeBus.getStatus()).toBe('connected')
+    // A start stopped by the unmount (StrictMode, leaving the page) is not reported as a failure.
+    expect(console.error).not.toHaveBeenCalled()
   })
 
   describe('a connection that closes while the hook is mounted', () => {

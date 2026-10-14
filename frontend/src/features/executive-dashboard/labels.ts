@@ -1,4 +1,4 @@
-import { formatNumber } from '@/features/dashboard/format';
+import { formatNumber, formatVndCompact } from '@/features/dashboard/format';
 
 // Texts of the dashboard tables. Null parts are left out.
 
@@ -19,4 +19,9 @@ export function withBranch(branchCode: string | null | undefined, label: string)
 // A table amount: the full number as on the report pages; "—" when there is none.
 export function formatAmount(value: number | null): string {
   return value == null ? '—' : formatNumber(value);
+}
+
+// A compact amount ("2,84 tỷ", "412 tr") as on the KPI tiles; "—" when there is none.
+export function formatCompactAmount(value: number | null): string {
+  return value == null ? '—' : formatVndCompact(value);
 }

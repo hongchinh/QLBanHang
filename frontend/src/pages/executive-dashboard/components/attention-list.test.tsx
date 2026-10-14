@@ -136,9 +136,17 @@ describe('AttentionList', () => {
   it('the report links carry the hint of the working branch', () => {
     renderList(FULL, 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
 
-    for (const link of screen.getAllByRole('link')) {
-      expect(link).toHaveAttribute('title', 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
+    for (const text of ['Khách nợ quá hạn', 'Mã hàng tồn âm', 'Khoản phải trả đến hạn 7 ngày']) {
+      expect(rowOf(text).querySelector('a')).toHaveAttribute('title', 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
     }
+  });
+
+  it('the credit limit row is not a report and carries no hint', () => {
+    renderList(FULL, 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
+
+    const link = rowOf('Khách vượt hạn mức nợ').querySelector('a');
+    expect(link).toHaveAttribute('href', '/credit-limits');
+    expect(link).not.toHaveAttribute('title');
   });
 
   it('the report links have no title without a hint', () => {

@@ -1,5 +1,6 @@
 import { TableCell } from '@/components/ui/table';
 import { formatNumber } from '@/features/dashboard/format';
+import { codeName, withBranch } from '@/features/executive-dashboard/labels';
 import type { FundBalance } from '@/features/executive-dashboard/types';
 import { cn } from '@/lib/utils';
 import { DataTable } from './data-table';
@@ -28,7 +29,7 @@ export function FundBalanceTable({ funds, showBranch, limit, total }: FundBalanc
     {
       key: 'fund',
       header: 'Quỹ',
-      cell: (fund) => `${showBranch ? `${fund.branchCode} · ` : ''}${fund.code ? `${fund.code} – ` : ''}${fund.name}`,
+      cell: (fund) => withBranch(showBranch ? fund.branchCode : null, codeName(fund.code, fund.name)),
     },
     {
       key: 'balance',
@@ -45,7 +46,9 @@ export function FundBalanceTable({ funds, showBranch, limit, total }: FundBalanc
       footer={
         total === undefined ? undefined : (
           <>
-            <TableCell>Tổng cộng</TableCell>
+            <th scope="row" className="qldh-table-cell border-r border-border/60 text-left align-middle font-medium">
+              Tổng cộng
+            </th>
             <TableCell className={cn('text-right tabular-nums', total < 0 && NEGATIVE)}>{formatNumber(total)}</TableCell>
           </>
         )

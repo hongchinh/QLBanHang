@@ -57,8 +57,9 @@ export function useNotificationHub() {
       connection.start().then(
         () => setStatus('connected'),
         (err) => {
-          console.error('SignalR connection failed:', err)
+          // A start stopped by the cleanup (StrictMode, leaving the page) is not a failure.
           if (!active) return
+          console.error('SignalR connection failed:', err)
           realtimeBus.setStatus('disconnected')
           retryLater()
         },

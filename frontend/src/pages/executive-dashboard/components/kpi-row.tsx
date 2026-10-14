@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import type { ReactNode } from 'react';
 import { StatTile } from '@/features/dashboard/components/stat-tile';
+import type { TileQuery } from '@/features/dashboard/components/tile-card';
 import { formatNumber, formatPct, formatSignedCompact, formatVndCompact } from '@/features/dashboard/format';
 import { useCashSummary, useDebtSummary, useInventorySummary, useSalesSummary } from '@/features/executive-dashboard/hooks';
 import { executiveLinks, reportLinkTitle } from '@/features/executive-dashboard/links';
@@ -14,28 +15,34 @@ interface KpiRowProps {
   params: ExecutiveParams;
 }
 
-// What a tile reads of its query.
-interface SummaryQuery {
-  isLoading: boolean;
-  isError: boolean;
-  data?: unknown;
-  refetch: () => unknown;
-}
-
-function queryState(query: SummaryQuery) {
+function queryState(query: TileQuery) {
   return {
     loading: query.isLoading,
+    // The figures of the previous key while the new one loads (keepPreviousData).
+    stale: query.isPlaceholderData === true,
     // A failed background refresh keeps the figures on screen.
     error: query.isError && query.data === undefined,
     onRetry: () => void query.refetch(),
   };
 }
 
+// The width of a group on wide screens: as many of the seven columns as it has tiles (static class names,
+// so Tailwind keeps them).
+const XL_SPAN: Record<number, string> = {
+  1: 'xl:col-span-1',
+  2: 'xl:col-span-2',
+  3: 'xl:col-span-3',
+  4: 'xl:col-span-4',
+};
+
 // "Tỷ suất 14,5% (▲ 0,8 điểm)": the margin and its change against the previous period, in points.
 function marginHint(sales: SalesSummary): string {
   const margin = `Tỷ suất ${formatPct(sales.marginPct)}`;
   if (sales.marginPct == null || sales.prevMarginPct == null) return margin;
-  const change = Math.round((sales.marginPct - sales.prevMarginPct) * 10) / 10;
+  // Rounded half away from zero to one decimal, worked in hundredths (the server sends two decimals): the
+  // floating-point difference of 14,56 and 13,71 is 0,8499…, which would round to 0,8 instead of 0,9.
+  const hundredths = Math.round(sales.marginPct * 100) - Math.round(sales.prevMarginPct * 100);
+  const change = (Math.sign(hundredths) * Math.round(Math.abs(hundredths) / 10)) / 10;
   return `${margin} (${change >= 0 ? '▲' : '▼'} ${formatNumber(Math.abs(change))} điểm)`;
 }
 
@@ -144,33 +151,26 @@ export function KpiRow({ params }: KpiRowProps) {
 
   if (periodTiles.length === 0 && nowTiles.length === 0) return null;
 
-  // One grid of seven columns on wide screens: the two group labels share the first row, the tiles the
-  // second. Narrower, each label spans the row above its own tiles.
+  // One grid of seven columns on wide screens, where the two groups sit side by side, each as wide as its
+  // tiles. Narrower, each group takes the full width. A group shares the columns of the row (subgrid), so its
+  // label spans exactly its own tiles.
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
-      {periodTiles.length > 0 && (
-        <KpiGroup label="Trong kỳ" span="xl:col-span-3">
-          {periodTiles}
-        </KpiGroup>
-      )}
-      {nowTiles.length > 0 && (
-        <KpiGroup label="Hiện tại" span="xl:col-span-4">
-          {nowTiles}
-        </KpiGroup>
-      )}
+      {periodTiles.length > 0 && <KpiGroup label="Trong kỳ">{periodTiles}</KpiGroup>}
+      {nowTiles.length > 0 && <KpiGroup label="Hiện tại">{nowTiles}</KpiGroup>}
     </div>
   );
 }
 
-function KpiGroup({ label, span, children }: { label: string; span: string; children: ReactNode }) {
+function KpiGroup({ label, children }: { label: string; children: ReactNode[] }) {
   const id = useId();
   return (
-    // `contents`: the label and the tiles are items of the parent grid.
-    <div role="group" aria-labelledby={id} className="contents">
-      <h2
-        id={id}
-        className={cn('col-span-full text-xs font-medium uppercase tracking-wide text-muted-foreground xl:row-start-1', span)}
-      >
+    <div
+      role="group"
+      aria-labelledby={id}
+      className={cn('col-span-full grid grid-cols-subgrid content-start gap-3', XL_SPAN[children.length])}
+    >
+      <h2 id={id} className="col-span-full text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </h2>
       {children}

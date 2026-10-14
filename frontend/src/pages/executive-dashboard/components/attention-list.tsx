@@ -20,6 +20,8 @@ interface Row {
   text: string;
   sub: (item: AttentionItem) => string | null;
   to: string;
+  // The tooltip of the link: the branch hint on the report rows only.
+  title: string | undefined;
   // The dot of an item that needs attention.
   dot: string;
 }
@@ -37,6 +39,7 @@ export function AttentionList({ attention, today, from, to, linkTitle }: Attenti
       text: 'Khách nợ quá hạn',
       sub: money,
       to: executiveLinks.debtOverdue('Receivable', today),
+      title: linkTitle,
       dot: 'bg-rose-500',
     },
     {
@@ -44,17 +47,27 @@ export function AttentionList({ attention, today, from, to, linkTitle }: Attenti
       text: 'Khách vượt hạn mức nợ',
       sub: (item) => (item.amount == null ? null : `vượt ${formatVnd(item.amount)}`),
       to: executiveLinks.creditLimits(),
+      // Not a report: the credit limits are managed per branch, the hint does not apply.
+      title: undefined,
       dot: 'bg-rose-500',
     },
-    { key: 'negativeStock', text: 'Mã hàng tồn âm', sub: () => null, to: executiveLinks.stockOnHand(), dot: 'bg-amber-500' },
+    {
+      key: 'negativeStock',
+      text: 'Mã hàng tồn âm',
+      sub: () => null,
+      to: executiveLinks.stockOnHand(),
+      title: linkTitle,
+      dot: 'bg-amber-500',
+    },
     {
       key: 'payablesDueSoon',
       text: 'Khoản phải trả đến hạn 7 ngày',
       sub: money,
       to: executiveLinks.debtBalance('Payable', from, to),
+      title: linkTitle,
       dot: 'bg-amber-500',
     },
-    { key: 'negativeFunds', text: 'Quỹ âm', sub: money, to: executiveLinks.cashBook(), dot: 'bg-rose-500' },
+    { key: 'negativeFunds', text: 'Quỹ âm', sub: money, to: executiveLinks.cashBook(), title: linkTitle, dot: 'bg-rose-500' },
   ];
   const visible = rows.flatMap((row) => {
     const item = attention[row.key];
@@ -87,7 +100,7 @@ export function AttentionList({ attention, today, from, to, linkTitle }: Attenti
         return (
           <li key={row.key}>
             {needsAttention && canOpenLink(row.to) ? (
-              <Link to={row.to} title={linkTitle} className="flex items-center gap-2.5 py-2 hover:bg-accent">
+              <Link to={row.to} title={row.title} className="flex items-center gap-2.5 py-2 hover:bg-accent">
                 {content}
               </Link>
             ) : (

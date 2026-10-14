@@ -65,7 +65,11 @@ describe('FundBalanceTable', () => {
     render(<FundBalanceTable funds={FUNDS.slice(0, 2)} showBranch={false} total={29_300} />);
 
     const rows = screen.getAllByRole('row');
-    expect(cells(rows[rows.length - 1])).toEqual(['Tổng cộng', '29.300']);
+    const total = rows[rows.length - 1];
+    // "Tổng cộng" is the header of its row.
+    expect(within(total).getByRole('rowheader', { name: 'Tổng cộng' })).toHaveAttribute('scope', 'row');
+    expect(cells(total)).toEqual(['29.300']);
+    expect(within(total).getByText('29.300')).toHaveClass('text-right', 'tabular-nums');
   });
 
   it('has no "Tổng cộng" row without total', () => {

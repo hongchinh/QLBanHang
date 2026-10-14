@@ -83,6 +83,18 @@ function TileActionControl({ action }: { action: TileAction }) {
   );
 }
 
+// The error of a query and its retry button; also for a second query a tile reads.
+export function TileError({ query }: { query: Pick<TileQuery, 'error' | 'refetch'> }) {
+  return (
+    <div role="status" className="text-sm text-rose-700">
+      <p>{query.error != null ? getErrorMessage(query.error) : 'Không tải được dữ liệu.'}</p>
+      <Button type="button" variant="outline" size="sm" className="mt-2 text-foreground" onClick={() => query.refetch()}>
+        Thử lại
+      </Button>
+    </div>
+  );
+}
+
 function TileBody({
   query,
   isEmpty,
@@ -95,14 +107,7 @@ function TileBody({
   }
   // Only a failure with nothing to show: a failed background refetch keeps the last data on screen.
   if (query?.isError && query.data === undefined) {
-    return (
-      <div role="status" className="text-sm text-rose-700">
-        <p>{query.error != null ? getErrorMessage(query.error) : 'Không tải được dữ liệu.'}</p>
-        <Button type="button" variant="outline" size="sm" className="mt-2 text-foreground" onClick={() => query.refetch()}>
-          Thử lại
-        </Button>
-      </div>
-    );
+    return <TileError query={query} />;
   }
   if (isEmpty) {
     return <p className="text-sm text-muted-foreground">{emptyText ?? 'Chưa có dữ liệu.'}</p>;

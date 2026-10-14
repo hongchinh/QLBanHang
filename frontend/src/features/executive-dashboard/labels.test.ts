@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { codeName, formatAmount, withBranch } from './labels';
+import { codeName, formatAmount, formatCompactAmount, withBranch } from './labels';
 
 describe('codeName', () => {
   it('joins the code and the name with an en dash', () => {
@@ -35,5 +35,17 @@ describe('formatAmount', () => {
 
   it('prints "—" for null', () => {
     expect(formatAmount(null)).toBe('—');
+  });
+});
+
+describe('formatCompactAmount', () => {
+  it('prints the compact money of the KPI tiles', () => {
+    expect(formatCompactAmount(1_620_000_000)).toBe('1,62 tỷ');
+    expect(formatCompactAmount(412_000_000)).toBe('412 tr');
+    expect(formatCompactAmount(0)).toBe('0');
+  });
+
+  it('prints "—" for null', () => {
+    expect(formatCompactAmount(null)).toBe('—');
   });
 });

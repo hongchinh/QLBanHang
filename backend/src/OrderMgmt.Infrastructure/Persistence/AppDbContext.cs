@@ -43,6 +43,7 @@ public class AppDbContext : DbContext, IAppDbContext
     public DbSet<PaymentMethod> PaymentMethods => Set<PaymentMethod>();
     public DbSet<InventorySettings> InventorySettings => Set<InventorySettings>();
     public DbSet<CashDebtSettings> CashDebtSettings => Set<CashDebtSettings>();
+    public DbSet<CompanyProfile> CompanyProfiles => Set<CompanyProfile>();
     public DbSet<CashReason> CashReasons => Set<CashReason>();
     public DbSet<Fund> Funds => Set<Fund>();
     public DbSet<CreditLimit> CreditLimits => Set<CreditLimit>();

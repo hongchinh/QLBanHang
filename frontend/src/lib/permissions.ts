@@ -32,6 +32,7 @@ export const PERMISSIONS = [
   'roles.manage',
   'user_settings.manage',
   'system.manage_settings',
+  'settings.company',
   'reports.revenue',
   'reports.profit',
   'reports.debt',

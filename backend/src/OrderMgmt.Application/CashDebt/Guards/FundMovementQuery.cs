@@ -14,7 +14,8 @@ internal enum FundMovementKind
 }
 
 /// One movement of a fund (P17). Code, PartnerOrPerson and Description are what the cash book shows; the opening
-/// amount has an empty code and no text. OtherFundId is the transfer's other fund.
+/// amount has an empty code and no text. OtherFundId is the transfer's other fund. ReasonName is the voucher's
+/// reason ("Chuyển quỹ" for a transfer half, null for the opening amount).
 internal sealed record FundMovement(
     Guid FundId,
     FundMovementKind Kind,
@@ -24,7 +25,8 @@ internal sealed record FundMovement(
     decimal Delta,
     string? PartnerOrPerson,
     string? Description,
-    Guid? OtherFundId)
+    Guid? OtherFundId,
+    string? ReasonName = null)
 {
     /// Inflows (and the opening amount) before outflows at the same instant.
     public int Order => Kind is FundMovementKind.Payment or FundMovementKind.TransferOut ? 1 : 0;
@@ -98,7 +100,7 @@ internal static class FundMovementQuery
             movements[v.FundId].Add(new FundMovement(v.FundId,
                 receipt ? FundMovementKind.Receipt : FundMovementKind.Payment,
                 v.VoucherAt, v.Id, v.Code, receipt ? v.Total : -v.Total,
-                FirstText(v.PartnerName, v.PersonName), FirstText(v.Description, v.ReasonName), null));
+                FirstText(v.PartnerName, v.PersonName), FirstText(v.Description, v.ReasonName), null, v.ReasonName));
         }
         // A transfer leaves its source fund and enters its destination fund (the two always differ).
         foreach (var t in transfers)
@@ -106,10 +108,10 @@ internal static class FundMovementQuery
             var description = FirstText(t.Description, $"Chuyển quỹ {t.FromCode} → {t.ToCode}");
             if (movements.TryGetValue(t.FromFundId, out var from))
                 from.Add(new FundMovement(t.FromFundId, FundMovementKind.TransferOut, t.VoucherAt, t.Id, t.Code,
-                    -t.Amount, null, description, t.ToFundId));
+                    -t.Amount, null, description, t.ToFundId, TransferReasonName));
             if (movements.TryGetValue(t.ToFundId, out var to))
                 to.Add(new FundMovement(t.ToFundId, FundMovementKind.TransferIn, t.VoucherAt, t.Id, t.Code,
-                    t.Amount, null, description, t.FromFundId));
+                    t.Amount, null, description, t.FromFundId, TransferReasonName));
         }
 
         return movements.ToDictionary(
@@ -120,6 +122,8 @@ internal static class FundMovementQuery
                 .ThenBy(x => x.Code, StringComparer.Ordinal)
                 .ToList());
     }
+
+    private const string TransferReasonName = "Chuyển quỹ";
 
     private static string? FirstText(string? value, string? fallback) =>
         string.IsNullOrWhiteSpace(value) ? fallback : value;

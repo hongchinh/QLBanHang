@@ -25,6 +25,13 @@ const INVENTORY_CARDS: {
   description: string;
 }[] = [
   {
+    to: '/settings/company',
+    permission: 'settings.company',
+    icon: Building2,
+    title: 'Thông tin đơn vị',
+    description: 'Tên, mã số thuế, người ký trên sổ sách.',
+  },
+  {
     to: '/settings/branches',
     permission: 'branches.manage',
     icon: Building2,

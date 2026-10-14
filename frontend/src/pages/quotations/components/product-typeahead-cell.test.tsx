@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import type { ProductSuggestion } from '@/features/products/types';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
 
@@ -45,6 +47,29 @@ describe('ProductTypeaheadCell', () => {
   it('stays closed on focus with openOnFocus={false}', () => {
     renderCell(false);
     expect(screen.queryByRole('listbox')).toBeNull();
+  });
+
+  // A modal dialog turns pointer events off on <body>; the list is portaled there, outside the
+  // dialog content, so it must turn them back on or the mouse cannot pick a row.
+  it('picks a row with the mouse inside a modal dialog and leaves the dialog open', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const onOpenChange = vi.fn();
+    render(
+      <Dialog open onOpenChange={onOpenChange}>
+        <DialogContent aria-describedby={undefined}>
+          <DialogTitle>Chọn mặt hàng</DialogTitle>
+          <ProductTypeaheadCell value="TON" onChange={vi.fn()} onSelect={onSelect} inputId="code" />
+        </DialogContent>
+      </Dialog>,
+    );
+    act(() => document.getElementById('code')!.focus());
+
+    await user.click(screen.getByRole('option', { name: /TON01/ }));
+
+    expect(onSelect).toHaveBeenCalledWith(sheet);
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    expect(screen.getByRole('dialog', { name: 'Chọn mặt hàng' })).toBeInTheDocument();
   });
 
   it('keeps the highlighted option clear of the sticky header and of the list bottom', () => {

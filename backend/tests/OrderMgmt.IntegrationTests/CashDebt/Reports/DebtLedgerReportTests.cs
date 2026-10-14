@@ -1,7 +1,10 @@
 using System.Net;
+using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OrderMgmt.Application.CashDebt.CashVouchers.Models;
+using OrderMgmt.Application.CashDebt.DebtOffsets.Models;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Inventory.Common;
@@ -114,6 +117,58 @@ public class DebtLedgerReportTests : CashDebtTestBase
             .Should().Equal(("PN00002", 6_000m), ("PC00001", 4_000m), ("PC00002", 1_000m));
         payable.ClosingDebit.Should().Be(0m);
         payable.ClosingCredit.Should().Be(1_000m);
+    }
+
+    [Fact]
+    public async Task Rows_carry_reason_and_due_date()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+
+        var report = await GetLedgerAsync(client, $"side=Receivable&partnerId={ids.Kh1Id}&from=2026-10-01&to=2026-10-31");
+
+        var xbhReason = await InDbAsync(db => db.StockReasons.IgnoreQueryFilters().AsNoTracking()
+            .Where(r => r.Code == "XBH").Select(r => r.Name).SingleAsync());
+        var ntlReason = await InDbAsync(db => db.StockReasons.IgnoreQueryFilters().AsNoTracking()
+            .Where(r => r.Code == "NTL").Select(r => r.Name).SingleAsync());
+        var autoReceiptReason = await InDbAsync(db => db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+            .Where(v => v.Id == ids.AutoReceiptId)
+            .Select(v => db.CashReasons.IgnoreQueryFilters().Where(r => r.Id == v.ReasonId).Select(r => r.Name).Single())
+            .SingleAsync());
+        report.Rows.Select(r => r.ReasonName).Should().Equal(
+            xbhReason, autoReceiptReason, "Thu tiền khách hàng", ntlReason);
+
+        var saleDueDate = await InDbAsync(db => db.DebtEntries.AsNoTracking()
+            .Where(e => e.SourceId == ids.SaleId && e.Side == DebtSide.Receivable)
+            .Select(e => e.DueDate).SingleAsync());
+        saleDueDate.Should().NotBeNull();
+        report.Rows.Select(r => r.DueDate).Should().Equal(saleDueDate, null, null, null);
+
+        // A debt offset on a partner that is both customer and supplier.
+        var both = await CreatePartnerAsync("BOTH" + ids.Kh1Code[3..], isCustomer: true, isSupplier: true);
+        await ReportDataset.PostStockAsync(this, client, StockDirection.Out, "XBH", "2026-10-20 09:00",
+            ids.MainWarehouseId, both, 1_000m, paymentMethodId: null, paid: 0m);
+        await ReportDataset.PostStockAsync(this, client, StockDirection.In, "NMH", "2026-10-21 09:00",
+            ids.MainWarehouseId, both, 400m, paymentMethodId: null, paid: 0m);
+        var saleEntry = await InDbAsync(db => db.DebtEntries.AsNoTracking()
+            .Where(e => e.PartnerId == both && e.Side == DebtSide.Receivable).SingleAsync());
+        var purchaseEntry = await InDbAsync(db => db.DebtEntries.AsNoTracking()
+            .Where(e => e.PartnerId == both && e.Side == DebtSide.Payable).SingleAsync());
+        var offsetResponse = await client.PostAsJsonAsync("/api/debt-offsets", new CreateDebtOffsetRequest
+        {
+            VoucherAt = Vn("2026-10-22 09:00"),
+            PartnerId = both,
+            Receivables = new List<AllocationRequest> { new() { EntryId = saleEntry.Id, Amount = 400m } },
+            Payables = new List<AllocationRequest> { new() { EntryId = purchaseEntry.Id, Amount = 400m } },
+        }, TestJson.Options);
+        offsetResponse.IsSuccessStatusCode.Should().BeTrue(await offsetResponse.Content.ReadAsStringAsync());
+
+        foreach (var side in new[] { DebtSide.Receivable, DebtSide.Payable })
+        {
+            var ledger = await GetLedgerAsync(client, $"side={side}&partnerId={both}&from=2026-10-01&to=2026-10-31");
+            ledger.Rows.Single(r => r.SourceType == DebtSourceType.Offset).ReasonName
+                .Should().Be("Bù trừ công nợ", side.ToString());
+        }
     }
 
     [Fact]

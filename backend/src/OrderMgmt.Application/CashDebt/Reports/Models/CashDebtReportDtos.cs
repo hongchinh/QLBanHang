@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.CashDebt.Reports.Models;
@@ -15,11 +16,15 @@ public class DebtBalanceReportRequest
 
     /// Matches the partner code or name.
     public string? Search { get; set; }
+
+    /// Company needs branches.access_all and drops the branch filter (T7).
+    public ReportScope Scope { get; set; } = ReportScope.Branch;
 }
 
 public class DebtBalanceReportDto
 {
     public DebtSide Side { get; set; }
+    public ReportScope Scope { get; set; }
     public DateOnly From { get; set; }
     public DateOnly To { get; set; }
 
@@ -51,12 +56,14 @@ public class DebtLedgerReportRequest
     public Guid PartnerId { get; set; }
     public DateOnly From { get; set; }
     public DateOnly To { get; set; }
+    public ReportScope Scope { get; set; } = ReportScope.Branch;
 }
 
 /// Opening and closing are split into Dư Nợ / Dư Có with DebtBalanceSign.Split (P24).
 public class DebtLedgerReportDto
 {
     public DebtSide Side { get; set; }
+    public ReportScope Scope { get; set; }
     public Guid PartnerId { get; set; }
     public string PartnerCode { get; set; } = default!;
     public string PartnerName { get; set; } = default!;
@@ -85,6 +92,15 @@ public class DebtLedgerRowDto
     public DebtSourceType SourceType { get; set; }
     public Guid SourceId { get; set; }
     public string? Description { get; set; }
+
+    /// The voucher's reason (stock or cash), "Bù trừ công nợ" for an offset (T8).
+    public string? ReasonName { get; set; }
+
+    /// DebtEntry.DueDate: set on Increase rows only.
+    public DateOnly? DueDate { get; set; }
+
+    /// Code of the entry's branch; set for the Company scope only (T21), null for Branch.
+    public string? BranchCode { get; set; }
     public decimal Increase { get; set; }
     public decimal Decrease { get; set; }
 
@@ -154,6 +170,9 @@ public class CashBookRowDto
     /// Receipt/payment: Description, else the reason name. Transfer: Description, else "Chuyển quỹ {from} → {to}".
     public string? Description { get; set; }
 
+    /// Reason name of the voucher; a transfer half is "Chuyển quỹ".
+    public string? ReasonName { get; set; }
+
     public decimal In { get; set; }
     public decimal Out { get; set; }
 
@@ -167,6 +186,7 @@ public class DebtReconciliationReportRequest
     public Guid PartnerId { get; set; }
     public DateOnly From { get; set; }
     public DateOnly To { get; set; }
+    public ReportScope Scope { get; set; } = ReportScope.Branch;
 }
 
 public class DebtReconciliationReportDto
@@ -176,7 +196,10 @@ public class DebtReconciliationReportDto
     public string PartnerName { get; set; } = default!;
     public string? TaxCode { get; set; }
     public string? Address { get; set; }
-    public string BranchName { get; set; } = default!;
+    public ReportScope Scope { get; set; }
+
+    /// The working branch's name; null for the Company scope.
+    public string? BranchName { get; set; }
     public DateOnly From { get; set; }
     public DateOnly To { get; set; }
 

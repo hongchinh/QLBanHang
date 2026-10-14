@@ -1,6 +1,6 @@
 # TT133 report forms — Excel/PDF exports for funds, inventory and debt (Báo cáo theo mẫu biểu TT133)
 
-> Created: 2026-10-13 19:26:58 · Source design: [brainstorm SUMMARY](../../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md), [section-01 form specs](../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md), [section-02 review decisions](../../brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md) · Builds on: [Round 2B plan](../archived/261012-1709-cash-debt-round2b/SUMMARY.md) (its "Print/Excel stays in Round 3" item)
+> Created: 2026-10-13 19:26:58 · Source design: [brainstorm SUMMARY](../../../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md), [section-01 form specs](../../../brainstorms/261012-2237-tt133-report-forms/section-01-form-specs.md), [section-02 review decisions](../../../brainstorms/261012-2237-tt133-report-forms/section-02-review-decisions.md) · Builds on: [Round 2B plan](../261012-1709-cash-debt-round2b/SUMMARY.md) (its "Print/Excel stays in Round 3" item)
 
 ## Goal
 
@@ -100,12 +100,12 @@ The plan also delivers what the forms need and the software lacks: the company p
 
 ## Phases
 
-- [ ] Phase 00 — Branch and failure baseline (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Company profile, amount in words, PDF converter rename and timeout fix (M) — `phase-01-company-profile.md`
-- [ ] Phase 02 — Form builder, export infrastructure, S04a and S05 (L) — `phase-02-form-builder-cash-forms.md`
-- [ ] Phase 03 — Debt scope, ledger fields, S12, debt summary, reconciliation record (L) — `phase-03-debt-forms.md`
-- [ ] Phase 04 — Stock summary (S07) report and page, S06, S08 (L) — `phase-04-stock-forms.md`
-- [ ] Phase 05 — Measurements, docs, final verification (M) — `phase-05-docs-and-verification.md`
+- [x] Phase 00 — Branch and failure baseline (S) — `phase-00-baseline.md`
+- [x] Phase 01 — Company profile, amount in words, PDF converter rename and timeout fix (M) — `phase-01-company-profile.md`
+- [x] Phase 02 — Form builder, export infrastructure, S04a and S05 (L) — `phase-02-form-builder-cash-forms.md`
+- [x] Phase 03 — Debt scope, ledger fields, S12, debt summary, reconciliation record (L) — `phase-03-debt-forms.md`
+- [x] Phase 04 — Stock summary (S07) report and page, S06, S08 (L) — `phase-04-stock-forms.md`
+- [x] Phase 05 — Measurements, docs, final verification (M) — `phase-05-docs-and-verification.md`
 
 Phases run in order. Phase 02 freezes the builder, the export service shape and the frontend export button; Phases 03 and 04 only add forms to them.
 

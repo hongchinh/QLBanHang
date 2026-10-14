@@ -1,6 +1,6 @@
 # Phase 01 — Company profile, amount in words, PDF converter rename
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

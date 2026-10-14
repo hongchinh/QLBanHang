@@ -47,7 +47,11 @@ public sealed class SampleDataHostedService : BackgroundService
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
             {
-                // Stopping: the branch stays Running until the next start recovers it.
+                // The runner logs nothing for a cancelled job, and the branch stays Running until the next start
+                // recovers it.
+                _logger.LogInformation(
+                    "Sample data job of branch {BranchId} requested by {UserId} interrupted by shutdown",
+                    job.BranchId, job.RequestedByUserId);
                 break;
             }
             catch (Exception ex)

@@ -30,7 +30,9 @@ public class SampleDataHostedServiceTests : CashDebtTestBase
             StockDirection.Out, "XBH", "K1", "DM-KH01", null, null, "XBH-0001",
             new[] { new SampleStockLine("DM-SP01", 1m, 60_000m, 0m, 0m) }));
 
-    /// A host whose generator answers with Plan(), and an admin client on it (the admin token of _client).
+    /// A host whose generator answers with Plan(), and an admin client on it (the admin token of _client). Creating
+    /// the client starts the host, so its startup recovery runs before any demo branch exists; a test builds one such
+    /// host only, since a host started later would fail the branches still Running in the shared database.
     private (WebApplicationFactory<Program> Host, HttpClient Client) WorkerHost()
     {
         var host = TinyPlans.WithService<ISampleDataGenerator>(_factory, new FakeSampleDataGenerator(_ => Plan()));

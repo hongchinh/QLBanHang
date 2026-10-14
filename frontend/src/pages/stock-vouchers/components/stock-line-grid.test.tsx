@@ -495,11 +495,15 @@ describe('StockLineGrid', () => {
     renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b' })] });
     const select = vi.spyOn(HTMLInputElement.prototype, 'select');
     try {
-      // Focus moves on within the same batch (fast keys): only the cell that still has it may select.
+      // The focus moves twice inside one batch, so the first cell never renders its raw text: only the cell that
+      // still has the focus may select.
       act(() => {
         byId('stock-line-quantity-0').focus();
         byId('stock-line-quantity-1').focus();
       });
+      // It has selected already: a keyboard focus waits for no frame.
+      expect(select.mock.contexts).toEqual([byId('stock-line-quantity-1')]);
+      // ... and nothing else is selected one frame later.
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(select.mock.contexts).toEqual([byId('stock-line-quantity-1')]);
@@ -603,8 +607,18 @@ describe('StockLineGrid', () => {
         ...overrides,
       });
 
+    // The six type=number cells: %CK and %VAT are one component, the four others another one.
+    const cells: [label: string, field: string][] = [
+      ['%CK', 'discount-rate'],
+      ['%VAT', 'vat-rate'],
+      ['Số tấm', 'sheet-count'],
+      ['Dài', 'length'],
+      ['Rộng', 'width'],
+      ['Dày', 'thickness'],
+    ];
+
     // The elements select() was called on by the time `action` returned: no frame, timer or promise is awaited.
-    function selectedBy(action: () => void): Element[] {
+    function selectedBy(action: () => void): unknown[] {
       const select = vi.spyOn(HTMLInputElement.prototype, 'select');
       try {
         action();
@@ -614,14 +628,7 @@ describe('StockLineGrid', () => {
       }
     }
 
-    it.each([
-      ['%CK', 'discount-rate'],
-      ['%VAT', 'vat-rate'],
-      ['Số tấm', 'sheet-count'],
-      ['Dài', 'length'],
-      ['Rộng', 'width'],
-      ['Dày', 'thickness'],
-    ])('ArrowDown into %s selects its value before the key handler returns', (_label, field) => {
+    it.each(cells)('ArrowDown into %s selects its value before the key handler returns', (_label, field) => {
       renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
       const from = byId(`stock-line-${field}-0`);
       act(() => from.focus());
@@ -681,10 +688,7 @@ describe('StockLineGrid', () => {
 
     // Unlike Đơn giá / SL, these cells select nothing after a mouse press, in the focus event or later, so the caret
     // stays where the browser put it. jsdom cannot show the caret; the test shows that no select() follows.
-    it.each([
-      ['%CK', 'discount-rate'],
-      ['Số tấm', 'sheet-count'],
-    ])('a mouse click on %s selects nothing, in the focus event or a frame later', async (_label, field) => {
+    it.each(cells)('a mouse click on %s selects nothing, in the focus event or a frame later', async (_label, field) => {
       renderGrid({ lines: [cubic()] });
       const select = vi.spyOn(HTMLInputElement.prototype, 'select');
       try {

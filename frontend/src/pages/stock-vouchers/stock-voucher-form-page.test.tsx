@@ -1577,7 +1577,7 @@ describe('StockVoucherFormPage', () => {
   // a title-bar button, after a dialog whose opener is gone, the focus is on <body> or in the title bar.
   describe('shortcuts while the focus is outside the form', () => {
     // With nothing focused, the browser sends the keys to <body>.
-    function pressOnBody(init: { key: string; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean }) {
+    function pressOnBody(init: { key: string; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean; repeat?: boolean }) {
       const event = createEvent.keyDown(document.body, init);
       fireEvent(document.body, event);
       return event;
@@ -1657,6 +1657,51 @@ describe('StockVoucherFormPage', () => {
 
       expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active');
       expect(preventDefault).toHaveBeenCalledTimes(1);
+    });
+
+    // A key held down repeats until it is let go. Its repeats are taken from the browser like the first press (its
+    // Save dialog must not open), but only the first press saves: not even a repeat that comes after that save ended.
+    it.each<[string, () => HTMLElement]>([
+      ['on <body>', () => document.body],
+      ['in a field of the form', () => byId('stock-voucher-note')],
+    ])('a held Ctrl+S %s saves once, also after the save has ended', async (_where, targetOf) => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      updateMock.mockResolvedValue(voucher({ version: 8 }));
+      renderInMain();
+      const target = targetOf();
+      const press = (repeat: boolean) => {
+        const event = createEvent.keyDown(target, { key: 's', ctrlKey: true, repeat });
+        fireEvent(target, event);
+        return event;
+      };
+
+      press(false);
+      await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Cập nhật' })).toBeEnabled());
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(press(true).defaultPrevented).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(updateMock).toHaveBeenCalledTimes(1);
+
+      // Let go and pressed again: that saves.
+      press(false);
+      await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(2));
+    });
+
+    // Here the first press went elsewhere: a repeat alone shows that it runs nothing.
+    it('a repeat of a held Alt+n is taken from the browser and switches no tab, on <body> or in the form', () => {
+      renderInMain();
+      blur();
+
+      expect(pressOnBody({ key: '3', altKey: true, repeat: true }).defaultPrevented).toBe(true);
+      const field = byId('stock-voucher-at');
+      const inForm = createEvent.keyDown(field, { key: '2', altKey: true, repeat: true });
+      fireEvent(field, inForm);
+
+      expect(inForm.defaultPrevented).toBe(true);
+      expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active');
     });
 
     it('Alt+3 on <body> opens the payment tab and puts the focus on it; Alt+4 needs a saved voucher', async () => {

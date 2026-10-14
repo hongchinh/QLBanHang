@@ -102,7 +102,10 @@ const CONCURRENCY_RELOAD_FAILED_MESSAGE =
 const ALT_TABS: Record<string, StockVoucherTab> = { '1': 'lines', '2': 'other', '3': 'payment', '4': 'history' };
 
 // What the shortcuts read of a key event, React's or the DOM's.
-type ShortcutKeyEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'preventDefault'>;
+type ShortcutKeyEvent = Pick<
+  KeyboardEvent,
+  'key' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'repeat' | 'preventDefault'
+>;
 
 const OPEN_DIALOG = '[role="dialog"], [role="alertdialog"]';
 
@@ -538,16 +541,18 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   }
 
   // Ctrl+S saves (with Caps Lock too, not with Shift); Alt+1..4 switch tabs, Alt+4 only on a saved voucher. Returns
-  // true when the key was one of them: it is taken from the browser then.
+  // true when the key was one of them: it is taken from the browser then. A key held down repeats: the repeats are
+  // taken too but run nothing, or a held Ctrl+S would save again each time the save before it ended.
   function runShortcut(e: ShortcutKeyEvent): boolean {
     if (e.key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
-      submitWithIntent(isEdit ? 'update' : 'save-stay');
+      if (!e.repeat) submitWithIntent(isEdit ? 'update' : 'save-stay');
       return true;
     }
     const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[e.key] : undefined;
     if (altTab && (altTab !== 'history' || isEdit)) {
       e.preventDefault();
+      if (e.repeat) return true;
       setActiveTab(altTab);
       // The focused cell may sit in a panel that is about to be hidden; keep the focus in the form so Ctrl+S / Alt+n keep working.
       setTimeout(() => document.querySelector<HTMLElement>('[role="tab"][data-state="active"]')?.focus(), 0);

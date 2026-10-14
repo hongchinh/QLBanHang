@@ -14,8 +14,7 @@ interface RangePickerProps {
   presets?: PresetOption[];
 }
 
-// eslint-disable-next-line react-refresh/only-export-components -- the default chip list is exported next to the picker that uses it
-export const DEFAULT_PRESETS: PresetOption[] = [
+const DEFAULT_PRESETS: PresetOption[] = [
   { key: 'today', label: 'Hôm nay' },
   { key: '7d', label: '7N' },
   { key: '30d', label: '30N' },

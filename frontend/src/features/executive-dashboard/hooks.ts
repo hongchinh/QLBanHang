@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { executiveApi } from './api';
 import { executiveKeys } from './keys';
 import type {
@@ -10,11 +10,14 @@ import type {
 } from './types';
 
 // Every executive query spreads these: the live signal refetches at once, and this interval is the fallback
-// for a missed signal (only while the tab is visible).
+// for a missed signal (only while the tab is visible). When the key changes (period, scope, granularity) the
+// data of the previous key stays as placeholder (`isPlaceholderData`), so a tile keeps its content on screen
+// instead of falling back to its skeleton.
 export const executiveQueryOptions = {
   staleTime: 30_000,
   refetchInterval: 60_000,
   refetchIntervalInBackground: false,
+  placeholderData: keepPreviousData,
 } as const;
 
 // `enabled: false` keeps the request of a domain the user may not see from being sent.

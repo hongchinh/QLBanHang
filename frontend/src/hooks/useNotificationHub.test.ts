@@ -1,5 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as SignalR from '@microsoft/signalr'
 
 // Shared mocks — declared before vi.mock calls (hoisted by Vitest)
 const mockOn = vi.fn()
@@ -10,29 +11,43 @@ const mockWithAutomaticReconnect = vi.fn().mockReturnThis()
 const mockOnReconnecting = vi.fn()
 const mockOnReconnected = vi.fn()
 const mockOnClose = vi.fn()
-const mockBuild = vi.fn().mockReturnValue({
+// The connection the hook gets. `state` is what SignalR would report: a test sets it by hand.
+const connection = {
+  state: 'Disconnected',
   on: mockOn,
   start: mockStart,
   stop: mockStop,
   onreconnecting: mockOnReconnecting,
   onreconnected: mockOnReconnected,
   onclose: mockOnClose,
-})
+}
+const mockBuild = vi.fn().mockReturnValue(connection)
 const invalidateQueries = vi.fn()
+// One client for every render, as the real useQueryClient returns: the hook's effect depends on it.
+const queryClient = { invalidateQueries }
+// The token of the signed-in user: a test changes it and renders again.
+const auth = { accessToken: 'test-token' as string | null }
 
-vi.mock('@microsoft/signalr', () => ({
-  HubConnectionBuilder: vi.fn(function () {
-    return {
-      withUrl: mockWithUrl,
-      withAutomaticReconnect: mockWithAutomaticReconnect,
-      build: mockBuild,
-    }
-  }),
-}))
+vi.mock('@microsoft/signalr', async (importOriginal) => {
+  const actual = await importOriginal<typeof SignalR>()
+  return {
+    HubConnectionState: actual.HubConnectionState,
+    HubConnectionBuilder: vi.fn(function () {
+      return {
+        withUrl: mockWithUrl,
+        withAutomaticReconnect: mockWithAutomaticReconnect,
+        build: mockBuild,
+      }
+    }),
+  }
+})
 
 vi.mock('@/stores/auth-store', () => ({
-  useAuthStore: vi.fn((selector: (s: { accessToken: string | null }) => unknown) =>
-    selector({ accessToken: 'test-token' })
+  useAuthStore: Object.assign(
+    vi.fn((selector: (s: { accessToken: string | null }) => unknown) =>
+      selector({ accessToken: auth.accessToken })
+    ),
+    { getState: () => ({ accessToken: auth.accessToken }) },
   ),
 }))
 
@@ -40,10 +55,11 @@ vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>()
   return {
     ...actual,
-    useQueryClient: vi.fn(() => ({ invalidateQueries })),
+    useQueryClient: vi.fn(() => queryClient),
   }
 })
 
+import { HubConnectionState } from '@microsoft/signalr'
 import { realtimeBus } from '@/lib/realtime-bus'
 import { useNotificationHub } from './useNotificationHub'
 
@@ -90,6 +106,8 @@ describe('useNotificationHub: dashboard signal and connection status', () => {
     // clearAllMocks keeps "once" implementations a test did not use up.
     mockStart.mockReset().mockResolvedValue(undefined)
     realtimeBus.setStatus('connecting')
+    connection.state = HubConnectionState.Disconnected
+    auth.accessToken = 'test-token'
   })
   afterEach(() => {
     vi.useRealTimers()
@@ -97,7 +115,7 @@ describe('useNotificationHub: dashboard signal and connection status', () => {
   })
 
   const handlerOf = (event: string) =>
-    mockOn.mock.calls.find(([name]: [string]) => name === event)?.[1] as ((payload?: unknown) => void) | undefined
+    mockOn.mock.calls.find((call) => call[0] === event)?.[1] as ((payload?: unknown) => void) | undefined
   const connected = () => waitFor(() => expect(realtimeBus.getStatus()).toBe('connected'))
   // A start() the test settles itself.
   function pendingStart() {
@@ -276,5 +294,162 @@ describe('useNotificationHub: dashboard signal and connection status', () => {
 
     expect(mockStart).toHaveBeenCalledTimes(1)
     expect(realtimeBus.getStatus()).toBe('connected')
+  })
+
+  describe('a connection that closes while the hook is mounted', () => {
+    // SignalR reports Disconnected before it calls the close callbacks.
+    const close = () => {
+      connection.state = HubConnectionState.Disconnected
+      mockOnClose.mock.calls[0][0]()
+    }
+    async function mountConnected() {
+      vi.useFakeTimers()
+      const view = renderHook(() => useNotificationHub())
+      await vi.advanceTimersByTimeAsync(0)
+      expect(realtimeBus.getStatus()).toBe('connected')
+      expect(mockStart).toHaveBeenCalledTimes(1)
+      return view
+    }
+
+    it('is started again 5 seconds later', async () => {
+      await mountConnected()
+
+      close()
+      expect(realtimeBus.getStatus()).toBe('disconnected')
+
+      await vi.advanceTimersByTimeAsync(4_999)
+      expect(mockStart).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(mockStart).toHaveBeenCalledTimes(2)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(realtimeBus.getStatus()).toBe('connected')
+      expect(mockBuild).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps trying every 5 seconds when the restart fails', async () => {
+      vi.spyOn(console, 'error').mockImplementation(() => {})
+      await mountConnected()
+      mockStart.mockRejectedValueOnce(new Error('offline'))
+
+      close()
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(mockStart).toHaveBeenCalledTimes(2)
+      expect(realtimeBus.getStatus()).toBe('disconnected')
+
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(mockStart).toHaveBeenCalledTimes(3)
+      await vi.advanceTimersByTimeAsync(0)
+      expect(realtimeBus.getStatus()).toBe('connected')
+    })
+
+    it.each([
+      HubConnectionState.Connecting,
+      HubConnectionState.Connected,
+      HubConnectionState.Reconnecting,
+      HubConnectionState.Disconnecting,
+    ])('is left alone by the retry when its state is %s', async (state) => {
+      await mountConnected()
+      close()
+
+      // Something else brought it back before the retry ran.
+      connection.state = state
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(mockStart).toHaveBeenCalledTimes(1)
+    })
+
+    it('schedules one restart for two close events', async () => {
+      await mountConnected()
+
+      close()
+      await vi.advanceTimersByTimeAsync(2_000)
+      close()
+
+      // The second event starts the 5 seconds again.
+      await vi.advanceTimersByTimeAsync(4_999)
+      expect(mockStart).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(mockStart).toHaveBeenCalledTimes(2)
+    })
+
+    it('is not started again when it closes after unmount', async () => {
+      const { unmount } = await mountConnected()
+
+      unmount()
+      close()
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(mockStart).toHaveBeenCalledTimes(1)
+    })
+
+    it('unmount cancels the restart a close scheduled', async () => {
+      const { unmount } = await mountConnected()
+
+      close()
+      await vi.advanceTimersByTimeAsync(1_000)
+      unmount()
+      await vi.advanceTimersByTimeAsync(60_000)
+
+      expect(mockStart).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('access token', () => {
+    it('a refreshed token neither stops nor rebuilds the connection', async () => {
+      const { rerender } = renderHook(() => useNotificationHub())
+      await connected()
+      const statusChanged = vi.fn()
+      const off = realtimeBus.onStatus(statusChanged)
+
+      auth.accessToken = 'refreshed-token'
+      rerender()
+      off()
+
+      expect(mockBuild).toHaveBeenCalledTimes(1)
+      expect(mockStart).toHaveBeenCalledTimes(1)
+      expect(mockStop).not.toHaveBeenCalled()
+      expect(statusChanged).not.toHaveBeenCalled()
+      expect(realtimeBus.getStatus()).toBe('connected')
+    })
+
+    it('the connection reads the token of the moment it asks for it', async () => {
+      const { rerender } = renderHook(() => useNotificationHub())
+      await connected()
+      const { accessTokenFactory } = mockWithUrl.mock.calls[0][1] as { accessTokenFactory: () => string }
+      expect(accessTokenFactory()).toBe('test-token')
+
+      auth.accessToken = 'refreshed-token'
+      rerender()
+
+      expect(accessTokenFactory()).toBe('refreshed-token')
+    })
+
+    it('losing the token stops the connection, and a new token builds a new one', async () => {
+      const { rerender } = renderHook(() => useNotificationHub())
+      await connected()
+
+      auth.accessToken = null
+      rerender()
+
+      expect(mockStop).toHaveBeenCalledTimes(1)
+      expect(realtimeBus.getStatus()).toBe('disconnected')
+      expect(mockBuild).toHaveBeenCalledTimes(1)
+
+      auth.accessToken = 'next-token'
+      rerender()
+
+      expect(mockBuild).toHaveBeenCalledTimes(2)
+      expect(mockStart).toHaveBeenCalledTimes(2)
+      await connected()
+    })
+
+    it('does not connect without a token', () => {
+      auth.accessToken = null
+
+      renderHook(() => useNotificationHub())
+
+      expect(mockBuild).not.toHaveBeenCalled()
+      expect(mockStart).not.toHaveBeenCalled()
+    })
   })
 })

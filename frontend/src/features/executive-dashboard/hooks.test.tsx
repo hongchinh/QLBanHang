@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, keepPreviousData } from '@tanstack/react-query';
 import type { QueryKey } from '@tanstack/react-query';
 import { apiGet } from '@/lib/api-client';
 import type * as ApiModule from './api';
@@ -205,6 +205,67 @@ describe('executiveQueryOptions', () => {
     expect(executiveQueryOptions.refetchInterval).toBe(60_000);
     expect(executiveQueryOptions.refetchIntervalInBackground).toBe(false);
     expect(executiveQueryOptions.staleTime).toBe(30_000);
+  });
+
+  it('keeps the data of the previous key while a new key loads', () => {
+    expect(executiveQueryOptions.placeholderData).toBe(keepPreviousData);
+  });
+});
+
+// A tile must not fall back to its skeleton when the period, the scope or the granularity changes.
+describe('a change of the query key', () => {
+  it('shows the previous data as placeholder until the new data arrives', async () => {
+    const day = { granularity: 'Day', points: [{ date: '2026-10-01', revenue: 1, cost: null, grossProfit: null }] };
+    const week = { granularity: 'Week', points: [{ date: '2026-09-28', revenue: 7, cost: null, grossProfit: null }] };
+    let resolveWeek!: (value: typeof week) => void;
+    apiMocks.salesSeries.mockImplementation((params: { granularity: string }) =>
+      params.granularity === 'Day'
+        ? Promise.resolve(day)
+        : new Promise((resolve) => {
+            resolveWeek = resolve;
+          }),
+    );
+    const { wrapper } = setup();
+
+    const { result, rerender } = renderHook(
+      ({ granularity }: { granularity: 'Day' | 'Week' }) => useSalesSeries({ ...range, granularity }),
+      { wrapper, initialProps: { granularity: 'Day' } },
+    );
+    // The first load has nothing to keep: the tile shows its skeleton.
+    expect(result.current.isLoading).toBe(true);
+    expect(result.current.data).toBeUndefined();
+    await waitFor(() => expect(result.current.data).toBe(day));
+    expect(result.current.isPlaceholderData).toBe(false);
+
+    rerender({ granularity: 'Week' });
+
+    expect(result.current.data).toBe(day);
+    expect(result.current.isPlaceholderData).toBe(true);
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.isFetching).toBe(true);
+
+    resolveWeek(week);
+    await waitFor(() => expect(result.current.data).toBe(week));
+    expect(result.current.isPlaceholderData).toBe(false);
+  });
+
+  it('a failed load of the new key leaves no data, so the tile can show the error', async () => {
+    apiMocks.debtSummary.mockImplementation((params: { branchId?: string }) =>
+      params.branchId === 'b1' ? Promise.resolve({ at: '2026-10-13' }) : Promise.reject(new Error('no')),
+    );
+    const { wrapper } = setup();
+
+    const { result, rerender } = renderHook(({ branchId }: { branchId: string }) => useDebtSummary({ branchId }), {
+      wrapper,
+      initialProps: { branchId: 'b1' },
+    });
+    await waitFor(() => expect(result.current.data).toEqual({ at: '2026-10-13' }));
+
+    rerender({ branchId: 'b2' });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isPlaceholderData).toBe(false);
   });
 });
 

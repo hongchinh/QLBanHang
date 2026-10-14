@@ -79,12 +79,21 @@ export function StatTile({
   // A failed tile is not a link: its retry button must not sit inside one.
   if (to && !error && canOpenLink(to)) {
     return (
-      <Link to={to} title={title} className={cn(TILE_CLASS, 'transition-colors hover:bg-accent')}>
+      <Link
+        to={to}
+        title={title}
+        aria-busy={loading || undefined}
+        className={cn(TILE_CLASS, 'transition-colors hover:bg-accent')}
+      >
         {content}
       </Link>
     );
   }
-  return <div className={TILE_CLASS}>{content}</div>;
+  return (
+    <div aria-busy={loading || undefined} className={TILE_CLASS}>
+      {content}
+    </div>
+  );
 }
 
 function DeltaBadge({ delta }: { delta: number | null }) {

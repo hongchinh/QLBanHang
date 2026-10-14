@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { EXECUTIVE_PRESETS } from '@/features/executive-dashboard/presets';
-import { DEFAULT_PRESETS, RangePicker } from './range-picker';
+import { RangePicker } from './range-picker';
 
 const buttonLabels = () => screen.getAllByRole('button').map((b) => b.textContent);
 const activeLabels = () =>
@@ -22,13 +22,6 @@ describe('RangePicker', () => {
     render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} />);
 
     expect(buttonLabels()).toEqual(['Hôm nay', '7N', '30N', 'Tháng này', 'Tháng trước', 'Tuỳ chỉnh ▾']);
-    expect(DEFAULT_PRESETS).toEqual([
-      { key: 'today', label: 'Hôm nay' },
-      { key: '7d', label: '7N' },
-      { key: '30d', label: '30N' },
-      { key: 'this-month', label: 'Tháng này' },
-      { key: 'last-month', label: 'Tháng trước' },
-    ]);
   });
 
   it('shows the given presets instead', () => {

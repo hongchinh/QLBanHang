@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { HubConnectionBuilder } from '@microsoft/signalr'
+import { HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
 import { executiveKeys } from '@/features/executive-dashboard/keys'
 import { realtimeBus } from '@/lib/realtime-bus'
@@ -10,10 +10,10 @@ const START_RETRY_MS = 5_000
 
 export function useNotificationHub() {
   const queryClient = useQueryClient()
-  const accessToken = useAuthStore((s) => s.accessToken)
+  const hasToken = useAuthStore((s) => !!s.accessToken)
 
   useEffect(() => {
-    if (!accessToken) return
+    if (!hasToken) return
 
     const apiBase = import.meta.env.VITE_API_BASE_URL ?? import.meta.env.VITE_API_BASE ?? ''
     const hubUrl = apiBase
@@ -49,22 +49,34 @@ export function useNotificationHub() {
       queryClient.invalidateQueries({ queryKey: executiveKeys.all, refetchType: 'none' })
     })
 
-    connection.onreconnecting(() => setStatus('disconnected'))
-    connection.onreconnected(() => setStatus('connected'))
-    connection.onclose(() => setStatus('disconnected'))
-
-    // Automatic reconnect does not cover a start() that fails: try again every 5 seconds.
+    // Automatic reconnect covers neither a start() that fails nor a connection that closed for good
+    // (the server ended it without allowing a reconnect): both are started again after 5 seconds.
     const start = () => {
+      // Only a connection that is down is started: start() rejects in any other state.
+      if (connection.state !== HubConnectionState.Disconnected) return
       connection.start().then(
         () => setStatus('connected'),
         (err) => {
           console.error('SignalR connection failed:', err)
           if (!active) return
           realtimeBus.setStatus('disconnected')
-          retryTimer = setTimeout(start, START_RETRY_MS)
+          retryLater()
         },
       )
     }
+    const retryLater = () => {
+      clearTimeout(retryTimer)
+      retryTimer = setTimeout(start, START_RETRY_MS)
+    }
+
+    connection.onreconnecting(() => setStatus('disconnected'))
+    connection.onreconnected(() => setStatus('connected'))
+    connection.onclose(() => {
+      // The cleanup's own stop() ends here too.
+      if (!active) return
+      realtimeBus.setStatus('disconnected')
+      retryLater()
+    })
 
     realtimeBus.setStatus('connecting')
     start()
@@ -75,5 +87,7 @@ export function useNotificationHub() {
       realtimeBus.setStatus('disconnected')
       connection.stop()
     }
-  }, [accessToken, queryClient])
+    // The token itself is not a dependency: a refreshed token must not rebuild the connection, and
+    // accessTokenFactory reads the current one whenever the connection needs it.
+  }, [hasToken, queryClient])
 }

@@ -12,6 +12,8 @@ export interface TileQuery {
   isError: boolean;
   error?: unknown;
   data?: unknown;
+  // The data on screen belongs to the previous query key (keepPreviousData) while the new key loads.
+  isPlaceholderData?: boolean;
   refetch: () => unknown;
 }
 
@@ -38,17 +40,25 @@ const ACTION_CLASS = 'shrink-0 text-xs font-normal text-primary hover:underline'
 // A dashboard tile: title, optional action, and the loading / error / empty states of its query.
 export function TileCard({ title, action, query, isEmpty, emptyText, className, children }: TileCardProps) {
   const titleId = useId();
+  const stale = query?.isPlaceholderData === true;
   return (
-    <section aria-labelledby={titleId} className={cn('rounded-xl border border-border bg-card p-4 shadow-sm', className)}>
+    <section
+      aria-labelledby={titleId}
+      aria-busy={query?.isLoading || stale || undefined}
+      className={cn('rounded-xl border border-border bg-card p-4 shadow-sm', className)}
+    >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 id={titleId} className="text-sm font-semibold text-foreground">
           {title}
         </h2>
         {action && <TileActionControl action={action} />}
       </div>
-      <TileBody query={query} isEmpty={isEmpty} emptyText={emptyText}>
-        {children}
-      </TileBody>
+      {/* Always this element, dimmed or not: the children (a toggle, a chart) stay mounted when the key changes. */}
+      <div className={cn(stale && 'opacity-60')}>
+        <TileBody query={query} isEmpty={isEmpty} emptyText={emptyText}>
+          {children}
+        </TileBody>
+      </div>
     </section>
   );
 }
@@ -79,13 +89,14 @@ function TileBody({
   emptyText,
   children,
 }: Pick<TileCardProps, 'query' | 'isEmpty' | 'emptyText' | 'children'>) {
+  // The first load only: a later key shows the previous data (isPlaceholderData) until its own arrives.
   if (query?.isLoading) {
-    return <div aria-busy="true" className="h-24 animate-pulse rounded bg-muted" />;
+    return <div className="h-24 animate-pulse rounded bg-muted" />;
   }
   // Only a failure with nothing to show: a failed background refetch keeps the last data on screen.
   if (query?.isError && query.data === undefined) {
     return (
-      <div role="alert" className="text-sm text-rose-700">
+      <div role="status" className="text-sm text-rose-700">
         <p>{query.error != null ? getErrorMessage(query.error) : 'Không tải được dữ liệu.'}</p>
         <Button type="button" variant="outline" size="sm" className="mt-2 text-foreground" onClick={() => query.refetch()}>
           Thử lại

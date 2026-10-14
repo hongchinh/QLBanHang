@@ -131,6 +131,30 @@ describe('StatTile', () => {
     expect(screen.getByText('Phải thu')).toBeInTheDocument();
   });
 
+  describe('aria-busy', () => {
+    it('is on the tile while it loads, not on the skeleton', () => {
+      const { container } = renderTile({ loading: true });
+
+      const tile = container.firstElementChild as HTMLElement;
+      expect(tile).toHaveAttribute('aria-busy', 'true');
+      expect(tile).toHaveTextContent('Phải thu');
+      expect(document.querySelectorAll('[aria-busy]')).toHaveLength(1);
+    });
+
+    it('is on the link when the loading tile is one', () => {
+      signIn(['reports.debt']);
+      renderTile({ loading: true, to: OVERDUE_LINK });
+
+      expect(screen.getByRole('link')).toHaveAttribute('aria-busy', 'true');
+    });
+
+    it('is absent once the tile has loaded', () => {
+      renderTile({ loading: false });
+
+      expect(document.querySelector('[aria-busy]')).toBeNull();
+    });
+  });
+
   describe('error', () => {
     it('shows "—" and a retry button in place of the hint', () => {
       const onRetry = vi.fn();

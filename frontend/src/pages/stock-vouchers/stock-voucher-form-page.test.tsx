@@ -1343,6 +1343,30 @@ describe('StockVoucherFormPage', () => {
       expect(createMock).not.toHaveBeenCalled();
     });
 
+    // Tiền CK is hidden by default: the error forced it in, and after the first key of the correction only the focus
+    // holds it. A Ctrl+S there that gets a 422 moves the focus into the dialog; the cell must still be on the page when
+    // the dialog gives the focus back.
+    it('a column that only the focus holds stays while a 422 dialog opened from its cell is up', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ lines: [{ ...voucher().lines[0], discountManual: true, discountAmount: 20_000 }] });
+      updateMock
+        .mockRejectedValueOnce(apiError(400, 'VALIDATION', { 'lines[0].discountAmount': ['Tiền chiết khấu phải từ 0 đến thành tiền.'] }))
+        .mockRejectedValueOnce(apiError(422, 'NEGATIVE_STOCK_WARNING', NEGATIVE_DETAILS));
+      renderPage('In');
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+      await waitFor(() => expect(document.activeElement?.id).toBe('stock-line-discount-amount-0'));
+      const cell = byId('stock-line-discount-amount-0');
+      fireEvent.change(cell, { target: { value: '5' } });
+
+      fireEvent.keyDown(cell, { key: 's', ctrlKey: true });
+      await screen.findByRole('dialog');
+      expect(cell.isConnected).toBe(true);
+      fireEvent.click(dialog().getByRole('button', { name: 'Quay lại' }));
+
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(cell));
+    });
+
     it('unmounting the form closes its watch subscriptions', () => {
       const before = watchSubscriptions.open;
       const { unmount } = renderPage('In');

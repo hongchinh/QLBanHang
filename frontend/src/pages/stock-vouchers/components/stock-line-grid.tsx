@@ -15,6 +15,7 @@ import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import { cn } from '@/lib/utils';
+import { DIALOG_SELECTOR } from '@/lib/focus';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
 import { toOptionalNumber } from '@/lib/to-number';
@@ -775,6 +776,9 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           if (e.currentTarget.contains(e.relatedTarget)) return;
           // The window went to the background: the cell keeps the focus of the page, so it keeps its column.
           if (e.target === document.activeElement) return;
+          // A dialog opened from the cell (the 422 of a Ctrl+S there) gives the focus back to it as it closes: the cell
+          // must still be on the page then.
+          if (e.relatedTarget instanceof Element && e.relatedTarget.closest(DIALOG_SELECTOR)) return;
           setFocusedColumn(null);
         }}
         style={{ '--stock-grid-left': `${left}px`, '--stock-grid-right': `${stickyRight}px` } as CSSProperties}

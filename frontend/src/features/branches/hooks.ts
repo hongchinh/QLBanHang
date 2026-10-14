@@ -3,6 +3,7 @@ import { cashKeys } from '@/features/cash-common/keys';
 import { inventoryKeys } from '@/features/stock-vouchers/keys';
 import { branchesApi } from './api';
 import { branchKeys } from './keys';
+import { branchesRefetchInterval } from './sample-data';
 import type { CreateBranchRequest, UpdateBranchRequest } from './types';
 
 function invalidateBranches(qc: QueryClient) {
@@ -14,6 +15,9 @@ export function useBranches() {
   return useQuery({
     queryKey: branchKeys.lists(),
     queryFn: () => branchesApi.list(),
+    // Poll while a demo branch's sample data is being filled.
+    refetchInterval: (query) => branchesRefetchInterval(query.state.data),
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -45,6 +49,23 @@ export function useDeleteBranch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => branchesApi.remove(id),
+    onSuccess: () => invalidateBranches(qc),
+  });
+}
+
+export function useDemoBranchDeletionPreview(id: string | null) {
+  return useQuery({
+    queryKey: [...branchKeys.all, 'demo-deletion', id],
+    queryFn: () => branchesApi.deletionPreview(id!),
+    enabled: !!id,
+    staleTime: 0,
+  });
+}
+
+export function useDeleteDemoBranch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => branchesApi.removeDemo(id),
     onSuccess: () => invalidateBranches(qc),
   });
 }

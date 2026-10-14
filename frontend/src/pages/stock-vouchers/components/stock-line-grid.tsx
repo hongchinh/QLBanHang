@@ -679,17 +679,23 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         return percentInput(idx, 'vatRate', 'vat-rate', '%VAT');
       case 'vat-amount':
         return <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.vatAmount ?? 0)}</div>;
-      case 'note':
+      case 'note': {
+        const noteError = errorOf(idx, 'note');
         return (
-          <input
-            id={cellId('note', idx)}
-            className="cell-input"
-            aria-label={rowLabel('Ghi chú', idx)}
-            disabled={readOnly}
-            value={line.note ?? ''}
-            onChange={(e) => setLineField(idx, 'note', e.target.value)}
-          />
+          <>
+            <input
+              id={cellId('note', idx)}
+              className="cell-input"
+              aria-label={rowLabel('Ghi chú', idx)}
+              {...errorProps('note', idx, noteError)}
+              disabled={readOnly}
+              value={line.note ?? ''}
+              onChange={(e) => setLineField(idx, 'note', e.target.value)}
+            />
+            <CellError id={errorId('note', idx)} message={noteError} />
+          </>
         );
+      }
       case 'net-amount':
         return <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.netAmount ?? 0)}</div>;
       case 'action':

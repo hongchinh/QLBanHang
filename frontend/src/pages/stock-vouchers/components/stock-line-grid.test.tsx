@@ -322,6 +322,17 @@ describe('StockLineGrid', () => {
     expect(price).toHaveAccessibleDescription('Đơn giá không hợp lệ');
   });
 
+  it('an error on Ghi chú marks the cell and shows its message under it, like the other cells', () => {
+    const { form } = renderGrid({ lines: [line({ note: 'qua dai' })] });
+
+    act(() => form().setError('lines.0.note', { type: 'server', message: 'Ghi chú quá dài.' }));
+
+    const note = byId('stock-line-note-0');
+    expect(note).toHaveAttribute('aria-invalid', 'true');
+    expect(note).toHaveAccessibleDescription('Ghi chú quá dài.');
+    expect(screen.getByText('Ghi chú quá dài.')).toBeVisible();
+  });
+
   it('an emptied %VAT stays empty while typing, counts as 0 and shows 0 after blur', () => {
     const { values } = renderGrid({ lines: [line({ vatRate: 10 })] });
     const vat = byId('stock-line-vat-rate-0');

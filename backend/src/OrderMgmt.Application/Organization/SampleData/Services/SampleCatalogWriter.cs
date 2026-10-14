@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Organization.SampleData.Models;
+using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
 
@@ -35,7 +36,26 @@ internal static class SampleCatalogWriter
             group = new ProductGroup { Code = GroupCode, Name = "Dữ liệu mẫu", SortOrder = 98, IsActive = true };
             db.ProductGroups.Add(group);
         }
+        else
+        {
+            Restore(group);
+        }
         return group.Id;
+    }
+
+    /// A sample row is reused (and brought back if soft-deleted); a row of real data keeps its code.
+    private static void Reuse<T>(T row, string code, bool isSample) where T : ISoftDeletable
+    {
+        if (!isSample)
+            throw new ConflictException($"Mã {code} đã được dùng cho dữ liệu thật.");
+        Restore(row);
+    }
+
+    private static void Restore(ISoftDeletable row)
+    {
+        row.IsDeleted = false;
+        row.DeletedAt = null;
+        row.DeletedBy = null;
     }
 
     private static async Task<Dictionary<string, Guid>> WriteProductsAsync(IAppDbContext db,
@@ -52,6 +72,7 @@ internal static class SampleCatalogWriter
         {
             if (existing.TryGetValue(spec.Code, out var product))
             {
+                Reuse(product, spec.Code, product.IsSample);
                 ids[spec.Code] = product.Id;
                 continue;
             }
@@ -95,6 +116,7 @@ internal static class SampleCatalogWriter
         {
             if (existing.TryGetValue(spec.Code, out var partner))
             {
+                Reuse(partner, spec.Code, partner.IsSample);
                 ids[spec.Code] = partner.Id;
                 continue;
             }

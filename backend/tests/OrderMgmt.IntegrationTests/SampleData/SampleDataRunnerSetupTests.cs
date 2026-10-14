@@ -108,4 +108,50 @@ public class SampleDataRunnerSetupTests : CashDebtTestBase
         await AssertInvariantsAsync();
         await AssertCashDebtInvariantsAsync();
     }
+
+    [Fact]
+    public async Task Second_branch_reuses_the_sample_catalog()
+    {
+        var first = await RunPlanAsync(await CreateBranchAsync("RS02"), TinyPlans.Setup(TinyPlans.OpeningDate));
+        var second = await RunPlanAsync(await CreateBranchAsync("RS03"), TinyPlans.Setup(TinyPlans.OpeningDate));
+
+        first.Succeeded.Should().BeTrue(first.Error);
+        second.Succeeded.Should().BeTrue(second.Error);
+        (await InDbAsync(db => db.Products.IgnoreQueryFilters().CountAsync(p => p.Code == "DM-SP01"))).Should().Be(1);
+        (await InDbAsync(db => db.Customers.IgnoreQueryFilters().CountAsync(c => c.Code == "DM-KH01"))).Should().Be(1);
+        (await InDbAsync(db => db.ProductGroups.IgnoreQueryFilters().CountAsync(g => g.Code == "DM"))).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Soft_deleted_sample_rows_are_restored()
+    {
+        (await RunPlanAsync(await CreateBranchAsync("RS04"), TinyPlans.Setup(TinyPlans.OpeningDate))).Succeeded.Should().BeTrue();
+        await InDbAsync(async db =>
+        {
+            var deletedAt = DateTimeOffset.UtcNow;
+            var group = await db.ProductGroups.SingleAsync(g => g.Code == "DM");
+            var product = await db.Products.SingleAsync(p => p.Code == "DM-SP01");
+            var partner = await db.Customers.SingleAsync(c => c.Code == "DM-KH01");
+            foreach (var row in new OrderMgmt.Domain.Common.BaseEntity[] { group, product, partner })
+            {
+                row.IsDeleted = true;
+                row.DeletedAt = deletedAt;
+                row.DeletedBy = Guid.NewGuid();
+            }
+            await db.SaveChangesAsync();
+        });
+
+        var result = await RunPlanAsync(await CreateBranchAsync("RS05"), TinyPlans.Setup(TinyPlans.OpeningDate));
+
+        result.Succeeded.Should().BeTrue(result.Error);
+        var group2 = await InDbAsync(db => db.ProductGroups.IgnoreQueryFilters().AsNoTracking().SingleAsync(g => g.Code == "DM"));
+        var product2 = await InDbAsync(db => db.Products.IgnoreQueryFilters().AsNoTracking().SingleAsync(p => p.Code == "DM-SP01"));
+        var partner2 = await InDbAsync(db => db.Customers.IgnoreQueryFilters().AsNoTracking().SingleAsync(c => c.Code == "DM-KH01"));
+        foreach (var row in new OrderMgmt.Domain.Common.BaseEntity[] { group2, product2, partner2 })
+        {
+            row.IsDeleted.Should().BeFalse();
+            row.DeletedAt.Should().BeNull();
+            row.DeletedBy.Should().BeNull();
+        }
+    }
 }

@@ -1411,6 +1411,194 @@ describe('StockVoucherFormPage', () => {
     await waitFor(() => expect(document.activeElement).toBe(tab(/Thanh toán/)));
   });
 
+  // The form hears its shortcuts only while the focus is inside it. After a save that opened the saved voucher, after
+  // a title-bar button, after a dialog whose opener is gone, the focus is on <body> or in the title bar.
+  describe('shortcuts while the focus is outside the form', () => {
+    // With nothing focused, the browser sends the keys to <body>.
+    function pressOnBody(init: { key: string; ctrlKey?: boolean; shiftKey?: boolean; altKey?: boolean }) {
+      const event = createEvent.keyDown(document.body, init);
+      fireEvent(document.body, event);
+      return event;
+    }
+
+    const blur = () => act(() => (document.activeElement as HTMLElement | null)?.blur());
+
+    // As the app renders the page.
+    const renderInMain = () =>
+      render(
+        <main id="main-content">
+          <StockVoucherFormPage type="In" />
+        </main>,
+      );
+
+    it('Ctrl+S on <body> saves exactly once, Ctrl+Shift+S does not', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderPage('In');
+      await fillPerUnitLine(2);
+      blur();
+      expect(document.activeElement).toBe(document.body);
+
+      expect(pressOnBody({ key: 'S', ctrlKey: true, shiftKey: true }).defaultPrevented).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(createMock).not.toHaveBeenCalled();
+
+      // Taken from the browser too: its own Save dialog must not open.
+      expect(pressOnBody({ key: 's', ctrlKey: true }).defaultPrevented).toBe(true);
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      // What the form holds now, as a save from inside the form would send it (the fund shows once a line is paid).
+      expect(createMock.mock.calls[0][0]).toMatchObject({ fundId: FUND_CASH, lines: [expect.objectContaining({ quantity: 2 })] });
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(createMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves a key that something else has already taken', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderPage('In');
+      await fillPerUnitLine(2);
+      blur();
+      const takeKey = (e: Event) => e.preventDefault();
+      document.body.addEventListener('keydown', takeKey);
+      try {
+        pressOnBody({ key: 's', ctrlKey: true });
+        pressOnBody({ key: '3', altKey: true });
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      } finally {
+        document.body.removeEventListener('keydown', takeKey);
+      }
+      expect(createMock).not.toHaveBeenCalled();
+      expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active');
+    });
+
+    it('Ctrl+S inside the form still saves exactly once', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderInMain();
+      await fillPerUnitLine(2);
+      const note = byId('stock-voucher-note');
+      act(() => note.focus());
+
+      fireEvent.keyDown(note, { key: 's', ctrlKey: true });
+
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(createMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('Alt+3 on <body> opens the payment tab and puts the focus on it; Alt+4 needs a saved voucher', async () => {
+      renderPage('In');
+      blur();
+
+      expect(pressOnBody({ key: '4', altKey: true }).defaultPrevented).toBe(false);
+      expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active');
+      expect(pressOnBody({ key: '3', altKey: true }).defaultPrevented).toBe(true);
+      expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active');
+      await waitFor(() => expect(document.activeElement).toBe(tab(/Thanh toán/)));
+    });
+
+    it('does nothing while a dialog is open', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      updateMock.mockResolvedValue(voucher());
+      renderPage('In');
+      fireEvent.click(screen.getByRole('button', { name: 'Hủy phiếu' }));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      expect(pressOnBody({ key: 's', ctrlKey: true }).defaultPrevented).toBe(false);
+      expect(pressOnBody({ key: '3', altKey: true }).defaultPrevented).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(updateMock).not.toHaveBeenCalled();
+      // The modal dialog hides the rest of the page from the accessibility tree.
+      expect(screen.getByRole('tab', { name: /Hàng hóa/, hidden: true })).toHaveAttribute('data-state', 'active');
+
+      // Once the dialog is gone the same key saves.
+      fireEvent.click(dialog().getByRole('button', { name: 'Quay lại' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      blur();
+      pressOnBody({ key: 's', ctrlKey: true });
+      await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+      expect(cancelMock).not.toHaveBeenCalled();
+    });
+
+    it('stops listening once the page is gone', async () => {
+      createMock.mockResolvedValue(voucher());
+      const { unmount } = renderPage('In');
+      await fillPerUnitLine(2);
+      unmount();
+
+      expect(pressOnBody({ key: 's', ctrlKey: true }).defaultPrevented).toBe(false);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a cancelled voucher', { status: 'Cancelled' as const, canEdit: false }],
+      ['a voucher the user may not edit', { canEdit: false }],
+    ])('Ctrl+S on <body> does not save %s, as in the form; Alt+4 still opens the history', async (_label, overrides) => {
+      routeParams.id = V1;
+      voucherState.data = voucher(overrides);
+      renderPage('In');
+
+      // The key is taken as it is in the form, and nothing is sent.
+      expect(pressOnBody({ key: 's', ctrlKey: true }).defaultPrevented).toBe(true);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(updateMock).not.toHaveBeenCalled();
+
+      expect(pressOnBody({ key: '4', altKey: true }).defaultPrevented).toBe(true);
+      expect(tab(/Lịch sử/)).toHaveAttribute('data-state', 'active');
+    });
+
+    it('takes the keys of the title bar, in main#main-content, but never of anything outside main', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderInMain();
+      await fillPerUnitLine(2);
+
+      // Outside main, where the app header and the sidebar are.
+      const outside = document.body.appendChild(document.createElement('button'));
+      try {
+        act(() => outside.focus());
+        const save = createEvent.keyDown(outside, { key: 's', ctrlKey: true });
+        fireEvent(outside, save);
+        const altTab = createEvent.keyDown(outside, { key: '3', altKey: true });
+        fireEvent(outside, altTab);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(save.defaultPrevented).toBe(false);
+        expect(altTab.defaultPrevented).toBe(false);
+        expect(createMock).not.toHaveBeenCalled();
+        expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active');
+      } finally {
+        outside.remove();
+      }
+
+      // A title-bar button is in main but outside the form. Caps Lock on: the key is "S".
+      const titleButton = screen.getByRole('button', { name: 'Lưu và thoát' });
+      act(() => titleButton.focus());
+      fireEvent.keyDown(titleButton, { key: 'S', ctrlKey: true });
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      // Ctrl+S is "save and stay", wherever it is pressed.
+      await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/stock-in/${V1}`, { replace: true }));
+    });
+
+    // The saved voucher replaces the new one: the form remounts and the focused cell is gone.
+    it('after a new voucher is saved and opened, Ctrl+S on <body> updates it', async () => {
+      createMock.mockResolvedValue(voucher());
+      updateMock.mockResolvedValue(voucher({ version: 8 }));
+      const { rerender } = renderPage('In');
+      await fillPerUnitLine(2);
+      fireEvent.keyDown(byId('stock-line-quantity-0'), { key: 's', ctrlKey: true });
+      await waitFor(() => expect(navigateMock).toHaveBeenCalledWith(`/stock-in/${V1}`, { replace: true }));
+
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      rerender(<StockVoucherFormPage type="In" />);
+      expect(screen.getByRole('button', { name: 'Cập nhật' })).toBeInTheDocument();
+      expect(document.activeElement).toBe(document.body);
+
+      pressOnBody({ key: 's', ctrlKey: true });
+
+      await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+      expect(updateMock.mock.calls[0][0].id).toBe(V1);
+    });
+  });
+
   it('clicking Phí VC on the totals bar focuses the freight input in the payment tab', async () => {
     renderPage('In');
     fireEvent.click(screen.getByRole('button', { name: /Phí VC/ }));

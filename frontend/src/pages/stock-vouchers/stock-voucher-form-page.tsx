@@ -101,6 +101,11 @@ const CONCURRENCY_RELOAD_FAILED_MESSAGE =
 
 const ALT_TABS: Record<string, StockVoucherTab> = { '1': 'lines', '2': 'other', '3': 'payment', '4': 'history' };
 
+// What the shortcuts read of a key event, React's or the DOM's.
+type ShortcutKeyEvent = Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'preventDefault'>;
+
+const OPEN_DIALOG = '[role="dialog"], [role="alertdialog"]';
+
 const JUMP_IDS: Record<TotalsJumpField, string> = {
   freight: 'stock-freight',
   orderDiscount: 'stock-order-discount',
@@ -532,12 +537,13 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       });
   }
 
-  function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
-    if (e.defaultPrevented) return;
+  // Ctrl+S saves (with Caps Lock too, not with Shift); Alt+1..4 switch tabs, Alt+4 only on a saved voucher. Returns
+  // true when the key was one of them: it is taken from the browser then.
+  function runShortcut(e: ShortcutKeyEvent): boolean {
     if (e.key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       submitWithIntent(isEdit ? 'update' : 'save-stay');
-      return;
+      return true;
     }
     const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[e.key] : undefined;
     if (altTab && (altTab !== 'history' || isEdit)) {
@@ -545,12 +551,36 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       setActiveTab(altTab);
       // The focused cell may sit in a panel that is about to be hidden; keep the focus in the form so Ctrl+S / Alt+n keep working.
       setTimeout(() => document.querySelector<HTMLElement>('[role="tab"][data-state="active"]')?.focus(), 0);
-      return;
+      return true;
     }
+    return false;
+  }
+
+  function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.defaultPrevented || runShortcut(e)) return;
     // D7: Enter never submits the form.
     const tag = (e.target as HTMLElement).tagName;
     if (e.key === 'Enter' && (tag === 'INPUT' || tag === 'SELECT')) e.preventDefault();
   }
+
+  // The form hears its keys only while the focus is inside it. After a save that opened the saved voucher, after a
+  // title-bar button or a dialog whose opener is gone, the focus is on <body> or in the title bar: the shortcuts are
+  // taken from the document there. A key inside the form is the form's own; the app header and sidebar, and every
+  // key while a dialog is open, are left alone.
+  const formRef = useRef<HTMLFormElement>(null);
+  // The shortcuts of the latest render: they read busy, readOnly and which fields are shown.
+  const runShortcutRef = useRef(runShortcut);
+  runShortcutRef.current = runShortcut;
+  useEffect(() => {
+    function handleDocumentKeyDown(e: KeyboardEvent) {
+      if (e.defaultPrevented || document.querySelector(OPEN_DIALOG)) return;
+      const target = e.target instanceof Element ? e.target : null;
+      const inPageOutsideForm = !!target?.closest('main#main-content') && !formRef.current?.contains(target);
+      if (target === document.body || inPageOutsideForm) runShortcutRef.current(e);
+    }
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    return () => document.removeEventListener('keydown', handleDocumentKeyDown);
+  }, []);
 
   // Enter from the main area: the first line without a product, or a new one.
   function enterGrid() {
@@ -704,6 +734,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Form-level Ctrl+S shortcut delegates to the submit handler. */}
       <form
+        ref={formRef}
         onSubmit={(e) => {
           e.preventDefault();
           submitWithIntent(isEdit ? 'update' : 'save-stay');

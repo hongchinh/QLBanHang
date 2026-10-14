@@ -356,6 +356,7 @@ public class VoucherFormBuilderTests
         ws.PageSetup.PageOrientation.Should().Be(XLPageOrientation.Landscape);
         ws.PageSetup.PagesWide.Should().Be(1);
         ws.PageSetup.PagesTall.Should().Be(1);
+        ws.PageSetup.CenterHorizontally.Should().BeTrue();
         ws.Column(1).Width.Should().BeApproximately(9.5, 0.01);
         ws.PageSetup.FirstRowToRepeatAtTop.Should().Be(0);
     }
@@ -379,6 +380,7 @@ public class VoucherFormBuilderTests
         ws.PageSetup.PageOrientation.Should().Be(XLPageOrientation.Portrait);
         ws.PageSetup.PagesWide.Should().Be(1);
         ws.PageSetup.PagesTall.Should().Be(0);
+        ws.PageSetup.CenterHorizontally.Should().BeFalse();
         ws.PageSetup.FirstRowToRepeatAtTop.Should().Be(b.Table.TableHeaderFirstRow);
     }
 }

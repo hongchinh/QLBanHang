@@ -174,6 +174,8 @@ public sealed class VoucherFormBuilder
         setup.PaperSize = XLPaperSize.A5Paper;
         setup.PageOrientation = XLPageOrientation.Landscape;
         setup.FitToPages(1, 1);
+        // Fitting to one page leaves the spare width on the right: centre the voucher instead.
+        setup.CenterHorizontally = true;
     }
 
     /// A4 is fitted to one page wide only, so a long voucher flows onto more pages: when a page could end inside the

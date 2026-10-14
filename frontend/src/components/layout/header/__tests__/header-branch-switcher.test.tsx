@@ -106,6 +106,22 @@ describe('HeaderBranchSwitcher', () => {
     expect(normal).not.toHaveTextContent('(demo)');
   });
 
+  it('shows the full label of the selected demo branch in the trigger and its title', () => {
+    mockMyBranches({
+      ...MY_BRANCHES,
+      branches: [
+        MY_BRANCHES.branches[0],
+        { id: 'b3', code: 'DEMO1', name: 'CN demo', isDemo: true },
+      ],
+    });
+    act(() => useBranchStore.setState({ workingBranchId: 'b3' }));
+    renderSwitcher('/');
+
+    const trigger = screen.getByRole('combobox', { name: 'Chi nhánh làm việc' });
+    expect(trigger).toHaveTextContent('DEMO1 — CN demo (demo)');
+    expect(trigger).toHaveAttribute('title', 'DEMO1 — CN demo (demo)');
+  });
+
   it('lists branches and switches working branch', async () => {
     mockMyBranches(MY_BRANCHES);
     const user = userEvent.setup();

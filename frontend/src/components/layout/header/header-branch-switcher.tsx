@@ -31,14 +31,21 @@ export function HeaderBranchSwitcher() {
     if (voucherPage) navigate(`/${voucherPage[1]}`);
   };
 
+  const selectedId = workingBranchId ?? myBranches.workingBranchId;
+  const selected = myBranches.branches.find((b) => b.id === selectedId);
+  // The trigger clips long text, so the full label (with the demo marker) is also its tooltip.
+  const selectedLabel = selected
+    ? `${selected.code} — ${selected.name}${selected.isDemo ? ' (demo)' : ''}`
+    : undefined;
+
   return (
     <Select
-      value={workingBranchId ?? myBranches.workingBranchId}
+      value={selectedId}
       onValueChange={(id) => void handleChange(id)}
     >
       <SelectTrigger
         aria-label="Chi nhánh làm việc"
-        title="Chi nhánh làm việc"
+        title={selectedLabel ?? 'Chi nhánh làm việc'}
         className="h-9 w-40 border-transparent bg-white text-sm text-foreground md:w-56"
       >
         <SelectValue />

@@ -8,6 +8,7 @@ using OrderMgmt.Application.CashDebt.DebtOffsets.Models;
 using OrderMgmt.Application.CashDebt.FundTransfers.Models;
 using OrderMgmt.Application.Inventory.OpeningStocks.Models;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
+using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -86,12 +87,12 @@ public abstract class DemoBranchFixture : CashDebtTestBase
     /// Ids of the rows FillAsync created in a demo branch. `CashVoucherIds` holds the automatic receipt too.
     protected sealed record DemoFill(Guid BankFundId, IReadOnlyList<Guid> ProductIds, IReadOnlyList<Guid> OpeningDebtIds,
         IReadOnlyList<Guid> StockVoucherIds, IReadOnlyList<Guid> CashVoucherIds, Guid FundTransferId, Guid DebtOffsetId,
-        IReadOnlyList<Guid> EntryIds)
+        IReadOnlyList<Guid> EntryIds, Guid DeletedTransferId)
     {
-        public int DocumentCount => StockVoucherIds.Count + CashVoucherIds.Count + 2;
+        public int DocumentCount => StockVoucherIds.Count + CashVoucherIds.Count + 3;
 
         /// The documents whose activities live in cash_document_activities.
-        public IEnumerable<Guid> CashDocumentIds => CashVoucherIds.Append(FundTransferId).Append(DebtOffsetId);
+        public IEnumerable<Guid> CashDocumentIds => CashVoucherIds.Append(FundTransferId).Append(DeletedTransferId).Append(DebtOffsetId);
     }
 
     /// Fills a demo branch with a row of every kind a branch holds, all in its one warehouse, dated after
@@ -169,11 +170,51 @@ public abstract class DemoBranchFixture : CashDebtTestBase
             new CashDocumentActionRequest { Version = expense.Version });
         cancelStatus.Should().Be(HttpStatusCode.OK, cancelError?.Message);
 
-        var entryIds = await InDbAsync(db => db.DebtEntries.Where(e => e.BranchId == branch.BranchId)
+        // What learners leave behind: documents deleted through the API (soft-deleted with their lines, activities and
+        // automatic receipt), and a fund and a warehouse deleted in the branch.
+        var deletedSale = await PostStockLineAsync(branch, StockDirection.Out, "XBH", "2026-10-08 09:00", customer,
+            productA, 1, 1_000m, cashMethod, paid: 1_000m);
+        (await client.DeleteAsync($"/api/stock-vouchers/{deletedSale.Id}?version={deletedSale.Version}"))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+        var deletedExpenseRequest = CashRequest(CashVoucherType.Payment, await CashReasonIdAsync("CK"), branch.CashFundId,
+            "2026-10-09 10:00", partnerId: null, 300m);
+        deletedExpenseRequest.PersonName = "Nguyễn B";
+        var deletedExpense = await CreateCashAsync(client, deletedExpenseRequest);
+        var (deleteStatus, _, deleteError) = await DeleteCashAsync(client, deletedExpense.Id,
+            new CashDocumentActionRequest { Version = deletedExpense.Version });
+        deleteStatus.Should().Be(HttpStatusCode.OK, deleteError?.Message);
+        var deletedTransfer = await PostFundTransferAsync(branch, bankFund, 1_000m);
+        var (transferStatus, _, transferError) = await DeleteTransferAsync(client, deletedTransfer.Id,
+            new CashDocumentActionRequest { Version = deletedTransfer.Version });
+        transferStatus.Should().Be(HttpStatusCode.OK, transferError?.Message);
+        var spareFund = await CreateBankFundAsync("NH02", branch.BranchId);
+        var spareWarehouse = await CreateWarehouseAsync(branch.BranchId, "WSP" + suffix);
+        await InDbAsync(async db =>
+        {
+            await db.Funds.Where(f => f.Id == spareFund)
+                .ExecuteUpdateAsync(s => s.SetProperty(f => f.IsDeleted, true));
+            await db.Warehouses.Where(w => w.Id == spareWarehouse)
+                .ExecuteUpdateAsync(s => s.SetProperty(w => w.IsDeleted, true));
+        });
+
+        var entryIds = await InDbAsync(db => db.DebtEntries.IgnoreQueryFilters().Where(e => e.BranchId == branch.BranchId)
             .Select(e => e.Id).ToListAsync());
         return new DemoFill(bankFund, new[] { productA, productB }, new[] { openingDebt, prepayment },
-            new[] { cashSale.Id, creditSale.Id, saleReturn.Id, otherOut.Id, purchase.Id, dualSale.Id },
-            new[] { cashSale.AutoCashVoucherId!.Value, receipt.Id, expense.Id }, transfer.Id, offset!.Id, entryIds);
+            new[] { cashSale.Id, creditSale.Id, saleReturn.Id, otherOut.Id, purchase.Id, dualSale.Id, deletedSale.Id },
+            new[]
+            {
+                cashSale.AutoCashVoucherId!.Value, receipt.Id, expense.Id, deletedExpense.Id,
+                deletedSale.AutoCashVoucherId!.Value,
+            }, transfer.Id, offset!.Id, entryIds, deletedTransfer.Id);
+    }
+
+    /// DELETE /api/branches/{id}/demo; asserts 200.
+    protected async Task<DemoBranchDeletionResultDto> DeleteDemoBranchAsync(Guid branchId)
+    {
+        var (status, result, error) = await ReadDocumentResponseAsync<DemoBranchDeletionResultDto>(
+            await _client.DeleteAsync($"/api/branches/{branchId}/demo"));
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        return result!;
     }
 
     /// Asserts the status and the error code of a refused request.

@@ -38,6 +38,7 @@ public class DemoBranchDeleteTests : DemoBranchFixture
     public async Task Delete_removes_every_row_of_the_demo_branch_and_nothing_else()
     {
         await ReportDataset.SeedAsync(this);
+        await AssertForeignKeysKnownAsync();
         // Read at run time, so a table added later is covered too (R4).
         var branchTables = await QueryAsync("select table_name from information_schema.columns"
             + " where table_schema = 'public' and column_name = 'branch_id' order by table_name");
@@ -47,6 +48,9 @@ public class DemoBranchDeleteTests : DemoBranchFixture
         var branch = await CreateDemoBranchAsync("DD01");
         var fill = await FillAsync(branch);
         await CreateTestUserAsync("dd_user", "Pass@123", RoleCodes.Sales, defaultBranchId: branch.BranchId);
+        await CreateTestUserAsync("dd_gone", "Pass@123", RoleCodes.Sales, defaultBranchId: branch.BranchId);
+        await InDbAsync(db => db.Users.Where(u => u.Username == "dd_gone")
+            .ExecuteUpdateAsync(s => s.SetProperty(u => u.IsDeleted, true)));
         var children = ChildCountQueries(fill);
         // The fill writes every table, so the checks after the delete are not vacuous.
         foreach (var table in tables)
@@ -64,7 +68,7 @@ public class DemoBranchDeleteTests : DemoBranchFixture
 
         var (status, result, error) = await ReadDocumentResponseAsync<DemoBranchDeletionResultDto>(response);
         status.Should().Be(HttpStatusCode.OK, error?.Message);
-        result!.ReassignedUserCount.Should().Be(1);
+        result!.ReassignedUserCount.Should().Be(2, "the soft-deleted user moves too");
         foreach (var table in tables)
             (await BranchRowCountAsync(table, branch.BranchId)).Should().Be(0, $"{table} keeps no row of the demo branch");
         foreach (var (table, sql) in children)
@@ -128,6 +132,102 @@ public class DemoBranchDeleteTests : DemoBranchFixture
         await AssertErrorAsync(response, HttpStatusCode.Conflict, "DEMO_WAREHOUSE_IN_USE");
         (await InDbAsync(db => db.Warehouses.Where(w => w.BranchId == branch.BranchId).Select(w => w.Id).ToListAsync()))
             .Should().Equal(branch.WarehouseId);
+    }
+
+    [Fact]
+    public async Task Delete_refuses_when_another_branchs_voucher_uses_its_warehouse()
+    {
+        var branch = await CreateDemoBranchAsync("DD07");
+        var product = await CreateInventoryProductAsync("DDSP07");
+        var voucher = await PostStockLineAsync(branch, StockDirection.In, "NMH", "2026-10-03 09:00",
+            await CreatePartnerAsync("DDSUP07", isCustomer: false, isSupplier: true), product, 1, 1_000m);
+        // A test-only corruption standing in for a warehouse moved between branches.
+        await InDbAsync(db => db.StockVouchers.Where(v => v.Id == voucher.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(v => v.BranchId, MainBranchId)));
+
+        await AssertErrorAsync(await _client.DeleteAsync(DeleteUrl(branch.BranchId)), HttpStatusCode.Conflict,
+            "DEMO_WAREHOUSE_IN_USE");
+        (await InDbAsync(db => db.Branches.AnyAsync(b => b.Id == branch.BranchId))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Delete_refuses_when_another_branchs_line_uses_its_warehouse()
+    {
+        var branch = await CreateDemoBranchAsync("DD08");
+        var product = await CreateInventoryProductAsync("DDSP08");
+        var main = new DemoBranch(MainBranchId, DefaultWarehouseId, await CashFundIdAsync(MainBranchId), _client);
+        var voucher = await PostStockLineAsync(main, StockDirection.In, "NMH", "2026-10-03 09:00",
+            await CreatePartnerAsync("DDSUP08", isCustomer: false, isSupplier: true), product, 1, 1_000m);
+        await InDbAsync(db => db.StockVoucherLines.Where(l => l.StockVoucherId == voucher.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(l => l.WarehouseId, branch.WarehouseId)));
+
+        await AssertErrorAsync(await _client.DeleteAsync(DeleteUrl(branch.BranchId)), HttpStatusCode.Conflict,
+            "DEMO_WAREHOUSE_IN_USE");
+        (await InDbAsync(db => db.Branches.AnyAsync(b => b.Id == branch.BranchId))).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_foreign_key_hit_by_a_write_outside_the_gate_gives_409_and_deletes_nothing()
+    {
+        var branch = await CreateDemoBranchAsync("DD09");
+        await ReportDataset.SetFundOpeningAsync(branch.Client, branch.CashFundId, 10_000m);
+        var expense = CashRequest(CashVoucherType.Payment, await CashReasonIdAsync("CK"), branch.CashFundId,
+            "2026-10-09 09:00", partnerId: null, 100m);
+        expense.PersonName = "Nguyễn C";
+        var cash = await CreateCashAsync(branch.Client, expense);
+        // A test-only corruption standing in for a document written to the branch's fund between two steps.
+        await InDbAsync(db => db.CashVouchers.Where(v => v.Id == cash.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(v => v.BranchId, MainBranchId)));
+
+        await AssertErrorAsync(await _client.DeleteAsync(DeleteUrl(branch.BranchId)), HttpStatusCode.Conflict,
+            "DEMO_BRANCH_BUSY");
+
+        (await InDbAsync(db => db.Branches.AnyAsync(b => b.Id == branch.BranchId))).Should().BeTrue();
+        (await InDbAsync(db => db.Funds.AnyAsync(f => f.Id == branch.CashFundId))).Should().BeTrue();
+        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Id == branch.WarehouseId))).Should().BeTrue();
+        (await InDbAsync(db => db.DocumentNumberings.IgnoreQueryFilters().AnyAsync(n => n.BranchId == branch.BranchId)))
+            .Should().BeTrue("the rows deleted before the failing statement are rolled back");
+    }
+
+    /// The foreign keys into the branch and into every parent the delete removes, as "child.column -> parent". A new
+    /// one (another column name, another child table) fails the test until DeleteAsync covers it and the list is updated.
+    private static readonly string[] KnownForeignKeys =
+    {
+        "cash_voucher_lines.cash_voucher_id -> cash_vouchers",
+        "cash_vouchers.branch_id -> branches",
+        "cash_vouchers.fund_id -> funds",
+        "cash_vouchers.source_stock_voucher_id -> stock_vouchers",
+        "credit_limits.branch_id -> branches",
+        "debt_entries.branch_id -> branches",
+        "debt_offset_vouchers.branch_id -> branches",
+        "debt_settlements.decrease_entry_id -> debt_entries",
+        "debt_settlements.increase_entry_id -> debt_entries",
+        "document_numberings.branch_id -> branches",
+        "fund_transfers.branch_id -> branches",
+        "fund_transfers.from_fund_id -> funds",
+        "fund_transfers.to_fund_id -> funds",
+        "funds.branch_id -> branches",
+        "opening_debts.branch_id -> branches",
+        "opening_stocks.branch_id -> branches",
+        "opening_stocks.warehouse_id -> warehouses",
+        "stock_voucher_activities.stock_voucher_id -> stock_vouchers",
+        "stock_voucher_lines.stock_voucher_id -> stock_vouchers",
+        "stock_voucher_lines.warehouse_id -> warehouses",
+        "stock_vouchers.branch_id -> branches",
+        "stock_vouchers.fund_id -> funds",
+        "stock_vouchers.warehouse_id -> warehouses",
+        "users.default_branch_id -> branches",
+        "warehouses.branch_id -> branches",
+    };
+
+    private async Task AssertForeignKeysKnownAsync()
+    {
+        var rows = await QueryAsync("select c.conrelid::regclass::text || '.' || a.attname || ' -> ' || c.confrelid::regclass::text"
+            + " from pg_constraint c join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)"
+            + " where c.contype = 'f' and c.confrelid::regclass::text in ('branches', 'stock_vouchers', 'cash_vouchers',"
+            + " 'fund_transfers', 'debt_offset_vouchers', 'debt_entries', 'funds', 'warehouses') order by 1");
+        rows.Select(r => r[0]).Should().Equal(KnownForeignKeys,
+            "DemoBranchService.DeleteAsync must delete the rows of every table that refers to the branch or its parents");
     }
 
     /// Count queries of the fill's child rows by the ids of their parents: once the parents are gone, a child left

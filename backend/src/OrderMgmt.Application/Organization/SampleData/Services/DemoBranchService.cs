@@ -1,3 +1,4 @@
+using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
@@ -15,17 +16,21 @@ public sealed class DemoBranchService : IDemoBranchService
 {
     private const string SampleGroupCode = "DM";
     private const string SampleGroupName = "Dữ liệu mẫu";
+    // 23503 foreign_key_violation; 23001 restrict_violation, which a RESTRICT foreign key raises when its parent goes.
+    private static readonly string[] ForeignKeyViolations = { "23503", "23001" };
 
     private readonly IAppDbContext _db;
     private readonly IDateTime _clock;
+    private readonly ICurrentUser _currentUser;
     private readonly ITransactionRunner _transaction;
     private readonly IInventoryLock _inventoryLock;
 
-    public DemoBranchService(IAppDbContext db, IDateTime clock, ITransactionRunner transaction,
+    public DemoBranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ITransactionRunner transaction,
         IInventoryLock inventoryLock)
     {
         _db = db;
         _clock = clock;
+        _currentUser = currentUser;
         _transaction = transaction;
         _inventoryLock = inventoryLock;
     }
@@ -54,118 +59,147 @@ public sealed class DemoBranchService : IDemoBranchService
     public Task<DemoBranchDeletionResultDto> DeleteAsync(Guid branchId, CancellationToken ct = default) =>
         _transaction.RunAsync(async c =>
         {
-            // 0. The exclusive gate waits for in-flight writes of the branch and keeps new ones out (D30); the guards
-            // are read behind it.
-            await _inventoryLock.AcquireBranchGateAsync(new[] { branchId }, exclusive: true, c);
-            await LoadDeletableBranchAsync(branchId, c);
-
-            // Product keys are valid for every branch: the real products whose cost price follows the branch's
-            // stock-ins, and the sample catalog.
-            var realStockInProducts = await _db.StockVoucherLines.IgnoreQueryFilters()
-                .Where(l => l.StockVoucher!.BranchId == branchId && l.StockVoucher.Type == StockDirection.In
-                            && !l.Product!.IsSample)
-                .Select(l => l.ProductId)
-                .Distinct()
-                .ToListAsync(c);
-            var sampleProducts = await _db.Products.IgnoreQueryFilters()
-                .Where(p => p.IsSample)
-                .Select(p => p.Id)
-                .ToListAsync(c);
-            await _inventoryLock.AcquireProductsAsync(realStockInProducts.Union(sampleProducts), c);
-
-            var warehouses = _db.Warehouses.IgnoreQueryFilters().Where(w => w.BranchId == branchId).Select(w => w.Id);
-            if (await _db.StockVouchers.IgnoreQueryFilters()
-                    .AnyAsync(v => v.BranchId != branchId && warehouses.Contains(v.WarehouseId), c)
-                || await _db.StockVoucherLines.IgnoreQueryFilters()
-                    .AnyAsync(l => l.StockVoucher!.BranchId != branchId && warehouses.Contains(l.WarehouseId), c)
-                || await _db.OpeningStocks.IgnoreQueryFilters()
-                    .AnyAsync(o => o.BranchId != branchId && warehouses.Contains(o.WarehouseId), c))
-                throw new ConflictException("DEMO_WAREHOUSE_IN_USE", "Kho của chi nhánh demo đang được chi nhánh khác dùng.");
-
-            // Id sets as subqueries, read by each statement before its parents go. Every foreign key is Restrict, so
-            // children are deleted before their parents.
-            var entries = _db.DebtEntries.IgnoreQueryFilters().Where(e => e.BranchId == branchId).Select(e => e.Id);
-            var cashVouchers = _db.CashVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).Select(v => v.Id);
-            var fundTransfers = _db.FundTransfers.IgnoreQueryFilters().Where(t => t.BranchId == branchId).Select(t => t.Id);
-            var debtOffsets = _db.DebtOffsetVouchers.IgnoreQueryFilters()
-                .Where(o => o.BranchId == branchId).Select(o => o.Id);
-            var stockVouchers = _db.StockVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).Select(v => v.Id);
-
-            // 1–2. Settlements, then the debt entries they join.
-            await _db.DebtSettlements.IgnoreQueryFilters()
-                .Where(s => entries.Contains(s.IncreaseEntryId) || entries.Contains(s.DecreaseEntryId))
-                .ExecuteDeleteAsync(c);
-            await _db.DebtEntries.IgnoreQueryFilters().Where(e => e.BranchId == branchId).ExecuteDeleteAsync(c);
-
-            // 3–6. Cash documents after their activities (no foreign key) and lines. Cash vouchers go before the stock
-            // vouchers that automatic ones follow (source_stock_voucher_id).
-            await _db.CashDocumentActivities.IgnoreQueryFilters()
-                .Where(a => cashVouchers.Contains(a.DocumentId) || fundTransfers.Contains(a.DocumentId)
-                            || debtOffsets.Contains(a.DocumentId))
-                .ExecuteDeleteAsync(c);
-            await _db.CashVoucherLines.IgnoreQueryFilters()
-                .Where(l => cashVouchers.Contains(l.CashVoucherId))
-                .ExecuteDeleteAsync(c);
-            await _db.CashVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).ExecuteDeleteAsync(c);
-            await _db.FundTransfers.IgnoreQueryFilters().Where(t => t.BranchId == branchId).ExecuteDeleteAsync(c);
-            await _db.DebtOffsetVouchers.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
-
-            // 7–8. Stock vouchers after their activities and lines.
-            await _db.StockVoucherActivities.IgnoreQueryFilters()
-                .Where(a => stockVouchers.Contains(a.StockVoucherId))
-                .ExecuteDeleteAsync(c);
-            await _db.StockVoucherLines.IgnoreQueryFilters()
-                .Where(l => stockVouchers.Contains(l.StockVoucherId))
-                .ExecuteDeleteAsync(c);
-            await _db.StockVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).ExecuteDeleteAsync(c);
-
-            // 9. Derived stock data (no foreign keys).
-            await _db.InventoryLedger.IgnoreQueryFilters().Where(e => e.BranchId == branchId).ExecuteDeleteAsync(c);
-            await _db.InventoryCostPeriods.IgnoreQueryFilters().Where(p => p.BranchId == branchId).ExecuteDeleteAsync(c);
-            await _db.StockBalances.IgnoreQueryFilters().Where(b => b.BranchId == branchId).ExecuteDeleteAsync(c);
-
-            // 10. Opening data and credit limits.
-            await _db.OpeningStocks.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
-            await _db.OpeningDebts.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
-            await _db.CreditLimits.IgnoreQueryFilters().Where(l => l.BranchId == branchId).ExecuteDeleteAsync(c);
-
-            // 11–12. Funds and warehouses, once no document or opening row uses them.
-            await _db.Funds.IgnoreQueryFilters().Where(f => f.BranchId == branchId).ExecuteDeleteAsync(c);
-            await _db.Warehouses.IgnoreQueryFilters().Where(w => w.BranchId == branchId).ExecuteDeleteAsync(c);
-
-            // 13. Numbering.
-            await _db.DocumentCounters.IgnoreQueryFilters().Where(n => n.BranchId == branchId).ExecuteDeleteAsync(c);
-            await _db.DocumentNumberings.IgnoreQueryFilters().Where(n => n.BranchId == branchId).ExecuteDeleteAsync(c);
-
-            // 14. Users (soft-deleted ones too) move to the main branch.
-            var now = _clock.UtcNow;
-            var reassignedUserCount = await _db.Users.IgnoreQueryFilters()
-                .Where(u => u.DefaultBranchId == branchId)
-                .ExecuteUpdateAsync(s => s
-                    .SetProperty(u => u.DefaultBranchId, BranchDefaults.MainBranchId)
-                    .SetProperty(u => u.UpdatedAt, (DateTimeOffset?)now), c);
-
-            // 15. The branch itself.
-            await _db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId).ExecuteDeleteAsync(c);
-
-            // 16. The real products priced by the branch's stock-ins follow their latest remaining stock-in.
-            await ProductCostPrices.RecomputeAsync(_db, realStockInProducts, c);
-            await _db.SaveChangesAsync(c);
-
-            // 17. The last demo branch takes the sample catalog it no longer needs along (soft-deleted branches do not
-            // count). The rows still used by something stay, and are counted.
-            var keptProducts = 0;
-            var keptPartners = 0;
-            if (!await _db.Branches.AnyAsync(b => b.IsDemo, c))
-                (keptProducts, keptPartners) = await CleanSampleCatalogAsync(c);
-
-            return new DemoBranchDeletionResultDto
+            try
             {
-                ReassignedUserCount = reassignedUserCount,
-                KeptSampleProductCount = keptProducts,
-                KeptSamplePartnerCount = keptPartners,
-            };
+                // 0. The exclusive gate, the guards and the product locks.
+                var stockInProducts = await AcquireLocksAsync(branchId, c);
+                await EnsureWarehousesNotSharedAsync(branchId, c);
+
+                // 1–13, 15. Every row of the branch, then the branch.
+                await DeleteBranchRowsAsync(branchId, c);
+
+                // 14. Users (soft-deleted ones too) move to the main branch.
+                var reassignedUserCount = await ReassignUsersAsync(branchId, c);
+                await _db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId).ExecuteDeleteAsync(c);
+
+                // 16. The products priced by the branch's stock-ins follow their latest remaining stock-in.
+                await ProductCostPrices.RecomputeAsync(_db, stockInProducts, c);
+                await _db.SaveChangesAsync(c);
+
+                // 17. The last demo branch takes the sample catalog it no longer needs along (soft-deleted branches do
+                // not count). The rows still used by something stay, and are counted.
+                var keptProducts = 0;
+                var keptPartners = 0;
+                if (!await _db.Branches.AnyAsync(b => b.IsDemo, c))
+                    (keptProducts, keptPartners) = await CleanSampleCatalogAsync(c);
+
+                return new DemoBranchDeletionResultDto
+                {
+                    ReassignedUserCount = reassignedUserCount,
+                    KeptSampleProductCount = keptProducts,
+                    KeptSamplePartnerCount = keptPartners,
+                };
+            }
+            catch (Exception ex) when (IsForeignKeyViolation(ex))
+            {
+                // A write that does not take the branch gate (a new fund, warehouse, credit limit or a user's default
+                // branch) landed between two steps. Nothing is deleted: the transaction rolls back.
+                throw new ConflictException("DEMO_BRANCH_BUSY", "Chi nhánh demo vừa có dữ liệu mới. Hãy thử xóa lại.");
+            }
         }, ct);
+
+    /// The exclusive gate waits for in-flight writes of the branch and keeps new ones out (D30); the guards are read
+    /// behind it. Locks the products (keys are valid for every branch): the sample catalog and the products with a
+    /// stock-in in the branch, which are returned for the cost price recomputation.
+    private async Task<List<Guid>> AcquireLocksAsync(Guid branchId, CancellationToken ct)
+    {
+        await _inventoryLock.AcquireBranchGateAsync(new[] { branchId }, exclusive: true, ct);
+        await LoadDeletableBranchAsync(branchId, ct);
+
+        var stockInProducts = await _db.StockVoucherLines.IgnoreQueryFilters()
+            .Where(l => l.StockVoucher!.BranchId == branchId && l.StockVoucher.Type == StockDirection.In)
+            .Select(l => l.ProductId)
+            .Distinct()
+            .ToListAsync(ct);
+        var sampleProducts = await _db.Products.IgnoreQueryFilters()
+            .Where(p => p.IsSample)
+            .Select(p => p.Id)
+            .ToListAsync(ct);
+        await _inventoryLock.AcquireProductsAsync(stockInProducts.Union(sampleProducts), ct);
+        return stockInProducts;
+    }
+
+    private async Task EnsureWarehousesNotSharedAsync(Guid branchId, CancellationToken ct)
+    {
+        var warehouses = _db.Warehouses.IgnoreQueryFilters().Where(w => w.BranchId == branchId).Select(w => w.Id);
+        if (await _db.StockVouchers.IgnoreQueryFilters()
+                .AnyAsync(v => v.BranchId != branchId && warehouses.Contains(v.WarehouseId), ct)
+            || await _db.StockVoucherLines.IgnoreQueryFilters()
+                .AnyAsync(l => l.StockVoucher!.BranchId != branchId && warehouses.Contains(l.WarehouseId), ct)
+            || await _db.OpeningStocks.IgnoreQueryFilters()
+                .AnyAsync(o => o.BranchId != branchId && warehouses.Contains(o.WarehouseId), ct))
+            throw new ConflictException("DEMO_WAREHOUSE_IN_USE", "Kho của chi nhánh demo đang được chi nhánh khác dùng.");
+    }
+
+    /// Steps 1–13: every row that belongs to the branch, children before parents (every foreign key is Restrict). The
+    /// id sets are subqueries, read by each statement before its parents go.
+    private async Task DeleteBranchRowsAsync(Guid branchId, CancellationToken c)
+    {
+        var entries = _db.DebtEntries.IgnoreQueryFilters().Where(e => e.BranchId == branchId).Select(e => e.Id);
+        var cashVouchers = _db.CashVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).Select(v => v.Id);
+        var fundTransfers = _db.FundTransfers.IgnoreQueryFilters().Where(t => t.BranchId == branchId).Select(t => t.Id);
+        var debtOffsets = _db.DebtOffsetVouchers.IgnoreQueryFilters()
+            .Where(o => o.BranchId == branchId).Select(o => o.Id);
+        var stockVouchers = _db.StockVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).Select(v => v.Id);
+
+        // 1–2. Settlements, then the debt entries they join.
+        await _db.DebtSettlements.IgnoreQueryFilters()
+            .Where(s => entries.Contains(s.IncreaseEntryId) || entries.Contains(s.DecreaseEntryId))
+            .ExecuteDeleteAsync(c);
+        await _db.DebtEntries.IgnoreQueryFilters().Where(e => e.BranchId == branchId).ExecuteDeleteAsync(c);
+
+        // 3–6. Cash documents after their activities (no foreign key) and lines. Cash vouchers go before the stock
+        // vouchers that automatic ones follow (source_stock_voucher_id).
+        await _db.CashDocumentActivities.IgnoreQueryFilters()
+            .Where(a => cashVouchers.Contains(a.DocumentId) || fundTransfers.Contains(a.DocumentId)
+                        || debtOffsets.Contains(a.DocumentId))
+            .ExecuteDeleteAsync(c);
+        await _db.CashVoucherLines.IgnoreQueryFilters()
+            .Where(l => cashVouchers.Contains(l.CashVoucherId))
+            .ExecuteDeleteAsync(c);
+        await _db.CashVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.FundTransfers.IgnoreQueryFilters().Where(t => t.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.DebtOffsetVouchers.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
+
+        // 7–8. Stock vouchers after their activities and lines.
+        await _db.StockVoucherActivities.IgnoreQueryFilters()
+            .Where(a => stockVouchers.Contains(a.StockVoucherId))
+            .ExecuteDeleteAsync(c);
+        await _db.StockVoucherLines.IgnoreQueryFilters()
+            .Where(l => stockVouchers.Contains(l.StockVoucherId))
+            .ExecuteDeleteAsync(c);
+        await _db.StockVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).ExecuteDeleteAsync(c);
+
+        // 9. Derived stock data (no foreign keys).
+        await _db.InventoryLedger.IgnoreQueryFilters().Where(e => e.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.InventoryCostPeriods.IgnoreQueryFilters().Where(p => p.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.StockBalances.IgnoreQueryFilters().Where(b => b.BranchId == branchId).ExecuteDeleteAsync(c);
+
+        // 10. Opening data and credit limits.
+        await _db.OpeningStocks.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.OpeningDebts.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.CreditLimits.IgnoreQueryFilters().Where(l => l.BranchId == branchId).ExecuteDeleteAsync(c);
+
+        // 11–12. Funds and warehouses, once no document or opening row uses them.
+        await _db.Funds.IgnoreQueryFilters().Where(f => f.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.Warehouses.IgnoreQueryFilters().Where(w => w.BranchId == branchId).ExecuteDeleteAsync(c);
+
+        // 13. Numbering.
+        await _db.DocumentCounters.IgnoreQueryFilters().Where(n => n.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.DocumentNumberings.IgnoreQueryFilters().Where(n => n.BranchId == branchId).ExecuteDeleteAsync(c);
+    }
+
+    private Task<int> ReassignUsersAsync(Guid branchId, CancellationToken ct)
+    {
+        var now = _clock.UtcNow;
+        var userId = _currentUser.UserId;
+        return _db.Users.IgnoreQueryFilters()
+            .Where(u => u.DefaultBranchId == branchId)
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(u => u.DefaultBranchId, BranchDefaults.MainBranchId)
+                .SetProperty(u => u.UpdatedAt, (DateTimeOffset?)now)
+                .SetProperty(u => u.UpdatedBy, userId), ct);
+    }
 
     /// Hard-deletes the sample products and partners nothing refers to, then the sample group when no product is
     /// left in it. Returns how many sample products and partners remain. Every check ignores the query filters.
@@ -205,6 +239,10 @@ public sealed class DemoBranchService : IDemoBranchService
         return (await _db.Products.IgnoreQueryFilters().CountAsync(p => p.IsSample, ct),
             await _db.Customers.IgnoreQueryFilters().CountAsync(p => p.IsSample, ct));
     }
+
+    /// A PostgreSQL foreign key violation (23503 or 23001), thrown by a bulk statement directly or wrapped by a save.
+    private static bool IsForeignKeyViolation(Exception ex) =>
+        (ex as DbException ?? ex.InnerException as DbException)?.SqlState is { } state && ForeignKeyViolations.Contains(state);
 
     /// The guards of the preview and the delete: the branch exists, is a demo one and is not being filled. Not tracked,
     /// so a read behind a lock sees the current row, not an instance the scope already holds.

@@ -3,7 +3,6 @@ using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Inventory.OpeningStocks.Models;
-using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -92,11 +91,6 @@ public class DemoBranchCatalogCleanupTests : DemoBranchFixture
         return (catalog, dk01, dk02);
     }
 
-    private async Task<DemoBranchDeletionResultDto> DeleteDemoAsync(Guid branchId)
-    {
-        var response = await _client.DeleteAsync($"/api/branches/{branchId}/demo");
-        return await ReadDataAsync<DemoBranchDeletionResultDto>(response);
-    }
 
     private Task<int> ProductCountAsync(params Guid[] ids) =>
         InDbAsync(db => db.Products.IgnoreQueryFilters().CountAsync(p => ids.Contains(p.Id)));
@@ -115,7 +109,7 @@ public class DemoBranchCatalogCleanupTests : DemoBranchFixture
     {
         var (c, dk01, _) = await SetUpAsync();
 
-        var result = await DeleteDemoAsync(dk01.BranchId);
+        var result = await DeleteDemoBranchAsync(dk01.BranchId);
 
         (await ProductCountAsync(c.SpA, c.SpB, c.SpC)).Should().Be(3);
         (await PartnerCountAsync(c.KhA, c.KhB)).Should().Be(2);
@@ -130,8 +124,8 @@ public class DemoBranchCatalogCleanupTests : DemoBranchFixture
     {
         var (c, dk01, dk02) = await SetUpAsync();
 
-        await DeleteDemoAsync(dk01.BranchId);
-        var result = await DeleteDemoAsync(dk02.BranchId);
+        await DeleteDemoBranchAsync(dk01.BranchId);
+        var result = await DeleteDemoBranchAsync(dk02.BranchId);
 
         (await ProductCountAsync(c.SpA, c.SpC)).Should().Be(0);
         (await ProductCountAsync(c.SpB)).Should().Be(1);
@@ -152,7 +146,7 @@ public class DemoBranchCatalogCleanupTests : DemoBranchFixture
         var dk01 = await CreateDemoBranchAsync("DK01");
         await SellInDemoBranchAsync(dk01, khA, spA);
 
-        var result = await DeleteDemoAsync(dk01.BranchId);
+        var result = await DeleteDemoBranchAsync(dk01.BranchId);
 
         (await ProductCountAsync(spA)).Should().Be(0);
         (await GroupCountAsync(SampleGroupName)).Should().Be(0);
@@ -165,7 +159,7 @@ public class DemoBranchCatalogCleanupTests : DemoBranchFixture
         await CreateGroupAsync("Nhóm thật");
         var dk01 = await CreateDemoBranchAsync("DK01");
 
-        await DeleteDemoAsync(dk01.BranchId);
+        await DeleteDemoBranchAsync(dk01.BranchId);
 
         (await GroupCountAsync("Nhóm thật")).Should().Be(1);
     }

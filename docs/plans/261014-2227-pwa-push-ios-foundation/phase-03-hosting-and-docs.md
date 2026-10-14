@@ -1,6 +1,6 @@
 # Phase 03 — Cache header của Caddy và tài liệu nền tảng
 
-**Status:** [-] in-progress
+**Status:** [x] complete
 **Complexity:** S
 
 ## Objective

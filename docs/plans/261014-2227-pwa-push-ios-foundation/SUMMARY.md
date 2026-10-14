@@ -56,7 +56,7 @@ Thông báo đẩy mà backend đã gửi hiện ra trên Android và iPhone (iO
 
 - [x] Phase 01 — Push hiển thị và bấm mở đúng trang (M) — [phase-01-push-display-and-click.md](phase-01-push-display-and-click.md)
 - [x] Phase 02 — Hỗ trợ iOS: icon, meta, safe-area, hướng dẫn cài (M) — [phase-02-ios-support.md](phase-02-ios-support.md)
-- [ ] Phase 03 — Cache header của Caddy và tài liệu nền tảng (S) — [phase-03-hosting-and-docs.md](phase-03-hosting-and-docs.md)
+- [x] Phase 03 — Cache header của Caddy và tài liệu nền tảng (S) — [phase-03-hosting-and-docs.md](phase-03-hosting-and-docs.md)
 
 Phase 01 và 02 gần như độc lập về file và có thể làm song song trong hai worktree rồi gộp; cả hai cùng sửa `App.tsx` và `App.shell.test.tsx` ở những chỗ khác nhau (phase 01 Task 6, phase 02 Task 11), nên khi gộp có thể phải giải xung đột nhỏ trong file test. Phase 03 làm sau cùng vì tài liệu mô tả kết quả của hai phase đầu.
 

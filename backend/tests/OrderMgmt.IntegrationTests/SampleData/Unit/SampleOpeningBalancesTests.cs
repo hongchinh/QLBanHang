@@ -47,6 +47,19 @@ public class SampleOpeningBalancesTests
     }
 
     [Fact]
+    public void OpeningStock_K2OnlyProductsHoldAtLeastThreeWeeksOfSales()
+    {
+        var k2 = Generate().OpeningStocks.Single(s => s.WarehouseKey == "K2").Lines.ToDictionary(l => l.ProductCode);
+        var k2Only = SampleCatalog.ProductPlans.Where(p => p.InK2 && !p.InK1).ToList();
+
+        k2Only.Should().NotBeEmpty();
+        foreach (var plan in k2Only)
+        {
+            k2[plan.ProductCode].Quantity.Should().BeGreaterThanOrEqualTo(3 * plan.WeeklySales);
+        }
+    }
+
+    [Fact]
     public void OpeningDebts_HaveSixteenUniqueKeysInOrder()
     {
         var debts = Generate().OpeningDebts;

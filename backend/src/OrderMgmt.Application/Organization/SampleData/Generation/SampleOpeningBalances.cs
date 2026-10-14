@@ -21,12 +21,16 @@ public static class SampleOpeningBalances
         var costs = SampleCatalog.Products.ToDictionary(p => p.Code, p => p.CostPrice);
         var stocks = new List<SampleOpeningStockSpec>();
 
-        // K1 holds 3-6 weeks of the planned sales, K2 a smaller 1-3 weeks.
-        foreach (var (key, minWeeks, maxWeeks) in new[] { ("K1", 3, 6), ("K2", 1, 3) })
+        foreach (var key in new[] { "K1", "K2" })
         {
             var lines = new List<SampleOpeningStockLine>();
             foreach (var plan in plans.Where(p => key == "K1" ? p.InK1 : p.InK2))
             {
+                var (minWeeks, maxWeeks) = key == "K1"
+                    ? (SampleDataVolumes.OpeningWeeksK1Min, SampleDataVolumes.OpeningWeeksK1Max)
+                    : plan.InK1
+                        ? (SampleDataVolumes.OpeningWeeksK2SharedMin, SampleDataVolumes.OpeningWeeksK2SharedMax)
+                        : (SampleDataVolumes.OpeningWeeksK2OnlyMin, SampleDataVolumes.OpeningWeeksK2OnlyMax);
                 var quantity = Math.Max(1m, Math.Round(plan.WeeklySales * random.Between(minWeeks, maxWeeks), MidpointRounding.AwayFromZero));
                 lines.Add(new SampleOpeningStockLine(plan.ProductCode, quantity, quantity * costs[plan.ProductCode]));
             }

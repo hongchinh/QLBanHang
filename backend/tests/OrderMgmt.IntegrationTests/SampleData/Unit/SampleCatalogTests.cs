@@ -123,11 +123,26 @@ public class SampleCatalogTests
     }
 
     [Fact]
-    public void Planned_weekly_sales_give_about_one_billion_a_month()
+    public void Planned_sales_are_about_one_billion_a_month()
     {
         var prices = Generate().Products.ToDictionary(p => p.Code, p => p.DefaultPrice);
         var monthly = SampleCatalog.ProductPlans.Sum(p => p.WeeklySales * prices[p.ProductCode]) * 52m / 12m;
-        monthly.Should().BeInRange(800_000_000m, 1_200_000_000m);
+        monthly.Should().BeInRange(950_000_000m, 1_100_000_000m);
+    }
+
+    [Fact]
+    public void Every_supplier_used_for_purchases_has_at_least_three_products()
+    {
+        var plans = SampleCatalog.ProductPlans;
+        var supplierCodes = plans.Select(p => p.PrimarySupplier)
+            .Concat(plans.Where(p => p.AltSupplier != null).Select(p => p.AltSupplier!))
+            .Distinct();
+
+        foreach (var supplier in supplierCodes)
+        {
+            plans.Count(p => p.PrimarySupplier == supplier || p.AltSupplier == supplier)
+                .Should().BeGreaterThanOrEqualTo(3, $"supplier {supplier} must be able to fill a 3-line purchase");
+        }
     }
 
     [Fact]

@@ -19,6 +19,8 @@ public enum SalesTier
 }
 
 /// Planned trading of one tracked product. WeeklySales is in the product's unit; AltSupplier may be a dual-role partner.
+/// InK1/InK2 mean opening-stock membership, not the only warehouses the product may ever be in
+/// (purchases into K2 may bring other products).
 public sealed record SampleProductPlan(string ProductCode, string PrimarySupplier, string? AltSupplier, decimal WeeklySales,
     bool InK1, bool InK2);
 

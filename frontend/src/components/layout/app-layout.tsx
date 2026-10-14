@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useBranchStore } from '@/stores/branch-store';
 import { useUiStore } from '@/stores/ui-store';
@@ -36,8 +35,8 @@ export function AppLayout() {
   }, [location.pathname, closeMobileDrawer]);
 
   const dashboardItem: NavItem = hasPermission('quotations.view_all')
-    ? { to: '/admin/dashboard', label: 'Tổng quan', icon: LayoutDashboard }
-    : { to: '/', label: 'Tổng quan', icon: LayoutDashboard };
+    ? { to: '/admin/dashboard', label: 'Tổng quan', icon: 'overview' }
+    : { to: '/', label: 'Tổng quan', icon: 'overview' };
 
   const visibleGroups = visibleNavGroups(hasPermission, isInRole);
 

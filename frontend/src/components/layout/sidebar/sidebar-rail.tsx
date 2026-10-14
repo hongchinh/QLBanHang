@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Search, Star } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { NavGroup, NavItem } from '../nav-config';
@@ -61,7 +61,7 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
             onClick={onSearch}
             className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            <Search className="h-4 w-4" />
+            <AppIcon name="search" tone="none" />
           </button>
         </TooltipTrigger>
         <TooltipContent side="right">Tìm chức năng</TooltipContent>
@@ -69,7 +69,7 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
       {pins && pinnedItems.length > 0 && (
         <SidebarFlyout
           title="Mục đã ghim"
-          icon={Star}
+          icon="pin"
           iconClassName="bg-nav-pin-bg text-nav-pin-fg"
           open={openId === 'pins'}
           onOpenChange={(open) => setOpenId(open ? 'pins' : null)}
@@ -79,7 +79,7 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
               aria-label="Mục đã ghim"
               className="flex h-10 w-10 items-center justify-center rounded-md text-nav-pin-fg hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Star className="h-4 w-4 fill-current" />
+              <AppIcon name="pin" tone="none" className="fill-current" />
             </button>
           }
         >
@@ -119,7 +119,7 @@ export function SidebarRail({ dashboardItem, groups, activePath, activeGroupId, 
                   group.id === activeGroupId && 'ring-2 ring-primary ring-offset-2 ring-offset-card',
                 )}
               >
-                <group.icon className="h-4 w-4" />
+                <AppIcon name={group.icon} />
               </button>
             }
           >

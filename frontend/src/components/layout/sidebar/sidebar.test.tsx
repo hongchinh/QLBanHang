@@ -266,3 +266,12 @@ describe('Sidebar pin chips', () => {
     expect(chips()).not.toBeInTheDocument();
   });
 });
+
+describe('Sidebar icons', () => {
+  it('renders registry icons for the Kho group and its items', () => {
+    const { container } = renderSidebar('/');
+    expect(header('Kho')).toHaveAttribute('aria-expanded', 'true');
+    expect(container.querySelector('[data-icon="stockOut"]')).not.toBeNull();
+    expect(container.querySelector('[data-icon="inventory"]')).not.toBeNull();
+  });
+});

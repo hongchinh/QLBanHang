@@ -144,7 +144,7 @@ export function KpiRow({ params }: KpiRowProps) {
   // tiles. Narrower, each group takes the full width. A group shares the columns of the row (subgrid), so its
   // label spans exactly its own tiles.
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
       {periodTiles.length > 0 && <KpiGroup label="Trong kỳ">{periodTiles}</KpiGroup>}
       {nowTiles.length > 0 && <KpiGroup label="Hiện tại">{nowTiles}</KpiGroup>}
     </div>

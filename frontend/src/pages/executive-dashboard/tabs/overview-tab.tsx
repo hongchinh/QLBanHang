@@ -85,8 +85,8 @@ export function OverviewTab({ params, openTabs, onOpenTab }: OverviewTabProps) {
   return (
     <div className="space-y-4">
       <KpiRow params={params} />
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="grid content-start gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="grid grid-cols-1 content-start gap-4 lg:grid-cols-2">
           {access.sales && (
             <TileCard
               title="Doanh thu – giá vốn – lãi gộp"

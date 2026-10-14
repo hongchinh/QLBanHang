@@ -134,6 +134,17 @@ describe('CashTab', () => {
     for (const title of TITLES) expect(tile(title)).toBeInTheDocument();
   });
 
+  // Below lg the tiles share one column that can shrink, so the widest table scrolls inside its own tile
+  // instead of making every tile wider than the screen.
+  it('lays the tiles in one shrinkable column below lg, two from lg, and a wide table scrolls in its tile', () => {
+    renderTab();
+
+    const grid = tile('Số dư các quỹ').parentElement;
+    expect(grid).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    for (const title of TITLES) expect(tile(title).parentElement).toBe(grid);
+    expect(within(tile(LARGEST)).getByRole('table').parentElement).toHaveClass('w-full', 'overflow-auto');
+  });
+
   it('asks each query with the params of the tab', () => {
     renderTab({ ...MONTH, branchId: 'b1' });
 

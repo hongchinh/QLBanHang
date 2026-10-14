@@ -187,6 +187,18 @@ describe('InventoryTab', () => {
     for (const title of TITLES) expect(tile(title)).toBeInTheDocument();
   });
 
+  // Below lg the tiles share one column that can shrink, so a wide table scrolls inside its own tile instead
+  // of making every tile wider than the screen.
+  it('lays the tiles in one shrinkable column below lg, two from lg, and a wide table scrolls in its tile', () => {
+    renderTab();
+
+    const grid = tile('Giá trị tồn theo kho').parentElement;
+    expect(grid).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    for (const title of TITLES) expect(tile(title).parentElement).toBe(grid);
+    expect(within(tile('Mã hàng tồn âm')).getByRole('table').parentElement).toHaveClass('w-full', 'overflow-auto');
+    expect(stat('Tồn âm').parentElement).toHaveClass('grid', 'grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-4');
+  });
+
   describe('Giá trị tồn theo kho', () => {
     it('in company scope a warehouse starts with its branch code', () => {
       renderTab();

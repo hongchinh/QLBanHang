@@ -222,6 +222,20 @@ describe('OverviewTab', () => {
     for (const title of TITLES) expect(tile(title)).toBeInTheDocument();
   });
 
+  // Below xl the two column groups stack, below lg the tiles share one column; every column can shrink, so a
+  // wide table or a long line stays inside its tile instead of making the page wider than the screen.
+  it('lays the tiles in shrinkable columns at every width', () => {
+    renderTab();
+
+    const tiles = tile('Doanh thu – giá vốn – lãi gộp').parentElement;
+    expect(tiles).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    for (const title of TITLES.slice(0, 5)) expect(tile(title).parentElement).toBe(tiles);
+    const columns = tiles?.parentElement;
+    expect(columns).toHaveClass('grid', 'grid-cols-1', 'xl:grid-cols-[minmax(0,1fr)_280px]');
+    expect(tile('Cần chú ý').parentElement?.parentElement).toBe(columns);
+    expect(within(tile('So sánh chi nhánh')).getByRole('table').parentElement).toHaveClass('w-full', 'overflow-auto');
+  });
+
   it('fills the tiles from their queries', () => {
     renderTab();
 

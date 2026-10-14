@@ -82,7 +82,7 @@ export function SalesTab({ params }: SalesTabProps) {
       {canViewCost && (
         <SegmentedToggle<SalesTopSort> label="Xếp hạng theo" options={SORTS} value={sort} onChange={setSortChoice} />
       )}
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <TopTile title="Top khách hàng" query={customers} columns={topColumns('Khách hàng', partnerName, canViewCost)} />
         <TopTile title="Top hàng hoá" query={products} columns={topColumns('Hàng hoá', partnerName, canViewCost)} />
         <TopTile

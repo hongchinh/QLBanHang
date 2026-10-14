@@ -142,6 +142,17 @@ describe('SalesTab', () => {
     expect(lastOptions(useBranchComparison)).toEqual({ enabled: true });
   });
 
+  // Below lg the lists share one column that can shrink, so a wide table scrolls inside its own tile instead
+  // of making every tile wider than the screen.
+  it('lays the lists in one shrinkable column below lg and two from lg', () => {
+    renderTab();
+
+    const grid = tile('Top khách hàng').parentElement;
+    expect(grid).toHaveClass('grid', 'grid-cols-1', 'lg:grid-cols-2');
+    for (const title of [...LISTS, 'So sánh chi nhánh']) expect(tile(title).parentElement).toBe(grid);
+    expect(within(tile('Top khách hàng')).getByRole('table').parentElement).toHaveClass('w-full', 'overflow-auto');
+  });
+
   it('in branch scope there is no branch comparison and its request is not sent', () => {
     state.scope = branchScope();
     renderTab({ ...MONTH, branchId: 'b1' });

@@ -469,7 +469,8 @@ describe('KpiRow', () => {
     renderRow();
 
     const grid = screen.getByRole('group', { name: 'Trong kỳ' }).parentElement;
-    expect(grid).toHaveClass('grid', 'xl:grid-cols-7');
+    // One column that can shrink on a phone, so a long hint never widens the page.
+    expect(grid).toHaveClass('grid', 'grid-cols-1', 'sm:grid-cols-2', 'lg:grid-cols-4', 'xl:grid-cols-7');
     for (const label of LABELS) {
       const element = screen.getByText(label);
       expect(element).toHaveClass('truncate');

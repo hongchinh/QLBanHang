@@ -100,7 +100,7 @@ export function DebtTab({ params }: DebtTabProps) {
   ];
 
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
       <TileCard
         title="Cơ cấu nợ phải thu"
         query={summary}

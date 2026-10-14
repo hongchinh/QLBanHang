@@ -50,6 +50,14 @@ describe('TileCard', () => {
     expect(tile).toHaveClass('lg:col-span-2');
   });
 
+  // In a grid column the tile may get narrower than its content: a wide table then scrolls inside the tile
+  // instead of widening the column, and with it every tile of the tab.
+  it('can shrink below the width of its content', () => {
+    renderTile();
+
+    expect(screen.getByRole('region', { name: 'Dòng tiền thu – chi' })).toHaveClass('min-w-0');
+  });
+
   it('shows the children of a query that has loaded', () => {
     renderTile({ query: query() });
 

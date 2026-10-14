@@ -272,6 +272,39 @@ describe('ExecutiveDashboardPage', () => {
     expect(screen.getByRole('tablist')).toHaveClass('max-w-full', 'overflow-x-auto', 'justify-start');
   });
 
+  // A page left open overnight with the default period moves to the new day: the tabs get the new period (and
+  // build new query keys from it), and the comparison period follows.
+  describe('without a period in the URL', () => {
+    beforeEach(() => {
+      vi.useFakeTimers();
+      // Saturday 31 October 2026, 23:59:30 in VN time.
+      vi.setSystemTime(new Date(2026, 9, 31, 23, 59, 30));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('follows the VN date past midnight', () => {
+      renderPage('/dashboard/executive');
+      expect(lastOverviewProps().params).toEqual({ from: '2026-10-01', to: '2026-10-31', branchId: 'b1' });
+      expect(screen.getByText('So với kỳ trước: 31/08/2026 – 30/09/2026')).toBeInTheDocument();
+
+      act(() => vi.advanceTimersByTime(30_000));
+
+      expect(lastOverviewProps().params).toEqual({ from: '2026-11-01', to: '2026-11-01', branchId: 'b1' });
+      expect(screen.getByText('So với kỳ trước: 31/10/2026 – 31/10/2026')).toBeInTheDocument();
+      // A preset still (on the 1st "Hôm nay" comes first), not "Tuỳ chỉnh".
+      expect(screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' })).not.toHaveClass('bg-foreground');
+      expect(screen.getByTestId('search')).toBeEmptyDOMElement();
+    });
+
+    it('keeps a period given in the URL', () => {
+      renderPage('/dashboard/executive?from=2026-10-01&to=2026-10-31');
+
+      act(() => vi.advanceTimersByTime(60_000));
+
+      expect(lastOverviewProps().params).toEqual({ from: '2026-10-01', to: '2026-10-31', branchId: 'b1' });
+    });
+  });
+
   it('a user who cannot switch gets no scope select', () => {
     state.scope = { ...branchScope(), canSwitch: false, branchId: undefined, branches: [B1] };
     renderPage();

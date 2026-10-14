@@ -1,8 +1,9 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { parseISO } from 'date-fns';
 import { computePreset } from '@/lib/date-range-presets';
 import type { RangePreset } from '@/lib/date-range-presets';
-import { formatDateYmd } from './format';
+import { useVnToday } from '@/lib/use-vn-today';
 
 // The presets live in lib/date-range-presets.ts; the type is re-exported for the modules that import it from here.
 export type { RangePreset };
@@ -19,11 +20,11 @@ export interface UseDashboardParams {
 export function useDashboardParams(): UseDashboardParams {
   const [sp, setSp] = useSearchParams();
 
-  const defaults = useMemo(() => {
-    const today = new Date();
-    const first = new Date(today.getFullYear(), today.getMonth(), 1);
-    return { from: formatDateYmd(first), to: formatDateYmd(today) };
-  }, []);
+  // Without from/to in the URL: this month up to today. It follows the VN date, so a page left open past
+  // midnight asks for the new day (or month) instead of the day it was opened.
+  const today = useVnToday();
+  // parseISO reads a date-only string as local midnight (VN time, lib/vn-datetime.ts).
+  const defaults = useMemo(() => computePreset('this-month', parseISO(today)), [today]);
 
   const from = sp.get('from') ?? defaults.from;
   const to = sp.get('to') ?? defaults.to;

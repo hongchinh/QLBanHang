@@ -2,7 +2,7 @@ import type { ComponentType } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LiveStatus } from '@/features/dashboard/components/live-status';
 import { RangePicker } from '@/features/dashboard/components/range-picker';
-import { previousPeriod } from '@/features/executive-dashboard/period';
+import { periodError, previousPeriod } from '@/features/executive-dashboard/period';
 import { EXECUTIVE_PRESETS } from '@/features/executive-dashboard/presets';
 import type { ExecutiveParams, ExecutiveTab } from '@/features/executive-dashboard/types';
 import { useExecutiveAccess } from '@/features/executive-dashboard/use-executive-access';
@@ -71,7 +71,14 @@ export function ExecutiveDashboardPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ScopeSelect />
-          <RangePicker from={from} to={to} onChange={setRange} onPreset={setPreset} presets={EXECUTIVE_PRESETS} />
+          <RangePicker
+            from={from}
+            to={to}
+            onChange={setRange}
+            onPreset={setPreset}
+            presets={EXECUTIVE_PRESETS}
+            validate={periodError}
+          />
         </div>
       </div>
 

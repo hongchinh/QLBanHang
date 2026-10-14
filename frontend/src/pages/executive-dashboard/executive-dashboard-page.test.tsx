@@ -305,6 +305,34 @@ describe('ExecutiveDashboardPage', () => {
     });
   });
 
+  describe('a period the API refuses', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      // Tuesday 13 October 2026.
+      vi.setSystemTime(new Date(2026, 9, 13, 10, 0, 0));
+    });
+    afterEach(() => vi.useRealTimers());
+
+    it('in the URL gives way to the default period and its comparison period', () => {
+      renderPage('/dashboard/executive?from=2026-10-20&to=2026-10-01');
+
+      expect(lastOverviewProps().params).toEqual({ from: '2026-10-01', to: '2026-10-13', branchId: 'b1' });
+      expect(screen.getByText('So với kỳ trước: 18/09/2026 – 30/09/2026')).toBeInTheDocument();
+    });
+
+    it('cannot be applied from "Tuỳ chỉnh", which gives the reason of the API', () => {
+      renderPage();
+      fireEvent.click(screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' }));
+      fireEvent.change(screen.getByLabelText('Từ ngày'), { target: { value: '2022-10-01' } });
+      fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: '2026-10-13' } });
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Khoảng thời gian tối đa là 3 năm.');
+      expect(screen.getByRole('button', { name: 'Áp dụng' })).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Áp dụng' }));
+      expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('from')).toBe('2026-10-01');
+    });
+  });
+
   it('a user who cannot switch gets no scope select', () => {
     state.scope = { ...branchScope(), canSwitch: false, branchId: undefined, branches: [B1] };
     renderPage();

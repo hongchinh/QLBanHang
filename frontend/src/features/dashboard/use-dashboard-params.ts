@@ -17,7 +17,12 @@ export interface UseDashboardParams {
   setPreset: (preset: RangePreset) => void;
 }
 
-export function useDashboardParams(): UseDashboardParams {
+export interface UseDashboardParamsOptions {
+  // Whether the screen can ask for this period; a URL period that fails gives way to the default period.
+  isValid?: (from: string, to: string) => boolean;
+}
+
+export function useDashboardParams({ isValid }: UseDashboardParamsOptions = {}): UseDashboardParams {
   const [sp, setSp] = useSearchParams();
 
   // Without from/to in the URL: this month up to today. It follows the VN date, so a page left open past
@@ -26,8 +31,12 @@ export function useDashboardParams(): UseDashboardParams {
   // parseISO reads a date-only string as local midnight (VN time, lib/vn-datetime.ts).
   const defaults = useMemo(() => computePreset('this-month', parseISO(today)), [today]);
 
-  const from = sp.get('from') ?? defaults.from;
-  const to = sp.get('to') ?? defaults.to;
+  const urlFrom = sp.get('from') ?? defaults.from;
+  const urlTo = sp.get('to') ?? defaults.to;
+  // A hand-edited or old link with a period the screen refuses opens the default period instead.
+  const valid = isValid?.(urlFrom, urlTo) ?? true;
+  const from = valid ? urlFrom : defaults.from;
+  const to = valid ? urlTo : defaults.to;
   const saleUserId = sp.get('saleUserId') ?? undefined;
 
   const setRange = useCallback(

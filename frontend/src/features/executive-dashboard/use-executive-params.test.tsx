@@ -48,6 +48,30 @@ describe('useExecutiveParams', () => {
     expect(params().scopeParam).toBe('branch');
   });
 
+  // A period the API refuses (a hand-edited or old link) opens the default period instead of a page of errors.
+  it.each([
+    ['"to" before "from"', 'from=2026-10-20&to=2026-10-01'],
+    ['longer than 1,100 days', 'from=2023-01-01&to=2026-10-13'],
+    ['a month that does not exist', 'from=2026-13-01&to=2026-10-13'],
+    ['a year before 2000', 'from=1999-01-01&to=1999-01-31'],
+    ['"from" alone after today', 'from=2026-10-20'],
+  ])('a period with %s in the URL falls back to the default', (_case, query) => {
+    const { params, search } = setup(`/dashboard/executive?${query}&tab=cash`);
+
+    expect(params().from).toBe('2026-10-01');
+    expect(params().to).toBe('2026-10-13');
+    expect(params().tab).toBe('cash');
+    // The URL is left as it is: the next choice of a period replaces it.
+    expect(search().get('tab')).toBe('cash');
+  });
+
+  it('keeps a valid period of 1,100 days from the URL', () => {
+    const { params } = setup('/dashboard/executive?from=2023-10-10&to=2026-10-13');
+
+    expect(params().from).toBe('2023-10-10');
+    expect(params().to).toBe('2026-10-13');
+  });
+
   it.each(['overview', 'sales', 'cash', 'debt', 'inventory'])('tab=%s is a tab', (tab) => {
     expect(setup(`/dashboard/executive?tab=${tab}`).params().tab).toBe(tab);
   });

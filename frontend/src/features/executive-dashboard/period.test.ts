@@ -1,5 +1,39 @@
 import { describe, expect, it } from 'vitest';
-import { bucketLabel, defaultGranularity, isDayGranularityAllowed, previousPeriod, rangeDays } from './period';
+import { bucketLabel, defaultGranularity, isDayGranularityAllowed, periodError, previousPeriod, rangeDays } from './period';
+
+// The rules and messages of ExecutiveQueryValidator, which refuses such a period with 400.
+describe('periodError', () => {
+  it('accepts an ordered period of valid dates', () => {
+    expect(periodError('2026-10-01', '2026-10-14')).toBeNull();
+    expect(periodError('2026-10-14', '2026-10-14')).toBeNull();
+    expect(periodError('2024-02-29', '2024-03-01')).toBeNull();
+    expect(periodError('2000-01-01', '2000-01-31')).toBeNull();
+    expect(periodError('2100-12-01', '2100-12-31')).toBeNull();
+  });
+
+  it('refuses "to" before "from"', () => {
+    expect(periodError('2026-10-20', '2026-10-01')).toBe('Đến ngày phải sau hoặc bằng từ ngày.');
+    expect(periodError('2026-10-02', '2026-10-01')).toBe('Đến ngày phải sau hoặc bằng từ ngày.');
+  });
+
+  it('accepts 1,100 days and refuses one more', () => {
+    expect(rangeDays('2023-10-11', '2026-10-14')).toBe(1100);
+    expect(periodError('2023-10-11', '2026-10-14')).toBeNull();
+    expect(periodError('2023-10-10', '2026-10-14')).toBe('Khoảng thời gian tối đa là 3 năm.');
+    expect(periodError('2023-01-01', '2026-10-14')).toBe('Khoảng thời gian tối đa là 3 năm.');
+  });
+
+  it.each(['1999-12-31', '2101-01-01', '2026-13-01', '2026-02-30', '2026-2-01', '20261-01-01', 'abc', ''])(
+    'refuses "from" %j',
+    (from) => {
+      expect(periodError(from, '2026-10-14')).toBe('Từ ngày không hợp lệ.');
+    },
+  );
+
+  it.each(['2101-01-01', '2026-10-32', '2026-10-14T00:00:00', ''])('refuses "to" %j', (to) => {
+    expect(periodError('2026-10-01', to)).toBe('Đến ngày không hợp lệ.');
+  });
+});
 
 describe('rangeDays', () => {
   it('counts both ends', () => {

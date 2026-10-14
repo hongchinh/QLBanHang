@@ -12,7 +12,12 @@ interface RangePickerProps {
   onPreset?: (preset: RangePreset) => void;
   // The chips in front of "Tuỳ chỉnh"; default DEFAULT_PRESETS.
   presets?: PresetOption[];
+  // Why a custom range cannot be applied (shown under the dates, "Áp dụng" disabled), or null.
+  // Default: "to" before "from" is refused.
+  validate?: (from: string, to: string) => string | null;
 }
+
+const orderedRange = (from: string, to: string) => (to < from ? 'Đến ngày phải sau hoặc bằng từ ngày.' : null);
 
 const DEFAULT_PRESETS: PresetOption[] = [
   { key: 'today', label: 'Hôm nay' },
@@ -22,7 +27,14 @@ const DEFAULT_PRESETS: PresetOption[] = [
   { key: 'last-month', label: 'Tháng trước' },
 ];
 
-export function RangePicker({ from, to, onChange, onPreset, presets = DEFAULT_PRESETS }: RangePickerProps) {
+export function RangePicker({
+  from,
+  to,
+  onChange,
+  onPreset,
+  presets = DEFAULT_PRESETS,
+  validate = orderedRange,
+}: RangePickerProps) {
   const [open, setOpen] = useState(false);
   const [draftFrom, setDraftFrom] = useState(from);
   const [draftTo, setDraftTo] = useState(to);
@@ -54,11 +66,13 @@ export function RangePicker({ from, to, onChange, onPreset, presets = DEFAULT_PR
     }
   };
 
+  const draftError = draftFrom && draftTo ? validate(draftFrom, draftTo) : null;
+  const canApply = Boolean(draftFrom && draftTo) && draftError === null;
+
   const handleApply = () => {
-    if (draftFrom && draftTo) {
-      onChange(draftFrom, draftTo);
-      setOpen(false);
-    }
+    if (!canApply) return;
+    onChange(draftFrom, draftTo);
+    setOpen(false);
   };
 
   return (
@@ -112,11 +126,16 @@ export function RangePicker({ from, to, onChange, onPreset, presets = DEFAULT_PR
                   className="mt-1"
                 />
               </label>
+              {draftError && (
+                <p role="alert" className="text-xs text-rose-700">
+                  {draftError}
+                </p>
+              )}
               <div className="flex justify-end gap-2 pt-1">
                 <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
                   Huỷ
                 </Button>
-                <Button size="sm" onClick={handleApply}>
+                <Button size="sm" onClick={handleApply} disabled={!canApply}>
                   Áp dụng
                 </Button>
               </div>

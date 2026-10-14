@@ -55,6 +55,66 @@ describe('RangePicker', () => {
     expect(onChange).toHaveBeenLastCalledWith('2026-01-01', '2026-10-13');
   });
 
+  describe('Tuỳ chỉnh', () => {
+    const openCustom = () => fireEvent.click(screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' }));
+    const setDates = (from: string, to: string) => {
+      fireEvent.change(screen.getByLabelText('Từ ngày'), { target: { value: from } });
+      fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: to } });
+    };
+    const apply = () => screen.getByRole('button', { name: 'Áp dụng' });
+
+    it('applies a valid range', () => {
+      const onChange = vi.fn();
+      render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={onChange} />);
+      openCustom();
+      setDates('2026-09-01', '2026-09-30');
+
+      expect(apply()).toBeEnabled();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      fireEvent.click(apply());
+
+      expect(onChange).toHaveBeenCalledWith('2026-09-01', '2026-09-30');
+    });
+
+    it('does not apply "to" before "from" and says why', () => {
+      const onChange = vi.fn();
+      render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={onChange} />);
+      openCustom();
+      setDates('2026-10-20', '2026-10-01');
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Đến ngày phải sau hoặc bằng từ ngày.');
+      expect(apply()).toBeDisabled();
+      fireEvent.click(apply());
+      expect(onChange).not.toHaveBeenCalled();
+
+      setDates('2026-10-01', '2026-10-20');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(apply()).toBeEnabled();
+    });
+
+    it('does not apply a range the screen refuses (validate) and shows its reason', () => {
+      const onChange = vi.fn();
+      const validate = (from: string) => (from < '2026-01-01' ? 'Khoảng thời gian tối đa là 3 năm.' : null);
+      render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={onChange} validate={validate} />);
+      openCustom();
+      setDates('2022-01-01', '2026-10-13');
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Khoảng thời gian tối đa là 3 năm.');
+      expect(apply()).toBeDisabled();
+      fireEvent.click(apply());
+      expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('needs both dates', () => {
+      render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} />);
+      openCustom();
+      setDates('2026-10-01', '');
+
+      expect(apply()).toBeDisabled();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
   it('marks the chip whose range is selected, and the custom button for any other range', () => {
     const { rerender } = render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} />);
     expect(activeLabels()).toEqual(['Tháng này']);

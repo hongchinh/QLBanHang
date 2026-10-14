@@ -150,6 +150,55 @@ public class CompanyScopeDemoTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Soft_deleted_demo_branch_stays_excluded_from_company_scope()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var client = MainBranchClient(ids);
+        var query = $"partnerId={ids.Kh1Id}&{October}";
+        var main = await GetAsync<DebtBalanceReportDto>(client, "debt-balance", $"side=Receivable&{query}");
+        var mainLedger = await GetAsync<DebtLedgerReportDto>(client, "debt-ledger", $"side=Receivable&{query}");
+        var mainReconciliation = await GetAsync<DebtReconciliationReportDto>(client, "debt-reconciliation", query);
+
+        await InDbAsync(db => db.Branches.Where(b => b.Id == ids.BranchBId)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsDemo, true).SetProperty(b => b.IsDeleted, true)));
+
+        var balance = await GetAsync<DebtBalanceReportDto>(client, "debt-balance", $"side=Receivable&{query}&scope=Company");
+        balance.Rows.Should().ContainSingle().Which.Increase.Should().Be(main.Rows.Single().Increase);
+        var ledger = await GetAsync<DebtLedgerReportDto>(client, "debt-ledger", $"side=Receivable&{query}&scope=Company");
+        ledger.ClosingBalance.Should().Be(mainLedger.ClosingBalance);
+        var reconciliation = await GetAsync<DebtReconciliationReportDto>(client, "debt-reconciliation", query + "&scope=Company");
+        reconciliation.Sides.Should().ContainSingle().Which.ClosingBalance
+            .Should().Be(mainReconciliation.Sides.Single().ClosingBalance);
+    }
+
+    [Fact]
+    public async Task Reconciliation_company_side_list_skips_demo_branch()
+    {
+        var ids = await ReportDataset.SeedAsync(this);
+        var warehouseB = await InDbAsync(db => db.Warehouses.IgnoreQueryFilters()
+            .Where(w => w.BranchId == ids.BranchBId).Select(w => w.Id).FirstAsync());
+        // Branch B sells to the supplier NCC1 (made a customer for the sale only), so only B gives it a Receivable side.
+        await InDbAsync(db => db.Customers.Where(c => c.Id == ids.Ncc1Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.IsCustomer, true)));
+        var clientB = CloneAdminClient();
+        UseBranch(clientB, ids.BranchBId);
+        await ReportDataset.PostStockAsync(this, clientB, StockDirection.Out, "XBH", "2026-10-06 09:00", warehouseB,
+            ids.Ncc1Id, 100m, paymentMethodId: null, paid: 0m);
+        await InDbAsync(db => db.Customers.Where(c => c.Id == ids.Ncc1Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(c => c.IsCustomer, false)));
+        var client = MainBranchClient(ids);
+        var query = $"partnerId={ids.Ncc1Id}&{October}&scope=Company";
+
+        var before = await GetAsync<DebtReconciliationReportDto>(client, "debt-reconciliation", query);
+        before.Sides.Select(s => s.Side).Should().BeEquivalentTo(new[] { DebtSide.Receivable, DebtSide.Payable });
+
+        await MarkDemoAsync(ids.BranchBId);
+
+        var after = await GetAsync<DebtReconciliationReportDto>(client, "debt-reconciliation", query);
+        after.Sides.Select(s => s.Side).Should().Equal(DebtSide.Payable);
+    }
+
+    [Fact]
     public async Task Demo_branch_report_still_works_when_named()
     {
         var ids = await ReportDataset.SeedAsync(this);

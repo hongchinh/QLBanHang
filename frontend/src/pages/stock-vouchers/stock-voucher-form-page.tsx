@@ -46,6 +46,7 @@ import { defaultFund, selectableFunds } from '@/features/funds/utils';
 import { useInventorySettings } from '@/features/inventory-settings/hooks';
 import { ActivityHistory } from '@/components/activity-history/activity-history';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
+import { VoucherPrintButton } from '@/components/voucher-print/voucher-print-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ButtonLoader } from '@/components/ui/button-loader';
@@ -719,6 +720,15 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
             )}
           </div>
           <div className="flex flex-wrap justify-end gap-2">
+            {isEdit && voucher && (
+              <VoucherPrintButton
+                kind="stock"
+                type={type}
+                vouchers={[{ id: voucher.id, code: voucher.code }]}
+                disabled={isDirty || busy}
+                disabledReason={isDirty ? 'Lưu thay đổi trước khi in' : undefined}
+              />
+            )}
             {!isEdit && (
               <>
                 <Button type="button" variant="outline" size="sm" onClick={() => submitWithIntent('save-exit')} disabled={busy} title="Ctrl+S">

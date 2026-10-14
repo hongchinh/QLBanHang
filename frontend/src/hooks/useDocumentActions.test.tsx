@@ -295,6 +295,37 @@ describe('useDocumentActions focus return', () => {
     await waitFor(() => expect(document.activeElement).toBe(save));
   });
 
+  // A resend usually takes longer than the dialog's exit: the dialog asks for a target while the save button is still
+  // disabled, and only the end of the resend can give the focus back.
+  it('after confirming, a resend that settles after the dialog has gone gives the focus back to that element', async () => {
+    let answer!: () => void;
+    const perform = vi
+      .fn<(a: Action) => Promise<void>>()
+      .mockImplementationOnce(blurAndReject('NEGATIVE_FUND_WARNING'))
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            (document.activeElement as HTMLElement | null)?.blur();
+            answer = resolve;
+          }),
+      );
+    render(<Harness perform={perform} />);
+    const save = screen.getByTestId('save');
+    act(() => save.focus());
+
+    fireEvent.click(save);
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Vẫn lưu' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    // Past the tick in which the closed dialog asks where the focus goes.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(save).toBeDisabled();
+    expect(document.activeElement).toBe(document.body);
+
+    await act(async () => answer());
+    await waitFor(() => expect(document.activeElement).toBe(save));
+  });
+
   it('does not take the focus from an element the user moved to meanwhile', async () => {
     const perform = vi
       .fn<(a: Action) => Promise<void>>()

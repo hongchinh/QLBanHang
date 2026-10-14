@@ -8,6 +8,7 @@ const block = (selector: string) => css.slice(css.indexOf(`${selector} {`), css.
 
 describe('icon tone tokens', () => {
   it.each([':root', '.dark'])('%s defines every --icon-* token', (selector) => {
+    expect(css).toContain(`${selector} {`);
     for (const tone of TONES) expect(block(selector)).toMatch(new RegExp(`--icon-${tone}:\\s*[\\d.]+ [\\d.]+% [\\d.]+%;`));
   });
 });

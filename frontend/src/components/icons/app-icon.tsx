@@ -13,7 +13,7 @@ const TONE_CLASS: Record<IconTone, string> = {
   muted: 'text-icon-muted', warn: 'text-icon-warn',
 };
 
-export interface AppIconProps extends Omit<LucideProps, 'ref' | 'size' | 'strokeWidth' | 'color'> {
+export interface AppIconProps extends Omit<LucideProps, 'ref' | 'size' | 'strokeWidth' | 'color' | 'aria-hidden' | 'aria-label' | 'role' | 'absoluteStrokeWidth'> {
   name: IconName;
   size?: IconSize;
   // Defaults to the registry tone; "none" keeps the surrounding text colour.

@@ -65,6 +65,7 @@ export default [
       ],
       'no-restricted-imports': ['warn', {
         paths: [{ name: 'lucide-react', message: 'Dùng AppIcon và tên trong src/components/icons/icon-registry.ts.' }],
+        patterns: [{ group: ['lucide-react/*'], message: 'Dùng AppIcon và tên trong src/components/icons/icon-registry.ts.' }],
       }],
     },
   },

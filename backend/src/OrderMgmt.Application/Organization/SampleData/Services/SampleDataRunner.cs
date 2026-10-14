@@ -49,6 +49,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
     private const string UniqueViolation = "23505";
     private const string GenericError = "Lỗi hệ thống khi tạo dữ liệu mẫu. Hãy xóa chi nhánh demo và tạo lại.";
     private const string BranchNotFound = "Không tìm thấy chi nhánh demo đang tạo dữ liệu mẫu.";
+    private const string NoLongerRunning = "Chi nhánh demo không còn ở trạng thái đang tạo dữ liệu mẫu.";
     private const string InterruptedError = "Bị gián đoạn do ứng dụng khởi động lại. Hãy xóa chi nhánh demo và tạo lại.";
     /// How long the dashboard signal of a finished run may hold the worker before it is given up.
     private static readonly TimeSpan SignalLimit = TimeSpan.FromSeconds(3);
@@ -153,7 +154,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
             if (!await StartAsync(job.BranchId, ct))
             {
                 _logger.LogWarning("Sample data of branch {BranchId}: not a Running demo branch; skipped", job.BranchId);
-                return LeftUnchanged(run, stopwatch);
+                var reason = await IsDemoAsync(job.BranchId, ct) ? NoLongerRunning : BranchNotFound;
+                return LeftUnchanged(run, stopwatch, reason);
             }
             await PrepareAsync(run, job.RequestedByUserId, owners, ct);
             await RunSetupAsync(run, plan, ct);
@@ -164,18 +166,20 @@ public sealed class SampleDataRunner : ISampleDataRunner
                 _logger.LogWarning("Sample data of branch {BranchCode} ran {Done} of {Total} items", run.BranchCode, run.Done, run.Total);
             run.CurrentKey = FinishKey;
             if (!await SetReadyAsync(job.BranchId, ct))
-            {
-                // Failed meanwhile, by the startup recovery of another instance during a rolling deploy for example.
-                _logger.LogWarning(
-                    "Sample data of branch {BranchId} ({BranchCode}): no longer a Running demo branch; left unchanged",
-                    job.BranchId, run.BranchCode);
-                return LeftUnchanged(run, stopwatch);
-            }
+                throw new NoLongerRunningException();
             await TrySignalDashboardsAsync(job.BranchId, ct);
             _logger.LogInformation(
                 "Sample data of branch {BranchCode} ready: {StepsExecuted} steps executed, {StepsSkipped} skipped in {Elapsed}",
                 run.BranchCode, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed);
             return new SampleDataRunResult(true, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed, null);
+        }
+        catch (NoLongerRunningException)
+        {
+            // Failed meanwhile, by the startup recovery of another instance during a rolling deploy for example.
+            _logger.LogWarning(
+                "Sample data of branch {BranchId} ({BranchCode}): no longer a Running demo branch; left unchanged",
+                job.BranchId, run!.BranchCode);
+            return LeftUnchanged(run, stopwatch, NoLongerRunning);
         }
         // As in GenerateAsync: once the token is cancelled every failure is thrown and the branch stays Running.
         catch (Exception ex) when (!ct.IsCancellationRequested)
@@ -189,10 +193,15 @@ public sealed class SampleDataRunner : ISampleDataRunner
         }
     }
 
-    /// A run on a branch that is missing, real or no longer Running: nothing was written to its row.
-    private static SampleDataRunResult LeftUnchanged(SampleRunState run, Stopwatch stopwatch) =>
+    /// The result of a run on a branch that is missing, real or no longer Running: the run does not change its status.
+    private static SampleDataRunResult LeftUnchanged(SampleRunState run, Stopwatch stopwatch, string reason) =>
         new(false, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed,
-            FormatError(run.CurrentKey, new SampleDataPlanException(BranchNotFound)));
+            FormatError(run.CurrentKey, new SampleDataPlanException(reason)));
+
+    /// The branch stopped being a Running demo branch during the run: the run stops and leaves it as it is.
+    private sealed class NoLongerRunningException : Exception
+    {
+    }
 
     /// SampleDataError: "{key}: {reason}", cut to 1000 characters without splitting a surrogate pair. Every signed-in
     /// user can read it, so the reason follows GlobalExceptionMiddleware and never shows an internal message.
@@ -417,8 +426,9 @@ public sealed class SampleDataRunner : ISampleDataRunner
         }
 
         run.Done++;
-        if (run.Done % ProgressEvery == 0)
-            await TrySetProgressAsync(run.BranchId, Math.Min(99, run.Done * 100 / run.Total), ct);
+        if (run.Done % ProgressEvery == 0
+            && !await TrySetProgressAsync(run.BranchId, Math.Min(99, run.Done * 100 / run.Total), ct))
+            throw new NoLongerRunningException();
     }
 
     /// S6: controllers are skipped, so a request goes through its validator first, when one is registered.
@@ -482,19 +492,29 @@ public sealed class SampleDataRunner : ISampleDataRunner
         }
     }
 
-    /// Best effort: a missed progress write must not fail the run.
-    private async Task TrySetProgressAsync(Guid branchId, int progress, CancellationToken ct)
+    /// Best effort: a missed progress write must not fail the run. False only when the write found no Running demo
+    /// branch, which stops the run.
+    private async Task<bool> TrySetProgressAsync(Guid branchId, int progress, CancellationToken ct)
     {
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
-            await RunningDemoBranch(scope, branchId)
-                .ExecuteUpdateAsync(s => s.SetProperty(b => b.SampleDataProgress, progress), ct);
+            return await RunningDemoBranch(scope, branchId)
+                .ExecuteUpdateAsync(s => s.SetProperty(b => b.SampleDataProgress, progress), ct) > 0;
         }
         catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "Could not write the sample data progress of branch {BranchId}", branchId);
+            return true;
         }
+    }
+
+    /// Whether the branch exists as a demo branch, to tell "no longer Running" from "missing or real".
+    private async Task<bool> IsDemoAsync(Guid branchId, CancellationToken ct)
+    {
+        await using var scope = _scopeFactory.CreateAsyncScope();
+        return await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
+            .AnyAsync(b => b.Id == branchId && b.IsDemo, ct);
     }
 
     /// Never throws. A few short retries without a token, so a database blip does not leave the branch Running; after

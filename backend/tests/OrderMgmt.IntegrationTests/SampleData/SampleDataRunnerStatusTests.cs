@@ -203,7 +203,7 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Code == "RJ02-K1"))).Should().BeFalse();
     }
 
-    /// A real branch fails the job before any plan is made, and its row is not touched.
+    /// A real branch is skipped before any plan is made, and its row is not touched.
     [Fact]
     public async Task Run_job_on_a_real_branch_makes_no_plan()
     {
@@ -313,6 +313,7 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
                 .RunPlanAsync(new SampleDataJob(branchId, adminId), TinyPlans.Setup(TinyPlans.OpeningDate));
 
         result.Succeeded.Should().BeFalse();
+        result.Error.Should().Be("KE-HOACH: Chi nhánh demo không còn ở trạng thái đang tạo dữ liệu mẫu.");
         var branch = await BranchAsync(branchId);
         (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
             .Should().Be((SampleDataStatus.Failed, 40, InterruptedError));
@@ -333,10 +334,15 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
             TinyPlans.Replace<IActingIdentity>(s, identity);
         });
 
-        // TinyPlans.Setup has 10 items, so the run writes its progress once, after the branch was failed.
-        var result = await TinyPlans.RunAsync(host, branchId, TinyPlans.Setup(TinyPlans.OpeningDate));
+        // 10 setup items and 2 steps: the progress write after the 10th item finds the branch Failed and stops the run
+        // before its steps.
+        var result = await TinyPlans.RunAsync(host, branchId,
+            TinyPlans.WithSteps(TinyPlans.OpeningDate, Sale("XBH-0001", 1), Sale("XBH-0002", 2)));
 
         result.Succeeded.Should().BeFalse();
+        result.Error.Should().Be("HAN-MUC-DM-KH01: Chi nhánh demo không còn ở trạng thái đang tạo dữ liệu mẫu.");
+        result.StepsExecuted.Should().Be(0);
+        (await InDbAsync(db => db.StockVouchers.AnyAsync(v => v.BranchId == branchId))).Should().BeFalse();
         var branch = await BranchAsync(branchId);
         (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
             .Should().Be((SampleDataStatus.Failed, 0, InterruptedError));

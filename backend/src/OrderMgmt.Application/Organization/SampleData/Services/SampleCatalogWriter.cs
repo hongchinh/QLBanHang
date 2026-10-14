@@ -19,7 +19,7 @@ internal static class SampleCatalogWriter
     private const string GroupCode = "DM";
     private const string GroupName = "Dữ liệu mẫu";
 
-    /// Runs in a transaction: a settings reset holds the product key until it commits.
+    /// Must run inside the caller's transaction: a settings reset holds the product key until it commits.
     public static async Task<SampleCatalogIds> WriteAsync(IAppDbContext db, IInventoryLock inventoryLock,
         SampleDataPlan plan, CancellationToken ct)
     {
@@ -107,9 +107,20 @@ internal static class SampleCatalogWriter
     {
         if (edited.Count == 0)
             return;
-        await inventoryLock.AcquireProductsAsync(edited.Select(e => e.Product.Id), ct);
+        var ids = edited.Select(e => e.Product.Id).ToList();
+        await inventoryLock.AcquireProductsAsync(ids, ct);
+        // Read again under the keys: the first read came before them, and the settings may have changed since.
+        var current = await db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => ids.Contains(p.Id))
+            .Select(p => new { p.Id, p.PricingMode, p.TrackInventory, p.PriceIncludesVat })
+            .ToDictionaryAsync(p => p.Id, ct);
         foreach (var (product, spec) in edited)
         {
+            var now = current[product.Id];
+            product.PricingMode = now.PricingMode;
+            product.TrackInventory = now.TrackInventory;
+            product.PriceIncludesVat = now.PriceIncludesVat;
+            if (ChangedSettings(product, spec).Count == 0)
+                continue;
             if (await db.InventoryLedger.AnyAsync(e => e.ProductId == product.Id, ct))
                 throw new ConflictException($"Hàng mẫu {spec.Code} đã bị đổi " +
                     $"{string.Join(", ", ChangedSettings(product, spec))}. Hãy xóa các chi nhánh demo rồi tạo lại.");

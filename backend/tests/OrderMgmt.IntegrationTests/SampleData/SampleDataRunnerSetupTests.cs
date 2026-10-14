@@ -218,22 +218,31 @@ public class SampleDataRunnerSetupTests : CashDebtTestBase
     }
 
     /// DM-SP01 has stock postings (its opening stock), so the product service locks these settings: a changed one
-    /// fails the job instead of a plan built on other settings.
-    [Fact]
-    public async Task Reused_product_with_stock_postings_and_changed_settings_fails_the_job()
+    /// fails the job instead of a plan built on other settings, and the message names what changed.
+    [Theory]
+    [InlineData(PricingMode.PerSquareMeter, true, false, "cách tính giá")]
+    [InlineData(PricingMode.PerUnit, false, false, "theo dõi tồn kho")]
+    [InlineData(PricingMode.PerUnit, true, true, "giá gồm VAT")]
+    [InlineData(PricingMode.PerSquareMeter, true, true, "cách tính giá, giá gồm VAT")]
+    public async Task Reused_product_with_stock_postings_and_changed_settings_fails_the_job(PricingMode pricingMode,
+        bool trackInventory, bool priceIncludesVat, string changed)
     {
         (await RunPlanAsync(await CreateBranchAsync("RS14"), TinyPlans.Setup(TinyPlans.OpeningDate))).Succeeded.Should().BeTrue();
         await InDbAsync(db => db.Products.Where(p => p.Code == "DM-SP01")
-            .ExecuteUpdateAsync(s => s.SetProperty(p => p.TrackInventory, false)));
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(p => p.PricingMode, pricingMode)
+                .SetProperty(p => p.TrackInventory, trackInventory)
+                .SetProperty(p => p.PriceIncludesVat, priceIncludesVat)));
         var branchId = await CreateBranchAsync("RS15");
 
         var result = await RunPlanAsync(branchId, TinyPlans.Setup(TinyPlans.OpeningDate));
 
         result.Succeeded.Should().BeFalse();
         result.Error.Should().Be(
-            "CATALOG: Hàng mẫu DM-SP01 đã bị đổi theo dõi tồn kho. Hãy xóa các chi nhánh demo rồi tạo lại.");
-        (await InDbAsync(db => db.Products.SingleAsync(p => p.Code == "DM-SP01"))).TrackInventory
-            .Should().BeFalse("a product with stock postings keeps its settings");
+            $"CATALOG: Hàng mẫu DM-SP01 đã bị đổi {changed}. Hãy xóa các chi nhánh demo rồi tạo lại.");
+        var product = await InDbAsync(db => db.Products.AsNoTracking().SingleAsync(p => p.Code == "DM-SP01"));
+        (product.PricingMode, product.TrackInventory, product.PriceIncludesVat)
+            .Should().Be((pricingMode, trackInventory, priceIncludesVat), "a product with stock postings keeps its settings");
         (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.BranchId == branchId))).Should().BeFalse();
     }
 

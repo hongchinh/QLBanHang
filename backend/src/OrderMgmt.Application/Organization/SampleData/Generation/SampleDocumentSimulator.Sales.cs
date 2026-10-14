@@ -124,29 +124,42 @@ internal sealed partial class SampleDocumentSimulator
     }
 
     /// Retail pays cash at once; others pay at once by chance, else buy on credit. A planned credit sale is on credit.
-    /// On the deposit day, while the till is short, sales are paid in cash, so the week ends with a deposit. A customer
-    /// whose credit would pass 80% of its limit pays by bank. The sales desk keeps the company's open receivables in
-    /// [ReceivableFloor, ReceivableCeiling]: above the ceiling it asks for payment at once; below the floor (once the
-    /// receivables have reached it, so not while they build up after the opening) it sells on credit.
+    /// A sale that would take a customer over 80% of its limit is paid by bank. On the deposit day, while the till is
+    /// short, sales are paid in cash, so the week ends with a deposit. The sales desk keeps the company's open receivables
+    /// in [ReceivableFloor, ReceivableCeiling]: above the ceiling it asks for payment at once; below the floor (once the
+    /// receivables have reached it, so not while they build up after the opening) it sells on credit. During the end hold
+    /// it steers the receivables expected at T: the open ones less those to be collected on their date before T.
     private (string? Method, string? Fund) SalePayment(SampleCustomerProfile customer, decimal total, bool plannedCredit)
     {
         var open = OpenReceivables();
         _receivablesReachedFloor |= open >= ReceivableFloor;
+        if (_holdStarted)
+        {
+            open -= _ledger.Items.Where(i => i.Side == DebtSide.Receivable && !i.IsPrepayment && i.Open > 0
+                && !_heldKeys.Contains(i.Key) && i.PayDate <= LastWorkingDay).Sum(i => i.Open);
+        }
         if (customer.Group == CustomerGroup.Retail)
             return ("TM", CashFund);
 
         var paidAtOnce = _random.Chance(PaidSalePercent);
         var byBank = _random.Chance(PaidSaleBankPercent);
+        var overLimit = customer.CreditLimit is { } limit
+            && _ledger.OpenReceivable(customer.Code) + total > limit * CreditLimitUsePercent / 100m;
         if (plannedCredit)
-            return (null, null);
+            return overLimit ? ("CK", _random.Pick(BankFunds)) : (null, null);
         if (DepositIsShort())
             return ("TM", CashFund);
-        if (customer.CreditLimit is { } limit && _ledger.OpenReceivable(customer.Code) + total > limit * CreditLimitUsePercent / 100m)
+        if (overLimit)
             return ("CK", _random.Pick(BankFunds));
         if (paidAtOnce && (open >= ReceivableFloor || !_receivablesReachedFloor) || open + total > ReceivableCeiling)
             return byBank ? ("CK", _random.Pick(BankFunds)) : ("TM", CashFund);
         return (null, null);
     }
+
+    /// The last working day of the window: the last document date, or the Saturday before it when that is a Sunday.
+    private DateOnly LastWorkingDay => _plan.LastDocumentDate.DayOfWeek == DayOfWeek.Sunday
+        ? _plan.LastDocumentDate.AddDays(-1)
+        : _plan.LastDocumentDate;
 
     /// Open receivable invoices of all customers.
     private decimal OpenReceivables() =>

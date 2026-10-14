@@ -7,7 +7,8 @@ namespace OrderMgmt.Application.Organization.SampleData.Generation;
 /// Simulates the documents of the window day by day (working days only). It tracks stock per warehouse, estimated fund
 /// balances and open debt items, so the plan never makes stock negative, keeps every fund at or above the margin and
 /// keeps credit balances at or below 80% of the limit (S12). Draws continue the generator's random stream.
-/// Split by concern: this file has the day loop and the schedule, `.Stock` the stock vouchers, `.Cash` the cash documents.
+/// Split by concern: this file has the day loop and the schedule, `.Sales` the sales, `.Stock` the other stock vouchers,
+/// `.Cash` the cash documents.
 internal sealed partial class SampleDocumentSimulator
 {
     private const string CashFund = "QTM";
@@ -92,7 +93,7 @@ internal sealed partial class SampleDocumentSimulator
     private List<SampleStep> Simulate()
     {
         PlanOncePerPeriod();
-        PlanBucketSales();
+        PlanCreditSales();
         TrackOpeningDebts();
 
         var steps = new List<SampleStep>();
@@ -248,30 +249,44 @@ internal sealed partial class SampleDocumentSimulator
         _ => due.AddDays(_random.Between(LateDaysAfterDueMin, LateDaysAfterDueMax)),
     };
 
-    /// Credit sales placed relative to T (the day after the last document), so the overdue report at T has an item in the
-    /// 1–30 and the 31–60 day buckets whatever the window: a sale to the first late payer due LateSaleOverdueDays before T,
-    /// and one to the bad debt customer due BadDebtSaleOverdueDays before T. Neither customer pays them before T (their
-    /// habits pay later, and the invoices are held: never settled early). CreditDays + overdue days (at most 45 + 40 = 85)
-    /// stay within the shortest window (89 days before T), so the sale date is never before the opening date; a unit test
-    /// checks it.
-    private void PlanBucketSales()
+    /// Planned credit sales (single line each):
+    /// - placed relative to T (the day after the last document), so the overdue report at T has an item in the 1–30 and
+    ///   the 31–60 day buckets whatever the window: one to the first late payer due LateSaleOverdueDays before T, one to
+    ///   the bad debt customer due BadDebtSaleOverdueDays before T. Neither customer pays them before T (their habits pay
+    ///   later, and the invoices are held: never settled early). CreditDays + overdue days (at most 45 + 40 = 85) stay
+    ///   within the shortest window (89 days before T), so the sale date is never before the opening date; a unit test
+    ///   checks it;
+    /// - one early sale to each customer with a credit limit.
+    private void PlanCreditSales()
     {
         var t = _plan.LastDocumentDate.AddDays(1);
         foreach (var (habit, overdueDays) in new[] { (PaymentHabit.Late, LateSaleOverdueDays), (PaymentHabit.BadDebt, BadDebtSaleOverdueDays) })
         {
-            // A planned sale skips the 80% credit check, so it goes to a customer without a limit.
-            var customer = SampleCatalog.CustomerProfiles.First(p => p.Habit == habit && p.CreditLimit == null);
+            var customer = SampleCatalog.PlacedSaleCustomer(habit);
             var date = t.AddDays(-(_partners[customer.Code].CreditDays ?? 0) - overdueDays);
             if (date.DayOfWeek == DayOfWeek.Sunday)
                 date = date.AddDays(1);
             _plannedSales.Add((date, customer, true));
         }
-        _plannedSales.Sort((a, b) => a.Date.CompareTo(b.Date));
+
+        // Customers with a credit limit buy large and would otherwise pay at once against the receivables ceiling: each
+        // gets one early credit sale (single line, within 80% of its limit), so the credit limit report has one to show.
+        var early = _plan.OpeningDate.AddDays(LimitedCustomerSaleDay);
+        if (early.DayOfWeek == DayOfWeek.Sunday)
+            early = early.AddDays(1);
+        foreach (var customer in SampleCatalog.CustomerProfiles.Where(p => p.CreditLimit != null))
+            _plannedSales.Add((early, customer, false));
+
+        // Stable sort: same-day sales keep the order above.
+        var ordered = _plannedSales.OrderBy(s => s.Date).ToList();
+        _plannedSales.Clear();
+        _plannedSales.AddRange(ordered);
     }
 
-    /// From EndHoldDays before T: customers pay only what is due (no early settlement), and every owner keeps an open
-    /// invoice at T. An owner's invoice still open at T is held (never settled early); an owner without one gets a planned
-    /// credit sale to its first on-time, non-retail customer, held as well.
+    /// From EndHoldDays before T: receipts take only invoices that are due or due within OnTimeDaysBeforeDueMax days (no
+    /// gathering), the sales desk steers the receivables expected at T, and every owner keeps an open invoice at T. An
+    /// owner's invoice still open at T is held (never settled early); an owner without one gets a planned credit sale to
+    /// its first on-time, non-retail customer without a credit limit, held as well.
     private void StartEndHold()
     {
         if (_holdStarted || _date < _plan.LastDocumentDate.AddDays(1 - EndHoldDays))

@@ -32,10 +32,10 @@ internal sealed partial class SampleDocumentSimulator
 
     /// One receipt per customer and day once an invoice's collection date has come. Besides the invoices due, it takes
     /// (oldest first, never a held invoice nor one the customer never pays):
-    /// - on the deposit day with a short till, invoices to collect within EarlyCollectionDays, until the till's shortfall
-    ///   is covered (during the end hold only invoices already due or due within OnTimeDaysBeforeDueMax days, as an
-    ///   on-time customer pays);
-    /// - before the end hold, the invoices to collect within ReceiptGatherDays (gathering).
+    /// - on the deposit day with a short till, invoices to collect within EarlyCollectionDays (during the end hold only
+    ///   invoices already due or due within OnTimeDaysBeforeDueMax days, as an on-time customer pays);
+    /// - before the end hold, the invoices to collect within ReceiptGatherDays and by the last working day (gathering),
+    ///   so a receipt never takes an invoice that would still be open at T.
     /// The dual-role partner pays nothing before its debt offset, so the offset finds both sides open.
     private void CustomerReceipts()
     {
@@ -43,28 +43,19 @@ internal sealed partial class SampleDocumentSimulator
         {
             if (customer.Code == DualRolePartner && !_offsetDone)
                 continue;
-            var shortfall = DepositIsShort() ? CashKeep + CashDepositMin + CashFloat - _ledger.Fund(CashFund) : 0m;
+            var shortTill = DepositIsShort();
             bool Due(SampleOpenItem i) => i.PayDate <= _date;
-            bool Early(SampleOpenItem i) => shortfall > 0m && !_heldKeys.Contains(i.Key) && i.PayDate != null && (_holdStarted
+            bool Early(SampleOpenItem i) => shortTill && !_heldKeys.Contains(i.Key) && i.PayDate != null && (_holdStarted
                 ? i.DueDate <= _date.AddDays(OnTimeDaysBeforeDueMax)
                 : i.PayDate <= _date.AddDays(EarlyCollectionDays));
-            bool Gathered(SampleOpenItem i) => !_holdStarted && !_heldKeys.Contains(i.Key) && i.PayDate <= _date.AddDays(ReceiptGatherDays);
+            bool Gathered(SampleOpenItem i) => !_holdStarted && !_heldKeys.Contains(i.Key)
+                && i.PayDate <= _date.AddDays(ReceiptGatherDays) && i.PayDate <= LastWorkingDay;
 
-            var candidates = _ledger.Items
+            var due = _ledger.Items
                 .Where(i => i.PartnerCode == customer.Code && i.Side == DebtSide.Receivable && !i.IsPrepayment && i.Open > 0
                     && (Due(i) || Early(i) || Gathered(i)))
                 .ToList();
-            if (!candidates.Any(i => Due(i) || Early(i)))
-                continue;
-
-            var due = new List<SampleOpenItem>();
-            foreach (var item in candidates)
-            {
-                var taken = due.Sum(i => i.Open);
-                if (Due(item) || Early(item) && taken < shortfall || Gathered(item))
-                    due.Add(item);
-            }
-            if (due.Count == 0)
+            if (!due.Any(i => Due(i) || Early(i)))
                 continue;
 
             var partial = _partialsDone < _partialDates.Length && _date >= _partialDates[_partialsDone]

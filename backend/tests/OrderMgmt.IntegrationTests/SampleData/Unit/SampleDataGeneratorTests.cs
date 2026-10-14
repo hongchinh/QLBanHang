@@ -105,7 +105,7 @@ public class SampleDataGeneratorTests
                      (PaymentHabit.BadDebt, SampleDataVolumes.BadDebtSaleOverdueDays),
                  })
         {
-            var customer = SampleCatalog.CustomerProfiles.First(p => p.Habit == habit && p.CreditLimit == null).Code;
+            var customer = SampleCatalog.PlacedSaleCustomer(habit).Code;
             (creditDays[customer] + overdueDays).Should().BeLessThanOrEqualTo(shortest, customer);
         }
     }
@@ -131,6 +131,7 @@ public class SampleDataGeneratorTests
     [InlineData("CN021", "2026-06-01", 3, false)]
     [InlineData("CN024", "2026-07-31", 3, false)]
     [InlineData("CN-DEMO", "2026-12-31", 2, true)]
+    [InlineData("B011", "2027-06-01", 3, false)]
     public void Invariants_hold_for_several_inputs(string code, string today, int owners, bool netExcludesVat)
     {
         var plan = Generate(code, owners, ParseDate(today), netExcludesVat);

@@ -139,6 +139,11 @@ public static class SampleCatalog
         .Select(p => new SampleCreditLimitSpec(p.Code, p.CreditLimit!.Value))
         .ToList();
 
+    /// The customer that gets the credit sale placed relative to T for a late payer or the bad debt customer: the first
+    /// one with that habit and no credit limit (a sale over 80% of a limit would be paid at once instead).
+    public static SampleCustomerProfile PlacedSaleCustomer(PaymentHabit habit) =>
+        CustomerProfiles.First(p => p.Habit == habit && p.CreditLimit == null);
+
     /// All 30 partners: customers, then suppliers, then the two dual-role partners.
     /// Customers and dual-role partners get OwnerIndex = position % ownerCount (customers first, then dual-role).
     public static List<SamplePartnerSpec> BuildPartners(int ownerCount)

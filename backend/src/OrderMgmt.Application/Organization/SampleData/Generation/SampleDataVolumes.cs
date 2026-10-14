@@ -92,9 +92,16 @@ public static class SampleDataVolumes
     public const int LateSaleOverdueDays = 15;
     public const int BadDebtSaleOverdueDays = 40;
 
+    /// Customers with a credit limit buy large, so near the receivables ceiling their sales are paid at once. Each gets
+    /// one planned single-line credit sale this many days after the opening date (within 80% of its limit), so they
+    /// always have credit sales.
+    public const int LimitedCustomerSaleDay = 3;
+
     /// End hold: in the last EndHoldDays days customers pay only invoices that are due or due within
-    /// OnTimeDaysBeforeDueMax days (also when a short till collects early), and every owner keeps an open invoice at T
+    /// OnTimeDaysBeforeDueMax days (also when a short till collects early), the sales desk steers the receivables
+    /// expected at T (open now, less what is collected on its date before T), and every owner keeps an open invoice at T
     /// (an owner without one gets a planned credit sale), so the debt by salesperson report has a balance for each.
+    /// Before the hold, gathering never takes an invoice to collect after the last working day.
     public const int EndHoldDays = 10;
 
     // ---- Purchases (NMH) ----
@@ -183,8 +190,8 @@ public static class SampleDataVolumes
 
     /// On the deposit day, while the till holds less than CashKeep + CashDepositMin + CashFloat, that day's sales (but the
     /// planned credit sales) and receipts are taken in cash, and customers with an invoice to collect within
-    /// EarlyCollectionDays pay it early, only up to the till's shortfall (during the end hold, only invoices due within
-    /// OnTimeDaysBeforeDueMax days), so every week ends with a deposit.
+    /// EarlyCollectionDays pay it early (during the end hold, only invoices due within OnTimeDaysBeforeDueMax days), so
+    /// every week ends with a deposit.
     public const int EarlyCollectionDays = 30;
 
     /// Deliberate partial payments: on or after these days of the window, the next receipt of an on-time customer pays

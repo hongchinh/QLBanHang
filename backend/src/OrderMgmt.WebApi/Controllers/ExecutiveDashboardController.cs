@@ -95,4 +95,13 @@ public class ExecutiveDashboardController : ApiControllerBase
         await _queryValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _debt.GetSummaryAsync(query, ct));
     }
+
+    [HttpGet("debt/breakdown")]
+    [HasPermission(Permissions.Reports.Debt)]
+    public async Task<ActionResult<ApiResponse<DebtBreakdownDto>>> DebtBreakdown(
+        [FromQuery] ExecutiveQuery query, CancellationToken ct)
+    {
+        await _queryValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _debt.GetBreakdownAsync(query, ct));
+    }
 }

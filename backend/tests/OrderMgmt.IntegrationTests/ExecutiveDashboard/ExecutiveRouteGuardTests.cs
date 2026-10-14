@@ -48,6 +48,9 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
         new("debt/summary", "&at=2026-10-31", Permissions.Reports.Debt,
             async response => (await ReadDataAsync<DebtSummaryDto>(response)).Receivable.Balance,
             OwnBranch: 1_500m, Company: 11_499m),
+        new("debt/breakdown", "&at=2026-10-31", Permissions.Reports.Debt,
+            async response => (await ReadDataAsync<DebtBreakdownDto>(response)).TopDebtors.Sum(row => row.Balance),
+            OwnBranch: 1_500m, Company: 11_499m),
     };
 
     public ExecutiveRouteGuardTests(PostgresFixture pg) : base(pg) { }

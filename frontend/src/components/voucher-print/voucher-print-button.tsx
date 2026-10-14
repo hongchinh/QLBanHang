@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { CompanyProfileHint } from '@/components/tt133-export/company-profile-hint';
 import { StockPriceModeDialog } from './stock-price-mode-dialog';
-import { canTakeFocus, giveFocusBack } from '@/lib/focus';
+import { canTakeFocus, giveFocusBack, isFocusLost } from '@/lib/focus';
 import { useVoucherPrint } from '@/features/voucher-print/use-voucher-print';
 import type { StockPrintPriceMode, VoucherPrintKind, VoucherPrintTarget } from '@/features/voucher-print/types';
 import type { ExportFormat } from '@/features/tt133-export/types';
@@ -46,15 +46,18 @@ export function VoucherPrintButton({
   // trigger. The trigger is disabled while a print runs; then the focus follows once it is enabled again.
   const returnFocus = (event: Event) => {
     event.preventDefault();
-    if (canTakeFocus(triggerRef.current)) giveFocusBack(triggerRef.current);
-    else refocusWhenEnabled.current = true;
+    const trigger = triggerRef.current;
+    if (!canTakeFocus(trigger)) refocusWhenEnabled.current = true;
+    else if (isFocusLost()) giveFocusBack(trigger); // never take the focus from where the user went meanwhile
   };
   useEffect(() => {
     if (isPending || !refocusWhenEnabled.current) return;
     refocusWhenEnabled.current = false;
-    if (canTakeFocus(triggerRef.current)) giveFocusBack(triggerRef.current);
+    const trigger = triggerRef.current;
+    if (isFocusLost() && canTakeFocus(trigger)) giveFocusBack(trigger);
   }, [isPending]);
   const choose = (format: ExportFormat) => {
+    refocusWhenEnabled.current = false; // a stale wish from an earlier dialog must not fire on this print
     if (kind === 'stock') setPendingFormat(format);
     else void print({ kind, type, vouchers, format });
   };

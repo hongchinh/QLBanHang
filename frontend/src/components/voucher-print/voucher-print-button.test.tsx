@@ -4,8 +4,9 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
 const printMock = vi.fn();
+const printState = { isPending: false };
 vi.mock('@/features/voucher-print/use-voucher-print', () => ({
-  useVoucherPrint: () => ({ print: printMock, isPending: false }),
+  useVoucherPrint: () => ({ print: printMock, isPending: printState.isPending }),
 }));
 
 const profile: { data: { name: string | null } | undefined } = { data: { name: 'Công ty A' } };
@@ -35,6 +36,7 @@ function renderButton(props: Partial<VoucherPrintButtonProps> = {}, parentClick?
 describe('VoucherPrintButton', () => {
   beforeEach(() => {
     printMock.mockReset();
+    printState.isPending = false;
     profile.data = { name: 'Công ty A' };
     useAuthStore.setState({
       user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions: [] },
@@ -156,5 +158,47 @@ describe('VoucherPrintButton', () => {
     await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
     await user.click(await screen.findByRole('button', { name: 'Hủy' }));
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  describe('focus after a print', () => {
+    async function printWhilePending() {
+      const user = userEvent.setup();
+      printMock.mockImplementation(() => {
+        printState.isPending = true; // a running print disables the trigger
+      });
+      const ui = () => (
+        <MemoryRouter>
+          <input aria-label="Tìm kiếm" />
+          <VoucherPrintButton kind="stock" type="In" vouchers={VOUCHERS} />
+        </MemoryRouter>
+      );
+      const view = render(ui());
+      const trigger = screen.getByRole('button', { name: 'In' });
+      await user.click(trigger);
+      await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
+      await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'In' }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(trigger).toBeDisabled();
+      const finish = () => {
+        printState.isPending = false;
+        view.rerender(ui());
+      };
+      return { user, trigger, finish };
+    }
+
+    it('keeps the focus where the user went while the print ran', async () => {
+      const { user, trigger, finish } = await printWhilePending();
+      const input = screen.getByRole('textbox', { name: 'Tìm kiếm' });
+      await user.click(input);
+      finish();
+      expect(trigger).toBeEnabled();
+      expect(input).toHaveFocus();
+    });
+
+    it('gives the focus back to the trigger when nothing else has it', async () => {
+      const { trigger, finish } = await printWhilePending();
+      finish();
+      await waitFor(() => expect(trigger).toHaveFocus());
+    });
   });
 });

@@ -512,6 +512,31 @@ describe('StockLineGrid', () => {
     }
   });
 
+  // A cell that takes and loses the focus inside one batch never renders its raw text, so it still waits to select
+  // on its next render. That render comes later, with the focus somewhere else (here the user types in the second
+  // cell and the whole grid renders), and must select nothing. jsdom's select() does not move the focus the way
+  // Chrome's does, so the test watches select() itself.
+  it('a number cell that lost the focus before it rendered does not select on a later render', () => {
+    const { values } = renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b', quantity: 7 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      const first = byId('stock-line-quantity-0');
+      const second = byId('stock-line-quantity-1');
+      act(() => {
+        first.focus();
+        second.focus();
+      });
+      expect(select.mock.contexts).toEqual([second]);
+
+      fireEvent.change(second, { target: { value: '8' } });
+
+      expect(values().lines[1].quantity).toBe(8);
+      expect(select.mock.contexts).toEqual([second]);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
   // A digit can arrive before the next frame; the whole raw text must already be selected then.
   it('keyboard navigation selects the raw text of the number cell before the handler returns', () => {
     renderGrid({ lines: [line({ quantity: 5, unitPrice: 30000 })] });
@@ -521,6 +546,47 @@ describe('StockLineGrid', () => {
     expect(focused()).toBe('stock-line-unit-price-0');
     expect(price.value).toBe('30000');
     expect([price.selectionStart, price.selectionEnd]).toEqual([0, 5]);
+  });
+
+  // The path the defect was reported on: a digit typed right after Ctrl+Delete was appended to the old value of the
+  // cell that took the focus.
+  it('Ctrl+Delete: the cell that takes the focus has its raw text selected before the handler returns', () => {
+    renderGrid({
+      lines: [line({ productCode: 'A', quantity: 5 }), line({ _uiKey: 'b', productCode: 'B', quantity: 1250 })],
+    });
+    const first = byId('stock-line-quantity-0');
+    const second = byId('stock-line-quantity-1');
+    expect(second.value).toBe('1,250'); // idle: formatted
+    act(() => first.focus());
+    fireEvent.keyDown(first, { key: 'Delete', ctrlKey: true }); // no frame awaited
+    expect(document.activeElement).toBe(second);
+    expect(second.value).toBe('1250');
+    expect([second.selectionStart, second.selectionEnd]).toEqual([0, 4]);
+  });
+
+  // The select runs in a layout effect with no dependency list, that is after every render, so it has to fire once
+  // per keyboard focus. Typing renders the cell: a select on those renders would make each digit replace the one
+  // typed before it.
+  it('typing after a keyboard focus does not select the text again', () => {
+    const { values } = renderGrid({ lines: [line({ quantity: 5, unitPrice: 30000 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      act(() => byId('stock-line-quantity-0').focus());
+      enter('stock-line-quantity-0'); // Đơn giá takes the focus by keyboard
+      const price = byId('stock-line-unit-price-0');
+      const selectsOnPrice = () => select.mock.contexts.filter((el) => el === price).length;
+      expect(selectsOnPrice()).toBe(1);
+
+      fireEvent.change(price, { target: { value: '4' } });
+      fireEvent.change(price, { target: { value: '45' } });
+
+      expect(selectsOnPrice()).toBe(1);
+      // The caret is after the two digits and nothing is selected: the next digit will be appended.
+      expect([price.selectionStart, price.selectionEnd]).toEqual([2, 2]);
+      expect(values().lines[0].unitPrice).toBe(45);
+    } finally {
+      select.mockRestore();
+    }
   });
 
   // What a click on Đơn giá / SL does in Chrome (measured; the same as before the keyboard fix): the browser puts the
@@ -568,6 +634,23 @@ describe('StockLineGrid', () => {
     } finally {
       select.mockRestore();
     }
+  });
+
+  // A press inside the cell that already has the focus (the user moves the caret) brings no focus event that would
+  // use it up. The cell forgets the press when it loses the focus; otherwise its next keyboard visit would count as a
+  // mouse one and select one frame late.
+  it('a click inside the focused number cell does not make the next keyboard focus select late', () => {
+    renderGrid({ lines: [line({ quantity: 5, unitPrice: 30000 })] });
+    const price = byId('stock-line-unit-price-0');
+    act(() => price.focus());
+    fireEvent.mouseDown(price); // the cell already has the focus: no focus event follows
+    enter('stock-line-unit-price-0', true); // Shift+Enter: back to SL
+    expect(focused()).toBe('stock-line-quantity-0');
+    expect(price.value).toBe('30.000'); // idle again: formatted
+    enter('stock-line-quantity-0'); // Enter: Đơn giá again, by keyboard, no frame awaited
+    expect(focused()).toBe('stock-line-unit-price-0');
+    expect(price.value).toBe('30000');
+    expect([price.selectionStart, price.selectionEnd]).toEqual([0, 5]);
   });
 
   // The mouse path selects one frame after the focus event, and by then the focus may be somewhere else. Chrome's
@@ -720,6 +803,31 @@ describe('StockLineGrid', () => {
 
       expect(focused()).toBe('stock-line-sheet-count-0');
       expect(selected).toEqual([cell]);
+    });
+
+    // These cells select in the focus event and nowhere else. Typing renders the cell: a select on those renders
+    // would make each digit replace the one typed before it.
+    it.each([
+      ['%CK', 'discount-rate'],
+      ['Số tấm', 'sheet-count'],
+    ])('typing in %s after a keyboard focus does not select its value again', (_label, field) => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const from = byId(`stock-line-${field}-0`);
+      act(() => from.focus());
+      const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+      try {
+        fireEvent.keyDown(from, { key: 'ArrowDown' });
+        const cell = byId(`stock-line-${field}-1`);
+        expect(select.mock.contexts).toEqual([cell]);
+
+        fireEvent.change(cell, { target: { value: '4' } });
+        fireEvent.change(cell, { target: { value: '45' } });
+
+        expect(select.mock.contexts).toEqual([cell]);
+        expect(cell.value).toBe('45');
+      } finally {
+        select.mockRestore();
+      }
     });
   });
 

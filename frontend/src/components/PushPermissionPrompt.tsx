@@ -10,6 +10,20 @@ interface Props {
 export function PushPermissionPrompt({ state, onEnable, onDismiss }: Props) {
   if (!isPushPromptVisible(state)) return null
 
+  // iOS delivers push only to the installed app, and has no beforeinstallprompt: explain the manual install.
+  if (state === 'ios-needs-install') {
+    return (
+      <div className="flex items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2">
+        <div className="text-sm text-blue-900">
+          Để nhận thông báo trên iPhone, bấm <strong>Chia sẻ</strong> rồi <strong>Thêm vào MH chính</strong>, sau đó mở app từ màn hình chính.
+        </div>
+        <button onClick={onDismiss} className="shrink-0 rounded px-3 py-1 text-sm text-blue-600 hover:text-blue-800">
+          Để sau
+        </button>
+      </div>
+    )
+  }
+
   const isError = state === 'error'
   const isLoading = state === 'loading'
 

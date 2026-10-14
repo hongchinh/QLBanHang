@@ -48,7 +48,8 @@ public class SettingsController : ApiControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetPwaIcon(int size, CancellationToken ct)
     {
-        if (size != 192 && size != 512)
+        // 180 is the iOS apple-touch-icon; 192 and 512 are the manifest icons.
+        if (size is not (180 or 192 or 512))
             return BadRequest();
 
         var result = await _branding.GetPwaIconAsync(size, ct);

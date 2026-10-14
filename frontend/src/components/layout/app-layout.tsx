@@ -76,7 +76,7 @@ export function AppLayout() {
         )}
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r bg-card transition-transform md:hidden',
+            'pt-safe pb-safe pl-safe fixed inset-y-0 left-0 z-50 flex w-60 flex-col border-r bg-card transition-transform md:hidden',
             mobileDrawerOpen ? 'translate-x-0' : '-translate-x-full',
           )}
         >

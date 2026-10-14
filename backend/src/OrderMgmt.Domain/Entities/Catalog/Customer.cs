@@ -21,6 +21,9 @@ public class Customer : BaseEntity
     public bool IsCustomer { get; set; } = true;
     public bool IsSupplier { get; set; }
 
+    /// <summary>Sample row created by the demo-branch data fill.</summary>
+    public bool IsSample { get; set; }
+
     /// Default payment term in days; used to default a voucher due date.
     public int? CreditDays { get; set; }
 

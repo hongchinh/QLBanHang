@@ -24,6 +24,7 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         // supplier-only partner would be stored as a customer by the database default.
         b.Property(x => x.IsCustomer).HasDefaultValue(true).HasSentinel(true);
         b.Property(x => x.IsSupplier).HasDefaultValue(false);
+        b.Property(x => x.IsSample).HasDefaultValue(false);
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => x.PhoneNumber);
@@ -89,6 +90,7 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.Property(x => x.Code).IsRequired().HasMaxLength(50);
         b.Property(x => x.Name).IsRequired().HasMaxLength(255);
         b.Property(x => x.Specification).HasMaxLength(500);
+        b.Property(x => x.IsSample).HasDefaultValue(false);
         b.Property(x => x.Note).HasMaxLength(2000);
         b.Property(x => x.DefaultPrice).HasColumnType("numeric(18,2)");
         b.Property(x => x.CostPrice).HasColumnType("numeric(18,2)");

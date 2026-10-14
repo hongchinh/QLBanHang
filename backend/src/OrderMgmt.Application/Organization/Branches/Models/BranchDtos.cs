@@ -1,3 +1,5 @@
+using OrderMgmt.Domain.Enums;
+
 namespace OrderMgmt.Application.Organization.Branches.Models;
 
 public class BranchDto
@@ -8,6 +10,10 @@ public class BranchDto
     public string? Address { get; set; }
     public DateOnly? LockedUntil { get; set; }
     public DateOnly? OpeningDate { get; set; }
+    public bool IsDemo { get; set; }
+    public SampleDataStatus SampleDataStatus { get; set; }
+    public int SampleDataProgress { get; set; }
+    public string? SampleDataError { get; set; }
 }
 
 public class CreateBranchRequest

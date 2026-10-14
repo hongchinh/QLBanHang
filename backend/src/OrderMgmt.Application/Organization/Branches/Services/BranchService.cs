@@ -233,5 +233,9 @@ public class BranchService : IBranchService
         Address = b.Address,
         LockedUntil = b.LockedUntil,
         OpeningDate = b.OpeningDate,
+        IsDemo = b.IsDemo,
+        SampleDataStatus = b.SampleDataStatus,
+        SampleDataProgress = b.SampleDataProgress,
+        SampleDataError = b.SampleDataError,
     };
 }

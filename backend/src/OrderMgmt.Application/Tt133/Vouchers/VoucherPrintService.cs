@@ -91,6 +91,16 @@ public class VoucherPrintService : IVoucherPrintService
         }, ct);
 
         var xlsx = _renderer.RenderCashVouchers(context, models);
-        return await _support.ToFileAsync(xlsx, models[0].Code, format, ct);
+        var baseName = models.Count == 1
+            ? models[0].Code
+            : VoucherPrintRules.BatchFileBase(CashBatchPrefix(models), _clock.UtcNow);
+        return await _support.ToFileAsync(xlsx, baseName, format, ct);
+    }
+
+    private static string CashBatchPrefix(IReadOnlyList<CashVoucherPrintModel> models)
+    {
+        var receipts = models.Any(m => m.Type == CashVoucherType.Receipt);
+        var payments = models.Any(m => m.Type == CashVoucherType.Payment);
+        return receipts && payments ? "PhieuThuChi" : payments ? "PhieuChi" : "PhieuThu";
     }
 }

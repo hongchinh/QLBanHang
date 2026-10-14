@@ -50,6 +50,16 @@ public class CashVouchersController : ApiControllerBase
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 
+    /// Several vouchers, one sheet each. A POST because a list of ids does not fit a URL; it changes nothing.
+    [HttpPost("print")]
+    [SkipDashboardSignal]
+    public async Task<IActionResult> PrintMany(
+        [FromBody] CashVoucherPrintRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
+    {
+        var file = await _print.PrintCashVouchersAsync(request.Ids, format, ct);
+        return File(file.Bytes, file.ContentType, file.FileName);
+    }
+
     [HttpGet("defaults")]
     public async Task<ActionResult<ApiResponse<CashVoucherDefaultsDto>>> GetDefaults(
         [FromQuery] CashVoucherType type, CancellationToken ct)

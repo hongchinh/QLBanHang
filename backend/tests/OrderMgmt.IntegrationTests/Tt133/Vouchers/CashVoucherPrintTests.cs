@@ -1,8 +1,17 @@
 using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using ClosedXML.Excel;
 using FluentAssertions;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
+using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Identity.Models;
+using OrderMgmt.Domain.Entities.CashDebt;
+using OrderMgmt.Infrastructure.Persistence;
 using OrderMgmt.Application.Tt133.Vouchers;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
@@ -19,7 +28,9 @@ public class CashVoucherPrintTests : CashDebtTestBase
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static readonly DateOnly Oct1 = new(2026, 10, 1);
 
-    public CashVoucherPrintTests(PostgresFixture pg) : base(pg) { }
+    private readonly PostgresFixture _pg;
+
+    public CashVoucherPrintTests(PostgresFixture pg) : base(pg) => _pg = pg;
 
     [Fact]
     public async Task Prints_a_receipt_as_01_TT()
@@ -189,6 +200,115 @@ public class CashVoucherPrintTests : CashDebtTestBase
         Texts(wb.Worksheets.Single()).Should().Contain($"Đơn vị: {branchName}");
     }
 
+    [Fact]
+    public async Task Prints_selected_vouchers_in_date_order_once_each()
+    {
+        await SetCompanyAsync();
+        var (_, client, fundId, _) = await BranchClientAsync();
+        var reasonId = await CashReasonIdAsync("TK");
+        var r1 = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, reasonId, fundId, "2026-10-06 08:00", null, 1_000m));
+        var r2 = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, reasonId, fundId, "2026-10-05 09:00", null, 2_000m));
+        var r3 = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, reasonId, fundId, "2026-10-05 09:00", null, 3_000m));
+
+        var response = await client.PostAsJsonAsync("/api/cash-vouchers/print?format=xlsx",
+            new CashVoucherPrintRequest { Ids = [r1.Id, r3.Id, r2.Id, r3.Id] });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        response.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^PhieuThu_\d{8}-\d{4}\.xlsx$");
+        using var wb = await Tt133Sheet.OpenAsync(response);
+        wb.Worksheets.Select(w => w.Name).Should().Equal(r2.Code, r3.Code, r1.Code);
+    }
+
+    [Fact]
+    public async Task Batch_names_follow_the_types()
+    {
+        await SetCompanyAsync();
+        var (_, client, fundId, _) = await BranchClientAsync();
+        var tk = await CashReasonIdAsync("TK");
+        var ck = await CashReasonIdAsync("CK");
+        var p1 = await CreateCashAsync(client, CashRequest(CashVoucherType.Payment, ck, fundId, "2026-10-05 09:00", null, 1_000m));
+        var p2 = await CreateCashAsync(client, CashRequest(CashVoucherType.Payment, ck, fundId, "2026-10-06 09:00", null, 2_000m));
+        var r = await CreateCashAsync(client, CashRequest(CashVoucherType.Receipt, tk, fundId, "2026-10-07 09:00", null, 3_000m));
+
+        var payments = await client.PostAsJsonAsync("/api/cash-vouchers/print?format=xlsx",
+            new CashVoucherPrintRequest { Ids = [p1.Id, p2.Id] });
+        var mixed = await client.PostAsJsonAsync("/api/cash-vouchers/print?format=xlsx",
+            new CashVoucherPrintRequest { Ids = [r.Id, p1.Id] });
+
+        payments.StatusCode.Should().Be(HttpStatusCode.OK, await payments.Content.ReadAsStringAsync());
+        payments.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^PhieuChi_\d{8}-\d{4}\.xlsx$");
+        mixed.StatusCode.Should().Be(HttpStatusCode.OK, await mixed.Content.ReadAsStringAsync());
+        mixed.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^PhieuThuChi_\d{8}-\d{4}\.xlsx$");
+        using var wb = await Tt133Sheet.OpenAsync(mixed);
+        wb.Worksheets.Should().HaveCount(2);
+        wb.Worksheets.Count(w => Texts(w).Contains("PHIẾU THU")).Should().Be(1);
+        wb.Worksheets.Count(w => Texts(w).Contains("PHIẾU CHI")).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Pdf_goes_through_the_converter()
+    {
+        var fakePdf = "%PDF-1.0 fake\n"u8.ToArray();
+        var fake = new RecordingConverter(fakePdf);
+        var factory = new WebAppFactoryWithConverter(_pg, fake);
+        await ((IAsyncLifetime)factory).InitializeAsync();
+        try
+        {
+            // The factory shares the test database, so the code is unique per run.
+            var code = "PTPDF" + Guid.NewGuid().ToString("N")[..6];
+            Guid id;
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                var voucher = new CashVoucher
+                {
+                    Type = CashVoucherType.Receipt,
+                    Code = code,
+                    VoucherAt = new DateTimeOffset(2026, 10, 5, 2, 0, 0, TimeSpan.Zero),
+                    BranchId = MainBranchId,
+                    FundId = await db.Funds.Where(f => f.BranchId == MainBranchId && f.Code == "QTM").Select(f => f.Id).SingleAsync(),
+                    ReasonId = await db.CashReasons.Where(r => r.Code == "TK").Select(r => r.Id).SingleAsync(),
+                    Total = 1_000m,
+                    Status = DocumentStatus.Active,
+                    OwnerUserId = await db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync(),
+                };
+                db.CashVouchers.Add(voucher);
+                db.CashVoucherLines.Add(new CashVoucherLine
+                {
+                    CashVoucherId = voucher.Id, SortOrder = 0, Description = "Dòng 1", Amount = 1_000m,
+                });
+                await db.SaveChangesAsync();
+                id = voucher.Id;
+            }
+            using var client = await AdminClientAsync(factory);
+            UseBranch(client, MainBranchId);
+
+            var response = await client.GetAsync($"/api/cash-vouchers/{id}/print?format=pdf");
+
+            response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+            response.Content.Headers.ContentType!.MediaType.Should().Be("application/pdf");
+            response.Content.Headers.ContentDisposition!.FileName.Should().Be($"{code}.pdf");
+            (await response.Content.ReadAsByteArrayAsync()).Should().Equal(fakePdf);
+            fake.Received.Should().NotBeNull();
+            fake.Received!.Take(2).Should().Equal((byte)'P', (byte)'K');
+        }
+        finally
+        {
+            await ((IAsyncLifetime)factory).DisposeAsync();
+        }
+    }
+
+    private static async Task<HttpClient> AdminClientAsync(WebAppFactory factory)
+    {
+        var client = factory.CreateClient();
+        var login = await client.PostAsJsonAsync("/api/auth/login",
+            new LoginRequest { Username = "admin", Password = "Admin@123" });
+        login.EnsureSuccessStatusCode();
+        var body = await login.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>(TestJson.Options);
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", body!.Data!.AccessToken);
+        return client;
+    }
+
     private Task SetCompanyAsync() =>
         InDbAsync(db => db.CompanyProfiles.Where(p => p.Id == 1).ExecuteUpdateAsync(s => s
             .SetProperty(p => p.Name, "Công ty ABC")
@@ -215,4 +335,39 @@ public class CashVoucherPrintTests : CashDebtTestBase
     }
 
     private static string NewCode(string prefix) => prefix + Guid.NewGuid().ToString("N")[..8];
+}
+
+file sealed class WebAppFactoryWithConverter : WebAppFactory
+{
+    private readonly ISpreadsheetPdfConverter _converter;
+
+    public WebAppFactoryWithConverter(PostgresFixture pg, ISpreadsheetPdfConverter converter) : base(pg) => _converter = converter;
+
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        base.ConfigureWebHost(builder);
+        builder.ConfigureServices(services =>
+        {
+            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(ISpreadsheetPdfConverter));
+            if (descriptor is not null)
+                services.Remove(descriptor);
+            services.AddSingleton(_converter);
+        });
+    }
+}
+
+/// Returns the given bytes and keeps the workbook it was handed.
+file sealed class RecordingConverter : ISpreadsheetPdfConverter
+{
+    private readonly byte[] _pdf;
+
+    public RecordingConverter(byte[] pdf) => _pdf = pdf;
+
+    public byte[]? Received { get; private set; }
+
+    public Task<byte[]> ConvertAsync(byte[] xlsxBytes, CancellationToken ct = default)
+    {
+        Received = xlsxBytes;
+        return Task.FromResult(_pdf);
+    }
 }

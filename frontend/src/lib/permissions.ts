@@ -63,6 +63,7 @@ export const PERMISSIONS = [
   'inventory.settings',
   'inventory.recalc_cost',
   'reports.cash',
+  'dashboard.executive',
   'receipts.view',
   'receipts.create',
   'receipts.edit',

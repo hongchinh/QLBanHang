@@ -27,6 +27,7 @@ const RULES: RouteRule[] = [
   { pattern: /^\/admin\/users(\/[^/]+)?$/, permission: 'user_settings.manage' },
   { pattern: /^\/admin\/roles$/, permission: 'roles.view' },
   { pattern: /^\/admin\/dashboard$/, permission: 'quotations.view_all' },
+  { pattern: /^\/dashboard\/executive$/, permission: 'dashboard.executive' },
   { pattern: /^\/reports\/sales-performance$/, permission: 'quotations.view_all' },
   { pattern: /^\/reports\/(revenue|sales-revenue|vehicle-revenue)$/, permission: 'reports.revenue' },
   { pattern: /^\/reports\/sales-revenue\/[^/]+$/, permission: 'reports.revenue' },

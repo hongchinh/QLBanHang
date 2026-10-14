@@ -64,6 +64,7 @@ import { UserSettingsPage } from '@/pages/admin/user-settings-page';
 import { UsersListPage } from '@/pages/admin/users-list-page';
 import { BulkTransferPage } from '@/pages/admin/bulk-transfer-page';
 import { AdminDashboardPage } from '@/pages/admin/admin-dashboard-page';
+import { ExecutiveDashboardPage } from '@/pages/executive-dashboard/executive-dashboard-page';
 import { RolesMatrixPage } from '@/pages/admin/roles-matrix-page';
 import { RevenuePage } from '@/pages/reports/revenue-page';
 import { SalesPerformancePage } from '@/pages/reports/sales-performance-page';
@@ -620,6 +621,14 @@ export function App() {
                   element={
                     <ProtectedRoute permission="quotations.view_all">
                       <AdminDashboardPage />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="dashboard/executive"
+                  element={
+                    <ProtectedRoute permission="dashboard.executive">
+                      <ExecutiveDashboardPage />
                     </ProtectedRoute>
                   }
                 />

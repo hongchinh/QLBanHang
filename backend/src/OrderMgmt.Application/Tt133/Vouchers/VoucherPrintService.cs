@@ -147,6 +147,7 @@ public class VoucherPrintService : IVoucherPrintService
                     OwnerName = v.Owner != null ? v.Owner.FullName : null,
                     Lines = v.Lines.Where(l => !l.IsDeleted).OrderBy(l => l.SortOrder).Select(l => new StockVoucherLineRow
                     {
+                        Id = l.Id,
                         ProductName = l.ProductName,
                         ProductCode = l.ProductCode,
                         UnitName = l.UnitName,
@@ -160,6 +161,7 @@ public class VoucherPrintService : IVoucherPrintService
                         Amount = l.Amount,
                         VatAmount = l.VatAmount,
                         PriceIncludesVat = l.PriceIncludesVat,
+                        TrackInventory = l.TrackInventory,
                         WarehouseId = l.WarehouseId,
                         WarehouseCode = l.Warehouse!.Code,
                         WarehouseName = l.Warehouse.Name,
@@ -194,7 +196,7 @@ public class VoucherPrintService : IVoucherPrintService
             PartnerAddress = VoucherPrintRules.FirstFilled(r.PartnerAddress),
             ReasonName = r.ReasonName,
             WarehouseNames = warehouses.Count > 0
-                ? string.Join(", ", warehouses.Select(l => l.WarehouseName))
+                ? string.Join(", ", warehouses.Select(l => l.WarehouseName).Distinct())
                 : r.WarehouseName,
             ShowWarehouseColumn = warehouses.Count > 1,
             Lines = r.Lines.Select((l, i) => new StockVoucherPrintLine
@@ -273,6 +275,7 @@ public class VoucherPrintService : IVoucherPrintService
 
     private sealed class StockVoucherLineRow
     {
+        public Guid Id { get; init; }
         public string ProductName { get; init; } = default!;
         public string ProductCode { get; init; } = default!;
         public string UnitName { get; init; } = default!;
@@ -286,6 +289,7 @@ public class VoucherPrintService : IVoucherPrintService
         public decimal Amount { get; init; }
         public decimal VatAmount { get; init; }
         public bool PriceIncludesVat { get; init; }
+        public bool TrackInventory { get; init; }
         public Guid WarehouseId { get; init; }
         public string WarehouseCode { get; init; } = default!;
         public string WarehouseName { get; init; } = default!;

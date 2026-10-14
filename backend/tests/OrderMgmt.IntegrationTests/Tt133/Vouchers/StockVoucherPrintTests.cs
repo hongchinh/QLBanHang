@@ -91,10 +91,12 @@ public class StockVoucherPrintTests : InventoryTestBase
     public async Task Spec_and_several_warehouses()
     {
         await SetCompanyAsync();
-        var second = await CreateWarehouseAsync(MainBranchId, NewCode("KH"));
+        var secondCode = NewCode("KH");
+        var second = await CreateWarehouseAsync(MainBranchId, secondCode);
+        var aCode = NewCode("A");
         var areaCode = NewCode("K");
         var area = await CreateInventoryProductAsync(areaCode, PricingMode.PerSquareMeter);
-        var a = await CreateInventoryProductAsync(NewCode("A"));
+        var a = await CreateInventoryProductAsync(aCode);
         var la = LineRequest(a, 3, 100_000);
         la.WarehouseId = second;
         var v = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-05 09:00",
@@ -111,8 +113,13 @@ public class StockVoucherPrintTests : InventoryTestBase
         Texts(ws).Should().Contain(new[] { "Kho", $"- Nhập tại kho: {kho01}, {secondName} Địa điểm: {Dots}" });
         var row = ws.Row(Tt133Sheet.RowOf(ws, $"Hàng {areaCode} (1200×2400 mm, 10 tấm)"));
         row.Cell(4).GetString().Should().Be("m²");
+        row.Cell(5).GetString().Should().Be("KHO01");
         row.Cell(6).GetValue<decimal>().Should().Be(28.8m);
         row.Cell(7).GetValue<decimal>().Should().Be(28.8m);
+        ws.Row(Tt133Sheet.RowOf(ws, $"Hàng {aCode}")).Cell(5).GetString().Should().Be(secondCode);
+        var headerRow = Tt133Sheet.RowOf(ws, "Kho");
+        Tt133Sheet.ColumnOf(ws, headerRow, "Kho").Should().Be(5);
+        Tt133Sheet.ColumnOf(ws, headerRow, "Đơn vị tính").Should().Be(4);
     }
 
     [Fact]

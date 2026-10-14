@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { computePreset, matchActivePreset } from '@/lib/date-range-presets';
@@ -74,9 +75,10 @@ export function QuotationDateFilter({ from, to, onChange }: QuotationDateFilterP
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
-          className={pillCls(isCustomActive)}
+          className={cn(pillCls(isCustomActive), 'inline-flex items-center gap-1')}
         >
-          Tuỳ chỉnh ▾
+          Tuỳ chỉnh
+          <AppIcon name="chevronDown" size={14} />
         </button>
         {open && (
           <div className="absolute right-0 top-9 z-20 w-64 rounded-lg border border-border bg-popover p-3 shadow-md">

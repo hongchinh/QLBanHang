@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { queryClient } from '@/lib/query-client';
 import { ProtectedRoute } from '@/routes/protected-route';
 import { AuthInit } from '@/routes/auth-init';
+import { SwNavigateListener } from '@/components/sw-navigate-listener';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { Toaster } from '@/components/ui/toaster';
 import { AppLayout } from '@/components/layout/app-layout';
@@ -135,6 +136,7 @@ export function App() {
           }
         >
         <BrowserRouter>
+          <SwNavigateListener />
           <AuthInit>
             <RouteErrorBoundary>
             <Routes>

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { App } from './App';
 import type { PushState } from '@/hooks/usePushNotification';
 
@@ -99,6 +99,25 @@ describe('App shell', () => {
     const shell = screen.getByTestId('app-shell');
     expect(shell.children).toHaveLength(2);
     expect(shell.firstElementChild).toContainElement(screen.getByRole('button', { name: button }));
+  });
+
+  // notificationclick posts NAVIGATE to the open window; the app moves inside the SPA, no reload.
+  it('follows a NAVIGATE message from the service worker', () => {
+    const original = Object.getOwnPropertyDescriptor(navigator, 'serviceWorker');
+    const container = new EventTarget();
+    Object.defineProperty(navigator, 'serviceWorker', { value: container, configurable: true });
+    try {
+      window.history.pushState({}, '', '/404');
+      render(<App />);
+      act(() => {
+        container.dispatchEvent(new MessageEvent('message', { data: { type: 'NAVIGATE', url: '/403' } }));
+      });
+      expect(window.location.pathname).toBe('/403');
+      expect(screen.getByText('forbidden')).toBeInTheDocument();
+    } finally {
+      if (original) Object.defineProperty(navigator, 'serviceWorker', original);
+      else delete (navigator as { serviceWorker?: unknown }).serviceWorker;
+    }
   });
 
   describe('error fallback', () => {

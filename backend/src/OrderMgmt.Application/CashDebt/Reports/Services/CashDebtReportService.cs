@@ -167,6 +167,7 @@ public class CashDebtReportService : ICashDebtReportService
         }
         else
         {
+            // S15: company scope skips demo branches, soft-deleted ones included.
             entries = entries.Where(e => !_db.Branches.IgnoreQueryFilters().Any(b => b.Id == e.BranchId && b.IsDemo));
         }
 
@@ -326,6 +327,7 @@ public class CashDebtReportService : ICashDebtReportService
         }
         else
         {
+            // S15: company scope skips demo branches, soft-deleted ones included.
             partnerEntries = partnerEntries.Where(
                 e => !_db.Branches.IgnoreQueryFilters().Any(b => b.Id == e.BranchId && b.IsDemo));
         }

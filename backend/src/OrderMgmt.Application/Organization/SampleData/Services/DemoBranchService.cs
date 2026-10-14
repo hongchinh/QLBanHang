@@ -263,7 +263,7 @@ public sealed class DemoBranchService : IDemoBranchService
     }
 
     /// A property of the provider's exception (PostgresException: ConstraintName, TableName), read by reflection like the
-    /// other services do, as the Application layer does not reference the provider.
+    /// other services do: no provider types in Application code.
     private static string? PgProperty(Exception? ex, string name) => ex?.GetType().GetProperty(name)?.GetValue(ex) as string;
 
     /// A PostgreSQL foreign key violation (23503 or 23001), thrown by a bulk statement directly or wrapped by a save.

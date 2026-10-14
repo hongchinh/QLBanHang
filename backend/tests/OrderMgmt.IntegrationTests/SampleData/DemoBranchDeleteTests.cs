@@ -232,7 +232,8 @@ public class DemoBranchDeleteTests : DemoBranchFixture
         var (status, _, error) = await ReadDocumentResponseAsync<object>(response);
         status.Should().Be(HttpStatusCode.InternalServerError);
         error!.Code.Should().Be("INTERNAL_ERROR");
-        // The failure is at step 11 (the funds), so the branch alone proves nothing: the fund and the warehouse stay too.
+        // Nothing before or at the failing step (11, the funds) was removed. That is all this shows: the rollback of the
+        // earlier steps is proved by the 409 test above.
         (await InDbAsync(db => db.Branches.AnyAsync(b => b.Id == branch.BranchId))).Should().BeTrue();
         (await InDbAsync(db => db.Funds.AnyAsync(f => f.Id == branch.CashFundId))).Should().BeTrue();
         (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Id == branch.WarehouseId))).Should().BeTrue();

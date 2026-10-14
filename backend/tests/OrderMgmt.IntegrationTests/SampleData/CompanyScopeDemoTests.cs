@@ -29,9 +29,9 @@ public class CompanyScopeDemoTests : CashDebtTestBase
         return client;
     }
 
-    private Task MarkDemoAsync(Guid branchId) =>
+    private Task MarkDemoAsync(Guid branchId, bool alsoDeleted = false) =>
         InDbAsync(db => db.Branches.Where(b => b.Id == branchId)
-            .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsDemo, true)));
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsDemo, true).SetProperty(b => b.IsDeleted, alsoDeleted)));
 
     private static async Task<T> GetAsync<T>(HttpClient client, string route, string query) =>
         await ReadDataAsync<T>(await client.GetAsync($"/api/reports/{route}?{query}"));
@@ -101,9 +101,13 @@ public class CompanyScopeDemoTests : CashDebtTestBase
         side.TotalIncrease.Should().Be(mainSide.TotalIncrease);
         side.OpeningBalance.Should().Be(mainSide.OpeningBalance);
     }
+    [Fact]
+    public Task Stock_summary_company_skips_demo_branch() => Stock_summary_Async(softDeleted: false);
 
     [Fact]
-    public async Task Stock_summary_company_skips_demo_branch()
+    public Task Stock_summary_company_skips_soft_deleted_demo_branch() => Stock_summary_Async(softDeleted: true);
+
+    private async Task Stock_summary_Async(bool softDeleted)
     {
         var ids = await ReportDataset.SeedAsync(this);
         var warehouseB = await InDbAsync(db => db.Warehouses.IgnoreQueryFilters()
@@ -121,7 +125,7 @@ public class CompanyScopeDemoTests : CashDebtTestBase
         var main = await GetAsync<StockSummaryReportDto>(mainClient, "stock-summary", query);
         before.Rows.Should().ContainSingle().Which.InQty.Should().Be(17m);
 
-        await MarkDemoAsync(ids.BranchBId);
+        await MarkDemoAsync(ids.BranchBId, softDeleted);
 
         var after = await GetAsync<StockSummaryReportDto>(mainClient, "stock-summary", query + "&scope=Company");
         var row = after.Rows.Should().ContainSingle().Subject;
@@ -170,9 +174,13 @@ public class CompanyScopeDemoTests : CashDebtTestBase
         reconciliation.Sides.Should().ContainSingle().Which.ClosingBalance
             .Should().Be(mainReconciliation.Sides.Single().ClosingBalance);
     }
+    [Fact]
+    public Task Reconciliation_company_side_list_skips_demo_branch() => Reconciliation_side_list_Async(softDeleted: false);
 
     [Fact]
-    public async Task Reconciliation_company_side_list_skips_demo_branch()
+    public Task Reconciliation_company_side_list_skips_soft_deleted_demo_branch() => Reconciliation_side_list_Async(softDeleted: true);
+
+    private async Task Reconciliation_side_list_Async(bool softDeleted)
     {
         var ids = await ReportDataset.SeedAsync(this);
         var warehouseB = await InDbAsync(db => db.Warehouses.IgnoreQueryFilters()
@@ -192,7 +200,7 @@ public class CompanyScopeDemoTests : CashDebtTestBase
         var before = await GetAsync<DebtReconciliationReportDto>(client, "debt-reconciliation", query);
         before.Sides.Select(s => s.Side).Should().BeEquivalentTo(new[] { DebtSide.Receivable, DebtSide.Payable });
 
-        await MarkDemoAsync(ids.BranchBId);
+        await MarkDemoAsync(ids.BranchBId, softDeleted);
 
         var after = await GetAsync<DebtReconciliationReportDto>(client, "debt-reconciliation", query);
         after.Sides.Select(s => s.Side).Should().Equal(DebtSide.Payable);

@@ -159,6 +159,7 @@ public static class DependencyInjection
         services.AddScoped<IOpeningStockService, OpeningStockService>();
         services.AddScoped<IInventoryReportService, InventoryReportService>();
         services.AddScoped<ITt133ExportService, Tt133ExportService>();
+        services.AddScoped<Tt133ExportSupport>();
         services.AddScoped<IExecutiveScopeResolver, ExecutiveScopeResolver>();
         services.AddScoped<ISalesMetricsService, SalesMetricsService>();
         services.AddScoped<ExecutiveLookups>();

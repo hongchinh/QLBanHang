@@ -1,6 +1,6 @@
 # Phase 04 — Price mode dialog and the stock voucher pages
 
-**Status:** [ ] pending
+**Status:** [x] complete
 **Complexity:** M
 
 ## Objective

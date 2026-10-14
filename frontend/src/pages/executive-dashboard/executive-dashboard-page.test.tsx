@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Outlet, useLocation } from 'react-router-dom';
 import { App } from '@/App';
 import type { Branch } from '@/features/branches/types';
@@ -7,6 +7,7 @@ import type { useExecutiveAccess } from '@/features/executive-dashboard/use-exec
 import type { useExecutiveScope } from '@/features/executive-dashboard/use-executive-scope';
 import { useAuthStore } from '@/stores/auth-store';
 import type { OverviewTab } from './tabs/overview-tab';
+import type { SalesTab } from './tabs/sales-tab';
 import { ExecutiveDashboardPage } from './executive-dashboard-page';
 
 vi.mock('@/hooks/useBeforeInstallPrompt', () => ({
@@ -27,6 +28,15 @@ const overviewTab = vi.fn((props: OverviewProps) => {
   return <div data-testid="overview-tab" />;
 });
 vi.mock('./tabs/overview-tab', () => ({ OverviewTab: (props: OverviewProps) => overviewTab(props) }));
+type SalesProps = React.ComponentProps<typeof SalesTab>;
+const salesTab = vi.fn((props: SalesProps) => {
+  void props;
+  return <div data-testid="sales-tab" />;
+});
+vi.mock('./tabs/sales-tab', () => ({ SalesTab: (props: SalesProps) => salesTab(props) }));
+vi.mock('./tabs/cash-tab', () => ({ CashTab: () => <div data-testid="cash-tab" /> }));
+vi.mock('./tabs/debt-tab', () => ({ DebtTab: () => <div data-testid="debt-tab" /> }));
+vi.mock('./tabs/inventory-tab', () => ({ InventoryTab: () => <div data-testid="inventory-tab" /> }));
 
 const useExecutiveLive = vi.fn((branchId: string | undefined) => {
   void branchId;
@@ -47,12 +57,21 @@ const branchScope = (): Scope => ({
   selectCompany: vi.fn(),
   selectBranch: vi.fn(),
 });
-// Phase 07 registers more panels; this access keeps the expectations below true then.
+// Every panel is registered; this access keeps the bar at the overview alone.
 const overviewOnly = (): Access => ({ sales: true, cash: true, debt: true, inventory: true, tabs: ['overview'] });
 
-const state: { scope: Scope; access: Access } = { scope: branchScope(), access: overviewOnly() };
+// access null: the real useExecutiveAccess, from the permissions of the signed-in user.
+const state: { scope: Scope; access: Access | null } = { scope: branchScope(), access: overviewOnly() };
 vi.mock('@/features/executive-dashboard/use-executive-scope', () => ({ useExecutiveScope: () => state.scope }));
-vi.mock('@/features/executive-dashboard/use-executive-access', () => ({ useExecutiveAccess: () => state.access }));
+vi.mock('@/features/executive-dashboard/use-executive-access', async (importOriginal) => {
+  const actual = await importOriginal<{ useExecutiveAccess: typeof useExecutiveAccess }>();
+  return {
+    useExecutiveAccess: () => {
+      const real = actual.useExecutiveAccess();
+      return state.access ?? real;
+    },
+  };
+});
 
 function signIn(permissions: string[]) {
   useAuthStore.setState({
@@ -80,10 +99,12 @@ const lastOverviewProps = () => overviewTab.mock.calls[overviewTab.mock.calls.le
 describe('ExecutiveDashboardPage', () => {
   beforeEach(() => {
     overviewTab.mockClear();
+    salesTab.mockClear();
     useExecutiveLive.mockClear();
     state.scope = branchScope();
     state.access = overviewOnly();
   });
+  afterEach(() => useAuthStore.setState({ accessToken: null, user: null }));
 
   it('shows the heading, the live status, the scope select and the period chips', () => {
     renderPage();
@@ -148,6 +169,107 @@ describe('ExecutiveDashboardPage', () => {
     act(() => lastOverviewProps().onOpenTab('sales'));
 
     expect(new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('tab')).toBe('sales');
+  });
+
+  describe('with the tabs of the permissions', () => {
+    const EVERY_DOMAIN = ['dashboard.executive', 'reports.profit', 'reports.cash', 'reports.debt', 'reports.inventory'];
+    const tabNames = () => screen.getAllByRole('tab').map((t) => t.textContent);
+    const selectedTab = () => screen.getByRole('tab', { selected: true }).textContent;
+    const searchTab = () => new URLSearchParams(screen.getByTestId('search').textContent ?? '').get('tab');
+
+    beforeEach(() => {
+      state.access = null;
+    });
+
+    it('a user with every domain sees the five tabs in order, and the overview can open the other four', () => {
+      signIn(EVERY_DOMAIN);
+      renderPage();
+
+      expect(tabNames()).toEqual(['Tổng quan', 'Kinh doanh', 'Tiền', 'Công nợ', 'Kho']);
+      expect(lastOverviewProps().openTabs).toEqual(['sales', 'cash', 'debt', 'inventory']);
+      // Only the active panel is mounted.
+      for (const id of ['sales-tab', 'cash-tab', 'debt-tab', 'inventory-tab']) {
+        expect(screen.queryByTestId(id)).not.toBeInTheDocument();
+      }
+    });
+
+    it('a user with reports.cash only sees Tổng quan and Tiền', () => {
+      signIn(['dashboard.executive', 'reports.cash']);
+      renderPage();
+
+      expect(tabNames()).toEqual(['Tổng quan', 'Tiền']);
+      expect(lastOverviewProps().openTabs).toEqual(['cash']);
+    });
+
+    it('?tab=debt opens the debt tab for a user with reports.debt', () => {
+      signIn(['dashboard.executive', 'reports.debt']);
+      renderPage('/dashboard/executive?from=2026-10-01&to=2026-10-13&tab=debt');
+
+      expect(selectedTab()).toBe('Công nợ');
+      expect(screen.getByTestId('debt-tab')).toBeInTheDocument();
+      expect(screen.queryByTestId('overview-tab')).not.toBeInTheDocument();
+    });
+
+    it('?tab=debt shows the overview for a user without reports.debt', () => {
+      signIn(['dashboard.executive', 'reports.cash']);
+      renderPage('/dashboard/executive?from=2026-10-01&to=2026-10-13&tab=debt');
+
+      expect(selectedTab()).toBe('Tổng quan');
+      expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
+      expect(screen.queryByTestId('debt-tab')).not.toBeInTheDocument();
+    });
+
+    it('choosing "Kho" writes tab=inventory to the URL and opens the inventory tab', () => {
+      signIn(EVERY_DOMAIN);
+      renderPage();
+
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Kho' }));
+
+      expect(searchTab()).toBe('inventory');
+      expect(selectedTab()).toBe('Kho');
+      expect(screen.getByTestId('inventory-tab')).toBeInTheDocument();
+      expect(screen.queryByTestId('overview-tab')).not.toBeInTheDocument();
+    });
+
+    it('the onOpenTab the overview received opens the sales tab, with the params of the page', () => {
+      signIn(EVERY_DOMAIN);
+      renderPage();
+
+      act(() => lastOverviewProps().onOpenTab('sales'));
+
+      expect(selectedTab()).toBe('Kinh doanh');
+      expect(screen.getByTestId('sales-tab')).toBeInTheDocument();
+      const props = salesTab.mock.calls[salesTab.mock.calls.length - 1][0];
+      expect(props.params).toEqual({ from: '2026-10-01', to: '2026-10-13', branchId: 'b1' });
+    });
+
+    it('choosing "Tổng quan" leaves the default out of the URL', () => {
+      signIn(EVERY_DOMAIN);
+      renderPage('/dashboard/executive?from=2026-10-01&to=2026-10-13&tab=cash');
+      expect(screen.getByTestId('cash-tab')).toBeInTheDocument();
+
+      fireEvent.mouseDown(screen.getByRole('tab', { name: 'Tổng quan' }));
+
+      expect(searchTab()).toBeNull();
+      expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
+    });
+  });
+
+  it('a registered panel the user may not open is not on the bar', () => {
+    state.access = { sales: true, cash: true, debt: false, inventory: true, tabs: ['overview', 'sales', 'cash', 'inventory'] };
+    renderPage('/dashboard/executive?from=2026-10-01&to=2026-10-13&tab=debt');
+
+    expect(screen.getAllByRole('tab').map((t) => t.textContent)).toEqual(['Tổng quan', 'Kinh doanh', 'Tiền', 'Kho']);
+    expect(screen.getByTestId('overview-tab')).toBeInTheDocument();
+    expect(screen.queryByTestId('debt-tab')).not.toBeInTheDocument();
+  });
+
+  // Five tabs are wider than a 375 px screen: the bar scrolls instead of pushing the page wider, starting
+  // at its first tab.
+  it('the tab bar scrolls sideways on a narrow screen', () => {
+    renderPage();
+
+    expect(screen.getByRole('tablist')).toHaveClass('max-w-full', 'overflow-x-auto', 'justify-start');
   });
 
   it('a user who cannot switch gets no scope select', () => {

@@ -77,7 +77,8 @@ export function ExecutiveDashboardPage() {
 
       {/* Only the active panel is mounted (TabsContent default), so the queries of the other tabs do not run. */}
       <Tabs value={activeTab} onValueChange={(value) => setTab(value as ExecutiveTab)}>
-        <TabsList>
+        {/* Five tabs are wider than a phone: the bar scrolls sideways, from its first tab. */}
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           {panels.map(({ key }) => (
             <TabsTrigger key={key} value={key}>
               {TAB_LABELS[key]}

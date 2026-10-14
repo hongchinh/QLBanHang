@@ -684,8 +684,10 @@ describe('StockLineGrid', () => {
     }
   });
 
-  // A digit can arrive before the next frame; the whole raw text must already be selected then.
-  it('keyboard navigation selects the raw text of the number cell before the handler returns', () => {
+  // A digit can arrive before the next frame; the whole raw text must already be selected then. fireEvent runs in
+  // act(), which returns once React has rendered what the key changed (in the browser that render comes in a
+  // microtask right after the key event, before the next key); no frame or timer runs in between.
+  it('keyboard navigation selects the raw text of the number cell in the render it causes, with no frame or timer', () => {
     renderGrid({ lines: [line({ quantity: 5, unitPrice: 30000 })] });
     byId('stock-line-quantity-0').focus();
     enter('stock-line-quantity-0'); // quantity -> unit price, no frame awaited
@@ -697,7 +699,7 @@ describe('StockLineGrid', () => {
 
   // The path the defect was reported on: a digit typed right after Ctrl+Delete was appended to the old value of the
   // cell that took the focus.
-  it('Ctrl+Delete: the cell that takes the focus has its raw text selected before the handler returns', () => {
+  it('Ctrl+Delete: the cell that takes the focus has its raw text selected in the render it causes, with no frame or timer', () => {
     renderGrid({
       lines: [line({ productCode: 'A', quantity: 5 }), line({ _uiKey: 'b', productCode: 'B', quantity: 1250 })],
     });
@@ -847,7 +849,8 @@ describe('StockLineGrid', () => {
       ['Dày', 'thickness'],
     ];
 
-    // The elements select() was called on by the time `action` returned: no frame, timer or promise is awaited.
+    // The elements select() was called on by the time `action` returned. fireEvent runs in act(), which also renders
+    // what the event changed, so this covers a select in the focus event and one in that render; no frame or timer runs.
     function selectedBy(action: () => void): unknown[] {
       const select = vi.spyOn(HTMLInputElement.prototype, 'select');
       try {
@@ -858,7 +861,7 @@ describe('StockLineGrid', () => {
       }
     }
 
-    it.each(cells)('ArrowDown into %s selects its value before the key handler returns', (_label, field) => {
+    it.each(cells)('ArrowDown into %s selects its value with no frame or timer', (_label, field) => {
       renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
       const from = byId(`stock-line-${field}-0`);
       act(() => from.focus());
@@ -869,7 +872,7 @@ describe('StockLineGrid', () => {
       expect(selected).toEqual([byId(`stock-line-${field}-1`)]);
     });
 
-    it('Enter into Số tấm selects its value before the key handler returns', () => {
+    it('Enter into Số tấm selects its value with no frame or timer', () => {
       renderGrid({ lines: [line({ pricingMode: 'PerSquareMeter', sheetCount: 2, length: 3000, width: 1200 })] });
       act(() => byId('stock-line-product-code-0').focus());
 
@@ -879,7 +882,7 @@ describe('StockLineGrid', () => {
       expect(selected).toEqual([byId('stock-line-sheet-count-0')]);
     });
 
-    it('Enter into %CK selects its value before the key handler returns', () => {
+    it('Enter into %CK selects its value with no frame or timer', () => {
       storePrefs({ hiddenColumns: [], enterStops: { PerUnit: ['quantity', 'unit-price', 'discount-rate'] } });
       renderGrid({ lines: [line({ pricingMode: 'PerUnit', discountRate: 5 })] });
       act(() => byId('stock-line-unit-price-0').focus());

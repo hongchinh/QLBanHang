@@ -179,8 +179,9 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
   const [editing, setEditing] = useState<string | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   const selectAfterRender = useRef(false);
-  // Keyboard focus: the raw text replaces the formatted one on this render, so select it as soon as
-  // that render commits (still inside the event that moved the focus, not a frame later).
+  // Keyboard focus: the raw text replaces the formatted one in the render the focus causes, so select it as soon as
+  // that render commits. React renders it in a microtask right after the event that moved the focus: the text is
+  // selected before the browser handles the next key, not a frame later.
   useLayoutEffect(() => {
     if (!selectAfterRender.current) return;
     selectAfterRender.current = false;

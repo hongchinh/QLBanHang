@@ -59,8 +59,9 @@ public class StockVoucherFormTests
         return new XLWorkbook(new MemoryStream(bytes));
     }
 
+    /// Every text line of the used cells (the header's right part is one cell of several lines; a saved file has CRLF line ends).
     private static List<string> Texts(IXLWorksheet sheet) =>
-        sheet.CellsUsed().Select(c => c.GetString()).ToList();
+        sheet.CellsUsed().SelectMany(c => c.GetString().Split('\n')).Select(t => t.TrimEnd('\r')).ToList();
 
     private static IXLCell CellWith(IXLWorksheet sheet, string text) =>
         sheet.CellsUsed().First(c => c.GetString() == text);
@@ -125,6 +126,7 @@ public class StockVoucherFormTests
         ws.Cell(headerRow + 1, 6).GetString().Should().Be("Thực nhập");
 
         ws.Row(headerRow + 1).Height.Should().Be(2 * ws.RowHeight);
+        ws.Column(2).Width.Should().BeApproximately(34, 0.01);
 
         ws.PageSetup.PaperSize.Should().Be(XLPaperSize.A4Paper);
         ws.PageSetup.PageOrientation.Should().Be(XLPageOrientation.Portrait);
@@ -231,9 +233,12 @@ public class StockVoucherFormTests
         ws.Cell(headerRow + 1, 6).GetString().Should().Be("Theo chứng từ");
         ws.Cell(headerRow + 1, 7).GetString().Should().Be("Thực nhập");
 
+        ws.Column(kho.Address.ColumnNumber).Width.Should().BeApproximately(11, 0.01);
+        ws.Column(2).Width.Should().BeApproximately(31, 0.01);
+
         var titleRow = RowOf(ws, "Người lập phiếu");
         string[] titles = ["Người lập phiếu", "Người giao hàng", "Thủ kho", "Kế toán trưởng"];
-        int[] titleColumns = [1, 3, 5, 8];
+        int[] titleColumns = [1, 3, 6, 8];
         for (var k = 0; k < titles.Length; k++)
             ws.Cell(titleRow, titleColumns[k]).GetString().Should().Be(titles[k]);
     }
@@ -261,6 +266,52 @@ public class StockVoucherFormTests
         note.Style.Font.Italic.Should().BeTrue();
         RowOf(ws, "ĐÃ HỦY").Should().BeLessThan(note.Address.RowNumber);
         note.Address.RowNumber.Should().BeLessThan(RowOf(ws, "- Họ và tên người giao: Trần Giao"));
+    }
+
+    private static StockVoucherPrintModel StockInWithLines(int count)
+    {
+        var m = StockIn();
+        m.Lines = Enumerable.Range(1, count).Select(i => new StockVoucherPrintLine
+        {
+            Number = i, Name = $"Hàng {i}", Code = $"M{i}", UnitName = "Tấm", Quantity = i, UnitPrice = 1_000, Amount = 1_000 * i,
+        }).ToList();
+        return m;
+    }
+
+    [Fact]
+    public void Signature_block_that_would_cross_a_page_starts_a_new_page()
+    {
+        using var wb = Render(StockInWithLines(40));
+        var ws = wb.Worksheet(1);
+
+        // The new page starts with the last two lines, so the repeated table header stands over real rows and the
+        // totals and the signatures travel with them.
+        ws.PageSetup.RowBreaks.Should().Equal(RowOf(ws, "Hàng 39") - 1);
+    }
+
+    [Fact]
+    public void Voucher_whose_end_sits_inside_a_later_page_has_no_page_break()
+    {
+        using var wb = Render(StockInWithLines(70));
+
+        wb.Worksheet(1).PageSetup.RowBreaks.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Signature_block_that_would_cross_a_later_page_starts_a_new_page()
+    {
+        using var wb = Render(StockInWithLines(98));
+        var ws = wb.Worksheet(1);
+
+        ws.PageSetup.RowBreaks.Should().Equal(RowOf(ws, "Hàng 97") - 1);
+    }
+
+    [Fact]
+    public void Short_voucher_has_no_page_break()
+    {
+        using var wb = Render(StockIn());
+
+        wb.Worksheet(1).PageSetup.RowBreaks.Should().BeEmpty();
     }
 
     [Fact]

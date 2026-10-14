@@ -12,11 +12,29 @@ public sealed record VoucherSigner(string Title, string Hint, string? Name);
 /// the plain text lines and the column widths to the wrapped Tt133FormBuilder.
 public sealed class VoucherFormBuilder
 {
+    // Page geometry of the A4 portrait PDF that LibreOffice prints, to keep the signature block on one page. A4 is
+    // 595.28 x 841.89 pt; Tt133FormBuilder.Finish sets 0.59 inch margins and no header or footer is printed.
+    private const double A4WidthPoints = 595.28;
+    private const double A4HeightPoints = 841.89;
+    private const double MarginPoints = 0.59 * 72;
+    // ClosedXML saves a column width with 0.710625 units of padding, and LibreOffice prints a width unit as about
+    // 5.56 pt (the digit width of the default Calibri 11; measured: the 01-VT table of 112.69 saved units printed
+    // 626 pt wide before scaling). LibreOffice fits the width with a zoom in whole percents.
+    private const double SavedWidthPadding = 0.710625;
+    private const double PointsPerWidthUnit = 5.56;
+    // The estimate may be a few percent off: the block is kept whole for every page height within this share of it.
+    private const double PageHeightTolerance = 0.03;
+    // The sheet font size set by Tt133FormBuilder; Sheet.RowHeight is the height of a row of it.
+    private const double DefaultFontSize = 11;
+
     private readonly Tt133FormContext _context;
     private readonly IReadOnlyList<Tt133Column> _columns;
     private readonly VoucherPaper _paper;
     private readonly int _rightStart;
     private readonly int _leftEnd;
+    private int _lastBodyRow;
+    private int _signatureFirstRow;
+    private int _signatureLastRow;
 
     public VoucherFormBuilder(IXLWorksheet sheet, Tt133FormContext context, IReadOnlyList<Tt133Column> columns,
         VoucherPaper paper, int? labelColumn = null)
@@ -37,7 +55,9 @@ public sealed class VoucherFormBuilder
 
     public IXLWorksheet Sheet { get; }
 
-    /// Unit and address on the left, the form code and its legal basis on the right; no MST line.
+    /// Unit and address on the left, one row each; no MST line. The form code and its legal basis on the right are one
+    /// wrapped cell over the three rows, so its lines stay together when a left line wraps; the rows are made tall
+    /// enough for both sides. Top-aligned.
     public void WriteHeaderBlock(string formCode)
     {
         var unit = string.IsNullOrWhiteSpace(_context.CompanyName)
@@ -46,30 +66,40 @@ public sealed class VoucherFormBuilder
                 ? _context.CompanyName
                 : $"{_context.CompanyName} – {_context.BranchName}";
         string[] left = [Labelled("Đơn vị:", unit), Labelled("Địa chỉ:", _context.Address), string.Empty];
-        string[] right =
-        [
-            $"Mẫu số {formCode}",
-            "(Ban hành theo Thông tư số 133/2016/TT-BTC",
-            "ngày 26/8/2016 của Bộ Tài chính)",
-        ];
+        var formLine = $"Mẫu số {formCode}";
+        const string basis = "(Ban hành theo Thông tư số 133/2016/TT-BTC";
+        const string basisDate = "ngày 26/8/2016 của Bộ Tài chính)";
 
+        var count = _columns.Count;
+        var first = Table.Row;
+        var rightLines = Tt133FormBuilder.LineCount(formLine, Width(_rightStart, count), bold: true)
+                         + Tt133FormBuilder.LineCount(basis, Width(_rightStart, count), bold: false)
+                         + Tt133FormBuilder.LineCount(basisDate, Width(_rightStart, count), bold: false);
+
+        var leftLines = 0;
         for (var i = 0; i < left.Length; i++)
         {
-            var row = Table.Row + i;
-            var leftCell = Merged(row, 1, _leftEnd);
+            var leftCell = Merged(first + i, 1, _leftEnd);
             leftCell.Value = left[i];
             leftCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            leftCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
 
-            var rightCell = Merged(row, _rightStart, _columns.Count);
-            rightCell.Value = right[i];
-            rightCell.Style.Font.Bold = i == 0;
-            rightCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
-
-            var lines = Math.Max(
-                Wrap(leftCell, left[i], 1, _leftEnd, bold: false),
-                Wrap(rightCell, right[i], _rightStart, _columns.Count, bold: i == 0));
-            SetRowLines(row, lines);
+            var lines = Wrap(leftCell, left[i], 1, _leftEnd, bold: false);
+            // The last row takes the lines the right part still needs.
+            if (i == left.Length - 1) lines = Math.Max(lines, rightLines - leftLines);
+            SetRowLines(first + i, lines);
+            leftLines += lines;
         }
+
+        Sheet.Range(first, _rightStart, first + left.Length - 1, count).Merge();
+        var rightCell = Sheet.Cell(first, _rightStart);
+        var text = rightCell.GetRichText();
+        text.AddText(formLine).SetBold();
+        text.AddText($"\n{basis}\n{basisDate}");
+        rightCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        rightCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
+        rightCell.Style.Alignment.WrapText = true;
+
         Table.Skip(left.Length + 1);
     }
 
@@ -90,7 +120,12 @@ public sealed class VoucherFormBuilder
             cell.Value = text;
             cell.Style.Font.Bold = bold;
             cell.Style.Font.Italic = italic;
-            if (size is { } s) cell.Style.Font.FontSize = s;
+            if (size is { } s)
+            {
+                cell.Style.Font.FontSize = s;
+                // An explicit height for the larger font: LibreOffice would grow the row itself, past the page estimate.
+                Sheet.Row(first + centre).Height = Sheet.RowHeight * s / DefaultFontSize;
+            }
             cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             if (size is null) Track(first + centre, Wrap(cell, text, 1, _leftEnd, bold));
             centre++;
@@ -119,6 +154,13 @@ public sealed class VoucherFormBuilder
             ? $"{label} {VoucherPrintRules.Dots}"
             : $"{label} {value.Trim()}");
 
+    /// One table body row (see Tt133FormBuilder.WriteRow); the builder keeps the last ones with the signatures.
+    public void WriteRow(params object?[] cells)
+    {
+        _lastBodyRow = Table.Row;
+        Table.WriteRow(cells);
+    }
+
     /// The date, then one block of columns per signer (split by column width): title, hint, four empty rows, name.
     public void WriteSignatures(DateOnly date, IReadOnlyList<VoucherSigner> signers)
     {
@@ -137,6 +179,8 @@ public sealed class VoucherFormBuilder
         WriteSignatureRow(row + 1, bounds, signers.Select(s => (string?)s.Title).ToList(), bold: true, italic: false);
         WriteSignatureRow(row + 2, bounds, signers.Select(s => (string?)s.Hint).ToList(), bold: false, italic: true);
         WriteSignatureRow(row + 7, bounds, signers.Select(s => s.Name).ToList(), bold: true, italic: false);
+        _signatureFirstRow = row;
+        _signatureLastRow = row + 7;
 
         Table.Skip(9);
     }
@@ -144,12 +188,75 @@ public sealed class VoucherFormBuilder
     public void Finish()
     {
         Table.Finish(repeatTableHeader: Table.TableHeaderFirstRow > 0);
-        if (_paper != VoucherPaper.A5Landscape) return;
+        if (_paper == VoucherPaper.A4Portrait)
+        {
+            KeepSignaturesOnOnePage();
+            return;
+        }
 
         var setup = Sheet.PageSetup;
         setup.PaperSize = XLPaperSize.A5Paper;
         setup.PageOrientation = XLPageOrientation.Landscape;
         setup.FitToPages(1, 1);
+        // Fitting to one page leaves the spare width on the right: centre the voucher instead.
+        setup.CenterHorizontally = true;
+    }
+
+    /// A4 is fitted to one page wide only, so a long voucher flows onto more pages. The end of the voucher is kept on
+    /// one page: the last two body rows, the totals and text lines and the signature block (date to names). When a
+    /// page could end inside it, a page break before it moves it whole to a new page, where the repeated table header
+    /// stands over real rows.
+    private void KeepSignaturesOnOnePage()
+    {
+        if (_signatureFirstRow == 0) return;
+        var keepFrom = _lastBodyRow > 0
+            ? Math.Max(Table.TableHeaderLastRow + 1, _lastBodyRow - 1)
+            : _signatureFirstRow;
+
+        var tableWidth = _columns.Sum(c => (c.Width + SavedWidthPadding) * PointsPerWidthUnit);
+        var scale = Math.Min(1, Math.Floor(100 * (A4WidthPoints - 2 * MarginPoints) / tableWidth) / 100);
+        var pageHeight = (A4HeightPoints - 2 * MarginPoints) / scale;
+
+        // A break cannot help when the kept rows and the repeated header do not fit on one page.
+        var kept = RepeatedHeaderHeight();
+        for (var r = keepFrom; r <= _signatureLastRow; r++) kept += Sheet.Row(r).Height;
+        if (kept > pageHeight * (1 - PageHeightTolerance)) return;
+
+        var low = PagesOf(keepFrom, pageHeight * (1 - PageHeightTolerance));
+        var high = PagesOf(keepFrom, pageHeight * (1 + PageHeightTolerance));
+        if (low.First != low.Last || high.First != high.Last || low.First != high.First)
+            Sheet.PageSetup.AddHorizontalPageBreak(keepFrom - 1);
+    }
+
+    /// The pages (1-based) of the row `from` and of the names row, for a page of the given height in sheet points;
+    /// whole rows only, and the repeated table header rows take their height again on every later page.
+    private (int First, int Last) PagesOf(int from, double pageHeight)
+    {
+        var headerLast = Table.TableHeaderLastRow;
+        var repeated = RepeatedHeaderHeight();
+        var page = 1;
+        var used = 0d;
+        var firstPage = 0;
+        for (var r = 1; r <= _signatureLastRow; r++)
+        {
+            var height = Sheet.Row(r).Height;
+            if (used > 0 && used + height > pageHeight)
+            {
+                page++;
+                used = Table.TableHeaderFirstRow > 0 && r > headerLast ? repeated : 0;
+            }
+            used += height;
+            if (r == from) firstPage = page;
+        }
+        return (firstPage, page);
+    }
+
+    private double RepeatedHeaderHeight()
+    {
+        var height = 0d;
+        if (Table.TableHeaderFirstRow > 0)
+            for (var r = Table.TableHeaderFirstRow; r <= Table.TableHeaderLastRow; r++) height += Sheet.Row(r).Height;
+        return height;
     }
 
     private void WriteSignatureRow(int row, int[] bounds, IReadOnlyList<string?> texts, bool bold, bool italic)

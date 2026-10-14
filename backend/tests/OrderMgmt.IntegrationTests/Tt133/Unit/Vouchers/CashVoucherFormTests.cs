@@ -43,8 +43,9 @@ public class CashVoucherFormTests
         return new XLWorkbook(new MemoryStream(bytes));
     }
 
+    /// Every text line of the used cells (the header's right part is one cell of several lines; a saved file has CRLF line ends).
     private static List<string> Texts(IXLWorksheet sheet) =>
-        sheet.CellsUsed().Select(c => c.GetString()).ToList();
+        sheet.CellsUsed().SelectMany(c => c.GetString().Split('\n')).Select(t => t.TrimEnd('\r')).ToList();
 
     private static IXLCell CellWith(IXLWorksheet sheet, string text) =>
         sheet.CellsUsed().First(c => c.GetString() == text);
@@ -131,6 +132,16 @@ public class CashVoucherFormTests
         using var wb = Render(model);
 
         Texts(wb.Worksheet(1)).Should().Contain("ĐÃ HỦY");
+    }
+
+    [Fact]
+    public void Cash_voucher_has_no_page_break()
+    {
+        var model = Receipt();
+        model.Reason = string.Join(" ", Enumerable.Repeat("Thu tiền hàng theo hợp đồng", 20));
+        using var wb = Render(model);
+
+        wb.Worksheet(1).PageSetup.RowBreaks.Should().BeEmpty();
     }
 
     [Fact]

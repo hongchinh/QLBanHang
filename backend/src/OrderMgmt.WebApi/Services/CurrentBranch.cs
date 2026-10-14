@@ -24,6 +24,7 @@ public class CurrentBranch : ICurrentBranch
 
     public async Task<Guid> GetIdAsync(CancellationToken ct = default)
     {
+        // Background work (no HTTP request) carries its branch in the acting identity.
         if (_acting.Current is { } a) return a.BranchId;
 
         if (_resolved.HasValue) return _resolved.Value;

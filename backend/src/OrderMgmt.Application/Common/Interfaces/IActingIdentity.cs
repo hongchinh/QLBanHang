@@ -1,6 +1,6 @@
 namespace OrderMgmt.Application.Common.Interfaces;
 
-/// <summary>Identity and working branch for work that runs outside an HTTP request (e.g. background seeding).</summary>
+/// Identity and working branch for work that runs outside an HTTP request (e.g. background seeding).
 public sealed record ActingIdentity(
     Guid UserId,
     string Username,
@@ -8,7 +8,7 @@ public sealed record ActingIdentity(
     Guid BranchId,
     IReadOnlyList<string> Permissions);
 
-/// <summary>Scoped holder. When set, ICurrentUser and ICurrentBranch answer from it; HTTP requests never set it.</summary>
+/// Scoped holder. When set, ICurrentUser and ICurrentBranch answer from it; HTTP requests never set it.
 public interface IActingIdentity
 {
     ActingIdentity? Current { get; }

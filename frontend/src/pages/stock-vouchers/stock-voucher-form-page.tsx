@@ -3,7 +3,7 @@ import { useForm, useWatch, type FieldErrors, type FieldPath, type Resolver } fr
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { addDays, format } from 'date-fns';
-import { ArrowLeft, Ban, RotateCcw, Save, Trash2, X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   useCancelStockVoucher,
   useCreateStockVoucher,
@@ -689,7 +689,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
               <Link to={labels.basePath}>
-                <ArrowLeft className="h-4 w-4 text-slate-500" />
+                <AppIcon name="back" />
               </Link>
             </Button>
             <h1 className="truncate text-xl font-bold">
@@ -714,7 +714,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                   }}
                   aria-label="Xóa nháp"
                 >
-                  <X className="h-3 w-3" />
+                  <AppIcon name="close" size={12} />
                 </button>
               </div>
             )}
@@ -735,32 +735,32 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                   Lưu và thoát
                 </Button>
                 <Button type="button" size="sm" onClick={() => submitWithIntent('save-stay')} disabled={busy} title="Ctrl+S">
-                  {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                  {busy ? <ButtonLoader className="mr-2" /> : <AppIcon name="save" tone="none" className="mr-2" />}
                   Lưu tạm
                 </Button>
               </>
             )}
             {isEdit && !readOnly && (
               <Button type="button" size="sm" onClick={() => submitWithIntent('update')} disabled={busy} title="Ctrl+S">
-                {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                {busy ? <ButtonLoader className="mr-2" /> : <AppIcon name="save" tone="none" className="mr-2" />}
                 Cập nhật
               </Button>
             )}
             {isEdit && voucher?.canCancel && status === 'Active' && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('cancel')} disabled={busy}>
-                <Ban className="mr-2 h-4 w-4 text-red-600" />
+                <AppIcon name="cancelVoucher" className="mr-2" />
                 Hủy phiếu
               </Button>
             )}
             {isEdit && voucher?.canCancel && status === 'Cancelled' && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('restore')} disabled={busy}>
-                <RotateCcw className="mr-2 h-4 w-4 text-emerald-600" />
+                <AppIcon name="restore" className="mr-2" />
                 Khôi phục
               </Button>
             )}
             {isEdit && voucher?.canDelete && status === 'Active' && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('delete')} disabled={busy}>
-                <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                <AppIcon name="delete" className="mr-2" />
                 Xóa
               </Button>
             )}

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch, type FieldPath, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Ban, RotateCcw, Save, Trash2, X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   useCancelCashVoucher,
   useCashVoucher,
@@ -441,7 +441,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
               <Link to={labels.basePath}>
-                <ArrowLeft className="h-4 w-4 text-slate-500" />
+                <AppIcon name="back" />
               </Link>
             </Button>
             <h1 className="truncate text-xl font-bold">
@@ -469,38 +469,38 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
                   Lưu và thoát
                 </Button>
                 <Button type="button" size="sm" onClick={() => submitWithIntent('save-stay')} disabled={busy || allocationsInvalid}>
-                  {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                  {busy ? <ButtonLoader className="mr-2" /> : <AppIcon name="save" tone="none" className="mr-2" />}
                   Lưu tạm
                 </Button>
               </>
             )}
             {isEdit && isManaged && (
               <Button type="button" variant="outline" size="sm" onClick={() => navigate(labels.basePath)}>
-                <X className="mr-2 h-4 w-4 text-slate-500" />
+                <AppIcon name="closeForm" className="mr-2" />
                 Đóng
               </Button>
             )}
             {isEdit && !isManaged && !readOnly && (
               <Button type="button" size="sm" onClick={() => submitWithIntent('update')} disabled={busy || allocationsInvalid}>
-                {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                {busy ? <ButtonLoader className="mr-2" /> : <AppIcon name="save" tone="none" className="mr-2" />}
                 Cập nhật
               </Button>
             )}
             {isEdit && !isManaged && voucher?.canCancel && status === 'Active' && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('cancel')} disabled={busy}>
-                <Ban className="mr-2 h-4 w-4 text-red-600" />
+                <AppIcon name="cancelVoucher" className="mr-2" />
                 Hủy phiếu
               </Button>
             )}
             {isEdit && !isManaged && voucher?.canCancel && status === 'Cancelled' && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('restore')} disabled={busy}>
-                <RotateCcw className="mr-2 h-4 w-4 text-emerald-600" />
+                <AppIcon name="restore" className="mr-2" />
                 Khôi phục
               </Button>
             )}
             {isEdit && !isManaged && voucher?.canDelete && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('delete')} disabled={busy}>
-                <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                <AppIcon name="delete" className="mr-2" />
                 Xóa
               </Button>
             )}

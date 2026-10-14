@@ -10,5 +10,6 @@ public interface ISampleDataRunner
     /// Status/progress/error; never throws (except cancellation).
     Task<SampleDataRunResult> RunPlanAsync(SampleDataJob job, SampleDataPlan plan, CancellationToken ct = default);
 
+    /// Marks every Running branch Failed (S9); called once when the worker starts.
     Task RecoverInterruptedAsync(CancellationToken ct = default);
 }

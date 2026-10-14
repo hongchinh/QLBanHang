@@ -3,10 +3,13 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Organization.Branches.Models;
 using OrderMgmt.Application.Organization.SampleData.Interfaces;
+using OrderMgmt.Application.Organization.SampleData.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.CashDebt;
 using OrderMgmt.IntegrationTests.Fixtures;
@@ -37,34 +40,64 @@ public class BranchSampleDataFlagsTests : CashDebtTestBase
     [Fact]
     public async Task Create_with_sample_data_marks_branch_demo_and_running()
     {
-        var response = await _client.PostAsJsonAsync("/api/branches", new { code = "SDF2", name = "CN demo", withSampleData = true });
+        var recorder = new RecordingSampleDataQueue();
+        var client = RecorderClient(recorder);
+
+        var response = await client.PostAsJsonAsync("/api/branches", new { code = "SDF2", name = "CN demo", withSampleData = true });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.GetProperty("data");
         data.GetProperty("sampleDataStatus").GetString().Should().Be("Running");
         var created = await ReadDataAsync<BranchDto>(response);
-        // Assert on the response only: a background worker may already have moved the row on.
+        // Status and progress only on the response: the worker may already have moved them on.
+        // IsDemo never changes, so the DB check is safe.
         created.IsDemo.Should().BeTrue();
         created.SampleDataStatus.Should().Be(SampleDataStatus.Running);
         created.SampleDataProgress.Should().Be(0);
 
         var isDemo = await InDbAsync(db => db.Branches.Where(b => b.Id == created.Id).Select(b => b.IsDemo).SingleAsync());
         isDemo.Should().BeTrue();
+        await AssertNumberingAndFundAsync(created.Id);
+
+        var adminId = await InDbAsync(db => db.Users.Where(u => u.Username == "admin").Select(u => u.Id).SingleAsync());
+        recorder.Jobs.Should().ContainSingle().Which.Should().Be(new SampleDataJob(created.Id, adminId));
     }
 
     [Fact]
     public async Task Create_without_sample_data_is_unchanged()
     {
-        var response = await _client.PostAsJsonAsync("/api/branches", new { code = "SDF3", name = "CN thường", withSampleData = false });
+        var recorder = new RecordingSampleDataQueue();
+        var client = RecorderClient(recorder);
+
+        var response = await client.PostAsJsonAsync("/api/branches", new { code = "SDF3", name = "CN thường", withSampleData = false });
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         var data = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement.GetProperty("data");
         data.GetProperty("sampleDataStatus").GetString().Should().Be("None");
         var created = await ReadDataAsync<BranchDto>(response);
         AssertNoFlags(created);
 
+        await AssertNumberingAndFundAsync(created.Id);
+        recorder.Jobs.Should().BeEmpty();
+    }
+
+    /// An admin client on a host of this test's database whose sample data queue is `recorder`.
+    private HttpClient RecorderClient(RecordingSampleDataQueue recorder)
+    {
+        var factory = _factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+        {
+            s.RemoveAll<ISampleDataQueue>();
+            s.AddSingleton<ISampleDataQueue>(recorder);
+        }));
+        var client = factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = _client.DefaultRequestHeaders.Authorization;
+        return client;
+    }
+
+    private async Task AssertNumberingAndFundAsync(Guid branchId)
+    {
         var (numberings, hasFund) = await InDbAsync(async db => (
-            await db.DocumentNumberings.CountAsync(n => n.BranchId == created.Id),
-            await db.Funds.AnyAsync(f => f.BranchId == created.Id && f.Code == "QTM")));
-        numberings.Should().Be(DocumentNumberingDefaults.AllTypes.Count());
+            await db.DocumentNumberings.CountAsync(n => n.BranchId == branchId),
+            await db.Funds.AnyAsync(f => f.BranchId == branchId && f.Code == "QTM")));
+        numberings.Should().Be(DocumentNumberingDefaults.AllTypes.Length);
         hasFund.Should().BeTrue();
     }
 

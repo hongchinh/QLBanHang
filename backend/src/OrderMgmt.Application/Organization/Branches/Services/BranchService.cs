@@ -95,9 +95,7 @@ public class BranchService : IBranchService
         var code = request.Code.Trim();
         if (await _db.Branches.AnyAsync(b => b.Code == code, ct))
             throw new ConflictException($"Mã chi nhánh '{code}' đã tồn tại.");
-        var requestedBy = request.WithSampleData
-            ? _currentUser.UserId ?? throw new UnauthorizedAccessException()
-            : Guid.Empty;
+        var requestedBy = Guid.Empty;
 
         var branch = new Branch
         {
@@ -107,6 +105,7 @@ public class BranchService : IBranchService
         };
         if (request.WithSampleData)
         {
+            requestedBy = _currentUser.UserId ?? throw new UnauthorizedAccessException();
             branch.IsDemo = true;
             branch.SampleDataStatus = SampleDataStatus.Running;
         }
@@ -118,6 +117,7 @@ public class BranchService : IBranchService
         _db.Funds.Add(new Fund { BranchId = branch.Id, Code = "QTM", Name = "Quỹ tiền mặt", Kind = FundKind.Cash, IsDefault = true });
         await _db.SaveChangesAsync(ct);
         // Enqueue only once the branch row is committed, so the worker always finds it.
+        // A branch committed but never queued (a crash here) is failed by the worker's start-up recovery (S9).
         if (request.WithSampleData)
             _sampleDataQueue.Enqueue(new SampleDataJob(branch.Id, requestedBy));
         return ToDto(branch);

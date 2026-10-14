@@ -32,11 +32,13 @@ public class SampleDataQueueTests
     {
         var q = new SampleDataQueue();
         using var cts = new CancellationTokenSource();
-        cts.Cancel();
-
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+        var reading = Task.Run(async () =>
         {
             await foreach (var _ in q.ReadAllAsync(cts.Token)) { }
         });
+        cts.CancelAfter(50);
+
+        // A reader that ignores cancellation fails this after 5 s instead of hanging the run.
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => reading.WaitAsync(TimeSpan.FromSeconds(5)));
     }
 }

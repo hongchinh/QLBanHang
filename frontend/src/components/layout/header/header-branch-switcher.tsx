@@ -1,4 +1,5 @@
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -44,11 +45,19 @@ export function HeaderBranchSwitcher() {
       onValueChange={(id) => void handleChange(id)}
     >
       <SelectTrigger
-        aria-label="Chi nhánh làm việc"
+        aria-label={selected?.isDemo ? 'Chi nhánh làm việc (demo)' : 'Chi nhánh làm việc'}
         title={selectedLabel ?? 'Chi nhánh làm việc'}
-        className="h-9 w-40 border-transparent bg-white text-sm text-foreground md:w-56"
+        className="h-9 w-40 gap-2 border-transparent bg-white text-sm text-foreground md:w-56"
       >
-        <SelectValue />
+        {/* The label truncates; the badge is a sibling so it is never clipped. */}
+        <SelectValue className="min-w-0 flex-1 text-left">
+          {selected ? `${selected.code} — ${selected.name}` : undefined}
+        </SelectValue>
+        {selected?.isDemo && (
+          <Badge variant="info" className="shrink-0 px-2 py-0 text-xs">
+            Demo
+          </Badge>
+        )}
       </SelectTrigger>
       <SelectContent>
         {myBranches.branches.map((b) => (

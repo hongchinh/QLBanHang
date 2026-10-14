@@ -1,6 +1,6 @@
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderBranchSwitcher } from '../header-branch-switcher';
@@ -106,7 +106,7 @@ describe('HeaderBranchSwitcher', () => {
     expect(normal).not.toHaveTextContent('(demo)');
   });
 
-  it('shows the full label of the selected demo branch in the trigger and its title', () => {
+  it('shows a non-truncated Demo badge beside the label of the selected demo branch, title keeps the full label', () => {
     mockMyBranches({
       ...MY_BRANCHES,
       branches: [
@@ -117,9 +117,21 @@ describe('HeaderBranchSwitcher', () => {
     act(() => useBranchStore.setState({ workingBranchId: 'b3' }));
     renderSwitcher('/');
 
-    const trigger = screen.getByRole('combobox', { name: 'Chi nhánh làm việc' });
-    expect(trigger).toHaveTextContent('DEMO1 — CN demo (demo)');
+    const trigger = screen.getByRole('combobox', { name: 'Chi nhánh làm việc (demo)' });
+    expect(trigger).toHaveTextContent('DEMO1 — CN demo');
     expect(trigger).toHaveAttribute('title', 'DEMO1 — CN demo (demo)');
+    const badge = within(trigger).getByText('Demo');
+    // The badge is its own element, outside the truncating label span.
+    expect(badge.closest('span')).toBeNull();
+    expect(trigger).toContainElement(badge);
+  });
+
+  it('shows no Demo badge in the trigger for a real branch', () => {
+    mockMyBranches(MY_BRANCHES);
+    renderSwitcher('/');
+
+    const trigger = screen.getByRole('combobox', { name: 'Chi nhánh làm việc' });
+    expect(within(trigger).queryByText('Demo')).not.toBeInTheDocument();
   });
 
   it('lists branches and switches working branch', async () => {

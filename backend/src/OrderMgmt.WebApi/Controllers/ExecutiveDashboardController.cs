@@ -115,4 +115,13 @@ public class ExecutiveDashboardController : ApiControllerBase
         await _queryValidator.ValidateAndThrowAsync(query, ct);
         return Success(await _inventory.GetSummaryAsync(query, ct));
     }
+
+    [HttpGet("inventory/breakdown")]
+    [HasPermission(Permissions.Reports.Inventory)]
+    public async Task<ActionResult<ApiResponse<InventoryBreakdownDto>>> InventoryBreakdown(
+        [FromQuery] ExecutiveQuery query, CancellationToken ct)
+    {
+        await _queryValidator.ValidateAndThrowAsync(query, ct);
+        return Success(await _inventory.GetBreakdownAsync(query, ct));
+    }
 }

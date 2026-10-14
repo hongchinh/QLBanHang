@@ -55,6 +55,9 @@ public class ExecutiveRouteGuardTests : ExecutiveDashboardTestBase
         new("inventory/summary", "", Permissions.Reports.Inventory,
             async response => (await ReadDataAsync<InventorySummaryDto>(response)).ProductCount,
             OwnBranch: 1m, Company: 2m),
+        new("inventory/breakdown", "", Permissions.Reports.Inventory,
+            async response => (await ReadDataAsync<InventoryBreakdownDto>(response)).ByWarehouse.Count,
+            OwnBranch: 1m, Company: 2m),
     };
 
     public ExecutiveRouteGuardTests(PostgresFixture pg) : base(pg) { }

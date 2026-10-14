@@ -1,5 +1,12 @@
 import { apiDelete, apiGet, apiPost, apiPut } from '@/lib/api-client';
-import type { Branch, CreateBranchRequest, MyBranches, UpdateBranchRequest } from './types';
+import type {
+  Branch,
+  CreateBranchRequest,
+  DemoBranchDeletionPreview,
+  DemoBranchDeletionResult,
+  MyBranches,
+  UpdateBranchRequest,
+} from './types';
 
 export const branchesApi = {
   list: () => apiGet<Branch[]>('/branches'),
@@ -11,5 +18,8 @@ export const branchesApi = {
     apiPut<Branch>(`/branches/${id}/lock`, { lockedUntil }),
   setOpeningDate: (id: string, openingDate: string | null) =>
     apiPut<Branch>(`/branches/${id}/opening-date`, { openingDate }),
+  deletionPreview: (id: string) =>
+    apiGet<DemoBranchDeletionPreview>(`/branches/${id}/demo-deletion`),
+  removeDemo: (id: string) => apiDelete<DemoBranchDeletionResult>(`/branches/${id}/demo`),
   me: () => apiGet<MyBranches>('/me/branches'),
 };

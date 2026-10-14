@@ -22,7 +22,7 @@ export function ScopeSelect() {
         <SelectItem value={COMPANY}>Toàn công ty</SelectItem>
         {scope.branches.map((b) => (
           <SelectItem key={b.id} value={b.id}>
-            {b.code} — {b.name}
+            {b.code} — {b.name}{b.isDemo ? ' (demo)' : ''}
           </SelectItem>
         ))}
       </SelectContent>

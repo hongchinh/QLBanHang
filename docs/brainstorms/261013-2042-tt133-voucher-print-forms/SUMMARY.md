@@ -272,7 +272,7 @@ Kiểm quyền và chi nhánh theo cùng thứ tự với `GetAsync` của màn 
 
 **Kỹ thuật** (đã chốt):
 - Tên thành phần dùng chung: `Tt133ExportSupport` (`Application/Tt133/Services`); hàm tải blob của frontend: `requestBlob` / `saveBlob` (`lib/blob-download.ts`).
-- A5 ngang qua LibreOffice, nhiều sheet trong một file: Kết quả kiểm tra A5 (Task 5.1): <<TO FILL>>
+- A5 ngang qua LibreOffice, nhiều sheet trong một file: Kết quả kiểm tra A5 (Task 5.1, 2026-10-15): đã chuyển bằng LibreOffice cục bộ — 01-TT/02-TT ra khổ A5 ngang (MediaBox 595,3 × 419,6 pt), mỗi phiếu một trang kể cả lý do dài ~400 ký tự; file in 3 phiếu ra 3 trang A5; 01-VT/02-VT ra A4 đứng, 40 dòng sang 2 trang với dòng tiêu đề bảng lặp lại. Đã sửa: khối chữ ký không còn bị tách qua trang (ngắt trang trước 2 dòng hàng cuối), ba dòng "Mẫu số…" liền nhau, cột Kho rộng hơn, A5 căn giữa trang.
 
 ## Review đối chiếu code (2026-10-14)
 

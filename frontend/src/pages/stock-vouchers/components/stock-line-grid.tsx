@@ -341,8 +341,12 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const { prefs, toggleColumn, toggleEnterStop, reset } = useStockGridPrefs(userId, type);
   const headerWarehouseId = useWatch({ control: form.control, name: 'warehouseId' }) ?? '';
   const forced = forcedColumns(rows, headerWarehouseId, lineErrors);
+  // A column also stays while the focus is in one of its cells. What forced a hidden column in can end under the
+  // caret (the first key of a correction clears a server error; picking the header warehouse in Kho ends "another
+  // warehouse"), and hiding the column then would drop the focus on <body> with the rest of the keys.
+  const [focusedColumn, setFocusedColumn] = useState<OptionalColumn | null>(null);
   const isShown = (key: ColumnKey) =>
-    !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key);
+    !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key) || key === focusedColumn;
   // Remove a row without a focus gap: the focused cell lives in the row being removed, so move the focus to a
   // surviving row BEFORE removing. Its key keeps that row mounted, so the focus stays there and nothing has to
   // re-focus later (a later re-focus would undo a key the user pressed in between). With no line left the focus
@@ -744,6 +748,18 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         className="accounting-grid-wrap stock-grid-wrap min-h-0 flex-1"
         tabIndex={-1}
         onKeyDown={handleGridKeyDown}
+        onFocus={(e) => {
+          const field = parseCellId(e.target.id)?.field;
+          setFocusedColumn(field && isOptional(field) ? field : null);
+        }}
+        onBlur={(e) => {
+          // The focus goes to another element of the grid: its focus event says which column holds it. A click runs the
+          // microtasks between the two events, so clearing here would first render the grid without the clicked cell.
+          if (e.currentTarget.contains(e.relatedTarget)) return;
+          // The window went to the background: the cell keeps the focus of the page, so it keeps its column.
+          if (e.target === document.activeElement) return;
+          setFocusedColumn(null);
+        }}
         style={{ '--stock-grid-left': `${left}px`, '--stock-grid-right': `${stickyRight}px` } as CSSProperties}
       >
         <table className="accounting-grid stock-grid" style={{ width: minWidth, minWidth }}>

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useForm, type UseFormReturn } from 'react-hook-form';
+import { useForm, type FieldPath, type UseFormReturn } from 'react-hook-form';
 import { StockLineGrid } from './stock-line-grid';
 import { stockGridPrefsKey } from '@/pages/stock-vouchers/utils/use-stock-grid-prefs';
 import { toFormDefaults, createEmptyStockLine } from '@/features/stock-vouchers/payload';
@@ -152,6 +152,24 @@ async function pickFromTypeahead(code: string) {
   fireEvent.change(byId('stock-line-product-code-0'), { target: { value: code } });
   const listbox = await screen.findByRole('listbox');
   fireEvent.mouseDown(within(listbox).getByText(code));
+}
+
+// Runs `steps` outside act(), as the browser does, then lets the renders that follow them land.
+async function outsideAct(steps: () => Promise<void>) {
+  const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+  const previous = env.IS_REACT_ACT_ENVIRONMENT;
+  env.IS_REACT_ACT_ENVIRONMENT = false;
+  try {
+    await steps();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    env.IS_REACT_ACT_ENVIRONMENT = previous;
+  }
+}
+
+// Only the microtasks run, in which React renders what an event changed: no task, frame or timer.
+async function eventRendered() {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
 }
 
 describe('StockLineGrid', () => {
@@ -362,6 +380,106 @@ describe('StockLineGrid', () => {
     const { form } = renderGrid({ lines: [line()] });
     act(() => form().setError('lines', { type: 'server', message: 'Phiếu phải có ít nhất 1 dòng' }));
     await waitFor(() => expect(headers()).toContain('STT'));
+  });
+
+  // The page drops a server error at the first change of the value it was about, so the correction ends what forced
+  // the column in at its first key. The rule: a column stays while the focus is in one of its cells.
+  describe('a hidden column that an error or the warehouse forced into view', () => {
+    // What the page does with a server error: it goes as soon as the value it was about changes.
+    function clearServerErrorsOnChange(form: UseFormReturn<StockVoucherFormValues, unknown, StockVoucherFormParsed>) {
+      form.watch((_values, { name }) => {
+        const path = name as FieldPath<StockVoucherFormValues> | undefined;
+        if (path && form.getFieldState(path).error?.type === 'server') form.clearErrors(path);
+      });
+    }
+
+    it.each([
+      ['Tiền CK', 'discount-amount', 'discountAmount', [], ['5', '50', '500', '5000'], 5000],
+      ['Ghi chú', 'note', 'note', [], ['m', 'mo', 'mot'], 'mot'],
+      ['%VAT', 'vat-rate', 'vatRate', ['vat-rate'], ['1', '10'], 10],
+    ] as const)('%s keeps its cell, the focus and every key while the user corrects a server error in it', (header, cell, field, hidden, keys, typed) => {
+      if (hidden.length) storePrefs({ hiddenColumns: [...hidden] });
+      const { values, form } = renderGrid({ lines: [line({ discountManual: true, discountAmount: 20_000, note: 'qua dai', vatRate: 8 })] });
+      clearServerErrorsOnChange(form());
+      expect(headers()).not.toContain(header);
+      act(() => form().setError(`lines.0.${field}`, { type: 'server', message: 'Giá trị không hợp lệ.' }));
+      const input = byId(`stock-line-${cell}-0`);
+      act(() => input.focus()); // where the page puts the focus after a rejected save
+
+      for (const text of keys) {
+        fireEvent.change(input, { target: { value: text } });
+        expect(input.isConnected).toBe(true);
+        expect(document.activeElement).toBe(input);
+      }
+
+      expect(form().getFieldState(`lines.0.${field}`).error).toBeUndefined();
+      expect(values().lines[0][field]).toBe(typed);
+      expect(headers()).toContain(header);
+      // Once the focus leaves the cell, the column the user hid goes again.
+      enter(`stock-line-${cell}-0`, true); // Shift+Enter: back to Đơn giá
+      expect(focused()).toBe('stock-line-unit-price-0');
+      expect(headers()).not.toContain(header);
+      expect(values().lines[0][field]).toBe(typed);
+    });
+
+    it('Kho keeps its select and the focus when the user picks the header warehouse in it', () => {
+      const { values } = renderGrid({ lines: [line({ warehouseId: WH2 })] });
+      const select = byId('stock-line-warehouse-0');
+      act(() => select.focus());
+
+      fireEvent.change(select, { target: { value: WH1 } });
+
+      expect(values().lines[0].warehouseId).toBe(WH1);
+      expect(select.isConnected).toBe(true);
+      expect(document.activeElement).toBe(select);
+      act(() => byId('stock-line-unit-price-0').focus());
+      expect(headers()).not.toContain('Kho');
+    });
+
+    // When the window loses the focus (the user switches to another program) the cell gets a blur event but keeps the
+    // focus of the page: it must still be there when the user comes back.
+    it('the column stays while the window is in the background', () => {
+      const { form } = renderGrid({ lines: [line({ note: 'qua dai' })] });
+      clearServerErrorsOnChange(form());
+      act(() => form().setError('lines.0.note', { type: 'server', message: 'Giá trị không hợp lệ.' }));
+      const input = byId('stock-line-note-0');
+      act(() => input.focus());
+      fireEvent.change(input, { target: { value: 'm' } });
+
+      fireEvent.blur(input);
+      fireEvent.focusOut(input);
+
+      expect(document.activeElement).toBe(input);
+      expect(input.isConnected).toBe(true);
+      expect(headers()).toContain('Ghi chú');
+    });
+
+    // A click on another cell: the browser blurs the cell the focus leaves (the page has no focused element for that
+    // moment), runs the microtasks, in which React renders, and only then focuses the clicked cell.
+    it('a click on another cell of the column that only the focus holds keeps that column', async () => {
+      const { form } = renderGrid({ lines: [line({ note: 'qua dai' }), line({ _uiKey: 'b', note: 'ghi chu 2' })] });
+      clearServerErrorsOnChange(form());
+      act(() => form().setError('lines.0.note', { type: 'server', message: 'Giá trị không hợp lệ.' }));
+      const first = byId('stock-line-note-0');
+      const second = byId('stock-line-note-1');
+      act(() => first.focus());
+      fireEvent.change(first, { target: { value: 'm' } }); // the error is gone: only the focus holds Ghi chú
+
+      await outsideAct(async () => {
+        const noFocus = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(document.body);
+        try {
+          first.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: second }));
+        } finally {
+          noFocus.mockRestore();
+        }
+        await eventRendered();
+        second.focus();
+      });
+
+      expect(second.isConnected).toBe(true);
+      expect(document.activeElement).toBe(second);
+      expect(headers()).toContain('Ghi chú');
+    });
   });
 
   it('pins #, Mã and Tên left and Số còn lại + delete right with cumulative offsets', () => {
@@ -958,24 +1076,6 @@ describe('StockLineGrid', () => {
       discountRate: l.discountRate,
       note: l.note,
     });
-
-    // Runs `steps` outside act(), then lets the renders that follow them land.
-    async function outsideAct(steps: () => Promise<void>) {
-      const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
-      const previous = env.IS_REACT_ACT_ENVIRONMENT;
-      env.IS_REACT_ACT_ENVIRONMENT = false;
-      try {
-        await steps();
-        await new Promise((resolve) => setTimeout(resolve, 20));
-      } finally {
-        env.IS_REACT_ACT_ENVIRONMENT = previous;
-      }
-    }
-
-    // Only the microtasks run, in which React renders what the event changed: no task, frame or timer.
-    async function eventRendered() {
-      for (let i = 0; i < 5; i++) await Promise.resolve();
-    }
 
     // A key typed into the focused cell, built from the text the cell shows: it ends up after that text.
     function typeKey(key: string) {

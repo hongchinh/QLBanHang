@@ -10,13 +10,16 @@ using Xunit;
 
 namespace OrderMgmt.IntegrationTests.SampleData.Unit;
 
-/// The worker without a host or a database: a runner that only ends when its token is cancelled.
+/// The worker without a host or a database: a runner that only ends when its token is cancelled, with a cancellation
+/// or, as a disposed scope or a broken connection would, with another exception.
 public class SampleDataWorkerShutdownTests
 {
-    [Fact]
-    public async Task Job_interrupted_by_shutdown_is_logged()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Job_interrupted_by_shutdown_is_logged(bool disposedOnStop)
     {
-        var runner = new BlockingRunner();
+        var runner = new BlockingRunner(disposedOnStop);
         var logger = new RecordingLogger();
         await using var services = new ServiceCollection()
             .AddScoped<ISampleDataRunner>(_ => runner)
@@ -37,12 +40,23 @@ public class SampleDataWorkerShutdownTests
 
     private sealed class BlockingRunner : ISampleDataRunner
     {
+        private readonly bool _disposedOnStop;
+
+        public BlockingRunner(bool disposedOnStop) => _disposedOnStop = disposedOnStop;
+
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public async Task RunJobAsync(SampleDataJob job, CancellationToken ct = default)
         {
             Started.TrySetResult();
-            await Task.Delay(Timeout.Infinite, ct);
+            try
+            {
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            catch (OperationCanceledException) when (_disposedOnStop)
+            {
+                throw new ObjectDisposedException("NpgsqlConnection");
+            }
         }
 
         public Task<SampleDataRunResult> RunPlanAsync(SampleDataJob job, SampleDataPlan plan, CancellationToken ct = default) =>

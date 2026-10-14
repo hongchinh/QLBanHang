@@ -83,26 +83,12 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         branch.SampleDataError.Should().StartWith("TKH-0001: ").And.Contain("XBH-9999");
     }
 
-    /// No validator message echoes the description, so the over-long description only checks the bound; the message of
-    /// an unknown key echoes the key, so a 2,000-character key checks the cut itself. The surrogate-safe cut is covered
-    /// by SampleDataErrorFormatTests.
+    /// No validator message echoes its input, but the message of an unknown key does, so a 2,000-character key checks
+    /// the cut. The surrogate-safe cut is covered by SampleDataErrorFormatTests.
     [Fact]
     public async Task Error_is_cut_to_1000_characters()
     {
-        var descriptionBranch = await CreateBranchAsync("RF03");
-        var tooLong = new SampleCashVoucherStep("CK-0001", At(1), null, CashVoucherType.Payment, "CK", "QTM", null,
-            "Chị Lan", new string('D', 2000), 1_000_000m, Array.Empty<SampleAllocationTarget>());
-
-        var described = await TinyPlans.RunAsync(_factory, descriptionBranch,
-            TinyPlans.WithSteps(TinyPlans.OpeningDate, tooLong));
-
-        described.Succeeded.Should().BeFalse();
-        var branch = await BranchAsync(descriptionBranch);
-        branch.SampleDataStatus.Should().Be(SampleDataStatus.Failed);
-        branch.SampleDataError.Should().StartWith("CK-0001: ");
-        branch.SampleDataError!.Length.Should().BeLessThanOrEqualTo(1000);
-
-        var keyBranch = await CreateBranchAsync("RF04");
+        var keyBranch = await CreateBranchAsync("RF03");
         var longKey = new string('K', 2000);
 
         var keyed = await TinyPlans.RunAsync(_factory, keyBranch,
@@ -171,8 +157,7 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         await CreateTestUserAsync("sd_job_a", "Pass@123", RoleCodes.Sales);
         await CreateTestUserAsync("sd_job_b", "Pass@123", RoleCodes.Sales);
         var owners = await TinyPlans.SalesOwnersAsync(_factory);
-        var ownerCount = owners.Count == 0 ? 1 : owners.Count;
-        ownerCount.Should().BeGreaterThanOrEqualTo(2);
+        owners.Should().HaveCountGreaterThanOrEqualTo(2);
         var generator = new FakeSampleDataGenerator(_ => TinyPlans.Setup(TinyPlans.OpeningDate));
         var host = TinyPlans.WithService<ISampleDataGenerator>(_factory, generator);
         var branchId = await CreateBranchAsync("RJ01");
@@ -186,7 +171,7 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
 
         var after = VnTime.ToVnDate(DateTimeOffset.UtcNow);
         var input = generator.Inputs.Should().ContainSingle().Subject;
-        (input.BranchCode, input.OwnerCount).Should().Be(("RJ01", ownerCount));
+        (input.BranchCode, input.OwnerCount).Should().Be(("RJ01", owners.Count));
         input.Today.Should().BeOneOf(before, after);
         var branch = await BranchAsync(branchId);
         (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
@@ -211,5 +196,98 @@ public class SampleDataRunnerStatusTests : CashDebtTestBase
         var branch = await BranchAsync(branchId);
         (branch.SampleDataStatus, branch.SampleDataError).Should().Be((SampleDataStatus.Failed, "KE-HOACH: boom"));
         (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Code == "RJ02-K1"))).Should().BeFalse();
+    }
+
+    /// A real branch fails the job before any plan is made, and its row is not touched.
+    [Fact]
+    public async Task Run_job_on_a_real_branch_makes_no_plan()
+    {
+        var generator = new FakeSampleDataGenerator(_ => TinyPlans.Setup(TinyPlans.OpeningDate));
+        var host = TinyPlans.WithService<ISampleDataGenerator>(_factory, generator);
+        var branchId = await CreateBranchAsync("RJ03");
+        var adminId = await TinyPlans.AdminIdAsync(_factory);
+
+        await using (var scope = host.Services.CreateAsyncScope())
+            await scope.ServiceProvider.GetRequiredService<ISampleDataRunner>()
+                .RunJobAsync(new SampleDataJob(branchId, adminId));
+
+        generator.Inputs.Should().BeEmpty();
+        var branch = await BranchAsync(branchId);
+        (branch.IsDemo, branch.SampleDataStatus, branch.SampleDataError).Should().Be((false, SampleDataStatus.None, (string?)null));
+        (await InDbAsync(db => db.Warehouses.AnyAsync(w => w.Code == "RJ03-K1"))).Should().BeFalse();
+    }
+
+    /// The worker breaks on cancellation and the next start recovers a Running branch; both need a cancelled run to
+    /// throw and leave the branch as it was.
+    [Fact]
+    public async Task Cancelled_run_throws_and_leaves_the_branch_running()
+    {
+        var branchId = await CreateBranchAsync("RC01");
+        await SetStatusAsync(branchId, isDemo: true, SampleDataStatus.Running, 30);
+        var adminId = await TinyPlans.AdminIdAsync(_factory);
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        await using (var scope = _factory.Services.CreateAsyncScope())
+        {
+            var runner = scope.ServiceProvider.GetRequiredService<ISampleDataRunner>();
+            var run = () => runner.RunPlanAsync(new SampleDataJob(branchId, adminId),
+                TinyPlans.Setup(TinyPlans.OpeningDate), cancelled.Token);
+            await run.Should().ThrowAsync<OperationCanceledException>();
+        }
+
+        var branch = await BranchAsync(branchId);
+        (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
+            .Should().Be((SampleDataStatus.Running, 30, (string?)null));
+    }
+
+    /// While the host stops, a failure may surface as another exception than a cancellation (a disposed scope, a broken
+    /// connection): it is thrown too, so the branch keeps Running for the restart recovery instead of a generic error.
+    [Fact]
+    public async Task Failure_after_cancellation_leaves_the_branch_running()
+    {
+        using var stopping = new CancellationTokenSource();
+        var generator = new FakeSampleDataGenerator(_ =>
+        {
+            stopping.Cancel();
+            throw new InvalidOperationException("connection broken");
+        });
+        var host = TinyPlans.WithService<ISampleDataGenerator>(_factory, generator);
+        // Start the host, and so its startup recovery, before the branch is Running.
+        _ = host.Services;
+        var branchId = await CreateBranchAsync("RC02");
+        await SetStatusAsync(branchId, isDemo: true, SampleDataStatus.Running, 0);
+        var adminId = await TinyPlans.AdminIdAsync(_factory);
+
+        await using (var scope = host.Services.CreateAsyncScope())
+        {
+            var runner = scope.ServiceProvider.GetRequiredService<ISampleDataRunner>();
+            var run = () => runner.RunJobAsync(new SampleDataJob(branchId, adminId), stopping.Token);
+            await run.Should().ThrowAsync<Exception>();
+        }
+
+        generator.Inputs.Should().ContainSingle();
+        var branch = await BranchAsync(branchId);
+        (branch.SampleDataStatus, branch.SampleDataError).Should().Be((SampleDataStatus.Running, (string?)null));
+    }
+
+    /// S18: a signal that fails or never completes is given up (after 3 s) and does not fail the saved run.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Signal_that_cannot_be_sent_does_not_fail_the_run(bool stall)
+    {
+        var recorder = new RecordingRealtimeNotifier { ThrowOnDashboardSignal = !stall, StallOnDashboardSignal = stall };
+        var host = TinyPlans.WithService<IRealtimeNotifier>(_factory, recorder);
+        var branchId = await CreateBranchAsync("RS03");
+
+        var result = await TinyPlans.RunAsync(host, branchId, TinyPlans.Setup(TinyPlans.OpeningDate))
+            .WaitAsync(TimeSpan.FromSeconds(60));
+
+        result.Succeeded.Should().BeTrue(result.Error);
+        recorder.DashboardSignals.Should().BeEmpty();
+        var branch = await BranchAsync(branchId);
+        (branch.SampleDataStatus, branch.SampleDataProgress, branch.SampleDataError)
+            .Should().Be((SampleDataStatus.Ready, 100, (string?)null));
     }
 }

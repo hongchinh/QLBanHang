@@ -14,7 +14,7 @@ using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Organization.SampleData.Services;
 
-/// Skipped: the amount the step computed at run time is 0 (S11), so no document was written.
+/// Skipped: nothing to do (amount 0 or a skipped target, S11), so no document was written.
 internal enum SampleStepOutcome
 {
     Executed,
@@ -166,14 +166,14 @@ internal sealed class SampleStepExecutor
     }
 
     /// Offsets what is open on both entries now: min(open receivable, open payable); 0 skips the step (S11), as does a
-    /// skipped target.
+    /// skipped target, once the partner and the other target are known.
     private async Task<SampleStepOutcome> DebtOffsetAsync(SampleDebtOffsetStep step, CancellationToken ct)
     {
-        if (_run.SkippedKeys.Contains(step.ReceivableTargetKey) || _run.SkippedKeys.Contains(step.PayableTargetKey))
-            return SampleStepOutcome.Skipped;
         var partnerId = SampleRunState.Lookup(_run.Partners, step.PartnerCode);
-        var receivable = SampleRunState.Lookup(_run.Entries, step.ReceivableTargetKey);
-        var payable = SampleRunState.Lookup(_run.Entries, step.PayableTargetKey);
+        var receivable = EntryOrSkipped(step.ReceivableTargetKey);
+        var payable = EntryOrSkipped(step.PayableTargetKey);
+        if (receivable is null || payable is null)
+            return SampleStepOutcome.Skipped;
         var open = await OpenAmountsAsync(new[] { receivable, payable }, ct);
         var amount = Math.Min(open[receivable.Id], open[payable.Id]);
         if (amount <= 0)
@@ -210,6 +210,11 @@ internal sealed class SampleStepExecutor
         await service.CancelAsync(voucherId, request, ct);
         return SampleStepOutcome.Executed;
     }
+
+    /// The entry the plan names by `key`, or null when that step was skipped: it wrote nothing, so nothing is open
+    /// there. A key the plan never defined still fails the item.
+    private SampleDebtEntryRef? EntryOrSkipped(string key) =>
+        _run.SkippedKeys.Contains(key) ? null : SampleRunState.Lookup(_run.Entries, key);
 
     /// Lets later steps name the document's debt entry by the step key.
     private async Task MapEntryAsync(string key, DebtSourceType sourceType, Guid sourceId, CancellationToken ct)

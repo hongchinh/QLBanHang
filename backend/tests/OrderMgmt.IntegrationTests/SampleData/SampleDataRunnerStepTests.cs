@@ -496,12 +496,13 @@ public class SampleDataRunnerStepTests : CashDebtTestBase
             Allocate("CHKH-0002", At(5), CashVoucherType.Payment, "CHKH", "VCB", "DM-KH01",
                 new SampleAllocationTarget("TKH-0002", null)),
             new SampleCancelStep("HUY-0001", At(6), null, "TKH-0002"),
-            new SampleDebtOffsetStep("BT-0001", At(7), null, "DM-KH01", "CHKH-0002", "OD-02"));
+            new SampleDebtOffsetStep("BT-0001", At(7), null, "DM-KH01", "CHKH-0002", "OD-02"),
+            new SampleDebtOffsetStep("BT-0002", At(8), null, "DM-KH01", "OD-01", "TKH-0002"));
 
         var result = await TinyPlans.RunAsync(_factory, branchId, plan);
 
         result.Succeeded.Should().BeTrue(result.Error);
-        (result.StepsExecuted, result.StepsSkipped).Should().Be((3, 4));
+        (result.StepsExecuted, result.StepsSkipped).Should().Be((3, 5));
         var vouchers = await CashVouchersByLineAsync(branchId);
         vouchers.Keys.Should().BeEquivalentTo("TKH-0001", "TKH-0003", "CHKH-0001");
         vouchers.Values.Should().OnlyContain(v => v.Status == DocumentStatus.Active);
@@ -514,6 +515,29 @@ public class SampleDataRunnerStepTests : CashDebtTestBase
 
         await AssertInvariantsAsync();
         await AssertCashDebtInvariantsAsync();
+    }
+
+    /// An offset naming a skipped step is skipped, but only once its other keys are known: a typo in one of them is
+    /// still a plan error.
+    [Theory]
+    [InlineData("DM-KH99", "OD-01", "TKH-0002", "DM-KH99")]
+    [InlineData("DM-KH01", "XBH-9999", "TKH-0002", "XBH-9999")]
+    [InlineData("DM-KH01", "TKH-0002", "XBH-9999", "XBH-9999")]
+    public async Task Offset_naming_a_skipped_step_still_checks_its_other_keys(string partnerCode, string receivableKey,
+        string payableKey, string unknownKey)
+    {
+        var branchId = await CreateBranchAsync("RT14");
+        var plan = TinyPlans.WithSteps(TinyPlans.OpeningDate,
+            Allocate("TKH-0001", At(1), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("OD-01", null)),
+            Allocate("TKH-0002", At(2), CashVoucherType.Receipt, "TKH", "VCB", "DM-KH01",
+                new SampleAllocationTarget("OD-01", null)),
+            new SampleDebtOffsetStep("BT-0001", At(3), null, partnerCode, receivableKey, payableKey));
+
+        var result = await TinyPlans.RunAsync(_factory, branchId, plan);
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Should().Be($"BT-0001: Kế hoạch tham chiếu khóa không tồn tại: {unknownKey}");
     }
 
     /// Cancelling an allocated receipt removes its settlements, so what it settled is open again for a later step.

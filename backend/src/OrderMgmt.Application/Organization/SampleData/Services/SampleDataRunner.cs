@@ -64,18 +64,18 @@ public sealed class SampleDataRunner : ISampleDataRunner
         _logger = logger;
     }
 
-    /// The generator's plan for the branch, VN today and the S5 owner count, then RunPlanAsync.
+    /// The generator's plan for the branch, VN today and the S5 owner count, then RunPlanAsync with the same owners.
     public async Task RunJobAsync(SampleDataJob job, CancellationToken ct = default)
     {
         using var logScope = BeginJobScope(job);
-        if (await GenerateAsync(job, ct) is { } plan)
-            await RunPlanCoreAsync(job, plan, ct);
+        if (await GenerateAsync(job, ct) is { } generated)
+            await RunPlanCoreAsync(job, generated.Plan, generated.Owners, ct);
     }
 
     public async Task<SampleDataRunResult> RunPlanAsync(SampleDataJob job, SampleDataPlan plan, CancellationToken ct = default)
     {
         using var logScope = BeginJobScope(job);
-        return await RunPlanCoreAsync(job, plan, ct);
+        return await RunPlanCoreAsync(job, plan, owners: null, ct);
     }
 
     /// At startup: a run that a stopped process left Running never finishes, so every Running demo branch becomes
@@ -98,29 +98,32 @@ public sealed class SampleDataRunner : ISampleDataRunner
         ["CorrelationId"] = $"sample-data-{job.BranchId:N}",
     });
 
-    /// Null when no plan could be made: the branch is then Failed under KE-HOACH, and a generator failure keeps the
-    /// generator's own message.
-    private async Task<SampleDataPlan?> GenerateAsync(SampleDataJob job, CancellationToken ct)
+    /// The plan and the owners it was made for. Null when no plan could be made (a missing or real branch, a generator
+    /// failure): the branch is then Failed under KE-HOACH, and a generator failure keeps the generator's own message.
+    private async Task<(SampleDataPlan Plan, IReadOnlyList<Guid> Owners)?> GenerateAsync(SampleDataJob job,
+        CancellationToken ct)
     {
         try
         {
             await using var scope = _scopeFactory.CreateAsyncScope();
             var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
-            var branchCode = await db.Branches.IgnoreQueryFilters().Where(b => b.Id == job.BranchId)
+            var branchCode = await db.Branches.IgnoreQueryFilters().Where(b => b.Id == job.BranchId && b.IsDemo)
                     .Select(b => b.Code).SingleOrDefaultAsync(ct)
                 ?? throw new SampleDataPlanException(BranchNotFound);
             var owners = await ResolveOwnersAsync(db, job.RequestedByUserId, ct);
             var input = new SampleDataGeneratorInput(branchCode, VnTime.ToVnDate(_clock.UtcNow), owners.Count);
             try
             {
-                return _generator.Generate(input);
+                return (_generator.Generate(input), owners);
             }
             catch (Exception ex)
             {
                 throw SampleDataPlanException.GeneratorFailed(ex);
             }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        // Once the token is cancelled every failure is thrown, whatever its type (while the host stops, a disposed scope
+        // or a broken connection rather than a cancellation): the branch stays Running for the restart recovery.
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             var error = FormatError(PlanKey, ex);
             _logger.LogError(ex, "Sample data plan of branch {BranchId} could not be made", job.BranchId);
@@ -129,7 +132,9 @@ public sealed class SampleDataRunner : ISampleDataRunner
         }
     }
 
-    private async Task<SampleDataRunResult> RunPlanCoreAsync(SampleDataJob job, SampleDataPlan plan, CancellationToken ct)
+    /// `owners`: those the plan was generated for, or null to resolve them here (S5).
+    private async Task<SampleDataRunResult> RunPlanCoreAsync(SampleDataJob job, SampleDataPlan plan,
+        IReadOnlyList<Guid>? owners, CancellationToken ct)
     {
         var stopwatch = Stopwatch.StartNew();
         SampleRunState? run = null;
@@ -138,7 +143,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
             run = new SampleRunState(job.BranchId, TotalItems(plan), PlanKey);
             if (!await StartAsync(job.BranchId, ct))
                 throw new SampleDataPlanException(BranchNotFound);
-            await PrepareAsync(run, job.RequestedByUserId, ct);
+            await PrepareAsync(run, job.RequestedByUserId, owners, ct);
             await RunSetupAsync(run, plan, ct);
             foreach (var step in plan.Steps)
                 await RunStepAsync(run, step, ct);
@@ -153,7 +158,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
                 run.BranchCode, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed);
             return new SampleDataRunResult(true, run.StepsExecuted, run.StepsSkipped, stopwatch.Elapsed, null);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        // As in GenerateAsync: once the token is cancelled every failure is thrown and the branch stays Running.
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             var key = run?.CurrentKey ?? PlanKey;
             var error = FormatError(key, ex);
@@ -202,9 +208,10 @@ public sealed class SampleDataRunner : ISampleDataRunner
         1 + plan.Warehouses.Count + plan.Funds.Count(f => f.Code != CashFundCode) + 1 + plan.Funds.Count
         + plan.OpeningStocks.Count + plan.OpeningDebts.Count + plan.CreditLimits.Count + plan.Steps.Count;
 
-    /// The branch, its existing funds, the reasons and payment methods, the people (S5) and every permission code (S4),
-    /// read once.
-    private async Task PrepareAsync(SampleRunState run, Guid requestedBy, CancellationToken ct)
+    /// The branch, its existing funds, the reasons and payment methods, the people (S5: `owners`, or resolved here when
+    /// null) and every permission code (S4), read once.
+    private async Task PrepareAsync(SampleRunState run, Guid requestedBy, IReadOnlyList<Guid>? owners,
+        CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
@@ -221,7 +228,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
             .Select(m => new { m.Code, m.Id }).ToDictionaryAsync(m => m.Code, m => m.Id, ct));
 
         run.RequestedBy = requestedBy;
-        run.Owners = await ResolveOwnersAsync(db, requestedBy, ct);
+        run.Owners = owners ?? await ResolveOwnersAsync(db, requestedBy, ct);
         var userIds = run.Owners.Append(requestedBy).Distinct().ToList();
         var users = await db.Users.IgnoreQueryFilters().Where(u => userIds.Contains(u.Id))
             .Select(u => new { u.Id, u.Username, u.FullName }).ToListAsync(ct);
@@ -363,7 +370,8 @@ public sealed class SampleDataRunner : ISampleDataRunner
         if (outcome == SampleStepOutcome.Skipped)
         {
             run.StepsSkipped++;
-            _logger.LogInformation("Sample data step {StepKey} of branch {BranchCode} skipped: its amount is 0",
+            _logger.LogInformation(
+                "Sample data step {StepKey} of branch {BranchCode} skipped: nothing to do (amount 0 or a skipped target)",
                 step.Key, run.BranchCode);
         }
         else
@@ -453,7 +461,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
             await using var scope = _scopeFactory.CreateAsyncScope();
             await DemoBranch(scope, branchId).ExecuteUpdateAsync(s => s.SetProperty(b => b.SampleDataProgress, progress), ct);
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        catch (Exception ex) when (!ct.IsCancellationRequested)
         {
             _logger.LogWarning(ex, "Could not write the sample data progress of branch {BranchId}", branchId);
         }

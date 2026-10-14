@@ -45,11 +45,12 @@ public sealed class SampleDataHostedService : BackgroundService
                 await using var scope = _scopeFactory.CreateAsyncScope();
                 await scope.ServiceProvider.GetRequiredService<ISampleDataRunner>().RunJobAsync(job, stoppingToken);
             }
-            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            catch (Exception ex) when (stoppingToken.IsCancellationRequested)
             {
-                // The runner logs nothing for a cancelled job, and the branch stays Running until the next start
-                // recovers it.
-                _logger.LogInformation(
+                // Stopping: the job ends with a cancellation, or with whatever failed as the host went away (a disposed
+                // scope, a broken connection). The runner logs nothing for it, and the branch stays Running until the
+                // next start recovers it.
+                _logger.LogInformation(ex is OperationCanceledException ? null : ex,
                     "Sample data job of branch {BranchId} requested by {UserId} interrupted by shutdown",
                     job.BranchId, job.RequestedByUserId);
                 break;

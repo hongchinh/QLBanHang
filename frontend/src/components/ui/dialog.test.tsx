@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { StrictMode, useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './dialog';
@@ -47,6 +47,32 @@ describe('Dialog focus return', () => {
 
     await waitFor(() => expect(screen.queryByText('Tiêu đề')).toBeNull());
     expect(document.activeElement).toBe(opener);
+  });
+
+  // The app renders in StrictMode, which runs the effects of a mounting component twice in development. The dialog
+  // releases its opener when Radix asks where the focus goes: Radix must ask only once the dialog has gone, and again
+  // for each opening.
+  it('gives the focus back to the opener of each opening in StrictMode, as the app renders', async () => {
+    render(
+      <StrictMode>
+        <StateDialog />
+      </StrictMode>,
+    );
+    const opener = screen.getByTestId('opener');
+    for (const close of ['Escape', 'Xong'] as const) {
+      act(() => opener.focus());
+      fireEvent.click(opener);
+      await screen.findByText('Tiêu đề');
+      // Past any tick the double run of the effects could have asked in.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(document.activeElement).not.toBe(opener);
+
+      if (close === 'Escape') fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
+      else fireEvent.click(screen.getByRole('button', { name: 'Xong' }));
+
+      await waitFor(() => expect(screen.queryByText('Tiêu đề')).toBeNull());
+      await waitFor(() => expect(document.activeElement).toBe(opener));
+    }
   });
 
   // Radix asks where the focus goes a tick after the dialog has gone (after its exit animation in a browser). A page

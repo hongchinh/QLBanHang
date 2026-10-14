@@ -50,9 +50,12 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       onCloseAutoFocus={(event) => {
+        // Radix asks once, after the content has gone. Released here: a dialog that stays rendered (a confirm dialog
+        // of a page) would otherwise hold on to an opener the page may have removed until it opens again.
+        const opener = openerRef.current;
+        openerRef.current = null;
         onCloseAutoFocus?.(event);
         if (event.defaultPrevented) return;
-        const opener = openerRef.current;
         if (!canTakeFocus(opener)) return;
         event.preventDefault();
         // Radix fires this a tick after the unmount: never take the focus from where the user went meanwhile. A key

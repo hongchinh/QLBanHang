@@ -58,6 +58,21 @@ describe('ScopeSelect', () => {
     ]);
   });
 
+  it('appends "(demo)" to a demo branch only', async () => {
+    const demo: Branch = { id: 'b3', code: 'DEMO1', name: 'CN demo', isDemo: true };
+    state.scope = scope({ branches: [B1, demo] });
+    const user = userEvent.setup();
+    render(<ScopeSelect />);
+
+    await user.click(screen.getByRole('combobox'));
+
+    expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([
+      'Toàn công ty',
+      'CN01 — Hà Nội',
+      'DEMO1 — CN demo (demo)',
+    ]);
+  });
+
   it('shows "Toàn công ty" in company mode and the working branch in branch mode', () => {
     const { unmount } = render(<ScopeSelect />);
     expect(screen.getByRole('combobox')).toHaveTextContent('Toàn công ty');

@@ -88,6 +88,24 @@ describe('HeaderBranchSwitcher', () => {
     expect(screen.queryByRole('combobox', { name: 'Chi nhánh làm việc' })).not.toBeInTheDocument();
   });
 
+  it('marks a demo branch with "(demo)" and leaves normal branches unmarked', async () => {
+    mockMyBranches({
+      ...MY_BRANCHES,
+      branches: [
+        MY_BRANCHES.branches[0],
+        { id: 'b3', code: 'DEMO1', name: 'CN demo', isDemo: true },
+      ],
+    });
+    const user = userEvent.setup();
+    renderSwitcher('/');
+
+    await user.click(screen.getByRole('combobox', { name: 'Chi nhánh làm việc' }));
+
+    expect(await screen.findByRole('option', { name: 'DEMO1 — CN demo (demo)' })).toBeInTheDocument();
+    const normal = screen.getByRole('option', { name: 'CN01 — Chi nhánh chính' });
+    expect(normal).not.toHaveTextContent('(demo)');
+  });
+
   it('lists branches and switches working branch', async () => {
     mockMyBranches(MY_BRANCHES);
     const user = userEvent.setup();

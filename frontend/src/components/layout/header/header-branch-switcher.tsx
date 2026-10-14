@@ -46,7 +46,7 @@ export function HeaderBranchSwitcher() {
       <SelectContent>
         {myBranches.branches.map((b) => (
           <SelectItem key={b.id} value={b.id}>
-            {b.code} — {b.name}
+            {b.code} — {b.name}{b.isDemo ? ' (demo)' : ''}
           </SelectItem>
         ))}
       </SelectContent>

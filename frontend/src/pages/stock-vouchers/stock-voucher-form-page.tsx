@@ -54,6 +54,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useDocumentActions } from '@/hooks/useDocumentActions';
 import { getErrorMessage } from '@/lib/api-client';
+import { DIALOG_SELECTOR, PAGE_AREA_SELECTOR } from '@/lib/focus';
 import type { ConfirmFlags } from '@/lib/confirm-required';
 import { toOptionalNumber } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
@@ -119,14 +120,13 @@ function shortcutOf(e: ShortcutKeyEvent, isEdit: boolean): 'save' | StockVoucher
   return altTab === 'history' && !isEdit ? undefined : altTab;
 }
 
-const OPEN_DIALOG = '[role="dialog"], [role="alertdialog"]';
 // Radix wraps the content of a popover in it. The grid's popovers are role="dialog" too, but they do not block the page.
 const POPOVER = '[data-radix-popper-content-wrapper]';
 
 // A modal dialog owns its keys, also one that sits inside the form in the React tree (the product catalog of a Mã
 // cell), whose keys reach the form's handler.
 function inModalDialog(target: EventTarget | null): boolean {
-  const dialog = target instanceof Element ? target.closest(OPEN_DIALOG) : null;
+  const dialog = target instanceof Element ? target.closest(DIALOG_SELECTOR) : null;
   return !!dialog && !dialog.closest(POPOVER);
 }
 
@@ -604,9 +604,9 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       // search of the whole page for an open dialog last.
       if (e.defaultPrevented || !shortcutOf(e, isEdit)) return;
       const target = e.target instanceof Element ? e.target : null;
-      const inPageOutsideForm = !!target?.closest('main#main-content') && !formRef.current?.contains(target);
+      const inPageOutsideForm = !!target?.closest(PAGE_AREA_SELECTOR) && !formRef.current?.contains(target);
       if (target !== document.body && !inPageOutsideForm) return;
-      if (!document.querySelector(OPEN_DIALOG)) runShortcutRef.current(e);
+      if (!document.querySelector(DIALOG_SELECTOR)) runShortcutRef.current(e);
     }
     document.addEventListener('keydown', handleDocumentKeyDown);
     return () => document.removeEventListener('keydown', handleDocumentKeyDown);

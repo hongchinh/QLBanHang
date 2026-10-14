@@ -75,10 +75,10 @@ Giao diện gần như không đổi. Giá trị nằm ở tính nhất quán, v
 
 ## Phases
 
-- [ ] Phase 01 — Nền tảng: token, registry, AppIcon, test chặn (M) — `phase-01-foundation.md`
-- [ ] Phase 02 — Layout, sidebar, header, ui và component dùng chung (M) — `phase-02-layout-and-shared.md`
-- [ ] Phase 03 — Chuyển các trang (L; 5 task độc lập, chạy song song được) — `phase-03-pages.md`
-- [ ] Phase 04 — Thay ký tự, icon KPI, chốt luật chặn và tài liệu (M) — `phase-04-glyphs-kpi-finalize.md`
+- [x] Phase 01 — Nền tảng: token, registry, AppIcon, test chặn (M) — `phase-01-foundation.md`
+- [x] Phase 02 — Layout, sidebar, header, ui và component dùng chung (M) — `phase-02-layout-and-shared.md`
+- [x] Phase 03 — Chuyển các trang (L; 5 task độc lập, chạy song song được) — `phase-03-pages.md`
+- [x] Phase 04 — Thay ký tự, icon KPI, chốt luật chặn và tài liệu (M) — `phase-04-glyphs-kpi-finalize.md`
 
 ## Final Verification
 

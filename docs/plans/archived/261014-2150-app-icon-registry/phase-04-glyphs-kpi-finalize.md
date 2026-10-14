@@ -1,6 +1,6 @@
 # Phase 04 — Thay ký tự, icon KPI, chốt luật chặn và tài liệu
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 
 ## Objective

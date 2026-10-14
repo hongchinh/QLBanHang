@@ -1,6 +1,6 @@
 # Phase 01 — Nền tảng: token, registry, AppIcon, test chặn
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 
 ## Objective

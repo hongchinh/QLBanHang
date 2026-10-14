@@ -1,6 +1,6 @@
 # Phase 02 — Layout, sidebar, header, ui và component dùng chung
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 
 ## Objective

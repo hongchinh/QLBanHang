@@ -4,6 +4,7 @@ using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Common;
+using OrderMgmt.Application.Inventory.StockVouchers.Services;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Application.Tt133.Services;
 using OrderMgmt.Domain.Common;
@@ -76,17 +77,8 @@ public class VoucherPrintService : IVoucherPrintService
                 })
                 .ToListAsync(token);
 
-            var branchId = await _currentBranch.GetIdAsync(token);
-            var byId = rows.ToDictionary(r => r.Id);
-            foreach (var id in distinct)
-            {
-                if (!byId.TryGetValue(id, out var row))
-                    throw new NotFoundException(nameof(CashVoucher), id);
-                if (!_currentUser.HasPermission(CashVoucherPermissions.View(row.Type)))
-                    throw new ForbiddenException();
-                if (row.BranchId != branchId)
-                    throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
-            }
+            await EnsureAccessAsync(distinct, rows.ToDictionary(r => r.Id), nameof(CashVoucher),
+                r => CashVoucherPermissions.View(r.Type), r => r.BranchId, token);
 
             var list = rows
                 .OrderBy(r => r.VoucherAt)
@@ -116,9 +108,14 @@ public class VoucherPrintService : IVoucherPrintService
     public async Task<ExportFile> PrintStockVouchersAsync(IReadOnlyList<Guid> ids, StockPrintPriceMode priceMode,
         ExportFormat format, CancellationToken ct = default)
     {
+        if (!Enum.IsDefined(priceMode))
+            throw new ValidationDomainException(
+                new Dictionary<string, string[]> { ["priceMode"] = ["Chế độ giá không hợp lệ."] }, null);
         if (priceMode == StockPrintPriceMode.Cost && !_currentUser.HasPermission(Permissions.Inventory.ViewCost))
             throw new ForbiddenException("Cần quyền xem giá vốn để in phiếu theo giá vốn.");
+        // A JSON null binds Ids to null; it counts as empty.
         var distinct = (ids ?? []).Distinct().ToList();
+        _support.EnsureSheetCount(distinct.Count, VouchersTooMany);
 
         var (context, models) = await _transaction.RunSnapshotAsync(async token =>
         {
@@ -170,6 +167,8 @@ public class VoucherPrintService : IVoucherPrintService
                     }).ToList(),
                 })
                 .ToListAsync(token);
+            await EnsureAccessAsync(distinct, rows.ToDictionary(r => r.Id), nameof(StockVoucher),
+                r => StockVoucherPermissions.View(r.Type), r => r.BranchId, token);
 
             CostSource? cost = null;
             if (priceMode == StockPrintPriceMode.Cost)
@@ -320,6 +319,23 @@ public class VoucherPrintService : IVoucherPrintService
     {
         var baseName = codes.Count == 1 ? codes[0] : VoucherPrintRules.BatchFileBase(batchPrefix, _clock.UtcNow);
         return _support.ToFileAsync(xlsx, baseName, format, ct);
+    }
+
+    /// As the voucher page, per id in request order: missing → 404, no view permission of its type → 403, another
+    /// branch → 403. The first failing id fails the whole request.
+    private async Task EnsureAccessAsync<TRow>(IReadOnlyList<Guid> ids, IReadOnlyDictionary<Guid, TRow> byId,
+        string resource, Func<TRow, string> viewPermission, Func<TRow, Guid> branchOf, CancellationToken ct)
+    {
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        foreach (var id in ids)
+        {
+            if (!byId.TryGetValue(id, out var row))
+                throw new NotFoundException(resource, id);
+            if (!_currentUser.HasPermission(viewPermission(row)))
+                throw new ForbiddenException();
+            if (branchOf(row) != branchId)
+                throw new ForbiddenException("Phiếu thuộc chi nhánh khác.");
+        }
     }
 
     private static string VouchersTooMany(int count, int max) =>

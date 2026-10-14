@@ -27,7 +27,8 @@ public class CashVoucherPrintModel
 
 public class StockVoucherPrintRequest
 {
-    public List<Guid> Ids { get; set; } = new();
+    /// Nullable on purpose: a JSON null must reach the service as "no targets" (422), not fail model binding with 400.
+    public List<Guid>? Ids { get; set; } = new();
     public StockPrintPriceMode PriceMode { get; set; } = StockPrintPriceMode.Voucher;
 }
 

@@ -488,6 +488,118 @@ public class StockVoucherPrintTests : InventoryTestBase
         }
     }
 
+    [Fact]
+    public async Task Prints_selected_vouchers_in_date_order()
+    {
+        await SetCompanyAsync();
+        var a = await CreateInventoryProductAsync(NewCode("A"));
+        var in1 = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-01 08:00", LineRequest(a, 10, 100_000));
+        var out1 = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-05 09:00", LineRequest(a, 2, 0));
+        var in2 = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-06 08:00", LineRequest(a, 1, 100_000));
+
+        var mixed = await PrintManyAsync(_client, new StockVoucherPrintRequest
+        {
+            Ids = [in2.Id, out1.Id, in1.Id, in2.Id], PriceMode = StockPrintPriceMode.None,
+        });
+        var stockIns = await PrintManyAsync(_client, new StockVoucherPrintRequest { Ids = [in1.Id, in2.Id] });
+        var single = await PrintManyAsync(_client, new StockVoucherPrintRequest { Ids = [out1.Id] });
+
+        mixed.StatusCode.Should().Be(HttpStatusCode.OK, await mixed.Content.ReadAsStringAsync());
+        mixed.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^PhieuNhapXuat_\d{8}-\d{4}\.xlsx$");
+        using (var wb = await Tt133Sheet.OpenAsync(mixed))
+            wb.Worksheets.Select(w => w.Name).Should().Equal(in1.Code, out1.Code, in2.Code);
+        stockIns.StatusCode.Should().Be(HttpStatusCode.OK, await stockIns.Content.ReadAsStringAsync());
+        stockIns.Content.Headers.ContentDisposition!.FileName.Should().MatchRegex(@"^PhieuNhapKho_\d{8}-\d{4}\.xlsx$");
+        single.StatusCode.Should().Be(HttpStatusCode.OK, await single.Content.ReadAsStringAsync());
+        single.Content.Headers.ContentDisposition!.FileName.Should().Be($"{out1.Code}.xlsx");
+    }
+
+    [Fact]
+    public async Task Unknown_voucher_is_404()
+    {
+        var a = await CreateInventoryProductAsync(NewCode("A"));
+        var v = await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-05 09:00", LineRequest(a, 1, 100_000));
+
+        (await PrintAsync(_client, Guid.NewGuid())).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await PrintManyAsync(_client, new StockVoucherPrintRequest { Ids = [v.Id, Guid.NewGuid()] }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Another_branch_is_403()
+    {
+        var b = await CreateBranchAsync(NewCode("VB"));
+        await SetBranchOpeningDateAsync(b, new DateOnly(2026, 10, 1));
+        var whB = await CreateWarehouseAsync(b, NewCode("KB"));
+        var clientB = CloneAdminClient();
+        UseBranch(clientB, b);
+        var a = await CreateInventoryProductAsync(NewCode("A"));
+        var v = await CreateVoucherAsync(clientB, StockDirection.In, "NKH", "2026-10-05 09:00", r => r.WarehouseId = whB,
+            LineRequest(a, 1, 100_000));
+
+        var response = await PrintAsync(_client, v.Id);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        var body = await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options);
+        body!.Error!.Message.Should().Be("Phiếu thuộc chi nhánh khác.");
+    }
+
+    [Fact]
+    public async Task Missing_view_permission_is_403()
+    {
+        var a = await CreateInventoryProductAsync(NewCode("A"));
+        await CreateVoucherAsync(_client, StockDirection.In, "NKH", "2026-10-01 08:00", LineRequest(a, 10, 100_000));
+        var stockOut = await CreateVoucherAsync(_client, StockDirection.Out, "XKH", "2026-10-05 09:00", LineRequest(a, 2, 0));
+        var client = await CreateClientWithPermissionsAsync("vpi_" + Guid.NewGuid().ToString("N")[..8], MainBranchId,
+            Permissions.StockIn.View);
+
+        (await PrintAsync(client, stockOut.Id)).StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Empty_batch_is_422_after_the_cost_check()
+    {
+        var empty = await PrintManyAsync(_client, new StockVoucherPrintRequest { Ids = [] });
+        var client = await CreateClientWithPermissionsAsync("vpe_" + Guid.NewGuid().ToString("N")[..8], MainBranchId,
+            Permissions.StockIn.View);
+        var emptyAtCost = await PrintManyAsync(client,
+            new StockVoucherPrintRequest { Ids = [], PriceMode = StockPrintPriceMode.Cost });
+
+        empty.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await empty.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Code.Should().Be("EXPORT_NO_TARGETS");
+        emptyAtCost.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Null_ids_is_422()
+    {
+        using var content = new StringContent("{\"ids\":null}", System.Text.Encoding.UTF8, "application/json");
+
+        var response = await _client.PostAsync("/api/stock-vouchers/print?format=xlsx", content);
+
+        response.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity, await response.Content.ReadAsStringAsync());
+        (await response.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!.Code.Should().Be("EXPORT_NO_TARGETS");
+    }
+
+    [Fact]
+    public async Task Undefined_price_mode_is_400()
+    {
+        var query = await PrintAsync(_client, Guid.NewGuid(), "format=xlsx&priceMode=Foo");
+        using var content = new StringContent($"{{\"ids\":[\"{Guid.NewGuid()}\"],\"priceMode\":7}}",
+            System.Text.Encoding.UTF8, "application/json");
+        var body = await _client.PostAsync("/api/stock-vouchers/print?format=xlsx", content);
+
+        query.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        body.StatusCode.Should().Be(HttpStatusCode.BadRequest, await body.Content.ReadAsStringAsync());
+        var error = (await body.Content.ReadFromJsonAsync<ApiResponse>(TestJson.Options))!.Error!;
+        error.Details.Should().ContainKey("priceMode");
+        error.Details!["priceMode"].Should().Equal("Chế độ giá không hợp lệ.");
+    }
+
+    private static Task<HttpResponseMessage> PrintManyAsync(HttpClient client, StockVoucherPrintRequest request,
+        string format = "xlsx") =>
+        client.PostAsJsonAsync($"/api/stock-vouchers/print?format={format}", request);
+
     /// The stock-in of `Prints_a_stock_in_with_its_totals`: line discount, order discount, VAT and freight.
     private async Task<(StockVoucherDto Voucher, string SupplierCode, string ACode)> StockInWithTotalsAsync()
     {

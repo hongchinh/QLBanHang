@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
+import { flexRender, getCoreRowModel, useReactTable, type ColumnDef, type Table as TanstackTable } from '@tanstack/react-table';
 import { format } from 'date-fns';
 import { Loader2, Plus, Search } from 'lucide-react';
 import { useStockVoucherOwners, useStockVouchers } from '@/features/stock-vouchers/hooks';
@@ -20,8 +20,11 @@ import { Input } from '@/components/ui/input';
 import { MultiSelect } from '@/components/ui/multi-select';
 import { Table, TableBody, TableCell, TableColGroup, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Can } from '@/components/auth/can';
+import { SelectionCheckbox } from '@/components/ui/selection-checkbox';
+import { VoucherPrintButton } from '@/components/voucher-print/voucher-print-button';
 import { getErrorMessage } from '@/lib/api-client';
 import { useColumnSizingPersist } from '@/lib/use-column-sizing-persist';
+import { useRowSelection } from '@/lib/use-row-selection';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useSearchParamNumber, useSearchParamString } from '@/lib/use-search-param-state';
 import { useUiStore } from '@/stores/ui-store';
@@ -42,6 +45,7 @@ const STATUS_OPTIONS: ReadonlyArray<{ value: StockVoucherStatusFilter; label: st
 const VALID_STATUSES = new Set<string>(STATUS_OPTIONS.map((o) => o.value));
 
 const COLUMN_SIZING_DEFAULTS: Record<string, number> = {
+  select: 36,
   code: 110,
   voucherAt: 130,
   warehouseName: 130,
@@ -56,7 +60,15 @@ const COLUMN_SIZING_DEFAULTS: Record<string, number> = {
   paidAmount: 120,
   status: 110,
   ownerName: 140,
+  actions: 48,
 };
+
+type RowSelection = ReturnType<typeof useRowSelection>;
+
+// The selection travels through table meta so the column definitions (and their cell components) stay stable.
+function selectionOf(table: TanstackTable<StockVoucherListItem>) {
+  return (table.options.meta as { selection: RowSelection }).selection;
+}
 
 const SELECT_CLASS = 'h-9 rounded-md border border-input bg-background px-2 text-sm';
 
@@ -123,7 +135,7 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
     : (savedStatus ?? 'Active');
   const ownerIds = useMemo(() => ownersParam.split(',').filter(Boolean), [ownersParam]);
 
-  const { data, isLoading, isFetching, isError, error } = useStockVouchers({
+  const listParams = {
     type,
     page,
     pageSize,
@@ -135,7 +147,13 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
     reasonId: reasonId || undefined,
     status,
     ownerUserIds: ownerIds.length > 0 ? ownerIds : undefined,
-  });
+  };
+  const { data, isLoading, isFetching, isError, error } = useStockVouchers(listParams);
+  const items = data?.items ?? [];
+  const selection = useRowSelection(
+    items.map((v) => v.id),
+    JSON.stringify(listParams),
+  );
 
   const { data: warehouses = [] } = useWarehouses();
   const { data: allReasons = [] } = useStockReasons({ direction: type });
@@ -153,6 +171,33 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
 
   const columns = useMemo<ColumnDef<StockVoucherListItem>[]>(
     () => [
+      {
+        id: 'select',
+        size: COLUMN_SIZING_DEFAULTS.select,
+        minSize: COLUMN_SIZING_DEFAULTS.select,
+        enableResizing: false,
+        header: ({ table }) => {
+          const s = selectionOf(table);
+          return (
+            <SelectionCheckbox
+              checked={s.allSelected}
+              indeterminate={s.someSelected}
+              onCheckedChange={s.toggleAll}
+              aria-label="Chọn tất cả phiếu trong trang"
+            />
+          );
+        },
+        cell: ({ row, table }) => {
+          const s = selectionOf(table);
+          return (
+            <SelectionCheckbox
+              checked={s.isSelected(row.original.id)}
+              onCheckedChange={(checked) => s.toggle(row.original.id, checked)}
+              aria-label={`Chọn ${row.original.code}`}
+            />
+          );
+        },
+      },
       {
         id: 'code',
         header: 'Số phiếu',
@@ -198,14 +243,30 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
           ),
       },
       textColumn('ownerName', 'Người tạo'),
+      {
+        id: 'actions',
+        header: '',
+        size: COLUMN_SIZING_DEFAULTS.actions,
+        minSize: COLUMN_SIZING_DEFAULTS.actions,
+        enableResizing: false,
+        cell: ({ row }) => (
+          <VoucherPrintButton
+            variant="icon"
+            kind="stock"
+            type={type}
+            vouchers={[{ id: row.original.id, code: row.original.code }]}
+          />
+        ),
+      },
     ],
-    [labels.basePath],
+    [labels.basePath, type],
   );
 
   const table = useReactTable({
-    data: data?.items ?? [],
+    data: items,
     columns,
     state: { columnSizing },
+    meta: { selection },
     onColumnSizingChange: setColumnSizing,
     columnResizeMode: 'onChange',
     enableColumnResizing: true,
@@ -334,6 +395,24 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
             </div>
           )}
 
+          {selection.selectedIds.length > 0 && (
+            <div
+              role="region"
+              aria-label="Phiếu đã chọn"
+              className="flex flex-wrap items-center gap-3 rounded-md border bg-muted/40 px-3 py-2 text-sm"
+            >
+              <span>Đã chọn {selection.selectedIds.length} phiếu</span>
+              <VoucherPrintButton
+                kind="stock"
+                type={type}
+                vouchers={items.filter((v) => selection.isSelected(v.id)).map((v) => ({ id: v.id, code: v.code }))}
+              />
+              <Button variant="ghost" size="sm" onClick={selection.clear}>
+                Bỏ chọn
+              </Button>
+            </div>
+          )}
+
           <div className="relative min-h-0 flex-1 overflow-hidden rounded-md border">
             {isFetching && !isLoading && (
               <div
@@ -385,7 +464,10 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
                     <TableRow
                       key={row.id}
                       className="cursor-pointer even:bg-muted/50"
-                      onClick={() => navigate(`${labels.basePath}/${row.original.id}`)}
+                      onClick={(e) => {
+                        // Clicks from portals (print dialog) bubble through the React tree; ignore them.
+                        if (e.currentTarget.contains(e.target as Node)) navigate(`${labels.basePath}/${row.original.id}`);
+                      }}
                     >
                       {row.getVisibleCells().map((c) => (
                         <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>

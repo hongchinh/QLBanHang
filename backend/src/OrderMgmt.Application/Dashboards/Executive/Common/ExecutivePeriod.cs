@@ -21,9 +21,9 @@ public sealed record ExecutivePeriod(DateOnly From, DateOnly To, DateOnly PrevFr
 
     public DateTimeOffset Start => VnTime.ToUtc(VnTime.StartOfDay(From));
 
-    public DateTimeOffset End => VnTime.ToUtc(VnTime.StartOfNextDay(To));
+    public DateTimeOffset End => ExecutiveDay.End(To);
 
     public DateTimeOffset PrevStart => VnTime.ToUtc(VnTime.StartOfDay(PrevFrom));
 
-    public DateTimeOffset PrevEnd => VnTime.ToUtc(VnTime.StartOfNextDay(PrevTo));
+    public DateTimeOffset PrevEnd => ExecutiveDay.End(PrevTo);
 }

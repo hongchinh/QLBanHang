@@ -41,7 +41,6 @@ public class CashMetricsService : ICashMetricsService
         var scope = await _scopes.ResolveAsync(query.BranchId, ct);
         var period = ExecutivePeriod.Create(query.From, query.To, today);
         var at = query.At ?? today;
-        var atEnd = VnTime.ToUtc(VnTime.StartOfNextDay(at));
 
         var funds = await LoadFundsAsync(scope, ct);
         var movements = await LoadMovementsAsync(funds, ct);
@@ -54,11 +53,7 @@ public class CashMetricsService : ICashMetricsService
         var net = receipts - payments;
         var prevNet = ReceiptTotal(previous) - PaymentTotal(previous);
 
-        // The opening amount is balance in every window, whatever its date.
-        var balances = movements
-            .Where(m => m.Kind == FundMovementKind.Opening || m.At < atEnd)
-            .GroupBy(m => m.FundId)
-            .ToDictionary(g => g.Key, g => g.Sum(m => m.Delta));
+        var balances = BalancesAt(movements, ExecutiveDay.End(at));
         var rows = funds
             .Select(f => new FundBalanceDto
             {
@@ -240,6 +235,14 @@ public class CashMetricsService : ICashMetricsService
         var byFund = await FundMovementQuery.LoadAsync(_db, funds.Select(f => f.Id).ToList(), ct);
         return byFund.Values.SelectMany(m => m).ToList();
     }
+
+    /// The balance of each fund at an instant: its opening amount, whatever its date, and every movement before the
+    /// instant. A fund without a movement has no entry.
+    private static Dictionary<Guid, decimal> BalancesAt(IEnumerable<FundMovement> movements, DateTimeOffset atEnd) =>
+        movements
+            .Where(m => m.Kind == FundMovementKind.Opening || m.At < atEnd)
+            .GroupBy(m => m.FundId)
+            .ToDictionary(g => g.Key, g => g.Sum(m => m.Delta));
 
     /// The movements dated in [from, to).
     private static List<FundMovement> InWindow(IEnumerable<FundMovement> movements, DateTimeOffset from, DateTimeOffset to) =>

@@ -45,7 +45,7 @@ public class DebtMetricsService : IDebtMetricsService
         var today = VnTime.ToVnDate(_clock.UtcNow);
         var scope = await _scopes.ResolveAsync(query.BranchId, ct);
         var at = query.At ?? today;
-        var atEnd = VnTime.ToUtc(VnTime.StartOfNextDay(at));
+        var atEnd = ExecutiveDay.End(at);
         var boundaries = DebtAging.DefaultBoundaries;
 
         var receivable = await LoadOpenItemsAsync(scope, DebtSide.Receivable, atEnd, ct);
@@ -83,7 +83,7 @@ public class DebtMetricsService : IDebtMetricsService
         var today = VnTime.ToVnDate(_clock.UtcNow);
         var scope = await _scopes.ResolveAsync(query.BranchId, ct);
         var at = query.At ?? today;
-        var atEnd = VnTime.ToUtc(VnTime.StartOfNextDay(at));
+        var atEnd = ExecutiveDay.End(at);
 
         var receivable = await LoadOpenItemsAsync(scope, DebtSide.Receivable, atEnd, ct);
         var payable = await LoadOpenItemsAsync(scope, DebtSide.Payable, atEnd, ct);
@@ -196,7 +196,7 @@ public class DebtMetricsService : IDebtMetricsService
                     BranchCode = BranchCodeOf(branchCodes, b.BranchId),
                     Balance = b.Balance,
                     Limit = b.Limit,
-                    Over = b.Balance - b.Limit,
+                    Over = b.Over,
                 };
             })
             .OrderByDescending(r => r.Over)
@@ -283,7 +283,11 @@ public class DebtMetricsService : IDebtMetricsService
 
     private sealed record CreditLimitRow(Guid CustomerId, Guid BranchId, decimal Amount);
 
-    private sealed record LimitBreach(Guid PartnerId, Guid BranchId, decimal Balance, decimal Limit);
+    private sealed record LimitBreach(Guid PartnerId, Guid BranchId, decimal Balance, decimal Limit)
+    {
+        /// How far the balance is above the limit.
+        public decimal Over => Balance - Limit;
+    }
 
     private sealed record EmployeeTotal(Guid? OwnerUserId, decimal Open, decimal Overdue);
 }

@@ -116,6 +116,17 @@ describe('giveFocusBack', () => {
     expect(onClick).toHaveBeenCalledTimes(2);
   });
 
+  // The watch ends with the release itself, not only with the next press.
+  it('once the key was released, nothing on the element is swallowed any more', () => {
+    const { button, onClick } = saveButton();
+    giveFocusBack(button);
+
+    fireEvent.keyUp(button, { key: 'Enter' });
+    keyDown(button, { repeat: true });
+
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
+
   // The release went unnoticed, e.g. the window lost the focus while the key was down.
   it('a new press acts even when no release was seen, and so do its repeats', () => {
     const { button, onClick } = saveButton();

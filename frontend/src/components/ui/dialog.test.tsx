@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from './dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './dialog';
 
 // Opened from state, with no DialogTrigger: Radix has no trigger to give the focus back to.
 function StateDialog({ opener }: { opener?: 'remove' | 'disable' }) {
@@ -47,6 +47,56 @@ describe('Dialog focus return', () => {
 
     await waitFor(() => expect(screen.queryByText('Tiêu đề')).toBeNull());
     expect(document.activeElement).toBe(opener);
+  });
+
+  // Radix asks where the focus goes a tick after the dialog has gone (after its exit animation in a browser). A page
+  // that moves the focus itself once the dialog is closed (the next field after a pick) must keep it.
+  it('does not take the focus back from an element that got it once the dialog had closed', async () => {
+    render(<StateDialog />);
+    const opener = screen.getByTestId('opener');
+    act(() => opener.focus());
+    fireEvent.click(opener);
+    await screen.findByText('Tiêu đề');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Xong' }));
+    expect(screen.queryByText('Tiêu đề')).toBeNull();
+    const other = screen.getByRole('button', { name: 'Khác' });
+    act(() => other.focus());
+    // Past the tick in which the closed dialog hands the focus back.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(document.activeElement).toBe(other);
+  });
+
+  // With a DialogTrigger Radix would put the focus back on the trigger itself, whatever has it by then.
+  it('does not take the focus back to its trigger from an element that got it once the dialog had closed', async () => {
+    render(
+      <>
+        <Dialog>
+          <DialogTrigger asChild>
+            <button type="button">Mở</button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogTitle>Tiêu đề</DialogTitle>
+            <DialogDescription>Mô tả</DialogDescription>
+          </DialogContent>
+        </Dialog>
+        <button type="button">Khác</button>
+      </>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Mở' });
+    act(() => trigger.focus());
+    fireEvent.click(trigger);
+    await screen.findByText('Tiêu đề');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Đóng' }));
+    expect(screen.queryByText('Tiêu đề')).toBeNull();
+    const other = screen.getByRole('button', { name: 'Khác' });
+    act(() => other.focus());
+    // Past the tick in which the closed dialog hands the focus back.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(document.activeElement).toBe(other);
   });
 
   // Enter held on the opener: the press opens the dialog, a repeat presses its first button, which closes it, and the

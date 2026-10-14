@@ -132,6 +132,28 @@ describe('ConfirmRequiredDialog', () => {
     }
   });
 
+  // Radix asks where the focus goes a tick after the dialog has gone: an element that got the focus meanwhile keeps it.
+  it('does not take the focus from an element that got it once the dialog had closed', async () => {
+    const target = document.createElement('input');
+    const other = document.createElement('input');
+    document.body.append(target, other);
+    try {
+      const { rerender } = render(
+        <ConfirmRequiredDialog request={warning} onConfirm={vi.fn()} onClose={vi.fn()} restoreFocusTo={() => target} />,
+      );
+      rerender(<ConfirmRequiredDialog request={null} onConfirm={vi.fn()} onClose={vi.fn()} restoreFocusTo={() => target} />);
+      expect(screen.queryByRole('dialog')).toBeNull();
+      act(() => other.focus());
+      // Past the tick in which the closed dialog hands the focus back.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+
+      expect(document.activeElement).toBe(other);
+    } finally {
+      target.remove();
+      other.remove();
+    }
+  });
+
   // A grid cell moves on Enter by itself: a long press that dismissed the dialog must not walk the grid once the focus
   // is back in the cell.
   it('the repeats of a key still held down do not reach the element it gives the focus to', async () => {

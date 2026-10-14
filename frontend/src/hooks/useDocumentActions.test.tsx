@@ -400,6 +400,55 @@ describe('useDocumentActions focus return', () => {
     await waitFor(() => expect(document.activeElement).toBe(other));
   });
 
+  it('stops watching the focus once the form is gone', () => {
+    const add = vi.spyOn(document, 'addEventListener');
+    const remove = vi.spyOn(document, 'removeEventListener');
+    try {
+      const { unmount } = render(<Harness perform={vi.fn()} />);
+      const listeners = add.mock.calls.filter(([type, , capture]) => type === 'focusin' && capture === true);
+      expect(listeners).toHaveLength(1);
+      unmount();
+      expect(remove).toHaveBeenCalledWith('focusin', listeners[0][1], true);
+    } finally {
+      add.mockRestore();
+      remove.mockRestore();
+    }
+  });
+
+  // A Radix AlertDialog has role="alertdialog": it comes and goes like any dialog.
+  it('never takes a control of an alert dialog for where the user was', async () => {
+    const perform = vi.fn<(a: Action) => Promise<void>>().mockImplementation(blurAndReject('NEGATIVE_FUND_WARNING'));
+    function Page() {
+      const [alert, setAlert] = useState(true);
+      return (
+        <>
+          <Harness perform={perform} />
+          {alert && (
+            <div role="alertdialog" aria-label="Thông báo">
+              <button type="button" onClick={() => setAlert(false)}>
+                OK
+              </button>
+            </div>
+          )}
+        </>
+      );
+    }
+    render(<Page />);
+    const save = screen.getByTestId('save');
+    act(() => save.focus());
+    const ok = screen.getByRole('button', { name: 'OK' });
+    act(() => ok.focus());
+    fireEvent.click(ok);
+    expect(ok.isConnected).toBe(false);
+
+    fireEvent.click(save);
+    await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(document.activeElement).toBe(save));
+  });
+
   const options = {
     reload: async () => undefined,
     onReloaded: () => {},
@@ -521,6 +570,28 @@ describe('useDocumentActions focus return', () => {
       // So a blind Enter runs nothing.
       await userEvent.keyboard('{Enter}');
       expect(onDiscardDraft).not.toHaveBeenCalled();
+    });
+
+    // jsdom ignores focus() on a disabled control, so where the focus ends up cannot show whether the dialog tried to
+    // give it to that element: the test watches the focus calls themselves.
+    it('does not even try to focus that element while it is disabled', async () => {
+      render(<LostOriginPage fate="disabled while the action ran" onDiscardDraft={vi.fn()} />);
+      const origin = screen.getByLabelText('Mã hàng');
+      act(() => origin.focus());
+      fireEvent.keyDown(origin, { key: 's', ctrlKey: true });
+      await screen.findByRole('dialog');
+      expect(origin).toBeDisabled();
+      const focus = vi.spyOn(HTMLElement.prototype, 'focus');
+      try {
+        fireEvent.click(screen.getByRole('button', { name: 'Quay lại' }));
+
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        // Past the tick in which the closed dialog hands the focus back.
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(focus.mock.contexts).not.toContain(origin);
+      } finally {
+        focus.mockRestore();
+      }
     });
   });
 

@@ -196,12 +196,17 @@ public class DashboardSignalTests : ExecutiveDashboardTestBase
             webApi.Where(t => t.GetCustomAttribute<DashboardSignalAttribute>() is not null)
                 .Should().BeEquivalentTo(expected.Keys, "no other controller sends the signal");
 
-            // stock-at is the one action of these controllers that is not a GET and changes nothing.
+            // stock-at and the batch prints of cash and stock vouchers are the actions of these controllers that are
+            // not a GET and change nothing. The order of GetTypes() / GetMethods() is not fixed.
             var stockAt = typeof(StockVouchersController).GetMethods()
                 .Single(m => m.GetCustomAttribute<HttpPostAttribute>()?.Template == "stock-at");
+            var cashPrint = typeof(CashVouchersController).GetMethods()
+                .Single(m => m.GetCustomAttribute<HttpPostAttribute>()?.Template == "print");
+            var stockPrint = typeof(StockVouchersController).GetMethods()
+                .Single(m => m.GetCustomAttribute<HttpPostAttribute>()?.Template == "print");
             webApi.SelectMany(t => t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.DeclaredOnly))
                 .Where(m => m.GetCustomAttribute<SkipDashboardSignalAttribute>() is not null)
-                .Should().Equal(stockAt);
+                .Should().BeEquivalentTo(new[] { stockAt, cashPrint, stockPrint });
         }
 
         [Fact]

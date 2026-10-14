@@ -2,6 +2,12 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { AppShell } from '../app-shell';
 
+// Every class of the content box is load-bearing. `flex flex-col` lets the routed page fill the column with
+// flex-1 (in a block box AppLayout would grow past the window), `min-h-0` lets the box shrink below its content,
+// and `overflow-y-auto` keeps a page that is still taller than the room (the login card on a short window)
+// scrolling inside the shell instead of the document.
+const CONTENT_CLASSES = ['flex', 'min-h-0', 'flex-1', 'flex-col', 'overflow-y-auto'];
+
 // jsdom has no layout: these assert the structure that makes banner + app one viewport-high column.
 // Only a browser can prove the pixels (the document must not scroll while the banner shows).
 describe('AppShell', () => {
@@ -17,7 +23,7 @@ describe('AppShell', () => {
     const [bannerSlot, content] = Array.from(shell.children);
     expect(bannerSlot).toHaveClass('shrink-0');
     expect(bannerSlot).toContainElement(screen.getByText('Bật thông báo'));
-    expect(content).toHaveClass('min-h-0', 'flex-1', 'flex-col');
+    expect(content).toHaveClass(...CONTENT_CLASSES);
     expect(content).toContainElement(screen.getByText('app'));
   });
 
@@ -30,6 +36,6 @@ describe('AppShell', () => {
 
     const shell = screen.getByTestId('app-shell');
     expect(shell.children).toHaveLength(1);
-    expect(shell.firstElementChild).toHaveClass('min-h-0', 'flex-1');
+    expect(shell.firstElementChild).toHaveClass(...CONTENT_CLASSES);
   });
 });

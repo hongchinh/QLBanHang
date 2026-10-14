@@ -126,6 +126,32 @@ describe('ProductTypeaheadCell', () => {
       expect(screen.getByRole('listbox')).toBeInTheDocument();
     });
 
+    // A Tab during the catalog's close animation: the box never gets the focus back from the catalog, so nothing has
+    // used up the pick. A later focus of the box is the user's own and opens the list.
+    it('opens the list on a later focus when the focus went somewhere else as the catalog closed', async () => {
+      render(<Page />);
+      const now = vi.spyOn(performance, 'now');
+      try {
+        const input = screen.getByRole('combobox');
+        act(() => input.focus());
+        fireEvent.mouseDown(screen.getByRole('button', { name: /Xem danh mục đầy đủ/ }));
+        const catalog = await screen.findByRole('dialog');
+        now.mockReturnValue(10_000);
+        fireEvent.doubleClick(within(catalog).getByText('TON01'));
+        act(() => screen.getByLabelText('Tên hàng').focus());
+        await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        act(() => screen.getByLabelText('Tên hàng').focus());
+
+        now.mockReturnValue(12_000);
+        act(() => input.focus());
+
+        expect(screen.getByRole('listbox')).toBeInTheDocument();
+      } finally {
+        now.mockRestore();
+      }
+    });
+
     // The quotation grid moves on to the name cell after a pick; coming back to the box later is a focus like any other.
     it('that moves on to the next cell leaves the box opening its list when the user comes back', async () => {
       render(<Page nextFocusId="name" />);

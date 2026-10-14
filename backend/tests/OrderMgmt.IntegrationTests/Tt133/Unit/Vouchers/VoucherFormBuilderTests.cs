@@ -96,6 +96,22 @@ public class VoucherFormBuilderTests
     }
 
     [Fact]
+    public void Header_cells_are_top_aligned()
+    {
+        var (b, ws) = NewBuilder(Context());
+
+        b.WriteHeaderBlock("01-TT");
+
+        foreach (var text in new[]
+                 {
+                     "Đơn vị: Công ty ABC – Chi nhánh HN", "Địa chỉ: 12 Láng Hạ", "Mẫu số 01-TT",
+                     "(Ban hành theo Thông tư số 133/2016/TT-BTC", "ngày 26/8/2016 của Bộ Tài chính)",
+                 })
+            CellWith(ws, text).Style.Alignment.Vertical.Should().Be(XLAlignmentVerticalValues.Top, text);
+        ws.Cell(3, 1).Style.Alignment.Vertical.Should().Be(XLAlignmentVerticalValues.Top);
+    }
+
+    [Fact]
     public void Header_without_company_profile()
     {
         var (b, ws) = NewBuilder(new Tt133FormContext { PrintDate = new DateOnly(2026, 10, 14) });

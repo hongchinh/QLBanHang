@@ -52,7 +52,8 @@ public sealed class VoucherFormBuilder
 
     public IXLWorksheet Sheet { get; }
 
-    /// Unit and address on the left, the form code and its legal basis on the right; no MST line.
+    /// Unit and address on the left, the form code and its legal basis on the right; no MST line. Top-aligned, so the
+    /// right lines stay together when a left line wraps.
     public void WriteHeaderBlock(string formCode)
     {
         var unit = string.IsNullOrWhiteSpace(_context.CompanyName)
@@ -74,11 +75,13 @@ public sealed class VoucherFormBuilder
             var leftCell = Merged(row, 1, _leftEnd);
             leftCell.Value = left[i];
             leftCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            leftCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
 
             var rightCell = Merged(row, _rightStart, _columns.Count);
             rightCell.Value = right[i];
             rightCell.Style.Font.Bold = i == 0;
             rightCell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            rightCell.Style.Alignment.Vertical = XLAlignmentVerticalValues.Top;
 
             var lines = Math.Max(
                 Wrap(leftCell, left[i], 1, _leftEnd, bold: false),

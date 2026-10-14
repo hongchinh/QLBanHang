@@ -3,15 +3,18 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Domain.Enums;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
 /// Type-specific permissions (stock_in.* / stock_out.*) are checked by the service.
 [Route("api/stock-vouchers")]
 [Authorize]
+[DashboardSignal(DashboardDomains.All)]
 [ProducesResponseType(typeof(ApiResponse), StatusCodes.Status422UnprocessableEntity)]
 public class StockVouchersController : ApiControllerBase
 {
@@ -48,7 +51,9 @@ public class StockVouchersController : ApiControllerBase
         [FromQuery] StockDirection type, [FromQuery] DateTimeOffset? voucherAt, CancellationToken ct)
         => Success(await _service.GetDefaultsAsync(type, voucherAt, ct));
 
+    /// A POST because of its body; it only reads, so the dashboards are not told.
     [HttpPost("stock-at")]
+    [SkipDashboardSignal]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<StockAtResult>>>> GetStockAt(
         [FromBody] StockAtRequest request, CancellationToken ct)
     {

@@ -6,8 +6,10 @@ using OrderMgmt.Application.CashDebt.Debt.Models;
 using OrderMgmt.Application.CashDebt.Ledger;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.WebApi.Authorization;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
@@ -15,6 +17,7 @@ namespace OrderMgmt.WebApi.Controllers;
 /// the settlement endpoints need debt.matching.
 [Route("api/debt")]
 [Authorize]
+[DashboardSignal(DashboardDomains.Debt)]
 public class DebtController : ApiControllerBase
 {
     private readonly IDebtService _service;

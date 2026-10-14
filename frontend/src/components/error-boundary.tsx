@@ -1,8 +1,15 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface Props {
   children: ReactNode;
+  /**
+   * Set it where a parent already gives the fallback its height (inside AppShell): the fallback fills that
+   * box. Without it the fallback claims the viewport height itself, which is right only where it replaces
+   * the whole app.
+   */
+  fill?: boolean;
 }
 
 interface State {
@@ -27,7 +34,13 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (this.state.error) {
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
+        <div
+          className={cn(
+            'flex',
+            this.props.fill ? 'flex-1' : 'min-h-screen',
+            'flex-col items-center justify-center gap-3 p-6 text-center',
+          )}
+        >
           <h1 className="text-2xl font-bold">Đã có lỗi xảy ra</h1>
           <p className="max-w-md text-sm text-muted-foreground">
             {this.state.error.message || 'Lỗi không xác định.'}

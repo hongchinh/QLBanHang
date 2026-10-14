@@ -54,6 +54,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useDocumentActions } from '@/hooks/useDocumentActions';
 import { getErrorMessage } from '@/lib/api-client';
+import { DIALOG_SELECTOR, PAGE_AREA_SELECTOR } from '@/lib/focus';
 import type { ConfirmFlags } from '@/lib/confirm-required';
 import { toOptionalNumber } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
@@ -68,6 +69,12 @@ import { StockVoucherMainFields, FieldError, SELECT_CLASS } from './components/s
 import { StockVoucherPaymentTab } from './components/stock-voucher-payment-tab';
 import { StockVoucherTabs } from './components/stock-voucher-tabs';
 import { savedImpactOf } from './utils/debt-after-voucher';
+import {
+  HEADER_ERROR_FIELDS,
+  LINE_ERROR_FIELDS,
+  QUANTITY_SOURCES,
+  staleServerErrorKeys,
+} from './utils/server-field-errors';
 import { errorTabs, firstErrorTab, tabOfField, type StockVoucherTab } from './utils/voucher-tabs';
 import { computeStockVoucher, type StockLineLike } from './utils/compute-stock-line';
 import { STOCK_VOUCHER_LABELS, type StockVoucherLabels } from './labels';
@@ -98,25 +105,32 @@ const CONCURRENCY_MESSAGE =
 const CONCURRENCY_RELOAD_FAILED_MESSAGE =
   'Phiếu đã được người khác cập nhật nhưng không tải lại được dữ liệu. Các thay đổi của bạn vẫn được giữ — vui lòng thử lại.';
 
-// Header fields that show their own error message.
-const HEADER_ERROR_FIELDS = new Set<string>(['fundId', 'dueDate', 'paidAmount', 'paymentMethodId']);
-
-const LINE_ERROR_FIELDS = new Set<string>([
-  'productId',
-  'warehouseId',
-  'sheetCount',
-  'length',
-  'width',
-  'thickness',
-  'quantity',
-  'unitPrice',
-  'discountRate',
-  'discountAmount',
-  'vatRate',
-  'note',
-]);
-
 const ALT_TABS: Record<string, StockVoucherTab> = { '1': 'lines', '2': 'other', '3': 'payment', '4': 'history' };
+
+// What the shortcuts read of a key event, React's or the DOM's.
+type ShortcutKeyEvent = Pick<
+  KeyboardEvent,
+  'key' | 'ctrlKey' | 'shiftKey' | 'altKey' | 'metaKey' | 'repeat' | 'target' | 'preventDefault'
+>;
+
+// Ctrl+S saves (with Caps Lock too, not with Shift); Alt+1..4 switch tabs, Alt+4 only on a saved voucher.
+function shortcutOf(e: ShortcutKeyEvent, isEdit: boolean): 'save' | StockVoucherTab | undefined {
+  // Chrome sends a keydown with no key when an autofill entry is picked; React's handler sees 'Unidentified'.
+  const key: string = typeof e.key === 'string' ? e.key : '';
+  if (key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) return 'save';
+  const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[key] : undefined;
+  return altTab === 'history' && !isEdit ? undefined : altTab;
+}
+
+// Radix wraps the content of a popover in it. The grid's popovers are role="dialog" too, but they do not block the page.
+const POPOVER = '[data-radix-popper-content-wrapper]';
+
+// A modal dialog owns its keys, also one that sits inside the form in the React tree (the product catalog of a Mã
+// cell), whose keys reach the form's handler.
+function inModalDialog(target: EventTarget | null): boolean {
+  const dialog = target instanceof Element ? target.closest(DIALOG_SELECTOR) : null;
+  return !!dialog && !dialog.closest(POPOVER);
+}
 
 const JUMP_IDS: Record<TotalsJumpField, string> = {
   freight: 'stock-freight',
@@ -166,14 +180,34 @@ function errorKeysOf(errors: FieldErrors<StockVoucherFormValues>): string[] {
   return keys;
 }
 
-// Accepts form keys and server keys (`lines[3].width`).
-function focusIdOf(key: string): string | undefined {
+// The ids of the controls that correct the error of a key, best first. Accepts form keys and server keys
+// (`lines[3].width`).
+function focusIdsOf(key: string): string[] {
   const line = /^lines(?:\.|\[)(\d+)(?:\]\.|\.)(\w+)$/.exec(key);
   if (line) {
-    const cell = LINE_CELL_IDS[line[2]];
-    return cell ? `stock-line-${cell}-${line[1]}` : undefined;
+    // SL of a line priced by size is computed, and disabled: the cells it is computed from correct its error.
+    const fields = line[2] === 'quantity' ? ['quantity', ...QUANTITY_SOURCES] : [line[2]];
+    return fields.filter((field) => LINE_CELL_IDS[field]).map((field) => `stock-line-${LINE_CELL_IDS[field]}-${line[1]}`);
   }
-  return key === 'lines' ? 'stock-line-product-code-0' : FIELD_FOCUS_IDS[key];
+  const id = key === 'lines' ? 'stock-line-product-code-0' : FIELD_FOCUS_IDS[key];
+  return id ? [id] : [];
+}
+
+function productCodeCell(row: number): HTMLElement | null {
+  return document.getElementById(`stock-line-product-code-${row}`);
+}
+
+// A focused cell must not go down with its row: the focus would fall on <body>, where the grid keys do not reach,
+// and after a 422 dialog there would be nothing to give it back to. Call before rows without a product are dropped,
+// while at least one row stays: a focus inside a row that goes moves to the product code of the last row that stays.
+function moveFocusOffBlankRows(lines: readonly StockLineFormValues[]) {
+  const active = document.activeElement;
+  const inBlankRow = lines.some(
+    (line, row) => !line.productId && !!productCodeCell(row)?.closest('tr')?.contains(active),
+  );
+  if (!inBlankRow) return;
+  const lastKept = lines.reduce((last, line, row) => (line.productId ? row : last), -1);
+  productCodeCell(lastKept)?.focus();
 }
 
 export function StockVoucherFormPage({ type }: { type: StockDirection }) {
@@ -275,6 +309,24 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     initialHasDraft: !!mountData.draft,
     initialSavedAt: mountData.draft ? new Date(mountData.draft.savedAt) : null,
   });
+
+  // A server error describes the value that was sent: it goes as soon as that value (or what drives it) changes.
+  // Client (zod) errors are left to the resolver.
+  useEffect(() => {
+    const copyLines = () => form.getValues('lines').map((line) => ({ ...line }));
+    // The lines before the change being handled: a product pick replaces a whole line at once.
+    let previousLines = copyLines();
+    const subscription = form.watch((_values, { name }) => {
+      if (name) {
+        for (const key of staleServerErrorKeys(name, form.getValues(), previousLines)) {
+          const path = key as FieldPath<StockVoucherFormValues>;
+          if (form.getFieldState(path).error?.type === 'server') form.clearErrors(path);
+        }
+      }
+      previousLines = copyLines();
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   const status = voucher?.status ?? 'Active';
   const readOnly = isEdit && (status === 'Cancelled' || !voucher?.canEdit);
@@ -461,16 +513,17 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     const tab = firstErrorTab(keys);
     if (!tab) return;
     setActiveTab(tab);
-    const id = keys.filter((k) => tabOfField(k) === tab).map(focusIdOf).find((v) => !!v);
+    const ids = keys.filter((k) => tabOfField(k) === tab).map(focusIdsOf).find((v) => v.length > 0) ?? [];
     // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
     // A missing target (e.g. a voucher with no lines has no first cell) falls back to a control inside the form.
     setTimeout(() => {
       const candidates = [
-        id ? document.getElementById(id) : null,
+        ...ids.map((id) => document.getElementById(id)),
         document.getElementById('stock-line-add'),
         document.querySelector<HTMLElement>('[role="tab"][data-state="active"]'),
       ];
-      // A control in a hidden panel refuses focus, so take the first candidate that actually receives it.
+      // A control in a hidden panel, or a disabled one, refuses focus, so take the first candidate that actually
+      // receives it.
       for (const el of candidates) {
         el?.focus();
         if (el && document.activeElement === el) return;
@@ -487,7 +540,9 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   function dropBlankLines() {
     const lines = form.getValues('lines');
     const kept = lines.filter((l) => !!l.productId);
-    if (kept.length > 0 && kept.length < lines.length) form.setValue('lines', kept, { shouldDirty: true });
+    if (kept.length === 0 || kept.length === lines.length) return;
+    moveFocusOffBlankRows(lines);
+    form.setValue('lines', kept, { shouldDirty: true });
   }
 
   function submitWithIntent(intent: SubmitIntent) {
@@ -512,25 +567,52 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       });
   }
 
-  function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
-    if (e.defaultPrevented) return;
-    if (e.key.toLowerCase() === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
-      e.preventDefault();
+  // Takes a shortcut key (shortcutOf) from the browser and runs its shortcut, unless the key was typed in a modal
+  // dialog; returns whether it took the key. A key held down repeats: the repeats are taken too but run nothing, or a
+  // held Ctrl+S would save again each time the save before it ended.
+  function runShortcut(e: ShortcutKeyEvent): boolean {
+    const shortcut = shortcutOf(e, isEdit);
+    if (!shortcut || inModalDialog(e.target)) return false;
+    e.preventDefault();
+    if (e.repeat) return true;
+    if (shortcut === 'save') {
       submitWithIntent(isEdit ? 'update' : 'save-stay');
-      return;
-    }
-    const altTab = e.altKey && !e.ctrlKey && !e.shiftKey && !e.metaKey ? ALT_TABS[e.key] : undefined;
-    if (altTab && (altTab !== 'history' || isEdit)) {
-      e.preventDefault();
-      setActiveTab(altTab);
+    } else {
+      setActiveTab(shortcut);
       // The focused cell may sit in a panel that is about to be hidden; keep the focus in the form so Ctrl+S / Alt+n keep working.
       setTimeout(() => document.querySelector<HTMLElement>('[role="tab"][data-state="active"]')?.focus(), 0);
-      return;
     }
+    return true;
+  }
+
+  function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.defaultPrevented || runShortcut(e)) return;
     // D7: Enter never submits the form.
     const tag = (e.target as HTMLElement).tagName;
     if (e.key === 'Enter' && (tag === 'INPUT' || tag === 'SELECT')) e.preventDefault();
   }
+
+  // The form hears its keys only while the focus is inside it. After a save that opened the saved voucher, after a
+  // title-bar button or a dialog whose opener is gone, the focus is on <body> or in the title bar: the shortcuts are
+  // taken from the document there. A key inside the form is the form's own; the app header and sidebar, and every
+  // key while a dialog is open, are left alone.
+  const formRef = useRef<HTMLFormElement>(null);
+  // The shortcuts of the latest render: they read busy, readOnly and which fields are shown.
+  const runShortcutRef = useRef(runShortcut);
+  runShortcutRef.current = runShortcut;
+  useEffect(() => {
+    function handleDocumentKeyDown(e: KeyboardEvent) {
+      // Every key pressed anywhere comes here, each one typed in the grid too: the cheap checks go first, and the
+      // search of the whole page for an open dialog last.
+      if (e.defaultPrevented || !shortcutOf(e, isEdit)) return;
+      const target = e.target instanceof Element ? e.target : null;
+      const inPageOutsideForm = !!target?.closest(PAGE_AREA_SELECTOR) && !formRef.current?.contains(target);
+      if (target !== document.body && !inPageOutsideForm) return;
+      if (!document.querySelector(DIALOG_SELECTOR)) runShortcutRef.current(e);
+    }
+    document.addEventListener('keydown', handleDocumentKeyDown);
+    return () => document.removeEventListener('keydown', handleDocumentKeyDown);
+  }, [isEdit]);
 
   // Enter from the main area: the first line without a product, or a new one.
   function enterGrid() {
@@ -541,7 +623,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       idx = lines.length;
       form.setValue('lines', [...lines, createEmptyStockLine(idx, form.getValues('warehouseId'))], { shouldDirty: true });
     }
-    setTimeout(() => document.getElementById(`stock-line-product-code-${idx}`)?.focus(), 0);
+    setTimeout(() => productCodeCell(idx)?.focus(), 0);
   }
 
   function handleSelectPartner(p: PartnerSearchItem | null) {
@@ -684,6 +766,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
       {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- Form-level Ctrl+S shortcut delegates to the submit handler. */}
       <form
+        ref={formRef}
         onSubmit={(e) => {
           e.preventDefault();
           submitWithIntent(isEdit ? 'update' : 'save-stay');

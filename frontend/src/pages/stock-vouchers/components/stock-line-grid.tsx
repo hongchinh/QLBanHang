@@ -1,5 +1,5 @@
 import { createPortal } from 'react-dom';
-import { useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { Keyboard, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,7 @@ import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import { cn } from '@/lib/utils';
+import { DIALOG_SELECTOR } from '@/lib/focus';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
 import { toOptionalNumber } from '@/lib/to-number';
@@ -130,6 +131,48 @@ function parseQuantityInput(text: string): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/**
+ * Tells a keyboard focus from a mouse one. A mouse press on the cell comes right before its mouse focus; every other
+ * focus is keyboard navigation (Enter / arrows / Ctrl+Delete through focusCell, or Tab). After keyboard navigation a
+ * numeric cell selects its whole value at once, so a digit typed right away replaces the value instead of being
+ * appended. What a mouse focus does is up to the cell: a type=number cell selects nothing, so the caret stays where
+ * the browser put it; a NumberCell selects its whole text one frame later, as it always did. The focus a cell gets
+ * back when the window comes to the front again (alt-tab) is no navigation: it counts as a mouse focus, so what the
+ * user was typing is not selected and replaced by the next digit. Returns the props to spread on the <input>.
+ */
+function useFocusOrigin(onFocus: (el: HTMLInputElement, byKeyboard: boolean) => void, onBlur?: () => void) {
+  const pressed = useRef(false);
+  // Up while the window is in the background with this cell as the page's focused element.
+  const windowAway = useRef(false);
+  return {
+    onMouseDown: () => {
+      pressed.current = true;
+    },
+    onFocus: (e: FocusEvent<HTMLInputElement>) => {
+      // The window's return brings the focus from outside the page. A focus from another element is a visit, also
+      // when the window came back with a click elsewhere and this cell never got its focus back.
+      const windowReturn = windowAway.current && e.relatedTarget === null;
+      const byKeyboard = !pressed.current && !windowReturn;
+      pressed.current = false;
+      windowAway.current = false;
+      onFocus(e.currentTarget, byKeyboard);
+    },
+    onBlur: (e: FocusEvent<HTMLInputElement>) => {
+      // A press on the cell that already had the focus is followed by no focus event: forget it here.
+      pressed.current = false;
+      // When the focus moves inside the page, the cell is no longer the active element by now; when the window
+      // loses the focus, it still is.
+      windowAway.current = e.currentTarget === document.activeElement;
+      onBlur?.();
+    },
+  };
+}
+
+// A type=number cell shows the same text focused or not, so its value is selected right in the focus event.
+function selectOnKeyboardFocus(el: HTMLInputElement, byKeyboard: boolean) {
+  if (byKeyboard) el.select();
+}
+
 interface NumberCellProps {
   field: LineFocusField;
   rowIndex: number;
@@ -145,8 +188,35 @@ interface NumberCellProps {
 // Formatted when idle; raw text while focused. Every keystroke commits the parsed value.
 function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, disabled, error }: NumberCellProps) {
   const [editing, setEditing] = useState<string | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  const selectAfterRender = useRef(false);
+  // Keyboard focus: the raw text replaces the formatted one in the render the focus causes, so select it as soon as
+  // that render commits. React renders it in a microtask right after the event that moved the focus: the text is
+  // selected before the browser handles the next key, not a frame later.
+  useLayoutEffect(() => {
+    if (!selectAfterRender.current) return;
+    selectAfterRender.current = false;
+    if (document.activeElement === ref.current) ref.current?.select();
+  });
+  const focusProps = useFocusOrigin(
+    (el, byKeyboard) => {
+      setEditing(value === undefined ? '' : String(value));
+      if (byKeyboard) {
+        selectAfterRender.current = true;
+      } else {
+        // Mouse focus, as before: the browser sets the caret right after the focus event, so the whole text is
+        // selected one frame later. The first click on a cell therefore selects the whole number; only a click in
+        // the cell that already has the focus (no focus event, so no select) leaves the caret where the user clicked.
+        requestAnimationFrame(() => {
+          if (document.activeElement === el) el.select();
+        });
+      }
+    },
+    () => setEditing(null),
+  );
   return (
     <input
+      ref={ref}
       id={cellId(field, rowIndex)}
       className="cell-input cell-number tabular-nums"
       type="text"
@@ -155,18 +225,11 @@ function NumberCell({ field, rowIndex, label, value, format, parse, onCommit, di
       {...errorProps(field, rowIndex, error)}
       disabled={disabled}
       value={editing ?? format(value)}
-      onFocus={(e) => {
-        const el = e.currentTarget;
-        setEditing(value === undefined ? '' : String(value));
-        requestAnimationFrame(() => {
-          if (document.activeElement === el) el.select();
-        });
-      }}
+      {...focusProps}
       onChange={(e) => {
         setEditing(e.target.value);
         onCommit(parse(e.target.value));
       }}
-      onBlur={() => setEditing(null)}
     />
   );
 }
@@ -190,6 +253,7 @@ function PercentCell({
   error?: string;
 }) {
   const [editing, setEditing] = useState<string | null>(null);
+  const focusProps = useFocusOrigin(selectOnKeyboardFocus, () => setEditing(null));
   return (
     <input
       id={cellId(field, rowIndex)}
@@ -202,11 +266,46 @@ function PercentCell({
       {...errorProps(field, rowIndex, error)}
       disabled={disabled}
       value={editing ?? value ?? ''}
+      {...focusProps}
       onChange={(e) => {
         setEditing(e.target.value);
         onCommit(toOptionalNumber(e.target.value) ?? 0);
       }}
-      onBlur={() => setEditing(null)}
+    />
+  );
+}
+
+// Số tấm / Dài / Rộng / Dày: an emptied cell means "no value".
+function DimensionCell({
+  field,
+  rowIndex,
+  label,
+  value,
+  onCommit,
+  disabled,
+  error,
+}: {
+  field: LineFocusField;
+  rowIndex: number;
+  label: string;
+  value: number | string;
+  onCommit: (value: number | '') => void;
+  disabled: boolean;
+  error?: string;
+}) {
+  const focusProps = useFocusOrigin(selectOnKeyboardFocus);
+  return (
+    <input
+      id={cellId(field, rowIndex)}
+      className="cell-input cell-number tabular-nums"
+      type="number"
+      step="any"
+      aria-label={rowLabel(label, rowIndex)}
+      {...errorProps(field, rowIndex, error)}
+      disabled={disabled}
+      value={value}
+      {...focusProps}
+      onChange={(e) => onCommit(toOptionalNumber(e.target.value) ?? '')}
     />
   );
 }
@@ -240,8 +339,13 @@ export interface StockLineGridProps {
 
 export function StockLineGrid({ form, type, warehouses, computed, stockAt, readOnly, toolbarSlot }: StockLineGridProps) {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'lines' });
-  const watched = useWatch({ control: form.control, name: 'lines' }) as StockLineFormValues[] | undefined;
-  const rows = watched ?? [];
+  // The watch renders the grid on every line change, but the rows are read from the form itself, which always matches
+  // the field array. react-hook-form hands the result of remove() and append() to its watchers only from an effect,
+  // one render after the field array: read from the watched copy, the row that moves up after a delete would first
+  // render the deleted line's values. That write drops the selection a keyboard focus has just made, and a key typed
+  // at once is added to the deleted line's value and saved into the line that moved up.
+  useWatch({ control: form.control, name: 'lines' });
+  const rows = form.getValues('lines') ?? [];
 
   const lineErrors = form.formState.errors.lines;
 
@@ -249,8 +353,12 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const { prefs, toggleColumn, toggleEnterStop, reset } = useStockGridPrefs(userId, type);
   const headerWarehouseId = useWatch({ control: form.control, name: 'warehouseId' }) ?? '';
   const forced = forcedColumns(rows, headerWarehouseId, lineErrors);
+  // A column also stays while the focus is in one of its cells. What forced a hidden column in can end under the
+  // caret (the first key of a correction clears a server error; picking the header warehouse in Kho ends "another
+  // warehouse"), and hiding the column then would drop the focus on <body> with the rest of the keys.
+  const [focusedColumn, setFocusedColumn] = useState<OptionalColumn | null>(null);
   const isShown = (key: ColumnKey) =>
-    !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key);
+    !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key) || key === focusedColumn;
   // Remove a row without a focus gap: the focused cell lives in the row being removed, so move the focus to a
   // surviving row BEFORE removing. Its key keeps that row mounted, so the focus stays there and nothing has to
   // re-focus later (a later re-focus would undo a key the user pressed in between). With no line left the focus
@@ -399,16 +507,14 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     const error = errorOf(idx, field);
     return (
       <>
-        <input
-          id={cellId(focusField, idx)}
-          className="cell-input cell-number tabular-nums"
-          type="number"
-          step="any"
-          aria-label={rowLabel(label, idx)}
-          {...errorProps(focusField, idx, error)}
-          disabled={disabled}
+        <DimensionCell
+          field={focusField}
+          rowIndex={idx}
+          label={label}
           value={(line?.[field] ?? '') as number | string}
-          onChange={(e) => setLineField(idx, field, toOptionalNumber(e.target.value) ?? '')}
+          disabled={disabled}
+          error={error}
+          onCommit={(value) => setLineField(idx, field, value)}
         />
         <CellError id={errorId(focusField, idx)} message={error} />
       </>
@@ -585,17 +691,23 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         return percentInput(idx, 'vatRate', 'vat-rate', '%VAT');
       case 'vat-amount':
         return <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.vatAmount ?? 0)}</div>;
-      case 'note':
+      case 'note': {
+        const noteError = errorOf(idx, 'note');
         return (
-          <input
-            id={cellId('note', idx)}
-            className="cell-input"
-            aria-label={rowLabel('Ghi chú', idx)}
-            disabled={readOnly}
-            value={line.note ?? ''}
-            onChange={(e) => setLineField(idx, 'note', e.target.value)}
-          />
+          <>
+            <input
+              id={cellId('note', idx)}
+              className="cell-input"
+              aria-label={rowLabel('Ghi chú', idx)}
+              {...errorProps('note', idx, noteError)}
+              disabled={readOnly}
+              value={line.note ?? ''}
+              onChange={(e) => setLineField(idx, 'note', e.target.value)}
+            />
+            <CellError id={errorId('note', idx)} message={noteError} />
+          </>
         );
+      }
       case 'net-amount':
         return <div className="cell-readonly cell-number tabular-nums">{fmt.format(result?.netAmount ?? 0)}</div>;
       case 'action':
@@ -654,6 +766,21 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         className="accounting-grid-wrap stock-grid-wrap min-h-0 flex-1"
         tabIndex={-1}
         onKeyDown={handleGridKeyDown}
+        onFocus={(e) => {
+          const field = parseCellId(e.target.id)?.field;
+          setFocusedColumn(field && isOptional(field) ? field : null);
+        }}
+        onBlur={(e) => {
+          // The focus goes to another element of the grid: its focus event says which column holds it. A click runs the
+          // microtasks between the two events, so clearing here would first render the grid without the clicked cell.
+          if (e.currentTarget.contains(e.relatedTarget)) return;
+          // The window went to the background: the cell keeps the focus of the page, so it keeps its column.
+          if (e.target === document.activeElement) return;
+          // A dialog opened from the cell (the 422 of a Ctrl+S there) gives the focus back to it as it closes: the cell
+          // must still be on the page then.
+          if (e.relatedTarget instanceof Element && e.relatedTarget.closest(DIALOG_SELECTOR)) return;
+          setFocusedColumn(null);
+        }}
         style={{ '--stock-grid-left': `${left}px`, '--stock-grid-right': `${stickyRight}px` } as CSSProperties}
       >
         <table className="accounting-grid stock-grid" style={{ width: minWidth, minWidth }}>
@@ -672,11 +799,10 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
             </tr>
           </thead>
           <tbody>
-            {/* Keyed from the field-array item, not the watched row: right after remove() the watched rows still
-                hold the removed one, and keying from them would unmount the last <tr> instead. field.id is
-                regenerated on every nested setValue, so the item's own _uiKey is the stable key. */}
+            {/* Keyed from the field-array item, so a row keeps its <tr> (and the focus in it) when the rows above it
+                go. field.id is regenerated on every nested setValue, so the item's own _uiKey is the stable key. */}
             {fields.map((field, idx) => {
-              const line = rows[idx] ?? (field as unknown as StockLineFormValues);
+              const line = rows[idx];
               const result = computed[idx];
               return (
                 <tr key={(field as { _uiKey?: string })._uiKey ?? field.id}>

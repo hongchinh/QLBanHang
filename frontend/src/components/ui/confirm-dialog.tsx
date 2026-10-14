@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { ignoreKeyRepeat } from '@/lib/focus';
 
 interface Props {
   open: boolean;
@@ -38,7 +39,8 @@ export function ConfirmDialog({
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        <DialogFooter>
+        {/* The press that opened the dialog may still be down: its repeats must not press a button here. */}
+        <DialogFooter onKeyDown={ignoreKeyRepeat}>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             {cancelLabel}
           </Button>

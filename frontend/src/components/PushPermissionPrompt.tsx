@@ -1,4 +1,5 @@
 import type { PushState } from '@/hooks/usePushNotification'
+import { isPushPromptVisible } from './push-prompt-visibility'
 
 interface Props {
   state: PushState
@@ -7,13 +8,13 @@ interface Props {
 }
 
 export function PushPermissionPrompt({ state, onEnable, onDismiss }: Props) {
-  if (state === 'denied' || state === 'granted' || state === 'unsupported') return null
+  if (!isPushPromptVisible(state)) return null
 
   const isError = state === 'error'
   const isLoading = state === 'loading'
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2">
       <div className="text-sm text-blue-900">
         {isError
           ? 'Bật thông báo thất bại. Vui lòng thử lại.'

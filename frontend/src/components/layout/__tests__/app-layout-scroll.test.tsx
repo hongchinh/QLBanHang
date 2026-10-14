@@ -25,4 +25,22 @@ describe('AppLayout grid', () => {
     expect(grid).toHaveClass('grid-rows-[4rem_minmax(0,1fr)]');
     expect(grid).not.toHaveClass('grid-rows-[4rem_1fr]');
   });
+
+  // The viewport height belongs to AppShell (it also holds the push banner); the layout just fills it.
+  it('fills the shell instead of claiming the viewport height itself', () => {
+    vi.mocked(useBranchContext).mockReturnValue({ myBranches: undefined, workingBranch: null, ready: true });
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<div>Page content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const grid = screen.getByText('header').parentElement!;
+    expect(grid).not.toHaveClass('h-screen');
+    expect(grid).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden');
+  });
 });

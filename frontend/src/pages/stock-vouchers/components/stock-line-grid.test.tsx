@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useForm, type UseFormReturn } from 'react-hook-form';
+import { useForm, type FieldPath, type UseFormReturn } from 'react-hook-form';
 import { StockLineGrid } from './stock-line-grid';
 import { stockGridPrefsKey } from '@/pages/stock-vouchers/utils/use-stock-grid-prefs';
 import { toFormDefaults, createEmptyStockLine } from '@/features/stock-vouchers/payload';
@@ -154,6 +154,24 @@ async function pickFromTypeahead(code: string) {
   fireEvent.mouseDown(within(listbox).getByText(code));
 }
 
+// Runs `steps` outside act(), as the browser does, then lets the renders that follow them land.
+async function outsideAct(steps: () => Promise<void>) {
+  const env = globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean };
+  const previous = env.IS_REACT_ACT_ENVIRONMENT;
+  env.IS_REACT_ACT_ENVIRONMENT = false;
+  try {
+    await steps();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  } finally {
+    env.IS_REACT_ACT_ENVIRONMENT = previous;
+  }
+}
+
+// Only the microtasks run, in which React renders what an event changed: no task, frame or timer.
+async function eventRendered() {
+  for (let i = 0; i < 5; i++) await Promise.resolve();
+}
+
 describe('StockLineGrid', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -304,6 +322,17 @@ describe('StockLineGrid', () => {
     expect(price).toHaveAccessibleDescription('Đơn giá không hợp lệ');
   });
 
+  it('an error on Ghi chú marks the cell and shows its message under it, like the other cells', () => {
+    const { form } = renderGrid({ lines: [line({ note: 'qua dai' })] });
+
+    act(() => form().setError('lines.0.note', { type: 'server', message: 'Ghi chú quá dài.' }));
+
+    const note = byId('stock-line-note-0');
+    expect(note).toHaveAttribute('aria-invalid', 'true');
+    expect(note).toHaveAccessibleDescription('Ghi chú quá dài.');
+    expect(screen.getByText('Ghi chú quá dài.')).toBeVisible();
+  });
+
   it('an emptied %VAT stays empty while typing, counts as 0 and shows 0 after blur', () => {
     const { values } = renderGrid({ lines: [line({ vatRate: 10 })] });
     const vat = byId('stock-line-vat-rate-0');
@@ -314,6 +343,24 @@ describe('StockLineGrid', () => {
 
     fireEvent.blur(vat);
     expect(vat).toHaveValue(0);
+  });
+
+  // Unlike %VAT, an emptied Số tấm / Dài / Rộng / Dày means "no value": the line keeps '', not 0.
+  it.each([
+    ['Số tấm', 'sheet-count', 'sheetCount'],
+    ['Dài', 'length', 'length'],
+    ['Rộng', 'width', 'width'],
+    ['Dày', 'thickness', 'thickness'],
+  ] as const)('an emptied %s leaves the line without that value, not with 0', (_label, cell, field) => {
+    const { values } = renderGrid({
+      lines: [line({ pricingMode: 'PerCubicMeter', sheetCount: 2, length: 3000, width: 100, thickness: 50 })],
+    });
+    const input = byId(`stock-line-${cell}-0`);
+
+    fireEvent.change(input, { target: { value: '' } });
+
+    expect(values().lines[0][field]).toBe('');
+    expect(input).toHaveValue(null);
   });
 
   it('hides Kho, Tiền CK, Tiền VAT and Ghi chú by default', () => {
@@ -364,6 +411,106 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(headers()).toContain('STT'));
   });
 
+  // The page drops a server error at the first change of the value it was about, so the correction ends what forced
+  // the column in at its first key. The rule: a column stays while the focus is in one of its cells.
+  describe('a hidden column that an error or the warehouse forced into view', () => {
+    // What the page does with a server error: it goes as soon as the value it was about changes.
+    function clearServerErrorsOnChange(form: UseFormReturn<StockVoucherFormValues, unknown, StockVoucherFormParsed>) {
+      form.watch((_values, { name }) => {
+        const path = name as FieldPath<StockVoucherFormValues> | undefined;
+        if (path && form.getFieldState(path).error?.type === 'server') form.clearErrors(path);
+      });
+    }
+
+    it.each([
+      ['Tiền CK', 'discount-amount', 'discountAmount', [], ['5', '50', '500', '5000'], 5000],
+      ['Ghi chú', 'note', 'note', [], ['m', 'mo', 'mot'], 'mot'],
+      ['%VAT', 'vat-rate', 'vatRate', ['vat-rate'], ['1', '10'], 10],
+    ] as const)('%s keeps its cell, the focus and every key while the user corrects a server error in it', (header, cell, field, hidden, keys, typed) => {
+      if (hidden.length) storePrefs({ hiddenColumns: [...hidden] });
+      const { values, form } = renderGrid({ lines: [line({ discountManual: true, discountAmount: 20_000, note: 'qua dai', vatRate: 8 })] });
+      clearServerErrorsOnChange(form());
+      expect(headers()).not.toContain(header);
+      act(() => form().setError(`lines.0.${field}`, { type: 'server', message: 'Giá trị không hợp lệ.' }));
+      const input = byId(`stock-line-${cell}-0`);
+      act(() => input.focus()); // where the page puts the focus after a rejected save
+
+      for (const text of keys) {
+        fireEvent.change(input, { target: { value: text } });
+        expect(input.isConnected).toBe(true);
+        expect(document.activeElement).toBe(input);
+      }
+
+      expect(form().getFieldState(`lines.0.${field}`).error).toBeUndefined();
+      expect(values().lines[0][field]).toBe(typed);
+      expect(headers()).toContain(header);
+      // Once the focus leaves the cell, the column the user hid goes again.
+      enter(`stock-line-${cell}-0`, true); // Shift+Enter: back to Đơn giá
+      expect(focused()).toBe('stock-line-unit-price-0');
+      expect(headers()).not.toContain(header);
+      expect(values().lines[0][field]).toBe(typed);
+    });
+
+    it('Kho keeps its select and the focus when the user picks the header warehouse in it', () => {
+      const { values } = renderGrid({ lines: [line({ warehouseId: WH2 })] });
+      const select = byId('stock-line-warehouse-0');
+      act(() => select.focus());
+
+      fireEvent.change(select, { target: { value: WH1 } });
+
+      expect(values().lines[0].warehouseId).toBe(WH1);
+      expect(select.isConnected).toBe(true);
+      expect(document.activeElement).toBe(select);
+      act(() => byId('stock-line-unit-price-0').focus());
+      expect(headers()).not.toContain('Kho');
+    });
+
+    // When the window loses the focus (the user switches to another program) the cell gets a blur event but keeps the
+    // focus of the page: it must still be there when the user comes back.
+    it('the column stays while the window is in the background', () => {
+      const { form } = renderGrid({ lines: [line({ note: 'qua dai' })] });
+      clearServerErrorsOnChange(form());
+      act(() => form().setError('lines.0.note', { type: 'server', message: 'Giá trị không hợp lệ.' }));
+      const input = byId('stock-line-note-0');
+      act(() => input.focus());
+      fireEvent.change(input, { target: { value: 'm' } });
+
+      fireEvent.blur(input);
+      fireEvent.focusOut(input);
+
+      expect(document.activeElement).toBe(input);
+      expect(input.isConnected).toBe(true);
+      expect(headers()).toContain('Ghi chú');
+    });
+
+    // A click on another cell: the browser blurs the cell the focus leaves (the page has no focused element for that
+    // moment), runs the microtasks, in which React renders, and only then focuses the clicked cell.
+    it('a click on another cell of the column that only the focus holds keeps that column', async () => {
+      const { form } = renderGrid({ lines: [line({ note: 'qua dai' }), line({ _uiKey: 'b', note: 'ghi chu 2' })] });
+      clearServerErrorsOnChange(form());
+      act(() => form().setError('lines.0.note', { type: 'server', message: 'Giá trị không hợp lệ.' }));
+      const first = byId('stock-line-note-0');
+      const second = byId('stock-line-note-1');
+      act(() => first.focus());
+      fireEvent.change(first, { target: { value: 'm' } }); // the error is gone: only the focus holds Ghi chú
+
+      await outsideAct(async () => {
+        const noFocus = vi.spyOn(document, 'activeElement', 'get').mockReturnValue(document.body);
+        try {
+          first.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: second }));
+        } finally {
+          noFocus.mockRestore();
+        }
+        await eventRendered();
+        second.focus();
+      });
+
+      expect(second.isConnected).toBe(true);
+      expect(document.activeElement).toBe(second);
+      expect(headers()).toContain('Ghi chú');
+    });
+  });
+
   it('pins #, Mã and Tên left and Số còn lại + delete right with cumulative offsets', () => {
     renderGrid({ lines: [line()] });
     const ths = screen.getAllByRole('columnheader');
@@ -410,6 +557,8 @@ describe('StockLineGrid', () => {
 
   const enter = (id: string, shift = false) => fireEvent.keyDown(byId(id), { key: 'Enter', shiftKey: shift });
   const focused = () => document.activeElement?.id;
+  // Resolves after the frame callbacks the grid has requested so far have run.
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
 
   it('picking a m² product focuses Số tấm, then Enter walks Dài, Rộng, Đơn giá and opens a new line', async () => {
     renderGrid({ lines: [createEmptyStockLine(0, WH1)] });
@@ -493,14 +642,393 @@ describe('StockLineGrid', () => {
     renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b' })] });
     const select = vi.spyOn(HTMLInputElement.prototype, 'select');
     try {
-      act(() => byId('stock-line-quantity-0').focus());
-      act(() => byId('stock-line-quantity-1').focus());
+      // The focus moves twice inside one batch, so the first cell never renders its raw text: only the cell that
+      // still has the focus may select.
+      act(() => {
+        byId('stock-line-quantity-0').focus();
+        byId('stock-line-quantity-1').focus();
+      });
+      // It has selected already: a keyboard focus waits for no frame.
+      expect(select.mock.contexts).toEqual([byId('stock-line-quantity-1')]);
+      // ... and nothing else is selected one frame later.
       await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(select.mock.contexts).toEqual([byId('stock-line-quantity-1')]);
     } finally {
       select.mockRestore();
     }
+  });
+
+  // A cell that takes and loses the focus inside one batch never renders its raw text, so it still waits to select
+  // on its next render. That render comes later, with the focus somewhere else (here the user types in the second
+  // cell and the whole grid renders), and must select nothing. jsdom's select() does not move the focus the way
+  // Chrome's does, so the test watches select() itself.
+  it('a number cell that lost the focus before it rendered does not select on a later render', () => {
+    const { values } = renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b', quantity: 7 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      const first = byId('stock-line-quantity-0');
+      const second = byId('stock-line-quantity-1');
+      act(() => {
+        first.focus();
+        second.focus();
+      });
+      expect(select.mock.contexts).toEqual([second]);
+
+      fireEvent.change(second, { target: { value: '8' } });
+
+      expect(values().lines[1].quantity).toBe(8);
+      expect(select.mock.contexts).toEqual([second]);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  // A digit can arrive before the next frame; the whole raw text must already be selected then. fireEvent runs in
+  // act(), which returns once React has rendered what the key changed (in the browser that render comes in a
+  // microtask right after the key event, before the next key); no frame or timer runs in between.
+  it('keyboard navigation selects the raw text of the number cell in the render it causes, with no frame or timer', () => {
+    renderGrid({ lines: [line({ quantity: 5, unitPrice: 30000 })] });
+    byId('stock-line-quantity-0').focus();
+    enter('stock-line-quantity-0'); // quantity -> unit price, no frame awaited
+    const price = byId('stock-line-unit-price-0') as HTMLInputElement;
+    expect(focused()).toBe('stock-line-unit-price-0');
+    expect(price.value).toBe('30000');
+    expect([price.selectionStart, price.selectionEnd]).toEqual([0, 5]);
+  });
+
+  // The path the defect was reported on: a digit typed right after Ctrl+Delete was appended to the old value of the
+  // cell that took the focus.
+  it('Ctrl+Delete: the cell that takes the focus has its raw text selected in the render it causes, with no frame or timer', () => {
+    renderGrid({
+      lines: [line({ productCode: 'A', quantity: 5 }), line({ _uiKey: 'b', productCode: 'B', quantity: 1250 })],
+    });
+    const first = byId('stock-line-quantity-0');
+    const second = byId('stock-line-quantity-1');
+    expect(second.value).toBe('1,250'); // idle: formatted
+    act(() => first.focus());
+    fireEvent.keyDown(first, { key: 'Delete', ctrlKey: true }); // no frame awaited
+    expect(document.activeElement).toBe(second);
+    expect(second.value).toBe('1250');
+    expect([second.selectionStart, second.selectionEnd]).toEqual([0, 4]);
+  });
+
+  // The select runs in a layout effect with no dependency list, that is after every render, so it has to fire once
+  // per keyboard focus. Typing renders the cell: a select on those renders would make each digit replace the one
+  // typed before it.
+  it('typing after a keyboard focus does not select the text again', () => {
+    const { values } = renderGrid({ lines: [line({ quantity: 5, unitPrice: 30000 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      act(() => byId('stock-line-quantity-0').focus());
+      enter('stock-line-quantity-0'); // Đơn giá takes the focus by keyboard
+      const price = byId('stock-line-unit-price-0');
+      const selectsOnPrice = () => select.mock.contexts.filter((el) => el === price).length;
+      expect(selectsOnPrice()).toBe(1);
+
+      fireEvent.change(price, { target: { value: '4' } });
+      fireEvent.change(price, { target: { value: '45' } });
+
+      expect(selectsOnPrice()).toBe(1);
+      // The caret is after the two digits and nothing is selected: the next digit will be appended.
+      expect([price.selectionStart, price.selectionEnd]).toEqual([2, 2]);
+      expect(values().lines[0].unitPrice).toBe(45);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  // What a click on Đơn giá / SL does in Chrome (measured; the same as before the keyboard fix): the browser puts the
+  // caret where the user clicked, right after the focus event, and one frame later the cell selects its WHOLE text.
+  // So the first click on a cell selects the whole number: the caret does not stay where the user clicked.
+  // jsdom places no caret; the test shows the cell's part: no select in the focus event, everything a frame later.
+  it('a number cell focused with the mouse selects its whole text one frame later, not in the focus event', async () => {
+    renderGrid({ lines: [line({ quantity: 1250 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      const cell = byId('stock-line-quantity-0');
+      fireEvent.mouseDown(cell);
+      act(() => cell.focus());
+      expect(select).not.toHaveBeenCalled();
+      await nextFrame();
+      expect(select.mock.contexts).toEqual([cell]);
+      expect(cell.value).toBe('1250');
+      expect([cell.selectionStart, cell.selectionEnd]).toEqual([0, 4]);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  // Only a click in the cell that already has the focus leaves the caret where the user clicked (measured in
+  // Chrome): that click brings no focus event, so the cell selects nothing. jsdom cannot show the caret; the test
+  // shows that no select() follows such a click.
+  it('a click inside the number cell that already has the focus selects nothing', async () => {
+    renderGrid({ lines: [line({ quantity: 1250 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      const cell = byId('stock-line-quantity-0');
+      fireEvent.mouseDown(cell);
+      act(() => cell.focus());
+      await nextFrame();
+      expect(select.mock.contexts).toEqual([cell]); // the first click: the whole text
+      select.mockClear();
+
+      fireEvent.mouseDown(cell);
+      fireEvent.mouseUp(cell);
+      fireEvent.click(cell);
+      await nextFrame();
+
+      expect(select).not.toHaveBeenCalled();
+      expect(document.activeElement).toBe(cell);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  // A press inside the cell that already has the focus (the user moves the caret) brings no focus event that would
+  // use it up. The cell forgets the press when it loses the focus; otherwise its next keyboard visit would count as a
+  // mouse one and select one frame late.
+  it('a click inside the focused number cell does not make the next keyboard focus select late', () => {
+    renderGrid({ lines: [line({ quantity: 5, unitPrice: 30000 })] });
+    const price = byId('stock-line-unit-price-0');
+    act(() => price.focus());
+    fireEvent.mouseDown(price); // the cell already has the focus: no focus event follows
+    enter('stock-line-unit-price-0', true); // Shift+Enter: back to SL
+    expect(focused()).toBe('stock-line-quantity-0');
+    expect(price.value).toBe('30.000'); // idle again: formatted
+    enter('stock-line-quantity-0'); // Enter: Đơn giá again, by keyboard, no frame awaited
+    expect(focused()).toBe('stock-line-unit-price-0');
+    expect(price.value).toBe('30000');
+    expect([price.selectionStart, price.selectionEnd]).toEqual([0, 5]);
+  });
+
+  // The mouse path selects one frame after the focus event, and by then the focus may be somewhere else. Chrome's
+  // select() also focuses the element, so without the "still the active element" check of that late select the
+  // cell the user has already left would take the focus back.
+  it('of two number cells clicked within one frame, only the one that still has the focus is selected', async () => {
+    renderGrid({ lines: [line({ quantity: 5 }), line({ _uiKey: 'b', quantity: 7 })] });
+    const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+    try {
+      const first = byId('stock-line-quantity-0');
+      const second = byId('stock-line-quantity-1');
+      fireEvent.mouseDown(first);
+      act(() => first.focus());
+      fireEvent.mouseDown(second);
+      act(() => second.focus());
+      // Both arrived by mouse: neither is selected yet, both selects wait for the frame.
+      expect(select).not.toHaveBeenCalled();
+      await nextFrame();
+      expect(select.mock.contexts).toEqual([second]);
+    } finally {
+      select.mockRestore();
+    }
+  });
+
+  // %CK, %VAT, Số tấm, Dài, Rộng and Dày are type=number inputs: select() works on them but selectionStart does
+  // not, so these tests watch select(). A value that is not selected gets the next digit appended (5 -> 57).
+  describe('type=number cells', () => {
+    const cubic = (overrides: Partial<StockLineFormValues> = {}) =>
+      line({
+        pricingMode: 'PerCubicMeter',
+        sheetCount: 2,
+        length: 3000,
+        width: 100,
+        thickness: 50,
+        discountRate: 5,
+        vatRate: 8,
+        ...overrides,
+      });
+
+    // The six type=number cells: %CK and %VAT are one component, the four others another one.
+    const cells: [label: string, field: string][] = [
+      ['%CK', 'discount-rate'],
+      ['%VAT', 'vat-rate'],
+      ['Số tấm', 'sheet-count'],
+      ['Dài', 'length'],
+      ['Rộng', 'width'],
+      ['Dày', 'thickness'],
+    ];
+
+    // The elements select() was called on by the time `action` returned. fireEvent runs in act(), which also renders
+    // what the event changed, so this covers a select in the focus event and one in that render; no frame or timer runs.
+    function selectedBy(action: () => void): unknown[] {
+      const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+      try {
+        action();
+        return [...select.mock.contexts];
+      } finally {
+        select.mockRestore();
+      }
+    }
+
+    it.each(cells)('ArrowDown into %s selects its value with no frame or timer', (_label, field) => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const from = byId(`stock-line-${field}-0`);
+      act(() => from.focus());
+
+      const selected = selectedBy(() => fireEvent.keyDown(from, { key: 'ArrowDown' }));
+
+      expect(focused()).toBe(`stock-line-${field}-1`);
+      expect(selected).toEqual([byId(`stock-line-${field}-1`)]);
+    });
+
+    it('Enter into Số tấm selects its value with no frame or timer', () => {
+      renderGrid({ lines: [line({ pricingMode: 'PerSquareMeter', sheetCount: 2, length: 3000, width: 1200 })] });
+      act(() => byId('stock-line-product-code-0').focus());
+
+      const selected = selectedBy(() => enter('stock-line-product-code-0'));
+
+      expect(focused()).toBe('stock-line-sheet-count-0');
+      expect(selected).toEqual([byId('stock-line-sheet-count-0')]);
+    });
+
+    it('Enter into %CK selects its value with no frame or timer', () => {
+      storePrefs({ hiddenColumns: [], enterStops: { PerUnit: ['quantity', 'unit-price', 'discount-rate'] } });
+      renderGrid({ lines: [line({ pricingMode: 'PerUnit', discountRate: 5 })] });
+      act(() => byId('stock-line-unit-price-0').focus());
+
+      const selected = selectedBy(() => enter('stock-line-unit-price-0'));
+
+      expect(focused()).toBe('stock-line-discount-rate-0');
+      expect(selected).toEqual([byId('stock-line-discount-rate-0')]);
+    });
+
+    it('Ctrl+Delete lands on the same cell of the next line with its value selected', async () => {
+      const { values } = renderGrid({
+        lines: [cubic({ productCode: 'A' }), cubic({ _uiKey: 'b', productCode: 'B', length: 2500 })],
+      });
+      const from = byId('stock-line-length-0');
+      const survivor = byId('stock-line-length-1');
+      act(() => from.focus());
+
+      const selected = selectedBy(() => fireEvent.keyDown(from, { key: 'Delete', ctrlKey: true }));
+
+      expect(selected).toEqual([survivor]);
+      await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B']));
+      expect(document.activeElement).toBe(survivor);
+    });
+
+    // jsdom has no Tab navigation: like Tab, a bare focus() arrives without a mouse press on the cell.
+    it.each([
+      ['%VAT', 'vat-rate'],
+      ['Rộng', 'width'],
+    ])('a focus on %s that no mouse press brought (Tab) selects its value', (_label, field) => {
+      renderGrid({ lines: [cubic()] });
+      const cell = byId(`stock-line-${field}-0`);
+
+      expect(selectedBy(() => act(() => cell.focus()))).toEqual([cell]);
+    });
+
+    // Unlike Đơn giá / SL, these cells select nothing after a mouse press, in the focus event or later, so the caret
+    // stays where the browser put it. jsdom cannot show the caret; the test shows that no select() follows.
+    it.each(cells)('a mouse click on %s selects nothing, in the focus event or a frame later', async (_label, field) => {
+      renderGrid({ lines: [cubic()] });
+      const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+      try {
+        const cell = byId(`stock-line-${field}-0`);
+        fireEvent.mouseDown(cell);
+        act(() => cell.focus());
+        fireEvent.mouseUp(cell);
+        fireEvent.click(cell);
+        await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(select).not.toHaveBeenCalled();
+      } finally {
+        select.mockRestore();
+      }
+    });
+
+    // A press on the cell that already has the focus is followed by no focus event; it must not be taken for the
+    // press of a later visit.
+    it('a second click in the focused cell does not stop the next keyboard visit from selecting', () => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const cell = byId('stock-line-sheet-count-0');
+      fireEvent.mouseDown(cell);
+      act(() => cell.focus());
+      fireEvent.mouseDown(cell);
+      fireEvent.keyDown(cell, { key: 'ArrowDown' });
+      expect(focused()).toBe('stock-line-sheet-count-1');
+
+      const selected = selectedBy(() => fireEvent.keyDown(byId('stock-line-sheet-count-1'), { key: 'ArrowUp' }));
+
+      expect(focused()).toBe('stock-line-sheet-count-0');
+      expect(selected).toEqual([cell]);
+    });
+
+    // These cells select in the focus event and nowhere else. Typing renders the cell: a select on those renders
+    // would make each digit replace the one typed before it.
+    it.each([
+      ['%CK', 'discount-rate'],
+      ['Số tấm', 'sheet-count'],
+    ])('typing in %s after a keyboard focus does not select its value again', (_label, field) => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const from = byId(`stock-line-${field}-0`);
+      act(() => from.focus());
+      const select = vi.spyOn(HTMLInputElement.prototype, 'select');
+      try {
+        fireEvent.keyDown(from, { key: 'ArrowDown' });
+        const cell = byId(`stock-line-${field}-1`);
+        expect(select.mock.contexts).toEqual([cell]);
+
+        fireEvent.change(cell, { target: { value: '4' } });
+        fireEvent.change(cell, { target: { value: '45' } });
+
+        expect(select.mock.contexts).toEqual([cell]);
+        expect(cell.value).toBe('45');
+      } finally {
+        select.mockRestore();
+      }
+    });
+
+    // Alt-tab away and back: the window's blur leaves the cell the page's active element, and the focus the window
+    // gives back when it returns comes with no mouse press. It is no keyboard visit: what the user was typing stays,
+    // and the next digit goes after it (12 -> 125), not over it.
+    it.each(cells)('the focus %s gets back when the window returns does not select what was typed', (_label, field) => {
+      const { values } = renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const from = byId(`stock-line-${field}-0`);
+      act(() => from.focus());
+      fireEvent.keyDown(from, { key: 'ArrowDown' });
+      const cell = byId(`stock-line-${field}-1`);
+      fireEvent.change(cell, { target: { value: '12' } });
+
+      // The window loses the focus: blur (and focusout, which fireEvent adds) on the cell, which stays the active
+      // element. It comes back: focus and focusin.
+      fireEvent.blur(cell);
+      expect(document.activeElement).toBe(cell);
+      const selected = selectedBy(() => fireEvent.focus(cell));
+      fireEvent.change(cell, { target: { value: '125' } });
+
+      expect(selected).toEqual([]);
+      const key = { 'discount-rate': 'discountRate', 'vat-rate': 'vatRate', 'sheet-count': 'sheetCount' }[field] ?? field;
+      expect(values().lines[1][key as keyof StockLineFormValues]).toBe(125);
+    });
+
+    // The window came back with a click on another cell, and this one never got its focus back: the next visit, which
+    // comes from another element, is a keyboard visit like any other.
+    it('a keyboard visit from another cell after the window went away selects', () => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const cell = byId('stock-line-discount-rate-0');
+      const other = byId('stock-line-discount-rate-1');
+      act(() => cell.focus());
+      fireEvent.blur(cell);
+
+      expect(selectedBy(() => fireEvent.focus(cell, { relatedTarget: other }))).toEqual([cell]);
+    });
+
+    // The window's return is used up by that one focus: the next keyboard visit selects as usual.
+    it('a keyboard visit after the window has returned selects again', () => {
+      renderGrid({ lines: [cubic(), cubic({ _uiKey: 'b' })] });
+      const cell = byId('stock-line-discount-rate-0');
+      act(() => cell.focus());
+      fireEvent.blur(cell);
+      fireEvent.focus(cell);
+      fireEvent.keyDown(cell, { key: 'ArrowDown' });
+
+      const selected = selectedBy(() => fireEvent.keyDown(byId('stock-line-discount-rate-1'), { key: 'ArrowUp' }));
+
+      expect(focused()).toBe('stock-line-discount-rate-0');
+      expect(selected).toEqual([cell]);
+    });
   });
 
   it('arrows leave the warehouse select alone', () => {
@@ -558,7 +1086,7 @@ describe('StockLineGrid', () => {
     const original = Node.prototype.removeChild;
     const spy = vi.spyOn(Node.prototype, 'removeChild').mockImplementation(function <T extends Node>(this: Node, child: T): T {
       const result = original.call(this, child) as T;
-      if ((child as Element).tagName === 'TR') resting.push(document.activeElement);
+      if ((child as unknown as Element).tagName === 'TR') resting.push(document.activeElement);
       return result;
     });
     try {
@@ -610,6 +1138,69 @@ describe('StockLineGrid', () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(document.activeElement).toBe(onC);
     expect(focused()).toBe('stock-line-quantity-1');
+  });
+
+  // In the browser React renders what a key event changed in a microtask, but react-hook-form hands the result of
+  // remove() to the watched lines only from an effect, and that render comes in a later task: the next key can arrive
+  // in between. Outside act(), as in the browser, these tests type that key into the focused cell at that moment.
+  describe('a key typed at once after a line is deleted', () => {
+    const threeLines = () => [
+      line({ _uiKey: 'a', productCode: 'A', pricingMode: 'PerCubicMeter', sheetCount: 2, length: 4002, width: 100, thickness: 50, discountRate: 5, note: 'ghi chu 1' }),
+      line({ _uiKey: 'b', productCode: 'B', pricingMode: 'PerCubicMeter', sheetCount: 3, length: 4003, width: 120, thickness: 60, discountRate: 6, note: 'ghi chu 2' }),
+      line({ _uiKey: 'c', productCode: 'C', pricingMode: 'PerCubicMeter', sheetCount: 4, length: 4004, width: 140, thickness: 70, discountRate: 7, note: 'ghi chu 3' }),
+    ];
+    const ownValues = (l: StockLineFormValues) => ({
+      productCode: l.productCode,
+      sheetCount: l.sheetCount,
+      length: l.length,
+      width: l.width,
+      thickness: l.thickness,
+      discountRate: l.discountRate,
+      note: l.note,
+    });
+
+    // A key typed into the focused cell, built from the text the cell shows: it ends up after that text.
+    function typeKey(key: string) {
+      const cell = document.activeElement as HTMLInputElement;
+      const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setValue.call(cell, cell.value + key);
+      cell.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    it.each([
+      ['%CK', 'discount-rate', 'discountRate', '9', 69],
+      ['Dài', 'length', 'length', '9', 40039],
+      ['Ghi chú', 'note', 'note', 'x', 'ghi chu 2x'],
+    ] as const)('Ctrl+Delete on %s: the key starts from the value of the line that moved up', async (_label, cell, field, key, typed) => {
+      showAllColumns();
+      const lines = threeLines();
+      const { values } = renderGrid({ lines });
+      const from = byId(`stock-line-${cell}-0`);
+      act(() => from.focus());
+
+      await outsideAct(async () => {
+        from.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', ctrlKey: true, bubbles: true, cancelable: true }));
+        await eventRendered();
+        typeKey(key);
+      });
+
+      expect(document.activeElement).toBe(byId(`stock-line-${cell}-0`));
+      expect(values().lines.map(ownValues)).toEqual([{ ...ownValues(lines[1]), [field]: typed }, ownValues(lines[2])]);
+    });
+
+    it('the delete button: the key starts from the code of the line that moved up', async () => {
+      const lines = threeLines();
+      const { values } = renderGrid({ lines });
+
+      await outsideAct(async () => {
+        screen.getByRole('button', { name: 'Xóa dòng 1' }).dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        await eventRendered();
+        typeKey('x');
+      });
+
+      expect(document.activeElement).toBe(byId('stock-line-product-code-0'));
+      expect(values().lines.map(ownValues)).toEqual([{ ...ownValues(lines[1]), productCode: 'Bx' }, ownValues(lines[2])]);
+    });
   });
 
   it('Ctrl+Delete does nothing on a read-only grid', async () => {

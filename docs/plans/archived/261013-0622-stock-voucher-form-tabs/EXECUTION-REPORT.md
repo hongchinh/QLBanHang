@@ -162,3 +162,27 @@ Still open, all older than the redesign unless noted:
 6. At 1280 px with 10-digit receivable and payable, or at 1024 px, the partner label in the debt strip shrinks to nothing and the strip scrolls sideways.
 7. The push-permission banner still makes the app 54 px taller than the window while it is shown.
 8. Not checked: other browsers, HiDPI or zoom, a physical keyboard with a Vietnamese IME.
+
+## Older defects round (2026-10-14, branch `fix/stock-voucher-form-older-defects`)
+
+Fixes items 1, 2, 4 and 7 of the list above (called H1–H4 below), plus the defects that three review rounds and real-browser checks (Chrome, mocked API, 1366×657 and 1920×969) found along the way. Every fix has a test that fails without it; the focus, server-error and shell code was also mutation-tested and the surviving mutants were killed.
+
+| Defect | Change | Measured result |
+|---|---|---|
+| H1: focus lost after a 422 dialog, Ctrl+S / Alt+n dead | `useDocumentActions` remembers the element the user was last on inside `main#main-content` and gives the focus back to it after the dialog closes and after every action that ends with the focus lost; `ui/dialog` gives the focus back to its opener; `giveFocusBack` and `ignoreKeyRepeat` stop a held Enter from pressing a button again; the stock voucher page also takes Ctrl+S and Alt+1..4 while the focus is on `<body>` or in its title bar | Focus back on the cell or button after Quay lại, Esc and Vẫn lưu; a held Enter saves once |
+| H2: a server field error stays after the user fixes the field | The error and its tab dot go when the field changes; also when a cell it is computed from changes (SL from the sizes, Tiền CK from %CK), when a payment method fills the fund, and when a product pick changes the cell | Error and dot go at the first key; other cells and lines keep theirs |
+| H3: a digit typed after a keyboard move into a number cell is appended | One keyboard-or-mouse focus check (`useFocusOrigin`) selects the value in the focus event (type=number cells) or in the render it causes (Đơn giá, SL); a mouse focus behaves as before; the focus a cell gets back when the window returns (alt-tab) selects nothing | 1495/1495 keyboard trials; Ctrl+Delete into a number cell 172/172 (was 82/172); mouse 48/48 unchanged |
+| H4: the push banner makes the app taller than the window | `AppShell`: one window-high column, banner slot (max 30% of the window, scrolls inside) only while the prompt shows, the app takes the rest; banner 54 → 46 px | Document height = window (657/657, 969/969); no page scrollbar |
+
+Found and fixed during the round: after Ctrl+Delete a moved row rendered the deleted line's values for one render and a key typed at once was saved into it (rows are now read from the form, not the watched copy; 216/216 delete trials save the right values); a hidden grid column shown only for its error now stays while the focus is in it (also while a 422 dialog opened from it is up); a server error on Ghi chú shows at its cell; an error on the computed SL focuses the cell that corrects it; the product suggestion list stays closed when the full catalog gives the focus back after a pick; an action started with nothing focused gives no focus back; a keydown with no key (autofill) no longer throws.
+
+Final automated state (before this report commit): `npm run test` 3 failed | 1303 passed (the 3 baseline failures); typecheck pass; lint 16 problems (main has 17); build pass.
+
+Still open:
+
+1. For one render (17–77 ms) after a delete, the read-only amount cells of a moved row (Số tiền, Tiền CK, Tiền VAT, computed SL) show the values of the line that sat at that index before; a Tiền CK shown by the user's column settings and entered by keyboard in that render starts its editing text from that value. Older than this round (main showed the whole row stale). Fix: key the computed results by line, not by index.
+2. The cash voucher, fund transfer and quotation forms still take Ctrl+S only while the focus is inside the form; after a 422 from a blank trailing cash line the focus stays on `<body>`.
+3. With the product catalog open from a Mã cell, Insert in its search box adds a grid line behind the dialog (older; the grid's key handler hears keys from its portaled children).
+4. Ctrl+S typed inside a modal dialog (the product catalog) is left to the browser, which opens its Save dialog.
+5. The toast offset and two report tables assume no banner.
+6. Items 3, 5, 6 and 8 of the list above.

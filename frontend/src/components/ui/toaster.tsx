@@ -1,5 +1,5 @@
 import * as ToastPrimitive from '@radix-ui/react-toast';
-import { X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { dismissToast, useToasts, type ToastVariant } from '@/lib/use-toast';
 
@@ -49,7 +49,7 @@ export function Toaster() {
             aria-label="Đóng"
             className="absolute right-2 top-2 rounded-md p-1 opacity-60 transition-opacity hover:opacity-100"
           >
-            <X className="h-4 w-4" />
+            <AppIcon name="close" />
           </ToastPrimitive.Close>
         </ToastPrimitive.Root>
       ))}

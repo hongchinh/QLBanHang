@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { ChevronDown } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -63,7 +63,7 @@ export function MultiSelect<T extends string>({
             <span className={value.length === 0 ? 'text-muted-foreground' : ''}>
               {label}
             </span>
-            <ChevronDown className="h-4 w-4 opacity-50" />
+            <AppIcon name="chevronDown" className="opacity-50" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

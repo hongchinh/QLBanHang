@@ -16,11 +16,11 @@ public sealed class SampleDataGenerator : ISampleDataGenerator
         var openingDate = SampleCalendar.OpeningDate(input.Today);
         var partners = SampleCatalog.BuildPartners(input.OwnerCount);
 
-        // One random stream, drawn in this order: opening stock, opening debts.
+        // One random stream, drawn in this order: opening stock, opening debts, documents.
         var openingStocks = SampleOpeningBalances.BuildStocks(random);
         var openingDebts = SampleOpeningBalances.BuildDebts(random, openingDate, input.Today, partners);
 
-        return new SampleDataPlan
+        var plan = new SampleDataPlan
         {
             OpeningDate = openingDate,
             LastDocumentDate = SampleCalendar.LastDocumentDate(input.Today),
@@ -32,5 +32,7 @@ public sealed class SampleDataGenerator : ISampleDataGenerator
             OpeningStocks = openingStocks,
             OpeningDebts = openingDebts,
         };
+        plan.Steps.AddRange(SampleDocumentSimulator.Run(random, plan));
+        return plan;
     }
 }

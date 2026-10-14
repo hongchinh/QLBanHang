@@ -67,7 +67,7 @@ describe('PushPermissionPrompt', () => {
     expect(container.firstElementChild).toHaveClass('py-2')
     expect(container.firstElementChild).not.toHaveClass('py-3')
   })
-})
+})
   it('tells iOS Safari users how to install the app instead of offering to enable', () => {
     const onDismiss = vi.fn()
     render(<PushPermissionPrompt state="ios-needs-install" onEnable={vi.fn()} onDismiss={onDismiss} />)

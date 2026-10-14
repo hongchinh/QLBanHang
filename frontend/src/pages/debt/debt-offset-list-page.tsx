@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
 import { format } from 'date-fns';
-import { Loader2, Plus } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useDebtOffsets } from '@/features/debt-offsets/hooks';
 import type { DebtOffsetListItem } from '@/features/debt-offsets/types';
 import type { DocumentStatusFilter } from '@/features/cash-common/types';
@@ -191,7 +191,7 @@ export function DebtOffsetListPage() {
         <Can permission="debt_offset.create">
           <Button asChild>
             <Link to={`${BASE_PATH}/new`}>
-              <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Tạo phiếu bù trừ
+              <AppIcon name="add" className="mr-2" /> Tạo phiếu bù trừ
             </Link>
           </Button>
         </Can>
@@ -245,7 +245,7 @@ export function DebtOffsetListPage() {
                 aria-live="polite"
               >
                 <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground shadow-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <AppIcon name="loading" />
                   Đang tải...
                 </div>
               </div>

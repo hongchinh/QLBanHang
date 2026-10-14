@@ -1,0 +1,376 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phiếu xuất kho — phương án D</title>
+<style>
+
+  :root {
+    --fg: #020817; --muted-fg: #64748B; --border: #E2E8F0; --muted: #F1F5F9; --card: #FFFFFF;
+    --primary: #2563EB; --header-bg: #1457A3; --group-bg: #F4F7FA;
+    --signal: #FF5A1F; --mute: #9A9EA6;
+    --page: #F8FAFC;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: #E9EDF2; }
+  .bar { position: sticky; top: 0; z-index: 5; background: #0F172A; color: #E2E8F0; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .bar h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 700; }
+  .seg { display: inline-flex; background: #1E293B; border-radius: 8px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: transparent; color: #CBD5E1; font: inherit; font-weight: 600; padding: 7px 14px; border-radius: 6px; cursor: pointer; min-height: 36px; }
+  .seg button[aria-pressed="true"] { background: #F8FAFC; color: #0F172A; }
+  .hint { font-size: 12px; color: #94A3B8; }
+  .wrap { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+  .stage { flex: 1 1 auto; min-width: 0; overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 3px rgba(15,23,42,.15); }
+  .notes { width: 340px; flex: none; background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(15,23,42,.15); position: sticky; top: 72px; }
+  .notes h2 { margin: 0 0 4px; font-size: 16px; }
+  .notes p.sub { margin: 0 0 12px; color: var(--muted-fg); font-size: 12.5px; }
+  .notes ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .notes li { display: flex; gap: 10px; font-size: 13px; }
+  .notes code { font-size: 12px; background: var(--muted); padding: 1px 4px; border-radius: 4px; }
+  .num { flex: none; width: 20px; height: 20px; border-radius: 50%; background: #F59E0B; color: #111; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+  .pin { position: absolute; z-index: 2; pointer-events: none; }
+  @media (max-width: 1100px) { .wrap { flex-direction: column; } .notes { width: 100%; position: static; } }
+
+  /* App frame (mirrors the current layout) */
+  .app { width: 1280px; background: var(--page); display: grid; grid-template-columns: 256px 1fr; grid-template-rows: 64px auto; position: relative; }
+  .hdr { grid-column: 1 / -1; background: var(--header-bg); color: #fff; display: flex; align-items: center; height: 64px; position: relative; }
+  .brand { width: 256px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; }
+  .logo { width: 30px; height: 30px; border-radius: 6px; background: rgba(255,255,255,.16); display: flex; align-items: center; justify-content: center; }
+  .brand b { font-size: 16px; flex: 1; }
+  .hbtn { width: 40px; height: 40px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: #fff; position: relative; }
+  .hsearch { display: flex; align-items: center; gap: 8px; width: 420px; height: 38px; border-radius: 8px; background: rgba(255,255,255,.14); padding: 0 12px; color: rgba(255,255,255,.85); font-size: 13px; }
+  .hsearch kbd { margin-left: auto; font: 11px ui-monospace, monospace; background: rgba(255,255,255,.18); border-radius: 4px; padding: 2px 6px; }
+  .hright { margin-left: auto; display: flex; align-items: center; gap: 6px; padding-right: 16px; }
+  .branch { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 6px; background: rgba(255,255,255,.12); font-size: 13px; }
+  .badge { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; border-radius: 8px; background: #EF4444; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+  .user { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding-left: 6px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: #fff; color: var(--header-bg); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+  .side { background: #fff; border-right: 1px solid var(--border); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; min-height: 900px; position: relative; }
+  .msearch { display: flex; align-items: center; gap: 8px; height: 34px; border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; color: var(--muted-fg); font-size: 13px; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; border-radius: 13px; background: #FFF7E0; color: #7A4A0E; border: 1px solid #FBE3A6; font-size: 12px; font-weight: 600; }
+  .item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 6px; color: var(--muted-fg); font-weight: 500; position: relative; }
+  .item.active { background: var(--primary); color: #fff; }
+  .group { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px; border-radius: 6px; background: var(--group-bg); font-weight: 600; margin-top: 8px; }
+  .group span.l { flex: 1; }
+  .tile { width: 26px; height: 26px; border-radius: 6px; background: var(--c); display: flex; align-items: center; justify-content: center; color: #fff; flex: none; }
+  .sub { padding-left: 14px; display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+  .chev { color: var(--muted-fg); display: inline-flex; }
+
+  .main { padding: 24px 28px 32px; display: flex; flex-direction: column; gap: 22px; position: relative; }
+  .ph { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .ph h2 { margin: 0; font-size: 24px; font-weight: 650; letter-spacing: -.01em; }
+  .ph p { margin: 2px 0 0; color: var(--muted-fg); font-size: 13px; }
+  .range { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; position: relative; }
+  .rchip { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--border); background: #fff; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .rchip.on { background: var(--fg); color: #fff; border-color: var(--fg); }
+  .rdate { font-size: 12.5px; color: var(--muted-fg); display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; position: relative; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.05); position: relative; }
+  .kpi .lab { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted-fg); }
+  .kpi .val { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; }
+  .kpi .val b { font-size: 22px; white-space: nowrap; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .delta { display: inline-flex; align-items: center; gap: 3px; border-radius: 10px; padding: 2px 8px; font-size: 12px; font-weight: 600; }
+  .up { background: #ECFDF5; color: #047857; } .down { background: #FFF1F2; color: #BE123C; }
+  .spark { height: 44px; margin-top: 10px; color: var(--primary); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.05); position: relative; }
+  .card h3 { margin: 0 0 14px; font-size: 16px; font-weight: 650; display: flex; justify-content: space-between; align-items: center; }
+  .gran { display: inline-flex; background: var(--muted); border-radius: 6px; padding: 3px; gap: 2px; font-size: 12px; font-weight: 600; }
+  .gran span { padding: 4px 10px; border-radius: 4px; color: var(--muted-fg); } .gran span.on { background: #fff; color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .fun { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 12.5px; color: var(--muted-fg); }
+  .fun .t { width: 100px; } .fun .b { flex: 1; height: 24px; background: var(--muted); border-radius: 4px; overflow: hidden; } .fun .b i { display: block; height: 100%; }
+  .act { display: flex; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+  .act .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; }
+  .act small { display: block; color: var(--muted-fg); font-size: 12px; }
+  .omit { font-size: 12px; color: var(--muted-fg); text-align: center; border: 1px dashed var(--border); border-radius: 10px; padding: 14px; }
+
+  /* Registry fallback marker (step 2): a business icon the Notch set does not have yet. */
+  .fallback { outline: 1.5px dashed #F59E0B; outline-offset: 2px; border-radius: 3px; }
+  svg.ic { display: block; flex: none; }
+
+  /* Step 2 surface changes required for the notch to stay visible */
+  .m-s2 .tile { background: var(--tint); color: var(--fg); }
+  .m-s2 .item.active { background: #fff; color: var(--fg); font-weight: 650; box-shadow: inset 3px 0 0 var(--primary); }
+
+  /* Voucher form */
+  .app { grid-template-columns: 256px minmax(0, 1fr); }
+  .main { min-width: 0; }
+  .main.form { padding: 0 20px 20px; gap: 8px; }
+  .vbar { position: sticky; top: 0; margin: 0 -20px; padding: 10px 20px; background: rgba(248,250,252,.96); border-bottom: 1px solid var(--border); box-shadow: 0 1px 2px rgba(15,23,42,.05); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+  .vbar .l { display: flex; align-items: center; gap: 8px; }
+  .vbar h2 { margin: 0; font-size: 20px; font-weight: 700; }
+  .ghost { width: 36px; height: 36px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn { height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: #fff; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; position: relative; color: var(--fg); }
+  .btn.pri { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.plan { border-style: dashed; }
+  .btn.plan small { font-weight: 500; color: var(--muted-fg); font-size: 11px; }
+  .m-s2 .btn.danger { color: #B42318; border-color: #F3C5C0; }
+  .fields { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: 92px minmax(0,1fr) 82px minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr); gap: 6px 10px; align-items: center; font-size: 13px; }
+  .fields label { color: var(--muted-fg); font-size: 12.5px; text-align: right; }
+  .fields label.req::after { content: " *"; color: #DC2626; }
+  .inp { height: 28px; border: 1px solid var(--border); border-radius: 5px; padding: 0 8px; display: flex; align-items: center; gap: 6px; background: #fff; font-size: 13px; min-width: 0; white-space: nowrap; overflow: hidden; }
+  .inp.ro { background: #F8FAFC; color: #334155; }
+  .inp .sel { margin-left: auto; color: var(--muted-fg); display: inline-flex; }
+  .span3 { grid-column: span 3; } .span5 { grid-column: span 5; }
+  .tabsbox { background: #fff; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; min-width: 0; }
+  .tabs { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 8px; flex-wrap: wrap; }
+  .tab { height: 38px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--muted-fg); }
+  .tab.on { color: var(--fg); font-weight: 650; box-shadow: inset 0 -2px 0 var(--primary); }
+  .tab .cnt { font-size: 11px; background: var(--muted); border-radius: 9px; padding: 0 6px; }
+  .tools { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 4px 0; position: relative; }
+  .tbtn { height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 5px; background: #fff; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; position: relative; }
+  .kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; background: #fff; color: #334155; }
+  .gridwrap { overflow-x: auto; }
+  table.g { border-collapse: collapse; font-size: 12.5px; width: 100%; min-width: 1240px; }
+  table.g th { background: #F8FAFC; color: var(--muted-fg); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.g td { padding: 0 8px; height: 32px; border-bottom: 1px solid #EEF2F6; white-space: nowrap; }
+  table.g .n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.g .muted { color: var(--muted-fg); }
+  table.g tr.cur td { background: #F5F9FF; }
+  table.g td.act { width: 40px; min-width: 40px; text-align: center; }
+  table.g th:last-child, table.g td.act { position: sticky; right: 0; background: #fff; }
+  table.g th:nth-last-child(2), table.g td.net { position: sticky; right: 40px; background: #fff; box-shadow: -1px 0 0 var(--border); }
+  table.g th:last-child, table.g th:nth-last-child(2) { background: #F8FAFC; }
+  table.g tr.cur td.act, table.g tr.cur td.net { background: #F5F9FF; }
+  .gfill { height: 120px; border-bottom: 1px solid #EEF2F6; }
+  .totals { background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 -2px 6px rgba(0,0,0,.06); }
+  .trow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 20px; padding: 8px 12px; font-size: 13px; color: var(--muted-fg); }
+  .trow .l { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .trow b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .trow .tot { color: var(--primary); font-weight: 800; font-size: 15px; }
+  .debt { display: flex; flex-wrap: nowrap; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-top: 1px dashed var(--border); background: rgba(241,245,249,.5); padding: 5px 12px; font-size: 12px; color: var(--muted-fg); position: relative; }
+  .debt b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .debt .who { font-weight: 650; color: var(--fg); }
+  .debt .ar { display: inline-flex; vertical-align: middle; }
+  .t-danger { color: #DC2626; } .t-create { color: #0891B2; } .t-muted { color: #64748B; } .t-print { color: #4F46E5; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>Phiếu xuất kho — phương án D</h1>
+  <div class="seg" role="group" aria-label="Chế độ xem">
+    <button type="button" data-mode="cur" aria-pressed="false">Hiện tại</button>
+    <button type="button" data-mode="s1" aria-pressed="true">Bước 1 · làm ngay</button>
+    <button type="button" data-mode="s2" aria-pressed="false">Bước 2 · khi Notch đạt chuẩn</button>
+  </div>
+  <span class="hint">Số màu cam trên mockup khớp với ghi chú bên phải. Phóng to trình duyệt (Ctrl +) để xem icon 16px.</span>
+</div>
+
+<div class="wrap">
+  <div class="stage">
+    <div class="app" id="app">
+      <header class="hdr">
+        <div class="brand">
+          <span class="logo"><i data-ic="quotation" data-sz="18" data-ctx="header"></i></span>
+          <b>QLBanHang</b>
+          <span class="hbtn"><i data-ic="collapse" data-sz="18" data-ctx="header"></i></span>
+        </div>
+        <div class="hsearch"><i data-ic="search" data-sz="16" data-ctx="header"></i>Tìm khách hàng, báo giá, chức năng…<kbd>Ctrl K</kbd></div>
+        <div class="hright">
+          <span class="branch"><i data-ic="branch" data-sz="16" data-ctx="header"></i>CN01 — Chi nhánh chính<i data-ic="chevronDown" data-sz="14" data-ctx="header"></i></span>
+          <span class="hbtn"><i data-ic="bell" data-sz="20" data-ctx="header"></i><span class="badge">3</span></span>
+          <span class="user"><span class="avatar">QT</span>Quản trị hệ thống<i data-ic="chevronDown" data-sz="14" data-ctx="header"></i></span>
+        </div>
+      </header>
+
+      <nav class="side" aria-label="Menu chính">
+        <div class="msearch"><i data-ic="search" data-sz="14" data-ctx="util"></i>Tìm menu…</div>
+        <a class="item"><i data-ic="overview" data-sz="16" data-ctx="nav"></i>Tổng quan</a>
+        <div class="group"><span class="tile" style="--c:#2563EB;--tint:#DCE7FD"><i data-ic="sales" data-sz="16" data-ctx="tile"></i></span><span class="l">Bán hàng</span><span class="chev"><i data-ic="chevronRight" data-sz="16" data-ctx="util"></i></span></div>
+        <div class="group"><span class="tile" style="--c:#D97706;--tint:#FBEBD3"><i data-ic="inventory" data-sz="16" data-ctx="tile"></i></span><span class="l">Kho</span><span class="chev"><i data-ic="chevronDown" data-sz="16" data-ctx="util"></i></span></div>
+        <div class="sub">
+          <a class="item"><i data-ic="stockIn" data-sz="16" data-ctx="nav"></i>Phiếu nhập kho</a>
+          <a class="item active" style="position:relative"><i data-ic="stockOut" data-sz="16" data-ctx="nav" data-state="active"></i>Phiếu xuất kho<span data-pin="s2:6" style="right:-6px;top:-8px"></span></a>
+          <a class="item"><i data-ic="openingStock" data-sz="16" data-ctx="nav"></i>Tồn đầu kỳ</a>
+        </div>
+        <div class="group"><span class="tile" style="--c:#059669;--tint:#D2F1E6"><i data-ic="cash" data-sz="16" data-ctx="tile"></i></span><span class="l">Thu chi</span><span class="chev"><i data-ic="chevronRight" data-sz="16" data-ctx="util"></i></span></div>
+        <div class="group"><span class="tile" style="--c:#DC2626;--tint:#FBDCDC"><i data-ic="debt" data-sz="16" data-ctx="tile"></i></span><span class="l">Công nợ</span><span class="chev"><i data-ic="chevronRight" data-sz="16" data-ctx="util"></i></span></div>
+        <div class="group"><span class="tile" style="--c:#7C3AED;--tint:#E9DFFD"><i data-ic="reports" data-sz="16" data-ctx="tile"></i></span><span class="l">Báo cáo</span><span class="chev"><i data-ic="chevronRight" data-sz="16" data-ctx="util"></i></span></div>
+        <div class="group"><span class="tile" style="--c:#0891B2;--tint:#D3EEF4"><i data-ic="catalogs" data-sz="16" data-ctx="tile"></i></span><span class="l">Danh mục</span><span class="chev"><i data-ic="chevronRight" data-sz="16" data-ctx="util"></i></span></div>
+        <div class="group"><span class="tile" style="--c:#4A5668;--tint:#E2E5EA"><i data-ic="system" data-sz="16" data-ctx="tile"></i></span><span class="l">Hệ thống</span><span class="chev"><i data-ic="chevronRight" data-sz="16" data-ctx="util"></i></span></div>
+      </nav>
+
+      <main class="main form">
+        <div class="vbar">
+          <div class="l">
+            <span class="ghost" aria-label="Quay lại"><i data-ic="back" data-sz="16" data-ctx="util" data-tone="muted"></i></span>
+            <h2>Phiếu xuất kho PX00012</h2>
+          </div>
+          <div class="btns">
+            <span class="btn pri"><i data-ic="save" data-sz="16" data-ctx="onPrimary"></i>Cập nhật<span data-pin="s2:2" style="right:-8px;top:-10px"></span></span>
+            <span class="btn plan"><i data-ic="print" data-sz="16" data-ctx="btn" data-tone="print"></i>In phiếu <small>(kế hoạch TT133)</small><span data-pin="cur:2,s1:4" style="right:-8px;top:-10px"></span></span>
+            <span class="btn danger"><i data-ic="cancelVoucher" data-sz="16" data-ctx="btn" data-tone="danger"></i>Hủy phiếu<span data-pin="cur:1,s1:2,s2:3" style="right:-8px;top:-10px"></span></span>
+            <span class="btn danger"><i data-ic="delete" data-sz="16" data-ctx="btn" data-tone="danger" data-notch="danger"></i>Xóa</span>
+          </div>
+        </div>
+
+        <div class="fields" style="position:relative">
+          <span data-pin="s1:1" style="left:-8px;top:-8px"></span>
+          <label class="req">Ngày xuất</label><span class="inp">14/10/2026 09:30</span>
+          <label class="req">Lý do xuất</label><span class="inp">Xuất bán hàng<span class="sel"><i data-ic="chevronDown" data-sz="14" data-ctx="util"></i></span></span>
+          <label class="req">Kho</label><span class="inp">Kho chính<span class="sel"><i data-ic="chevronDown" data-sz="14" data-ctx="util"></i></span></span>
+          <label>HTTT</label><span class="inp">Chuyển khoản<span class="sel"><i data-ic="chevronDown" data-sz="14" data-ctx="util"></i></span></span>
+          <label>Mã đối tượng</label><span class="inp"><i data-ic="search" data-sz="14" data-ctx="field"></i>KH0012</span>
+          <label>Tên đối tượng</label><span class="inp ro span5">Công ty TNHH An Phát</span>
+          <label>Địa chỉ</label><span class="inp ro" style="grid-column: span 7">12 Nguyễn Văn Linh, phường Tân Phong, TP. Hồ Chí Minh</span>
+        </div>
+
+        <div class="tabsbox">
+          <div class="tabs">
+            <span class="tab on">Hàng hóa <span class="cnt">3</span></span>
+            <span class="tab">Thông tin khác</span>
+            <span class="tab">Thanh toán</span>
+            <span class="tab">Lịch sử</span>
+            <div class="tools">
+              <span class="tbtn"><i data-ic="addLine" data-sz="16" data-ctx="btn" data-tone="create"></i>Thêm dòng<span data-pin="cur:3,s1:3,s2:4" style="right:-8px;top:-10px"></span></span>
+              <span class="tbtn"><i data-ic="gridSettings" data-sz="16" data-ctx="btn"></i>Cột &amp; phím Enter<span data-pin="s2:5" style="right:-8px;top:-10px"></span></span>
+              <span class="tbtn"><i data-ic="keyboard" data-sz="16" data-ctx="btn"></i>Phím tắt</span>
+            </div>
+          </div>
+          <div class="gridwrap">
+            <table class="g">
+              <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Kho</th><th class="n">Số tấm</th><th class="n">Dài</th><th class="n">Rộng</th><th class="n">SL</th><th class="n">SL tồn</th><th class="n">Đơn giá</th><th class="n">Số tiền</th><th class="n">%CK</th><th class="n">%VAT</th><th class="n">Số còn lại</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="muted">1</td><td>CN-PE05</td><td>Tấm cách nhiệt PE OPP 5mm</td><td>m²</td><td>Kho chính</td><td class="n">10</td><td class="n">25</td><td class="n">1,2</td><td class="n">300</td><td class="n muted">1.250</td><td class="n">18.500</td><td class="n">5.550.000</td><td class="n">0</td><td class="n">10</td><td class="n net"><b>6.105.000</b></td><td class="act"><i data-ic="deleteRow" data-sz="16" data-ctx="row" data-tone="danger"></i></td></tr>
+                <tr class="cur"><td class="muted">2</td><td>CN-BTT50</td><td>Bông thủy tinh 50mm</td><td>cuộn</td><td>Kho chính</td><td class="n muted">—</td><td class="n muted">—</td><td class="n muted">—</td><td class="n">12</td><td class="n muted">40</td><td class="n">465.000</td><td class="n">5.580.000</td><td class="n">5</td><td class="n">10</td><td class="n net"><b>5.831.100</b></td><td class="act"><i data-ic="deleteRow" data-sz="16" data-ctx="row" data-tone="danger"></i><span data-pin="s2:7" style="right:-2px;top:-6px"></span></td></tr>
+                <tr><td class="muted">3</td><td>CN-EPS50</td><td>Tôn xốp EPS 50mm</td><td>m</td><td>Kho chính</td><td class="n">8</td><td class="n">6</td><td class="n muted">—</td><td class="n">48</td><td class="n muted">96</td><td class="n">235.000</td><td class="n">11.280.000</td><td class="n">0</td><td class="n">10</td><td class="n net"><b>12.408.000</b></td><td class="act"><i data-ic="deleteRow" data-sz="16" data-ctx="row" data-tone="danger"></i></td></tr>
+              </tbody>
+            </table>
+            <div class="gfill"></div>
+          </div>
+        </div>
+
+        <div class="totals">
+          <div class="trow">
+            <div class="l"><span>3 dòng</span><span>Tiền hàng <b>22.410.000</b></span><span>CK <b>279.000</b></span><span>VAT <b>2.213.100</b></span><span>Phí VC <b>300.000</b></span><span>CK đơn <b>0</b></span><span>Đã thanh toán <b>10.000.000</b></span></div>
+            <span class="tot">Tổng thanh toán: 24.644.100</span>
+          </div>
+          <div class="debt">
+            <span data-pin="cur:4,s1:5" style="right:4px;top:2px"></span>
+            <span class="who">KH0012 — Công ty TNHH An Phát</span>
+            <span>Phải thu <b>18.200.000</b> <span data-g="arrow"></span> sau phiếu <b>32.844.100</b></span>
+            <span>Phải trả <b>0</b></span>
+            <span>Hạn mức <b>50.000.000</b></span>
+            <span>Còn được nợ sau phiếu <b>17.155.900</b></span>
+            <span>Quá hạn <b>0</b></span>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <aside class="notes" aria-live="polite">
+    <h2 id="nt"></h2>
+    <p class="sub" id="ns"></p>
+    <ol id="nl"></ol>
+  </aside>
+</div>
+
+<script>
+const LUCIDE = {"Menu": "<line x1=\"4\" x2=\"20\" y1=\"12\" y2=\"12\"></line><line x1=\"4\" x2=\"20\" y1=\"6\" y2=\"6\"></line><line x1=\"4\" x2=\"20\" y1=\"18\" y2=\"18\"></line>", "PanelLeftClose": "<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\"></rect><path d=\"M9 3v18\"></path><path d=\"m16 15-3-3 3-3\"></path>", "Search": "<circle cx=\"11\" cy=\"11\" r=\"8\"></circle><path d=\"m21 21-4.3-4.3\"></path>", "ChevronDown": "<path d=\"m6 9 6 6 6-6\"></path>", "ChevronRight": "<path d=\"m9 18 6-6-6-6\"></path>", "Bell": "<path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9\"></path><path d=\"M10.3 21a1.94 1.94 0 0 0 3.4 0\"></path>", "Building2": "<path d=\"M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z\"></path><path d=\"M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2\"></path><path d=\"M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2\"></path><path d=\"M10 6h4\"></path><path d=\"M10 10h4\"></path><path d=\"M10 14h4\"></path><path d=\"M10 18h4\"></path>", "LayoutDashboard": "<rect width=\"7\" height=\"9\" x=\"3\" y=\"3\" rx=\"1\"></rect><rect width=\"7\" height=\"5\" x=\"14\" y=\"3\" rx=\"1\"></rect><rect width=\"7\" height=\"9\" x=\"14\" y=\"12\" rx=\"1\"></rect><rect width=\"7\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"></rect>", "ShoppingCart": "<circle cx=\"8\" cy=\"21\" r=\"1\"></circle><circle cx=\"19\" cy=\"21\" r=\"1\"></circle><path d=\"M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12\"></path>", "Warehouse": "<path d=\"M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z\"></path><path d=\"M6 18h12\"></path><path d=\"M6 14h12\"></path><rect width=\"12\" height=\"12\" x=\"6\" y=\"10\"></rect>", "Wallet": "<path d=\"M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1\"></path><path d=\"M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4\"></path>", "Scale": "<path d=\"m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z\"></path><path d=\"m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z\"></path><path d=\"M7 21h10\"></path><path d=\"M12 3v18\"></path><path d=\"M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2\"></path>", "BarChart3": "<path d=\"M3 3v16a2 2 0 0 0 2 2h16\"></path><path d=\"M18 17V9\"></path><path d=\"M13 17V5\"></path><path d=\"M8 17v-3\"></path>", "Library": "<path d=\"m16 6 4 14\"></path><path d=\"M12 6v14\"></path><path d=\"M8 8v12\"></path><path d=\"M4 4v16\"></path>", "Settings": "<path d=\"M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z\"></path><circle cx=\"12\" cy=\"12\" r=\"3\"></circle>", "FileText": "<path d=\"M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z\"></path><path d=\"M14 2v4a2 2 0 0 0 2 2h4\"></path><path d=\"M10 9H8\"></path><path d=\"M16 13H8\"></path><path d=\"M16 17H8\"></path>", "Users": "<path d=\"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2\"></path><circle cx=\"9\" cy=\"7\" r=\"4\"></circle><path d=\"M22 21v-2a4 4 0 0 0-3-3.87\"></path><path d=\"M16 3.13a4 4 0 0 1 0 7.75\"></path>", "QrCode": "<rect width=\"5\" height=\"5\" x=\"3\" y=\"3\" rx=\"1\"></rect><rect width=\"5\" height=\"5\" x=\"16\" y=\"3\" rx=\"1\"></rect><rect width=\"5\" height=\"5\" x=\"3\" y=\"16\" rx=\"1\"></rect><path d=\"M21 16h-3a2 2 0 0 0-2 2v3\"></path><path d=\"M21 21v.01\"></path><path d=\"M12 7v3a2 2 0 0 1-2 2H7\"></path><path d=\"M3 12h.01\"></path><path d=\"M12 3h.01\"></path><path d=\"M12 16v.01\"></path><path d=\"M16 12h1\"></path><path d=\"M21 12v.01\"></path><path d=\"M12 21v-1\"></path>", "Star": "<polygon points=\"12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2\"></polygon>", "TrendingUp": "<polyline points=\"22 7 13.5 15.5 8.5 10.5 2 17\"></polyline><polyline points=\"16 7 22 7 22 13\"></polyline>", "TrendingDown": "<polyline points=\"22 17 13.5 8.5 8.5 13.5 2 7\"></polyline><polyline points=\"16 17 22 17 22 11\"></polyline>", "ArrowRight": "<path d=\"M5 12h14\"></path><path d=\"m12 5 7 7-7 7\"></path>", "X": "<path d=\"M18 6 6 18\"></path><path d=\"m6 6 12 12\"></path>", "CirclePlus": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><path d=\"M8 12h8\"></path><path d=\"M12 8v8\"></path>", "Ban": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><path d=\"m4.9 4.9 14.2 14.2\"></path>", "CheckCircle2": "<circle cx=\"12\" cy=\"12\" r=\"10\"></circle><path d=\"m9 12 2 2 4-4\"></path>", "Send": "<path d=\"M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z\"></path><path d=\"m21.854 2.147-10.94 10.939\"></path>", "CircleUserRound": "<path d=\"M18 20a6 6 0 0 0-12 0\"></path><circle cx=\"12\" cy=\"10\" r=\"4\"></circle><circle cx=\"12\" cy=\"12\" r=\"10\"></circle>", "ReceiptText": "<path d=\"M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z\"></path><path d=\"M14 8H8\"></path><path d=\"M16 12H8\"></path><path d=\"M13 16H8\"></path>", "Calendar": "<path d=\"M8 2v4\"></path><path d=\"M16 2v4\"></path><rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"></rect><path d=\"M3 10h18\"></path>", "CalendarDays": "<path d=\"M8 2v4\"></path><path d=\"M16 2v4\"></path><rect width=\"18\" height=\"18\" x=\"3\" y=\"4\" rx=\"2\"></rect><path d=\"M3 10h18\"></path><path d=\"M8 14h.01\"></path><path d=\"M12 14h.01\"></path><path d=\"M16 14h.01\"></path><path d=\"M8 18h.01\"></path><path d=\"M12 18h.01\"></path><path d=\"M16 18h.01\"></path>", "Plus": "<path d=\"M5 12h14\"></path><path d=\"M12 5v14\"></path>", "ArrowLeft": "<path d=\"m12 19-7-7 7-7\"></path><path d=\"M19 12H5\"></path>", "Save": "<path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\"></path><path d=\"M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7\"></path><path d=\"M7 3v4a1 1 0 0 0 1 1h7\"></path>", "Trash2": "<path d=\"M3 6h18\"></path><path d=\"M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6\"></path><path d=\"M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2\"></path><line x1=\"10\" x2=\"10\" y1=\"11\" y2=\"17\"></line><line x1=\"14\" x2=\"14\" y1=\"11\" y2=\"17\"></line>", "Printer": "<path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\"></path><path d=\"M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6\"></path><rect x=\"6\" y=\"14\" width=\"12\" height=\"8\" rx=\"1\"></rect>", "Keyboard": "<path d=\"M10 8h.01\"></path><path d=\"M12 12h.01\"></path><path d=\"M14 8h.01\"></path><path d=\"M16 12h.01\"></path><path d=\"M18 8h.01\"></path><path d=\"M6 8h.01\"></path><path d=\"M7 16h10\"></path><path d=\"M8 12h.01\"></path><rect width=\"20\" height=\"16\" x=\"2\" y=\"4\" rx=\"2\"></rect>", "Settings2": "<path d=\"M20 7h-9\"></path><path d=\"M14 17H5\"></path><circle cx=\"17\" cy=\"17\" r=\"3\"></circle><circle cx=\"7\" cy=\"7\" r=\"3\"></circle>", "LayoutList": "<rect width=\"7\" height=\"7\" x=\"3\" y=\"3\" rx=\"1\"></rect><rect width=\"7\" height=\"7\" x=\"3\" y=\"14\" rx=\"1\"></rect><path d=\"M14 4h7\"></path><path d=\"M14 9h7\"></path><path d=\"M14 15h7\"></path><path d=\"M14 20h7\"></path>", "ArrowUpFromLine": "<path d=\"m18 9-6-6-6 6\"></path><path d=\"M12 3v14\"></path><path d=\"M5 21h14\"></path>", "ArrowDownToLine": "<path d=\"M12 17V3\"></path><path d=\"m6 11 6 6 6-6\"></path><path d=\"M19 21H5\"></path>", "ClipboardList": "<rect width=\"8\" height=\"4\" x=\"8\" y=\"2\" rx=\"1\" ry=\"1\"></rect><path d=\"M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2\"></path><path d=\"M12 11h4\"></path><path d=\"M12 16h4\"></path><path d=\"M8 11h.01\"></path><path d=\"M8 16h.01\"></path>", "RotateCcw": "<path d=\"M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8\"></path><path d=\"M3 3v5h5\"></path>"};
+const NOTCH = {"dashboard": {"d": "M3 3h8v8H3zM3 15h8v6H3zM15 13h6v8h-6z", "ax": 16.0, "ay": 4.0}, "cart": {"d": "M2 3h3l2.5 12h11L21 7H6M9 20a1 1 0 1 0 2 0a1 1 0 1 0-2 0M16 20a1 1 0 1 0 2 0a1 1 0 1 0-2 0", "ax": 11.0, "ay": 9.0}, "warehouse": {"d": "M3 7l9-4 9 4v10l-9 4-9-4zM3 7l9 4 9-4M12 11v10", "ax": 15.0, "ay": 12.0}, "wallet": {"d": "M3 6h15a2 2 0 0 1 2 2v11H3zM3 6l12-3v3", "ax": 17.0, "ay": 10.5}, "contract": {"d": "M15 2H6v20h13V8M9 17c1-2 2-2 2.5-.5s1 1.5 2 0 1.5-1 3 .5", "ax": 16.0, "ay": 2.0}, "reports": {"d": "M3 3v18h18M8 17v-5M12 17V9M16 17v-3", "ax": 17.0, "ay": 5.0}, "folder": {"d": "M3 5h6l2 2h10v13H3z", "ax": 14.5, "ay": 11.5}, "settings": {"d": "M4 6h10M18 6h2M14 6a2 2 0 1 0 4 0a2 2 0 1 0-4 0M4 12h3M13 12h7M4 18h3M11 18h9M7 18a2 2 0 1 0 4 0a2 2 0 1 0-4 0", "ax": 8.0, "ay": 10.0}, "document": {"d": "M15 2H6v20h13V8M9 13h7M9 17h5", "ax": 16.0, "ay": 2.0}, "search": {"d": "M3 10a7 7 0 1 0 14 0a7 7 0 1 0-14 0M15.5 15.5L21 21", "ax": 8.0, "ay": 8.0}, "bell": {"d": "M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4", "ax": 17.0, "ay": 1.0}, "stockin": {"d": "M12 3v10M7 8l5 5 5-5M4 15v5h16v-5", "ax": 10.0, "ay": 15.5}, "upload": {"d": "M12 13V3M7 8l5-5 5 5M4 15v5h16v-5", "ax": 10.0, "ay": 15.5}, "table": {"d": "M3 4h18v16H3zM3 9h18M3 14.5h18M9 4v16", "ax": 13.0, "ay": 9.75}, "trash": {"d": "M4 7h16M6 7l1 14h10l1-14M10 11v6M14 11v6", "ax": 10.0, "ay": 1.5}, "plus": {"d": "M12 3v6M12 15v6M3 12h6M15 12h6", "ax": 10.0, "ay": 10.0}};
+// Registry: business name -> [lucide name, Notch id or null, kind]. kind 'util' never takes a notch; 'missing' = not in the Notch set yet.
+const REG = {
+  collapse: ['PanelLeftClose', null, 'util'], chevronDown: ['ChevronDown', null, 'util'], chevronRight: ['ChevronRight', null, 'util'],
+  branch: ['Building2', null, 'util'], arrowRight: ['ArrowRight', null, 'util'], back: ['ArrowLeft', null, 'util'],
+  search: ['Search', 'search'], bell: ['Bell', 'bell'], overview: ['LayoutDashboard', 'dashboard'],
+  sales: ['ShoppingCart', 'cart'], inventory: ['Warehouse', 'warehouse'], cash: ['Wallet', 'wallet'],
+  debt: ['Scale', 'contract'], reports: ['BarChart3', 'reports'], catalogs: ['Library', 'folder'], system: ['Settings', 'settings'],
+  quotation: ['FileText', 'document'],
+  stockIn: ['ArrowDownToLine', 'stockin'], stockOut: ['ArrowUpFromLine', 'upload'], openingStock: ['ClipboardList', 'table'],
+  save: ['Save', null, 'missing'], print: ['Printer', null, 'missing'], cancelVoucher: ['Ban', null, 'missing'],
+  delete: ['Trash2', 'trash'], deleteRow: ['Trash2', 'trash'], addLine: ['Plus', 'plus'],
+  gridSettings: ['Settings2', 'settings'], keyboard: ['Keyboard', null, 'missing'],
+};
+const STROKE = { 12: 2, 14: 2, 16: 2, 18: 1.85, 20: 1.85, 24: 1.75 };
+const TONE = { danger: 't-danger', create: 't-create', muted: 't-muted', print: 't-print' };
+let mode = 's1';
+
+function render(el) {
+  const name = el.dataset.ic, sz = +el.dataset.sz, ctx = el.dataset.ctx, state = el.dataset.state;
+  const [lu, no, kind] = REG[name];
+  const sw = mode === 'cur' ? 2 : STROKE[sz] || 2;
+  const useNotch = mode === 's2' && no;
+  let inner;
+  if (useNotch) {
+    const n = NOTCH[no];
+    let fill = 'var(--mute)';
+    if (state === 'active') fill = 'var(--signal)';
+    if (el.dataset.notch === 'danger') fill = '#D92D20';
+    if (ctx === 'onPrimary') fill = 'var(--signal)';
+    const hide = ctx === 'header';
+    inner = `<path d="${n.d}"/>` + (hide ? '' : `<rect x="${n.ax}" y="${n.ay}" width="4" height="4" rx="1" fill="${fill}" stroke="none"/>`);
+  } else {
+    inner = LUCIDE[lu];
+  }
+  // Steps 0 and 1 keep the per-action colours (step 1 only moves them into tokens); step 2 strokes everything in ink.
+  const tone = mode !== 's2' && el.dataset.tone ? TONE[el.dataset.tone] : '';
+  const cls = ['ic', tone, mode === 's2' && kind === 'missing' ? 'fallback' : ''].filter(Boolean).join(' ');
+  return `<svg class="${cls}" width="${sz}" height="${sz}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${inner}</svg>`;
+}
+
+const GLYPH = {};
+function fakeEl(ic, sz, ctx) { const e = document.createElement('i'); e.dataset.ic = ic; e.dataset.sz = String(sz); e.dataset.ctx = ctx; return e; }
+GLYPH.arrow = () => mode === 'cur' ? '→' : `<span class="ar">${render(fakeEl('arrowRight', 12, 'util'))}</span>`;
+
+const NOTES = {
+  cur: {
+    t: 'Hiện tại', s: 'Form Phiếu xuất kho đang ở chế độ sửa: icon lucide, màu theo hành động bằng class Tailwind thô.',
+    items: [
+      '<b>Hủy phiếu</b> và <b>Xóa</b>: icon <code>text-red-600</code> trên nút viền. Thùng rác ở mỗi dòng lưới cũng đỏ.',
+      '<b>In phiếu</b> chưa có trên form này. Nút có viền đứt là chỗ kế hoạch TT133 (in 02-VT) sẽ thêm vào.',
+      '<b>Thêm dòng</b>: icon <code>text-cyan-600</code>; Lưu không màu; nút quay lại <code>slate-500</code>.',
+      'Dải công nợ dùng ký tự <b>→</b> giữa số dư hiện tại và số dư sau phiếu.',
+    ],
+  },
+  s1: {
+    t: 'Bước 1 · làm ngay', s: 'Vẫn là lucide, màu nhìn thấy không đổi; thay đổi nằm trong code.',
+    items: [
+      'Mọi icon đi qua <code>&lt;AppIcon name="cancelVoucher" tone="danger" /&gt;</code>. Tên gọi theo nghiệp vụ, không theo hình vẽ.',
+      'Màu theo hành động thành <b>tone</b> trong registry: danger = Hủy phiếu, Xóa, xóa dòng; create = Thêm dòng; muted = quay lại. Không còn class màu thô rải ở 77 file, nên không còn chỗ thiếu màu như hiện nay.',
+      'Thêm dòng, Cột &amp; phím Enter, Phím tắt dùng cùng cỡ 16px, nét 2.',
+      'Khi kế hoạch TT133 thêm nút In phiếu, chỉ cần khai báo <code>print</code> một lần trong registry.',
+      'Ký tự → trong dải công nợ dùng icon mũi tên.',
+    ],
+  },
+  s2: {
+    t: 'Bước 2 · khi Notch đạt chuẩn', s: 'Đổi file map sang Notch. Màn có nhiều nút thao tác nên xung đột bộc lộ rõ.',
+    items: [
+      'Icon có trong Notch (thùng rác, dấu cộng, thanh trượt, tìm kiếm, menu kho) đổi ngay. Icon tiện ích (quay lại, chevron, mũi tên) giữ lucide.',
+      '<b>4/7 icon thao tác</b> của màn này chưa có trong Notch: Lưu, In phiếu, Hủy phiếu, Phím tắt. Registry dùng lucide (viền đứt), nên trên một thanh có hai họ icon đứng cạnh nhau.',
+      'Quy tắc Notch "nét màu mực, màu chỉ ở khối" xóa màu theo hành động (quyết định 260519). Để Hủy phiếu và Xóa vẫn trông nguy hiểm, chữ nút phải chuyển sang đỏ. Đây là thay đổi quy ước cần duyệt riêng.',
+      '<b>Thêm dòng</b>: icon plus 16px có khối nằm ngay tâm và khe về 0px, nên nhìn như một dấu cộng tô đặc. Đây là lỗi đã đo ở phần kỹ thuật.',
+      '<b>Cột &amp; phím Enter</b> và nhóm <b>Hệ thống</b> cùng dùng icon settings của Notch, vi phạm quy tắc mỗi icon dùng một nơi của sidebar.',
+      'Mục Phiếu xuất kho đang mở: icon upload có khối Signal đè lên nét khay (khe −0,33px ở 16px).',
+      'Thùng rác trên mỗi dòng giữ khối xám. Nếu tô khối đỏ, lưới 30 dòng sẽ có 30 chấm đỏ, ngược với ý "một điểm nhấn".',
+    ],
+  },
+};
+
+function paint() {
+  document.getElementById('app').classList.toggle('m-s2', mode === 's2');
+  document.querySelectorAll('[data-ic]').forEach((el) => {
+    const keep = Object.entries(el.dataset).map(([k, v]) => `data-${k.replace(/[A-Z]/g, (c) => '-' + c.toLowerCase())}="${v}"`).join(' ');
+    el.outerHTML = `<i ${keep} style="display:inline-flex">${render(el)}</i>`;
+  });
+  document.querySelectorAll('[data-g]').forEach((el) => { el.innerHTML = GLYPH[el.dataset.g](); });
+  document.querySelectorAll('[data-pin]').forEach((el) => {
+    const hit = el.dataset.pin.split(',').map((x) => x.split(':')).find(([m]) => m === mode);
+    el.className = 'pin';
+    el.innerHTML = hit ? `<span class="num">${hit[1]}</span>` : '';
+  });
+  const N = NOTES[mode];
+  document.getElementById('nt').textContent = N.t;
+  document.getElementById('ns').textContent = N.s;
+  document.getElementById('nl').innerHTML = N.items.map((h, i) => `<li><span class="num">${i + 1}</span><span>${h}</span></li>`).join('');
+  document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === mode)));
+}
+document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; paint(); }));
+paint();
+</script>
+</body>
+</html>

@@ -20,8 +20,13 @@ describe('QuotationDateFilter', () => {
   it('shows "Tất cả", its four presets and the custom button', () => {
     render(<QuotationDateFilter from="" to="" onChange={vi.fn()} />);
 
-    expect(buttonLabels()).toEqual(['Tất cả', '7N', '30N', 'Tháng này', 'Tháng trước', 'Tuỳ chỉnh ▾']);
+    expect(buttonLabels()).toEqual(['Tất cả', '7N', '30N', 'Tháng này', 'Tháng trước', 'Tuỳ chỉnh']);
     expect(activeLabels()).toEqual(['Tất cả']);
+  });
+
+  it('the custom button carries a chevronDown icon', () => {
+    render(<QuotationDateFilter from="" to="" onChange={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Tuỳ chỉnh' }).querySelector('[data-icon="chevronDown"]')).not.toBeNull();
   });
 
   it.each([
@@ -29,7 +34,7 @@ describe('QuotationDateFilter', () => {
     ['2026-09-14', '2026-10-13', '30N'],
     ['2026-10-01', '2026-10-13', 'Tháng này'],
     ['2026-09-01', '2026-09-30', 'Tháng trước'],
-    ['2026-10-02', '2026-10-13', 'Tuỳ chỉnh ▾'],
+    ['2026-10-02', '2026-10-13', 'Tuỳ chỉnh'],
   ])('%s … %s marks "%s"', (from, to, label) => {
     render(<QuotationDateFilter from={from} to={to} onChange={vi.fn()} />);
 
@@ -44,7 +49,7 @@ describe('QuotationDateFilter', () => {
   ])('%s … %s is a custom range here', (from, to) => {
     render(<QuotationDateFilter from={from} to={to} onChange={vi.fn()} />);
 
-    expect(activeLabels()).toEqual(['Tuỳ chỉnh ▾']);
+    expect(activeLabels()).toEqual(['Tuỳ chỉnh']);
   });
 
   it('clicking a preset reports its range', () => {

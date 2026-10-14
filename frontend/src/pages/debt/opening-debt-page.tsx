@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
-import { AlertTriangle, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { PartnerAutocomplete } from '@/components/partner-autocomplete/partner-autocomplete';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Button } from '@/components/ui/button';
@@ -131,7 +131,7 @@ export function OpeningDebtPage() {
                 setDialogOpen(true);
               }}
             >
-              <Pencil className="h-4 w-4 text-blue-600" />
+              <AppIcon name="edit" />
             </Button>
             <Button
               variant="ghost"
@@ -139,7 +139,7 @@ export function OpeningDebtPage() {
               aria-label="Xóa nợ đầu kỳ"
               onClick={() => setPendingDelete(row.original)}
             >
-              <Trash2 className="h-4 w-4 text-red-600" />
+              <AppIcon name="delete" />
             </Button>
           </div>
         ),
@@ -192,7 +192,7 @@ export function OpeningDebtPage() {
           }}
           disabled={!openingDate}
         >
-          <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm
+          <AppIcon name="add" className="mr-2" /> Thêm
         </Button>
       </div>
 
@@ -201,7 +201,7 @@ export function OpeningDebtPage() {
           role="alert"
           className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900"
         >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <AppIcon name="warning" tone="none" className="mt-0.5" />
           <span>
             Chi nhánh chưa có ngày đầu kỳ. Vào{' '}
             <Link to="/settings/branches" className="font-medium underline">
@@ -216,7 +216,7 @@ export function OpeningDebtPage() {
         <CardContent className="p-4">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="relative w-full max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Tìm theo số CT / mã / tên đối tượng..."
                 aria-label="Tìm nợ đầu kỳ"

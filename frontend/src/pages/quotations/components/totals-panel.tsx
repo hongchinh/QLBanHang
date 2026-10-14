@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { QrCode } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
@@ -29,7 +29,7 @@ export function TotalsPanel({ lines, header, onHeaderChange, quotationCode }: Pr
         title="Tạo QR thanh toán"
         className="text-cyan-600 hover:text-cyan-700"
       >
-        <QrCode className="h-3.5 w-3.5" />
+        <AppIcon name="paymentQr" size={14} />
       </Link>
     );
   };

@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { LayoutDashboard } from 'lucide-react';
 import type { NavItem } from '../nav-config';
 import { allNavGroups } from './sidebar-test-utils';
 import { filterNavGroups, findActiveItem, normalizeVi, resolvePinnedItems } from './nav-search';
 
-const item = (to: string): NavItem => ({ to, label: to, icon: LayoutDashboard });
+const item = (to: string): NavItem => ({ to, label: to, icon: 'overview' });
 const ITEMS = [
   item('/admin/dashboard'), item('/quotations'), item('/settings'),
   item('/settings/my-quotation-settings'), item('/reports/sales-revenue'), item('/admin/users'),

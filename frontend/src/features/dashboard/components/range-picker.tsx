@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -88,8 +89,9 @@ export function RangePicker({
       ))}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <button type="button" aria-pressed={matchPreset == null} className={chipClass(matchPreset == null)}>
-            Tuỳ chỉnh ▾
+          <button type="button" aria-pressed={matchPreset == null} className={cn(chipClass(matchPreset == null), 'inline-flex items-center gap-1')}>
+            Tuỳ chỉnh
+            <AppIcon name="chevronDown" size={14} />
           </button>
         </PopoverTrigger>
         <PopoverContent align="end" collisionPadding={16} className="w-72 max-w-[calc(100vw-2rem)] p-3">
@@ -118,8 +120,8 @@ export function RangePicker({
           </div>
         </PopoverContent>
       </Popover>
-      <span className="ml-1 text-xs text-muted-foreground">
-        {from} → {to}
+      <span className="ml-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+        {from} <AppIcon name="arrowRight" size={12} label="đến" /> {to}
       </span>
     </div>
   );

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
-import { Pencil, Plus, Trash2, Wallet } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useDeleteFund, useFunds } from '@/features/funds/hooks';
 import type { Fund } from '@/features/funds/types';
 import type { FundKind } from '@/features/cash-common/types';
@@ -86,7 +86,7 @@ export function FundListPage() {
                 title="Số dư đầu kỳ"
                 onClick={() => setOpeningTarget(row.original)}
               >
-                <Wallet className="h-4 w-4 text-emerald-600" />
+                <AppIcon name="openingBalance" />
               </Button>
             )}
             {canManage && (
@@ -100,7 +100,7 @@ export function FundListPage() {
                     setDialogOpen(true);
                   }}
                 >
-                  <Pencil className="h-4 w-4 text-blue-600" />
+                  <AppIcon name="edit" />
                 </Button>
                 <Button
                   variant="ghost"
@@ -108,7 +108,7 @@ export function FundListPage() {
                   aria-label="Xóa quỹ"
                   onClick={() => setPendingDelete(row.original)}
                 >
-                  <Trash2 className="h-4 w-4 text-red-600" />
+                  <AppIcon name="delete" />
                 </Button>
               </>
             )}
@@ -155,7 +155,7 @@ export function FundListPage() {
           </Select>
           {canManage && (
             <Button onClick={openCreate}>
-              <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm quỹ
+              <AppIcon name="add" className="mr-2" /> Thêm quỹ
             </Button>
           )}
         </div>

@@ -5,7 +5,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   useDeleteProductGroup,
   useProductGroups,
@@ -88,7 +88,7 @@ export function ProductGroupListPage() {
                 aria-label="Sửa nhóm hàng hóa"
                 onClick={() => openEdit(row.original)}
               >
-                <Pencil className="h-4 w-4 text-blue-600" />
+                <AppIcon name="edit" />
               </Button>
             </Can>
             <Can permission="products.delete">
@@ -98,7 +98,7 @@ export function ProductGroupListPage() {
                 aria-label="Xóa nhóm hàng hóa"
                 onClick={() => setPendingDelete(row.original)}
               >
-                <Trash2 className="h-4 w-4 text-red-600" />
+                <AppIcon name="delete" />
               </Button>
             </Can>
           </div>
@@ -137,7 +137,7 @@ export function ProductGroupListPage() {
         </div>
         <Can permission="products.create">
           <Button onClick={openCreate}>
-            <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm nhóm
+            <AppIcon name="add" className="mr-2" /> Thêm nhóm
           </Button>
         </Can>
       </div>
@@ -146,7 +146,7 @@ export function ProductGroupListPage() {
         <CardContent className="p-4">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Tìm theo tên / mã..."
                 value={search}

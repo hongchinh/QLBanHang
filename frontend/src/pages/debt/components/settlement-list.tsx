@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { format } from 'date-fns';
-import { Undo2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import type { DebtSide, DebtSourceType, SettlementOrigin } from '@/features/cash-common/types';
 import { useDebtSettlements, useDeleteSettlement, useDeleteSettlementBatch } from '@/features/debt/hooks';
 import type { DebtSettlement } from '@/features/debt/types';
@@ -150,7 +150,7 @@ export function SettlementList({ partnerId, side, docHref }: SettlementListProps
                   <td className="px-2 py-2 text-right">
                     {unmatchable && (
                       <Button variant="outline" size="sm" onClick={() => setPending({ kind: 'batch', batch })}>
-                        <Undo2 className="mr-1 h-4 w-4 text-red-600" />
+                        <AppIcon name="unsettle" className="mr-1" />
                         Bỏ cả lô
                       </Button>
                     )}

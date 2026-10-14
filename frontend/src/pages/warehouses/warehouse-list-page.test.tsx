@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { WarehouseListPage } from './warehouse-list-page';
@@ -88,5 +88,12 @@ describe('WarehouseListPage', () => {
     renderPage();
     // Without a branch the backend lists the working branch only, so the default says so.
     expect(screen.getByRole('combobox', { name: 'Lọc chi nhánh' })).toHaveTextContent('Chi nhánh làm việc');
+  });
+
+  it('row actions use AppIcon edit and delete tones', () => {
+    renderPage();
+    const row = within(screen.getByRole('row', { name: /KHO01/ }));
+    expect(row.getByRole('button', { name: 'Sửa kho' }).querySelector('[data-icon="edit"]')).toHaveClass('text-icon-edit');
+    expect(row.getByRole('button', { name: 'Xóa kho' }).querySelector('[data-icon="delete"]')).toHaveClass('text-icon-danger');
   });
 });

@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { AppIcon } from '@/components/icons';
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
@@ -773,7 +774,7 @@ export function App() {
           >
             Cập nhật ngay
           </button>
-          <button onClick={() => setNeedRefresh(false)} aria-label="Đóng" className="text-gray-400 hover:text-white">✕</button>
+          <button onClick={() => setNeedRefresh(false)} aria-label="Đóng" className="text-gray-400 hover:text-white"><AppIcon name="close" /></button>
         </div>
       )}
     </ErrorBoundary>

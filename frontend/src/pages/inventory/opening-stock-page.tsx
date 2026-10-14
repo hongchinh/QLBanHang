@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Plus, Save, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useOpeningStock, useSaveOpeningStock } from '@/features/opening-stock/hooks';
 import type { OpeningStockGrid, SaveOpeningStockRequest } from '@/features/opening-stock/types';
 import type { ProductSuggestion } from '@/features/products/types';
@@ -174,7 +174,7 @@ export function OpeningStockPage() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-xl font-semibold">Tồn đầu kỳ</h1>
         <Button onClick={() => void submit(false)} disabled={!canSave || save.isPending}>
-          {save.isPending ? <ButtonLoader /> : <Save className="h-4 w-4" />}
+          {save.isPending ? <ButtonLoader /> : <AppIcon name="save" tone="none" />}
           Lưu
         </Button>
       </div>
@@ -204,7 +204,7 @@ export function OpeningStockPage() {
               role="alert"
               className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 sm:col-span-2 lg:col-span-3"
             >
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <AppIcon name="warning" tone="none" className="mt-0.5" />
               <span>Chi nhánh chưa có ngày đầu kỳ. Vào Cấu hình → Chi nhánh để đặt ngày đầu kỳ trước khi lưu.</span>
             </div>
           )}
@@ -292,7 +292,7 @@ export function OpeningStockPage() {
                           aria-label="Xóa dòng"
                           onClick={() => setRows((current) => current.filter((r) => r.key !== row.key))}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <AppIcon name="delete" />
                         </Button>
                       </td>
                     </tr>
@@ -309,7 +309,7 @@ export function OpeningStockPage() {
                     disabled={!loaded}
                     onClick={() => setRows((c) => [...c, emptyRow()])}
                   >
-                    <Plus className="h-4 w-4" />
+                    <AppIcon name="add" />
                     Thêm dòng
                   </Button>
                 </td>

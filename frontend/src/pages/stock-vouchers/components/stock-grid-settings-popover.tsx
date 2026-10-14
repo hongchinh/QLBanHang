@@ -1,4 +1,4 @@
-import { Settings2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { PricingMode } from '@/features/products/types';
@@ -28,7 +28,7 @@ export function StockGridSettingsPopover({ prefs, onToggleColumn, onToggleEnterS
     <Popover>
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" size="sm" className="h-7">
-          <Settings2 className="mr-1.5 h-4 w-4" />
+          <AppIcon name="gridSettings" className="mr-1.5" />
           Cột &amp; phím Enter
         </Button>
       </PopoverTrigger>

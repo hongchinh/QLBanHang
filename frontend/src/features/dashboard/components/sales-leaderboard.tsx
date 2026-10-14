@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import type { SalesLeaderboardItem } from '../types';
+import { DeltaArrow } from './delta-arrow';
 import { formatDelta, formatNumber, formatVnd } from '../format';
 import { cn } from '@/lib/utils';
 
@@ -52,10 +53,12 @@ export function SalesLeaderboard({ items, loading, empty, drillHref }: SalesLead
                 {it.conversionRate != null && <span>CR {it.conversionRate.toFixed(1)}%</span>}
                 <span
                   className={cn(
+                    'inline-flex items-center gap-0.5',
                     delta.tone === 'positive' && 'text-emerald-600',
                     delta.tone === 'negative' && 'text-rose-600',
                   )}
                 >
+                  {delta.direction && <DeltaArrow direction={delta.direction} />}
                   {delta.text}
                 </span>
               </div>

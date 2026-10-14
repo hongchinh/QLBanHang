@@ -42,6 +42,7 @@ export function DashboardPage() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           label="Doanh thu hôm nay"
+          icon="kpiRevenueToday"
           format="currency"
           kpi={summary.data?.todayRevenue}
           loading={summary.isLoading}
@@ -49,6 +50,7 @@ export function DashboardPage() {
         />
         <KpiCard
           label="Doanh thu khoảng"
+          icon="kpiRevenueRange"
           format="currency"
           kpi={summary.data?.rangeRevenue}
           loading={summary.isLoading}
@@ -56,6 +58,7 @@ export function DashboardPage() {
         />
         <KpiCard
           label="Tổng báo giá"
+          icon="kpiQuotations"
           format="number"
           kpi={summary.data?.totalCount}
           loading={summary.isLoading}
@@ -63,6 +66,7 @@ export function DashboardPage() {
         />
         <KpiCard
           label="Đã huỷ"
+          icon="kpiCancelled"
           format="number"
           kpi={summary.data?.cancelledCount}
           loading={summary.isLoading}

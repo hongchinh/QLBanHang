@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useProducts, useProductGroups } from '@/features/products/hooks';
@@ -42,7 +42,7 @@ export function ProductCatalogList({
       {/* Search input */}
       <div className="border-b p-3">
         <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <AppIcon name="search" className="absolute left-2.5 top-2.5" />
           <Input
             className="pl-8"
             placeholder="Tìm mã, tên hàng..."
@@ -144,18 +144,18 @@ export function ProductCatalogList({
         </span>
         <div className="flex gap-1">
           <button
-            className="rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
             disabled={page <= 1}
             onClick={() => onPageChange(page - 1)}
           >
-            ← Trước
+            <AppIcon name="chevronLeft" size={14} /> Trước
           </button>
           <button
-            className="rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
+            className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
             disabled={page >= totalPages}
             onClick={() => onPageChange(page + 1)}
           >
-            Sau →
+            Sau <AppIcon name="chevronRight" size={14} />
           </button>
         </div>
       </div>

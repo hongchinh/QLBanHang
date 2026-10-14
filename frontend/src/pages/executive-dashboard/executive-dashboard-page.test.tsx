@@ -114,7 +114,7 @@ describe('ExecutiveDashboardPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Điều hành' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('Trực tiếp');
     expect(screen.getByRole('combobox')).toHaveTextContent('CN01 — Hà Nội');
-    for (const chip of ['Hôm nay', 'Tuần này', 'Tháng này', 'Năm nay', 'Tuỳ chỉnh ▾']) {
+    for (const chip of ['Hôm nay', 'Tuần này', 'Tháng này', 'Năm nay', 'Tuỳ chỉnh']) {
       expect(screen.getByRole('button', { name: chip })).toBeInTheDocument();
     }
     expect(screen.queryByRole('button', { name: '7N' })).not.toBeInTheDocument();
@@ -294,7 +294,7 @@ describe('ExecutiveDashboardPage', () => {
       expect(lastOverviewProps().params).toEqual({ from: '2026-11-01', to: '2026-11-01', branchId: 'b1' });
       expect(screen.getByText('So với kỳ trước: 31/10/2026 – 31/10/2026')).toBeInTheDocument();
       // A preset still (on the 1st "Hôm nay" comes first), not "Tuỳ chỉnh".
-      expect(screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' })).not.toHaveClass('bg-foreground');
+      expect(screen.getByRole('button', { name: 'Tuỳ chỉnh' })).not.toHaveClass('bg-foreground');
       expect(screen.getByTestId('search')).toBeEmptyDOMElement();
     });
 
@@ -324,7 +324,7 @@ describe('ExecutiveDashboardPage', () => {
 
     it('cannot be applied from "Tuỳ chỉnh", which gives the reason of the API', () => {
       renderPage();
-      fireEvent.click(screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Tuỳ chỉnh' }));
       fireEvent.change(screen.getByLabelText('Từ ngày'), { target: { value: '2022-10-01' } });
       fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: '2026-10-13' } });
 

@@ -9,6 +9,12 @@ vi.mock('@/features/search/hooks', () => ({
 }))
 
 describe('HeaderSearchMobileSheet', () => {
+  it('keeps the trigger icon free of the muted tone', () => {
+    render(<MemoryRouter><HeaderSearchMobileSheet /></MemoryRouter>)
+    const trigger = screen.getByRole('button', { name: 'Mở tìm kiếm' })
+    expect(trigger.querySelector('[data-icon="search"]')).not.toHaveClass('text-icon-muted')
+  })
+
   // The sheet is fixed to the top of the viewport, outside the shell's padding.
   it('keeps the open sheet inside the safe area', () => {
     render(<MemoryRouter><HeaderSearchMobileSheet /></MemoryRouter>)

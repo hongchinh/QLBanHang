@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useCanOpenLink } from '@/hooks/useCanOpenLink';
 import { cn } from '@/lib/utils';
 import { formatPct } from '../format';
+import { DeltaArrow } from './delta-arrow';
 
 type HintTone = 'default' | 'good' | 'warn' | 'bad';
 
@@ -123,8 +124,11 @@ function DeltaBadge({ delta }: { delta: number | null }) {
   // Zero counts as a rise, as formatDelta does for the quotation dashboards.
   const rise = delta >= 0;
   return (
-    <span className={cn('mr-1.5 whitespace-nowrap font-medium', rise ? 'text-emerald-700' : 'text-rose-700')}>
-      {rise ? '▲' : '▼'} {formatPct(Math.abs(delta))}
+    <span
+      className={cn('mr-1.5 inline-flex items-center gap-0.5 whitespace-nowrap font-medium', rise ? 'text-emerald-700' : 'text-rose-700')}
+    >
+      <DeltaArrow direction={rise ? 'up' : 'down'} />
+      {formatPct(Math.abs(delta))}
     </span>
   );
 }

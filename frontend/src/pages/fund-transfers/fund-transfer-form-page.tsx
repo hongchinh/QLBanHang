@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Ban, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   useCancelFundTransfer,
   useCreateFundTransfer,
@@ -267,7 +267,7 @@ function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
               <Link to={BASE_PATH}>
-                <ArrowLeft className="h-4 w-4 text-slate-500" />
+                <AppIcon name="back" />
               </Link>
             </Button>
             <h1 className="truncate text-xl font-bold">
@@ -285,33 +285,33 @@ function FundTransferForm({ id, transfer, defaults, refetchTransfer }: FormProps
                   Lưu và thoát
                 </Button>
                 <Button type="button" size="sm" onClick={() => submitWithIntent('save-stay')} disabled={busy}>
-                  {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                  {busy ? <ButtonLoader className="mr-2" /> : <AppIcon name="save" tone="none" className="mr-2" />}
                   Lưu tạm
                 </Button>
               </>
             )}
             {isEdit && !readOnly && (
               <Button type="button" size="sm" onClick={() => submitWithIntent('update')} disabled={busy}>
-                {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+                {busy ? <ButtonLoader className="mr-2" /> : <AppIcon name="save" tone="none" className="mr-2" />}
                 Cập nhật
               </Button>
             )}
             {isEdit && transfer?.canCancel && status === 'Active' && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('cancel')} disabled={busy}>
-                <Ban className="mr-2 h-4 w-4 text-red-600" />
+                <AppIcon name="cancelVoucher" className="mr-2" />
                 Hủy phiếu
               </Button>
             )}
             {isEdit && transfer?.canCancel && status === 'Cancelled' && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('restore')} disabled={busy}>
-                <RotateCcw className="mr-2 h-4 w-4 text-emerald-600" />
+                <AppIcon name="restore" className="mr-2" />
                 Khôi phục
               </Button>
             )}
             {/* The server deletes a transfer in any status. */}
             {isEdit && transfer?.canDelete && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('delete')} disabled={busy}>
-                <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                <AppIcon name="delete" className="mr-2" />
                 Xóa
               </Button>
             )}

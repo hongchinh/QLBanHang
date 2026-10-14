@@ -231,10 +231,10 @@ describe('InventoryTab', () => {
       expect(cells(rowOf('Giá trị tồn theo kho', 'CN01 · KHO01 – Kho chính'))[2]).toBe('—');
     });
 
-    it('"Tồn kho →" opens stock on hand and says which branch it opens for', () => {
+    it('"Tồn kho" opens stock on hand and says which branch it opens for', () => {
       renderTab();
 
-      const link = within(tile('Giá trị tồn theo kho')).getByRole('link', { name: 'Tồn kho →' });
+      const link = within(tile('Giá trị tồn theo kho')).getByRole('link', { name: 'Tồn kho' });
       expect(link).toHaveAttribute('href', '/inventory/stock-on-hand');
       expect(link).toHaveAttribute('title', HINT);
     });
@@ -287,10 +287,10 @@ describe('InventoryTab', () => {
       expect(cells(rowOf('Mã hàng tồn âm', 'SP009 – Vít bắn tôn'))[1]).toBe('KHO02');
     });
 
-    it('"Tồn kho →" opens stock on hand', () => {
+    it('"Tồn kho" opens stock on hand', () => {
       renderTab();
 
-      expect(within(tile('Mã hàng tồn âm')).getByRole('link', { name: 'Tồn kho →' })).toHaveAttribute(
+      expect(within(tile('Mã hàng tồn âm')).getByRole('link', { name: 'Tồn kho' })).toHaveAttribute(
         'href',
         '/inventory/stock-on-hand',
       );

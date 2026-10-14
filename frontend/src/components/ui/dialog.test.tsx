@@ -233,3 +233,18 @@ describe('Dialog focus return', () => {
     }
   });
 });
+
+describe('Dialog close button', () => {
+  it('draws its close icon through AppIcon', async () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>Tiêu đề</DialogTitle>
+          <DialogDescription>Mô tả</DialogDescription>
+        </DialogContent>
+      </Dialog>,
+    );
+    const close = await screen.findByRole('button', { name: 'Đóng' });
+    expect(close.querySelector('[data-icon="close"]')).not.toBeNull();
+  });
+});

@@ -6,7 +6,8 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table';
-import { Plus, Pencil, Printer, Ban, Search, Copy, MoreHorizontal, Send, CheckCircle2, BadgeCheck, Loader2, FileSpreadsheet } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
+import { ButtonLoader } from '@/components/ui/button-loader';
 import {
   useQuotations,
   useTransitionQuotation,
@@ -169,7 +170,7 @@ function QuotationActionsCell({
     <div className="flex justify-end gap-1">
       <Can permission="quotations.update">
         <Button asChild variant="ghost" size="icon" aria-label="Sửa">
-          <Link to={`/quotations/${q.id}`}><Pencil className="h-4 w-4 text-blue-600" /></Link>
+          <Link to={`/quotations/${q.id}`}><AppIcon name="edit" /></Link>
         </Button>
       </Can>
       <Can permission="quotations.accounting_confirm">
@@ -181,7 +182,7 @@ function QuotationActionsCell({
             title="KT xác nhận đã nhận tiền"
             onClick={() => onTransition('AccountingConfirm')}
           >
-            <BadgeCheck className="h-4 w-4 text-emerald-600" />
+            <AppIcon name="accountingConfirm" />
           </Button>
         )}
       </Can>
@@ -189,8 +190,8 @@ function QuotationActionsCell({
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" aria-label="Thao tác khác">
             {busy
-              ? <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-              : <MoreHorizontal className="h-4 w-4 text-slate-500" />
+              ? <ButtonLoader />
+              : <AppIcon name="more" tone="muted" />
             }
           </Button>
         </DropdownMenuTrigger>
@@ -201,19 +202,19 @@ function QuotationActionsCell({
               title={canSend ? undefined : 'Chỉ gửi được báo giá đang ở trạng thái Nháp'}
               onClick={() => onTransition('Send')}
             >
-              <Send className="mr-2 h-4 w-4 text-cyan-600" /> Gửi
+              <AppIcon name="send" className="mr-2" /> Gửi
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={!canConfirm}
               title={canConfirm ? undefined : 'Chỉ xác nhận được báo giá đã gửi'}
               onClick={() => onTransition('Confirm')}
             >
-              <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" /> Xác nhận
+              <AppIcon name="confirm" className="mr-2" /> Xác nhận
             </DropdownMenuItem>
           </Can>
           <Can permission="quotations.create">
             <DropdownMenuItem onClick={onClone}>
-              <Copy className="mr-2 h-4 w-4 text-violet-600" /> Nhân bản
+              <AppIcon name="clone" className="mr-2" /> Nhân bản
             </DropdownMenuItem>
           </Can>
           <Can permission="quotations.update">
@@ -223,7 +224,7 @@ function QuotationActionsCell({
               title={canCancel ? undefined : 'Báo giá đã hủy'}
               onClick={() => onTransition('Cancel')}
             >
-              <Ban className="mr-2 h-4 w-4 text-red-600" /> Hủy
+              <AppIcon name="cancelVoucher" className="mr-2" /> Hủy
             </DropdownMenuItem>
           </Can>
           <Can permission="quotations.print">
@@ -233,8 +234,8 @@ function QuotationActionsCell({
               onClick={() => runExport('quotation-pdf', () => openQuotationPdf(q.id))}
             >
               {loadingExport === 'quotation-pdf'
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <Printer className="mr-2 h-4 w-4 text-indigo-600" />
+                ? <ButtonLoader className="mr-2" />
+                : <AppIcon name="print" className="mr-2" />
               }
               Báo giá
             </DropdownMenuItem>
@@ -243,8 +244,8 @@ function QuotationActionsCell({
               onClick={() => runExport('handover-pdf-with', () => openHandoverPdf(q.id, true))}
             >
               {loadingExport === 'handover-pdf-with'
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <Printer className="mr-2 h-4 w-4 text-indigo-600" />
+                ? <ButtonLoader className="mr-2" />
+                : <AppIcon name="print" className="mr-2" />
               }
               Biên bản bàn giao (có tiền)
             </DropdownMenuItem>
@@ -253,8 +254,8 @@ function QuotationActionsCell({
               onClick={() => runExport('handover-pdf-no', () => openHandoverPdf(q.id, false))}
             >
               {loadingExport === 'handover-pdf-no'
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <Printer className="mr-2 h-4 w-4 text-indigo-600" />
+                ? <ButtonLoader className="mr-2" />
+                : <AppIcon name="print" className="mr-2" />
               }
               Biên bản bàn giao (không tiền)
             </DropdownMenuItem>
@@ -264,8 +265,8 @@ function QuotationActionsCell({
               onClick={() => runExport('quotation-excel', () => downloadQuotationExcel(q.id, q.code))}
             >
               {loadingExport === 'quotation-excel'
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-700" />
+                ? <ButtonLoader className="mr-2" />
+                : <AppIcon name="exportExcel" className="mr-2" />
               }
               Báo giá
             </DropdownMenuItem>
@@ -274,8 +275,8 @@ function QuotationActionsCell({
               onClick={() => runExport('handover-excel-with', () => downloadHandoverExcel(q.id, q.code, true))}
             >
               {loadingExport === 'handover-excel-with'
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-700" />
+                ? <ButtonLoader className="mr-2" />
+                : <AppIcon name="exportExcel" className="mr-2" />
               }
               Biên bản bàn giao (có tiền)
             </DropdownMenuItem>
@@ -284,8 +285,8 @@ function QuotationActionsCell({
               onClick={() => runExport('handover-excel-no', () => downloadHandoverExcel(q.id, q.code, false))}
             >
               {loadingExport === 'handover-excel-no'
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-700" />
+                ? <ButtonLoader className="mr-2" />
+                : <AppIcon name="exportExcel" className="mr-2" />
               }
               Biên bản bàn giao (không tiền)
             </DropdownMenuItem>
@@ -605,7 +606,7 @@ export function QuotationListPage() {
         <Can permission="quotations.create">
           <Button asChild>
             <Link to="/quotations/new">
-              <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm báo giá
+              <AppIcon name="add" className="mr-2" /> Thêm báo giá
             </Link>
           </Button>
         </Can>
@@ -615,7 +616,7 @@ export function QuotationListPage() {
         <CardContent className="flex flex-1 min-h-0 flex-col gap-3 p-4">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Tìm theo số / tên khách..."
                 value={search}
@@ -717,7 +718,7 @@ export function QuotationListPage() {
                 aria-live="polite"
               >
                 <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground shadow-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <AppIcon name="loading" />
                   Đang tải...
                 </div>
               </div>

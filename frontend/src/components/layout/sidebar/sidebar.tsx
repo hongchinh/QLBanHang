@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { SearchX, X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
@@ -127,7 +127,7 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
       {onClose && (
         <div className="flex h-16 items-center justify-end border-b px-3">
           <Button variant="ghost" size="icon" aria-label="Đóng menu" onClick={onClose}>
-            <X className="h-5 w-5" />
+            <AppIcon name="close" size={20} />
           </Button>
         </div>
       )}
@@ -157,7 +157,7 @@ export function Sidebar({ dashboardItem, groups, collapsed, onClose }: SidebarPr
             {filtered ? (
               filtered.count === 0 ? (
                 <div className="flex flex-col items-center gap-1 py-8 text-center text-sm text-muted-foreground">
-                  <SearchX className="h-6 w-6" aria-hidden />
+                  <AppIcon name="searchEmpty" size={24} />
                   <p>Không tìm thấy chức năng</p>
                   <p className="text-xs">Thử từ khóa ngắn hơn</p>
                 </div>

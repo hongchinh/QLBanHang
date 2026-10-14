@@ -21,13 +21,13 @@ describe('RangePicker', () => {
   it('keeps its five chips and the custom button when presets is not given', () => {
     render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} />);
 
-    expect(buttonLabels()).toEqual(['Hôm nay', '7N', '30N', 'Tháng này', 'Tháng trước', 'Tuỳ chỉnh ▾']);
+    expect(buttonLabels()).toEqual(['Hôm nay', '7N', '30N', 'Tháng này', 'Tháng trước', 'Tuỳ chỉnh']);
   });
 
   it('shows the given presets instead', () => {
     render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} presets={EXECUTIVE_PRESETS} />);
 
-    expect(buttonLabels()).toEqual(['Hôm nay', 'Tuần này', 'Tháng này', 'Năm nay', 'Tuỳ chỉnh ▾']);
+    expect(buttonLabels()).toEqual(['Hôm nay', 'Tuần này', 'Tháng này', 'Năm nay', 'Tuỳ chỉnh']);
   });
 
   it('clicking a chip calls onPreset with its key', () => {
@@ -56,7 +56,7 @@ describe('RangePicker', () => {
   });
 
   describe('Tuỳ chỉnh', () => {
-    const openCustom = () => fireEvent.click(screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' }));
+    const openCustom = () => fireEvent.click(screen.getByRole('button', { name: 'Tuỳ chỉnh' }));
     const setDates = (from: string, to: string) => {
       fireEvent.change(screen.getByLabelText('Từ ngày'), { target: { value: from } });
       fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: to } });
@@ -115,22 +115,31 @@ describe('RangePicker', () => {
     });
   });
 
+  it('the custom button carries a chevronDown icon and the date range an arrowRight icon between the dates', () => {
+    const { container } = render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} />);
+    expect(screen.getByRole('button', { name: 'Tuỳ chỉnh' }).querySelector('[data-icon="chevronDown"]')).not.toBeNull();
+    const arrow = container.querySelector('[data-icon="arrowRight"]');
+    expect(arrow).not.toBeNull();
+    expect(arrow!.parentElement).toHaveTextContent('2026-10-01 2026-10-13');
+    expect(screen.getByRole('img', { name: 'đến' })).toHaveAttribute('data-icon', 'arrowRight');
+  });
+
   it('marks the chip whose range is selected, and the custom button for any other range', () => {
     const { rerender } = render(<RangePicker from="2026-10-01" to="2026-10-13" onChange={vi.fn()} />);
     expect(activeLabels()).toEqual(['Tháng này']);
 
     rerender(<RangePicker from="2026-10-02" to="2026-10-13" onChange={vi.fn()} />);
-    expect(activeLabels()).toEqual(['Tuỳ chỉnh ▾']);
+    expect(activeLabels()).toEqual(['Tuỳ chỉnh']);
 
     // The year so far is a preset of the executive list only.
     rerender(<RangePicker from="2026-01-01" to="2026-10-13" onChange={vi.fn()} />);
-    expect(activeLabels()).toEqual(['Tuỳ chỉnh ▾']);
+    expect(activeLabels()).toEqual(['Tuỳ chỉnh']);
     rerender(<RangePicker from="2026-01-01" to="2026-10-13" onChange={vi.fn()} presets={EXECUTIVE_PRESETS} />);
     expect(activeLabels()).toEqual(['Năm nay']);
   });
 
   describe('accessibility', () => {
-    const custom = () => screen.getByRole('button', { name: 'Tuỳ chỉnh ▾' });
+    const custom = () => screen.getByRole('button', { name: 'Tuỳ chỉnh' });
 
     it('the chips are a group "Kỳ báo cáo" and say which one is selected, not by colour only', () => {
       const { rerender } = render(
@@ -139,7 +148,7 @@ describe('RangePicker', () => {
 
       const group = screen.getByRole('group', { name: 'Kỳ báo cáo' });
       expect(within(group).getByRole('button', { name: 'Tháng này' })).toHaveAttribute('aria-pressed', 'true');
-      for (const name of ['Hôm nay', 'Tuần này', 'Năm nay', 'Tuỳ chỉnh ▾']) {
+      for (const name of ['Hôm nay', 'Tuần này', 'Năm nay', 'Tuỳ chỉnh']) {
         expect(within(group).getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
       }
 

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import type { NavGroup } from '../nav-config';
 import type { MatchRange } from './nav-search';
@@ -17,14 +17,13 @@ interface SidebarGroupProps {
 }
 
 export function SidebarGroup({ group, open, onToggle, activePath, listId, resultCount, matches, pins }: SidebarGroupProps) {
-  const { icon: Icon, label, color, items } = group;
-  const Chevron = open ? ChevronDown : ChevronRight;
+  const { label, color, items } = group;
   const iconBlock = (
     <span
       aria-hidden
       className={cn('flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md text-white', color)}
     >
-      <Icon className="h-4 w-4" />
+      <AppIcon name={group.icon} />
     </span>
   );
   return (
@@ -45,7 +44,7 @@ export function SidebarGroup({ group, open, onToggle, activePath, listId, result
         >
           {iconBlock}
           <span className="flex-1 truncate text-left">{label}</span>
-          <Chevron className="h-4 w-4 text-muted-foreground" />
+          <AppIcon name={open ? 'chevronDown' : 'chevronRight'} className="text-muted-foreground" />
         </button>
       )}
       {/* The list always exists so aria-controls resolves; `hidden` takes it out of the tab order. */}

@@ -6,7 +6,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table';
-import { Ban, CheckCircle2, Copy, Loader2, MoreHorizontal, Pencil, Plus, Printer, Search, Send } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   useCloneQuotation,
   useQuotationOwners,
@@ -197,13 +197,13 @@ export function CustomerQuotationsSection({ customerId }: CustomerQuotationsSect
             <div className="flex justify-end gap-1">
               <Can permission="quotations.update">
                 <Button asChild variant="ghost" size="icon" aria-label="Sửa">
-                  <Link to={`/quotations/${q.id}`}><Pencil className="h-4 w-4 text-blue-600" /></Link>
+                  <Link to={`/quotations/${q.id}`}><AppIcon name="edit" /></Link>
                 </Button>
               </Can>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" aria-label="Thao tác khác">
-                    <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                    <AppIcon name="more" tone="muted" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
@@ -213,14 +213,14 @@ export function CustomerQuotationsSection({ customerId }: CustomerQuotationsSect
                       title={canSend ? undefined : 'Chỉ gửi được báo giá đang ở trạng thái Nháp'}
                       onClick={() => setPendingTransition({ item: q, action: 'Send' })}
                     >
-                      <Send className="mr-2 h-4 w-4 text-cyan-600" /> Gửi
+                      <AppIcon name="send" className="mr-2" /> Gửi
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       disabled={!canConfirm}
                       title={canConfirm ? undefined : 'Chỉ xác nhận được báo giá đã gửi'}
                       onClick={() => setPendingTransition({ item: q, action: 'Confirm' })}
                     >
-                      <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" /> Xác nhận
+                      <AppIcon name="confirm" className="mr-2" /> Xác nhận
                     </DropdownMenuItem>
                   </Can>
                   <Can permission="quotations.create">
@@ -236,7 +236,7 @@ export function CustomerQuotationsSection({ customerId }: CustomerQuotationsSect
                         });
                       }}
                     >
-                      <Copy className="mr-2 h-4 w-4 text-violet-600" /> Nhân bản
+                      <AppIcon name="clone" className="mr-2" /> Nhân bản
                     </DropdownMenuItem>
                   </Can>
                   <Can permission="quotations.print">
@@ -247,7 +247,7 @@ export function CustomerQuotationsSection({ customerId }: CustomerQuotationsSect
                         );
                       }}
                     >
-                      <Printer className="mr-2 h-4 w-4 text-indigo-600" /> In PDF
+                      <AppIcon name="print" className="mr-2" /> In PDF
                     </DropdownMenuItem>
                   </Can>
                   <Can permission="quotations.update">
@@ -257,7 +257,7 @@ export function CustomerQuotationsSection({ customerId }: CustomerQuotationsSect
                       title={canCancel ? undefined : 'Báo giá đã hủy'}
                       onClick={() => setPendingTransition({ item: q, action: 'Cancel' })}
                     >
-                      <Ban className="mr-2 h-4 w-4 text-red-600" /> Hủy
+                      <AppIcon name="cancelVoucher" className="mr-2" /> Hủy
                     </DropdownMenuItem>
                   </Can>
                 </DropdownMenuContent>
@@ -312,7 +312,7 @@ export function CustomerQuotationsSection({ customerId }: CustomerQuotationsSect
           <Can permission="quotations.create">
             <Button asChild>
               <Link to="/quotations/new">
-                <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm báo giá
+                <AppIcon name="add" className="mr-2" /> Thêm báo giá
               </Link>
             </Button>
           </Can>
@@ -320,7 +320,7 @@ export function CustomerQuotationsSection({ customerId }: CustomerQuotationsSect
         <CardContent className="flex min-h-0 flex-1 flex-col gap-3">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Tìm theo số báo giá..."
                 value={search}
@@ -394,7 +394,7 @@ export function CustomerQuotationsSection({ customerId }: CustomerQuotationsSect
                 aria-live="polite"
               >
                 <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground shadow-sm">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                  <AppIcon name="loading" />
                   Đang tải...
                 </div>
               </div>

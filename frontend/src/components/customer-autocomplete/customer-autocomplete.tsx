@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { LayoutList, Plus, X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -159,7 +159,7 @@ export function CustomerAutocomplete({
                 className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 tabIndex={-1}
               >
-                <X className="h-4 w-4" />
+                <AppIcon name="close" />
               </button>
             </div>
           ) : (
@@ -195,7 +195,7 @@ export function CustomerAutocomplete({
           aria-label="Thêm mới khách hàng"
           disabled={disabled}
         >
-          <Plus className="h-4 w-4" />
+          <AppIcon name="add" />
         </Button>
       </div>
 
@@ -308,7 +308,7 @@ export function CustomerAutocomplete({
                   setCatalogOpen(true);
                 }}
               >
-                <LayoutList className="h-3.5 w-3.5" aria-hidden="true" />
+                <AppIcon name="listPicker" size={14} />
                 Xem danh mục đầy đủ
               </button>
             </div>

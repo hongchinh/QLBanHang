@@ -37,23 +37,26 @@ describe('StatTile', () => {
   });
 
   describe('delta', () => {
-    it('a rise is ▲ in emerald with a decimal comma', () => {
+    it('a rise is an up arrow in emerald with a decimal comma', () => {
       renderTile({ delta: 12.5 });
 
-      expect(screen.getByText('▲ 12,5%').className).toContain('emerald');
+      expect(screen.getByText('12,5%').closest('span')?.className).toContain('emerald');
+      expect(screen.getByRole('img', { name: 'tăng' })).toBeInTheDocument();
     });
 
-    it('a fall is ▼ in rose, without the sign', () => {
+    it('a fall is a down arrow in rose, without the sign', () => {
       renderTile({ delta: -3.2 });
 
-      expect(screen.getByText('▼ 3,2%').className).toContain('rose');
+      expect(screen.getByText('3,2%').closest('span')?.className).toContain('rose');
+      expect(screen.getByRole('img', { name: 'giảm' })).toBeInTheDocument();
       expect(screen.queryByText(/-3/)).not.toBeInTheDocument();
     });
 
-    it('no change is ▲ 0%, like the delta of the quotation dashboards', () => {
+    it('no change is an up arrow 0%, like the delta of the quotation dashboards', () => {
       renderTile({ delta: 0 });
 
-      expect(screen.getByText('▲ 0%').className).toContain('emerald');
+      expect(screen.getByText('0%').closest('span')?.className).toContain('emerald');
+      expect(screen.getByRole('img', { name: 'tăng' })).toBeInTheDocument();
     });
 
     it('null is "—" in the muted colour', () => {
@@ -62,13 +65,13 @@ describe('StatTile', () => {
       const dashes = screen.getAllByText('—');
       expect(dashes).toHaveLength(1);
       expect(dashes[0].className).toContain('muted');
-      expect(screen.queryByText(/[▲▼]/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('img', { name: /tăng|giảm/ })).not.toBeInTheDocument();
     });
 
     it('is left out when the prop is not given', () => {
       renderTile({ hint: 'so với kỳ trước' });
 
-      expect(screen.queryByText(/[▲▼]/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('img', { name: /tăng|giảm/ })).not.toBeInTheDocument();
       expect(screen.queryByText('—')).not.toBeInTheDocument();
     });
   });
@@ -156,7 +159,7 @@ describe('StatTile', () => {
       const line = hint.parentElement as HTMLElement;
       expect(line.className).not.toMatch(/\b(whitespace-nowrap|truncate|line-clamp-\d|flex)\b/);
       // The delta stays in one piece.
-      expect(screen.getByText('▲ 12,5%')).toHaveClass('whitespace-nowrap');
+      expect(screen.getByText('12,5%').closest('span')).toHaveClass('whitespace-nowrap');
     });
 
     it('a hint that is not text gets no title', () => {

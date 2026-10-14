@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LayoutList } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useProductSearch } from '@/features/products/hooks';
@@ -337,7 +337,7 @@ export function ProductTypeaheadCell({
                 setCatalogOpen(true);
               }}
             >
-              <LayoutList className="h-3.5 w-3.5" aria-hidden="true" />
+              <AppIcon name="listPicker" size={14} />
               Xem danh mục đầy đủ
             </button>
           </div>

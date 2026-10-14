@@ -149,6 +149,7 @@ describe('Sidebar search', () => {
     await user.type(searchBox(), 'xyz');
     expect(screen.getByText('Không tìm thấy chức năng')).toBeInTheDocument();
     expect(screen.getByText('Thử từ khóa ngắn hơn')).toBeInTheDocument();
+    expect(document.querySelector('[data-icon="searchEmpty"]')).toBeInTheDocument();
   });
 
   it('treats a blank query as no search', async () => {
@@ -264,5 +265,14 @@ describe('Sidebar pin chips', () => {
     renderSidebar('/');
     await user.type(searchBox(), 'thu');
     expect(chips()).not.toBeInTheDocument();
+  });
+});
+
+describe('Sidebar icons', () => {
+  it('renders registry icons for the Kho group and its items', () => {
+    const { container } = renderSidebar('/');
+    expect(header('Kho')).toHaveAttribute('aria-expanded', 'true');
+    expect(container.querySelector('[data-icon="stockOut"]')).not.toBeNull();
+    expect(container.querySelector('[data-icon="inventory"]')).not.toBeNull();
   });
 });

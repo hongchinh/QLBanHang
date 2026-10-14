@@ -43,6 +43,12 @@ describe('ActivityHistory', () => {
     expect(screen.getAllByText('An')).toHaveLength(3);
   });
 
+  it('colours the Created and Deleted icons by tone', () => {
+    const { container } = render(<ActivityHistory {...baseProps} activities={[activity('Created'), activity('Deleted')]} />);
+    expect(container.querySelector('[data-icon="activityCreated"]')).toHaveClass('text-icon-create');
+    expect(container.querySelector('[data-icon="activityDeleted"]')).toHaveClass('text-icon-danger');
+  });
+
   it('falls back to an unknown actor', () => {
     render(<ActivityHistory {...baseProps} activities={[{ ...activity('Updated'), actorName: null }]} />);
     expect(screen.getByText('Người dùng không xác định')).toBeInTheDocument();

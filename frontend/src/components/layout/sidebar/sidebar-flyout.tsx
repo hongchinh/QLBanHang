@@ -1,12 +1,13 @@
 import { useRef } from 'react';
 import type * as React from 'react';
+import { AppIcon, type IconName } from '@/components/icons';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface SidebarFlyoutProps {
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: IconName;
   // Background + text classes of the title icon block.
   iconClassName: string;
   open: boolean;
@@ -15,7 +16,7 @@ interface SidebarFlyoutProps {
   children: React.ReactNode;
 }
 
-export function SidebarFlyout({ title, icon: Icon, iconClassName, open, onOpenChange, trigger, children }: SidebarFlyoutProps) {
+export function SidebarFlyout({ title, icon, iconClassName, open, onOpenChange, trigger, children }: SidebarFlyoutProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   // Radix skips links when choosing the initial focus, which would land on the first star (pin) button.
   const focusFirstLink = (event: Event) => {
@@ -43,7 +44,7 @@ export function SidebarFlyout({ title, icon: Icon, iconClassName, open, onOpenCh
       >
         <div className="mb-1 flex items-center gap-2 px-1 py-1 text-sm font-semibold">
           <span aria-hidden className={cn('flex h-[26px] w-[26px] items-center justify-center rounded-md', iconClassName)}>
-            <Icon className="h-4 w-4" />
+            <AppIcon name={icon} />
           </span>
           {title}
         </div>

@@ -1,4 +1,4 @@
-import { Ban, CirclePlus, Link2Off, Loader2, ReceiptText, RotateCcw, Save, Trash2, type LucideIcon } from 'lucide-react';
+import { AppIcon, type IconName } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import type { StockVoucherActivityAction } from '@/features/stock-vouchers/types';
 
@@ -26,7 +26,7 @@ export function ActivityHistory({ activities, isLoading, isError, errorMessage, 
   if (isLoading) {
     return (
       <div role="status" className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-        <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin text-blue-600" />
+        <AppIcon name="loading" />
         Đang tải lịch sử...
       </div>
     );
@@ -82,22 +82,21 @@ const ACTIVITY_LABELS: Record<DocumentActivityAction, string> = {
   AutoVoucherChanged: 'Phiếu thu/chi tự động',
 };
 
-const ACTIVITY_ICONS: Record<DocumentActivityAction, { icon: LucideIcon; className: string }> = {
-  Created: { icon: CirclePlus, className: 'text-cyan-600' },
-  Updated: { icon: Save, className: 'text-blue-600' },
-  Cancelled: { icon: Ban, className: 'text-red-600' },
-  Restored: { icon: RotateCcw, className: 'text-emerald-600' },
-  Deleted: { icon: Trash2, className: 'text-red-600' },
-  SettlementRemoved: { icon: Link2Off, className: 'text-amber-600' },
-  AutoVoucherChanged: { icon: ReceiptText, className: 'text-indigo-600' },
+const ACTIVITY_ICONS: Record<DocumentActivityAction, IconName> = {
+  Created: 'activityCreated',
+  Updated: 'activityUpdated',
+  Cancelled: 'activityCancelled',
+  Restored: 'activityRestored',
+  Deleted: 'activityDeleted',
+  SettlementRemoved: 'activitySettlementRemoved',
+  AutoVoucherChanged: 'activityAutoVoucherChanged',
 };
 
 // An action the map does not know (a newer server) shows no icon.
 function ActivityIcon({ action }: { action: DocumentActivityAction }) {
   const entry = ACTIVITY_ICONS[action];
   if (!entry) return null;
-  const Icon = entry.icon;
-  return <Icon aria-hidden="true" className={`h-4 w-4 ${entry.className}`} />;
+  return <AppIcon name={entry} />;
 }
 
 function formatActivityTime(value: string) {

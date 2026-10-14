@@ -178,10 +178,10 @@ describe('CashTab', () => {
       expect(within(tile('Số dư các quỹ')).getByText('QTM – Tiền mặt')).toBeInTheDocument();
     });
 
-    it('"Sổ quỹ →" opens the cash book and says which branch it opens for', () => {
+    it('"Sổ quỹ" opens the cash book and says which branch it opens for', () => {
       renderTab();
 
-      const link = within(tile('Số dư các quỹ')).getByRole('link', { name: 'Sổ quỹ →' });
+      const link = within(tile('Số dư các quỹ')).getByRole('link', { name: 'Sổ quỹ' });
       expect(link).toHaveAttribute('href', '/reports/cash-book');
       expect(link).toHaveAttribute('title', 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
     });

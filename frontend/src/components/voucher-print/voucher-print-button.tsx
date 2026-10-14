@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, FileSpreadsheet, FileText, Loader2, Printer } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
+import { ButtonLoader } from '@/components/ui/button-loader';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -67,7 +68,7 @@ export function VoucherPrintButton({
   };
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const title = disabled ? disabledReason : undefined;
-  const icon = isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Printer className="h-4 w-4" />;
+  const icon = isPending ? <ButtonLoader /> : <AppIcon name="print" tone="none" />;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -89,17 +90,17 @@ export function VoucherPrintButton({
             <Button variant="outline" size="sm" disabled={isDisabled} title={title} onClick={stop} ref={triggerRef}>
               {icon}
               {label}
-              <ChevronDown className="h-4 w-4" />
+              <AppIcon name="chevronDown" />
             </Button>
           )}
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" onClick={stop}>
           <DropdownMenuItem onSelect={() => choose('pdf')}>
-            <FileText className="mr-2 h-4 w-4 text-indigo-600" />
+            <AppIcon name="exportPdf" className="mr-2" />
             In (PDF)
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => choose('xlsx')}>
-            <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-700" />
+            <AppIcon name="exportExcel" className="mr-2" />
             Excel
           </DropdownMenuItem>
         </DropdownMenuContent>

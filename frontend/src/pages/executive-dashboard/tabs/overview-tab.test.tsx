@@ -397,13 +397,13 @@ describe('OverviewTab', () => {
   });
 
   describe('report links', () => {
-    it('in company scope with three branches "Sổ quỹ →" says which branch the report opens for', () => {
+    it('in company scope with three branches "Sổ quỹ" says which branch the report opens for', () => {
       renderTab();
 
-      const link = within(tile('Dòng tiền thu – chi')).getByRole('link', { name: 'Sổ quỹ →' });
+      const link = within(tile('Dòng tiền thu – chi')).getByRole('link', { name: 'Sổ quỹ' });
       expect(link).toHaveAttribute('href', '/reports/cash-book');
       expect(link).toHaveAttribute('title', 'Báo cáo mở theo chi nhánh đang làm việc (CN01)');
-      expect(within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Nợ quá hạn →' })).toHaveAttribute(
+      expect(within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Nợ quá hạn' })).toHaveAttribute(
         'title',
         'Báo cáo mở theo chi nhánh đang làm việc (CN01)',
       );
@@ -417,14 +417,14 @@ describe('OverviewTab', () => {
       state.scope = branchScope();
       renderTab({ ...MONTH, branchId: 'b1' });
 
-      expect(within(tile('Dòng tiền thu – chi')).getByRole('link', { name: 'Sổ quỹ →' })).not.toHaveAttribute('title');
+      expect(within(tile('Dòng tiền thu – chi')).getByRole('link', { name: 'Sổ quỹ' })).not.toHaveAttribute('title');
       expect(within(tile('Cần chú ý')).getAllByRole('link')[0]).not.toHaveAttribute('title');
     });
 
-    it('"Nợ quá hạn →" opens the overdue receivables as at today', () => {
+    it('"Nợ quá hạn" opens the overdue receivables as at today', () => {
       renderTab();
 
-      expect(within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Nợ quá hạn →' })).toHaveAttribute(
+      expect(within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Nợ quá hạn' })).toHaveAttribute(
         'href',
         `/reports/debt-overdue?side=Receivable&at=${todayYmd()}`,
       );
@@ -632,12 +632,12 @@ describe('OverviewTab', () => {
     });
   });
 
-  describe('the "→" buttons', () => {
+  describe('the arrow buttons', () => {
     it('open the Kinh doanh tab when it is on the bar', () => {
       const onOpenTab = vi.fn();
       renderTab(MONTH, ['sales'], onOpenTab);
 
-      for (const label of ['Chi tiết →', 'Kinh doanh →', 'Xem thêm →']) {
+      for (const label of ['Chi tiết', 'Kinh doanh', 'Xem thêm']) {
         fireEvent.click(screen.getByRole('button', { name: label }));
       }
 
@@ -648,7 +648,7 @@ describe('OverviewTab', () => {
     it('are absent when the Kinh doanh tab is not on the bar', () => {
       renderTab(MONTH, []);
 
-      for (const label of ['Chi tiết →', 'Kinh doanh →', 'Xem thêm →']) {
+      for (const label of ['Chi tiết', 'Kinh doanh', 'Xem thêm']) {
         expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument();
       }
     });
@@ -656,7 +656,7 @@ describe('OverviewTab', () => {
     it('are absent when only other tabs are on the bar', () => {
       renderTab(MONTH, ['cash', 'debt']);
 
-      expect(screen.queryByRole('button', { name: 'Chi tiết →' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Chi tiết' })).not.toBeInTheDocument();
     });
   });
 });

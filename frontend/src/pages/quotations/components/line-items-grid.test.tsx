@@ -9,14 +9,19 @@ import type {
 } from '@/features/quotations/schema';
 import { useAuthStore } from '@/stores/auth-store';
 
+const cellProps = vi.hoisted(() => ({ last: undefined as Record<string, unknown> | undefined }));
+
 vi.mock('./product-typeahead-cell', () => ({
-  ProductTypeaheadCell: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
-    <input
-      aria-label="product-code"
-      value={value}
-      onChange={(e) => onChange((e.target as HTMLInputElement).value)}
-    />
-  ),
+  ProductTypeaheadCell: (props: { value: string; onChange: (value: string) => void }) => {
+    cellProps.last = props;
+    return (
+      <input
+        aria-label="product-code"
+        value={props.value}
+        onChange={(e) => props.onChange((e.target as HTMLInputElement).value)}
+      />
+    );
+  },
 }));
 
 const baseLines: QuotationLineFormValues[] = [
@@ -85,6 +90,13 @@ function renderGrid(lines: QuotationLineFormValues[] = baseLines) {
 describe('LineItemsGrid', () => {
   beforeEach(() => {
     setCostPermission(false);
+  });
+
+  it('turns on product quick add for the code cell and returns to the name cell', () => {
+    renderGrid([baseLines[0]]);
+
+    expect(cellProps.last?.allowQuickAdd).toBe(true);
+    expect(cellProps.last?.nextFocusId).toBe('line-name-0');
   });
 
   it('renders existing rows and subtotal footer', () => {
@@ -178,6 +190,16 @@ describe('LineItemsGrid', () => {
       expect(screen.getByText(/chưa có dòng nào/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /xóa tất cả dòng/i })).toBeDisabled();
     });
+  });
+
+  it('an Enter that commits an IME composition does not move the focus', () => {
+    renderGrid();
+    const unit = document.getElementById('line-unit-0') as HTMLElement;
+    unit.focus();
+    fireEvent.keyDown(unit, { key: 'Enter', isComposing: true, keyCode: 229 });
+    expect(document.activeElement).toBe(unit);
+    fireEvent.keyDown(unit, { key: 'Enter' });
+    expect(document.activeElement).not.toBe(unit);
   });
 
   it('removes active row with Ctrl+Delete', async () => {

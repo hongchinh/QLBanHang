@@ -2,7 +2,7 @@
 key: quotations.list
 title: Danh sách báo giá
 routes: [/quotations]
-sources: [frontend/src/pages/quotations/quotation-list-page.tsx, frontend/src/pages/quotations/components/**, frontend/src/features/quotations/**, frontend/src/stores/ui-store.ts, backend/src/OrderMgmt.Application/Sales/Quotations/**]
+sources: [frontend/src/pages/quotations/quotation-list-page.tsx, frontend/src/pages/quotations/components/status-pill.tsx, frontend/src/pages/quotations/components/list-footer.tsx, frontend/src/pages/quotations/components/quotation-date-filter.tsx, frontend/src/pages/quotations/utils/owner-ids.ts, frontend/src/features/quotations/**, frontend/src/stores/ui-store.ts, backend/src/OrderMgmt.Application/Sales/Quotations/**]
 related: [quotations.form, customers.list]
 updated: 2026-10-15
 ---

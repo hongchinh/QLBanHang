@@ -23,7 +23,6 @@ export function toUpsertPayload(
     partnerId: parsed.partnerId,
     partnerName: parsed.partnerName,
     partnerAddress: parsed.partnerAddress,
-    partnerTaxCode: parsed.partnerTaxCode,
     personName: parsed.personName,
     description: parsed.description,
     attachedDocs: parsed.attachedDocs,
@@ -52,8 +51,8 @@ export function isOwnAllocation(row: CashVoucherAllocation): boolean {
   return row.origin === 'AtVoucher' && row.isOwn;
 }
 
-export function createEmptyCashLine(): CashLineFormValues {
-  return { _uiKey: crypto.randomUUID(), description: '', amount: 0, note: '' };
+export function createEmptyCashLine(description = ''): CashLineFormValues {
+  return { _uiKey: crypto.randomUUID(), description, amount: 0, note: '' };
 }
 
 // `type` is used for a new voucher only; an edit keeps the stored type.
@@ -71,7 +70,6 @@ export function toFormDefaults(
       partnerId: '',
       partnerName: '',
       partnerAddress: '',
-      partnerTaxCode: '',
       personName: '',
       description: '',
       attachedDocs: '',
@@ -91,7 +89,6 @@ export function toFormDefaults(
     partnerId: voucher.partnerId ?? '',
     partnerName: voucher.partnerName ?? '',
     partnerAddress: voucher.partnerAddress ?? '',
-    partnerTaxCode: voucher.partnerTaxCode ?? '',
     personName: voucher.personName ?? '',
     description: voucher.description ?? '',
     attachedDocs: voucher.attachedDocs ?? '',

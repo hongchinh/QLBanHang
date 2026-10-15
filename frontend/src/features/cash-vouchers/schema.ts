@@ -36,7 +36,6 @@ export const cashVoucherSchema = z.object({
   partnerId: optionalUuid(),
   partnerName: optionalString(255),
   partnerAddress: optionalString(1000),
-  partnerTaxCode: optionalString(20),
   personName: optionalString(255),
   description: optionalString(500),
   attachedDocs: optionalString(255),

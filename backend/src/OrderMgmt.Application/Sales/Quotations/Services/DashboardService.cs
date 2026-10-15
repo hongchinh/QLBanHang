@@ -6,7 +6,6 @@ using OrderMgmt.Application.Dashboards.Common;
 using OrderMgmt.Application.Dashboards.Executive.Common;
 using OrderMgmt.Application.Dashboards.Executive.Services;
 using OrderMgmt.Application.Inventory.Common;
-using OrderMgmt.Application.Reports.Common;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
 using OrderMgmt.Application.Sales.Quotations.Models;
 using OrderMgmt.Domain.Common;
@@ -61,30 +60,6 @@ public class DashboardService : IDashboardService
 
     private static decimal? DeltaOf(decimal cur, decimal prev)
         => prev == 0m ? null : Math.Round((cur - prev) / prev * 100m, 2, MidpointRounding.AwayFromZero);
-
-    private static async Task<List<(DateOnly Date, decimal Total, int Count)>> GroupByRevenueDateAsync(
-        IQueryable<Quotation> q, string dateMode, CancellationToken ct)
-    {
-        if (dateMode == RevenueDateField.AccountingConfirmedAt)
-            return (await q
-                .GroupBy(x => DateOnly.FromDateTime(x.AccountingConfirmedAt!.Value))
-                .Select(g => new { Date = g.Key, Total = g.Sum(x => x.Total), Count = g.Count() })
-                .ToListAsync(ct))
-                .Select(r => (r.Date, r.Total, r.Count)).ToList();
-
-        if (dateMode == RevenueDateField.ConfirmedAt)
-            return (await q
-                .GroupBy(x => DateOnly.FromDateTime(x.ConfirmedAt!.Value))
-                .Select(g => new { Date = g.Key, Total = g.Sum(x => x.Total), Count = g.Count() })
-                .ToListAsync(ct))
-                .Select(r => (r.Date, r.Total, r.Count)).ToList();
-
-        return (await q
-            .GroupBy(x => x.QuotationDate)
-            .Select(g => new { Date = g.Key, Total = g.Sum(x => x.Total), Count = g.Count() })
-            .ToListAsync(ct))
-            .Select(r => (r.Date, r.Total, r.Count)).ToList();
-    }
 
     /// The working branch, and the owner the revenue is limited to: the requested one, or the current user when the
     /// owner scope is on and the user cannot view all quotations (the same rule as ApplyScope).

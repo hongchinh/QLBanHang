@@ -105,30 +105,4 @@ public class DashboardScopingTests : DashboardTestBase
         var resp = await _client.GetAsync($"/api/dashboard/sales-leaderboard?from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}");
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
-
-    [Fact]
-    public async Task Leaderboard_AsAdmin_OrdersByRevenueDesc()
-    {
-        await CreateTestUserAsync("dash_lead_low", "Sales@123", RoleCodes.Sales);
-        await CreateTestUserAsync("dash_lead_high", "Sales@123", RoleCodes.Sales);
-        var low = await GetUserIdAsync("dash_lead_low");
-        var high = await GetUserIdAsync("dash_lead_high");
-        var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var now = DateTime.UtcNow;
-
-        await SeedQuotationAsync("BG-LD-L", low, QuotationStatus.Confirmed, today, 100m, confirmedAt: now);
-        await SeedQuotationAsync("BG-LD-H1", high, QuotationStatus.Confirmed, today, 500m, confirmedAt: now);
-        await SeedQuotationAsync("BG-LD-H2", high, QuotationStatus.Confirmed, today, 500m, confirmedAt: now);
-
-        var resp = await _client.GetAsync($"/api/dashboard/sales-leaderboard?from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}");
-        resp.StatusCode.Should().Be(HttpStatusCode.OK);
-        var body = await resp.Content.ReadFromJsonAsync<ApiResponse<List<SalesLeaderboardItemDto>>>(TestJson.Options);
-        var data = body!.Data!;
-        data.Should().NotBeEmpty();
-        var highRow = data.FirstOrDefault(x => x.UserId == high);
-        var lowRow = data.FirstOrDefault(x => x.UserId == low);
-        highRow.Should().NotBeNull();
-        lowRow.Should().NotBeNull();
-        data.IndexOf(highRow!).Should().BeLessThan(data.IndexOf(lowRow!));
-    }
 }

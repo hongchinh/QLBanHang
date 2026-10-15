@@ -1,7 +1,9 @@
 using System.Net;
+using System.Net.Http.Json;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Dashboards.Executive.Models;
+using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Application.Sales.Quotations.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
@@ -123,6 +125,10 @@ public class DashboardRevenueTests : ExecutiveDashboardTestBase
         customer.CustomerName.Should().Be(await InDbAsync(db =>
             db.Customers.Where(c => c.Id == data.CustomerId).Select(c => c.Name).SingleAsync()));
         top.Should().NotContain(c => c.CustomerId == data.Other.CustomerId);
+
+        var limited = await ReadDataAsync<List<TopCustomerDto>>(await data.Branch.Client.GetAsync(
+            "/api/dashboard/top-customers?from=2026-10-01&to=2026-10-31&limit=1"));
+        limited.Should().ContainSingle().Which.CustomerId.Should().Be(data.CustomerId);
     }
 
     [Fact]
@@ -165,6 +171,21 @@ public class DashboardRevenueTests : ExecutiveDashboardTestBase
         var response = await data.SalesClient.GetAsync("/api/dashboard/sales-leaderboard?from=2026-10-01&to=2026-10-31");
 
         response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Cancelled_voucher_is_left_out()
+    {
+        var data = await SeedAsync();
+
+        var cancel = await data.Branch.Client.PostAsJsonAsync($"/api/stock-vouchers/{data.SaleVoucherId}/cancel",
+            new StockVoucherActionRequest { Version = data.SaleVoucherVersion });
+        cancel.StatusCode.Should().Be(HttpStatusCode.OK, await cancel.Content.ReadAsStringAsync());
+
+        // The 600 sale of 10-04 is cancelled: 300 - 150 stay.
+        var summary = await ReadDataAsync<DashboardSummaryDto>(await data.Branch.Client.GetAsync(
+            "/api/dashboard/summary?from=2026-10-01&to=2026-10-31"));
+        summary.RangeRevenue.Value.Should().Be(150m);
     }
 
     private sealed record SeedData(FreshBranch Branch, Guid ProductId, Guid CustomerId, Guid AdminId, Guid SalesId,

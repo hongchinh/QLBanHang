@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { PartnerAutocomplete } from './partner-autocomplete';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 
@@ -262,6 +262,144 @@ describe('PartnerAutocomplete list and modes', () => {
     renderAutocomplete({ requireReason: false });
     await typeAndOpen();
     expect(screen.queryByRole('button', { name: /Thêm nhanh/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Xem danh mục đầy đủ')).not.toBeInTheDocument();
+  });
+});
+
+describe('PartnerAutocomplete footer rows', () => {
+  let onAddNew: ReturnType<typeof vi.fn>;
+  let onOpenCatalog: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    usePartnerSearchMock.mockReset();
+    usePartnerSearchMock.mockReturnValue({ data: partners, isLoading: false, isError: false });
+    onAddNew = vi.fn();
+    onOpenCatalog = vi.fn();
+  });
+
+  function renderFooter(overrides: Partial<Props> = {}) {
+    return renderAutocomplete({ requireReason: false, onAddNew, onOpenCatalog, ...overrides });
+  }
+
+  function renderFooterRaw() {
+    return render(
+      <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} onAddNew={onAddNew} onOpenCatalog={onOpenCatalog} />,
+    );
+  }
+
+  function selectedIndex() {
+    return screen.getAllByRole('option').findIndex((o) => o.getAttribute('aria-selected') === 'true');
+  }
+
+  it('0 results: the add row is row 0, selected, with the Enter / F4 hint; the catalog row follows', async () => {
+    usePartnerSearchMock.mockReturnValue({ data: [], isLoading: false, isError: false });
+    renderFooter();
+    await typeAndOpen('zzz');
+
+    const addRow = screen.getByRole('option', { name: /Thêm mới đối tượng "zzz"/ });
+    expect(addRow).toHaveAttribute('aria-selected', 'true');
+    expect(within(addRow).getByText('Enter / F4')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Xem danh mục đầy đủ/ })).toBeInTheDocument();
+    expect(screen.getAllByRole('option')).toHaveLength(2);
+  });
+
+  it('with results the add row hint is F4 and ArrowDown walks results, add row, catalog row, wraps', async () => {
+    renderFooter();
+    const input = await typeAndOpen('abc');
+
+    const addRow = screen.getByRole('option', { name: /Thêm mới đối tượng "abc"/ });
+    expect(within(addRow).getByText('F4')).toBeInTheDocument();
+    expect(screen.getAllByRole('option')).toHaveLength(4);
+    expect(selectedIndex()).toBe(0);
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(selectedIndex()).toBe(2);
+    expect(addRow).toHaveAttribute('aria-selected', 'true');
+    expect(input).toHaveAttribute('aria-activedescendant', addRow.id);
+
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(selectedIndex()).toBe(3);
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(selectedIndex()).toBe(0);
+    fireEvent.keyDown(input, { key: 'ArrowUp' });
+    expect(selectedIndex()).toBe(3);
+  });
+
+  it('Tab and Shift+Tab move the same way and prevent the default', async () => {
+    renderFooter();
+    const input = await typeAndOpen('abc');
+
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
+    expect(selectedIndex()).toBe(2);
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
+    expect(selectedIndex()).toBe(3);
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
+    expect(selectedIndex()).toBe(0);
+    expect(fireEvent.keyDown(input, { key: 'Tab', shiftKey: true })).toBe(false);
+    expect(selectedIndex()).toBe(3);
+  });
+
+  it('hides the add row while loading, on error and while pending, but keeps the catalog row', async () => {
+    usePartnerSearchMock.mockReturnValue({ data: undefined, isLoading: true, isFetching: true, isError: false });
+    const { unmount } = renderFooterRaw();
+    await typeAndOpen('abc');
+    expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Xem danh mục đầy đủ/ })).toBeInTheDocument();
+    unmount();
+
+    usePartnerSearchMock.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+    const second = renderFooterRaw();
+    await typeAndOpen('abc');
+    expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Xem danh mục đầy đủ/ })).toBeInTheDocument();
+    second.unmount();
+
+    usePartnerSearchMock.mockReturnValue({ data: partners, isLoading: false, isError: false });
+    renderFooter();
+    const input = await typeAndOpen('abc');
+    fireEvent.change(input, { target: { value: 'abcd' } });
+    expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /Xem danh mục đầy đủ/ })).toBeInTheDocument();
+    expect(await screen.findByText('Thêm mới đối tượng "abcd"')).toBeInTheDocument();
+  });
+
+  it('mouse down on the add row calls onAddNew with the keyword and closes the list', async () => {
+    renderFooter();
+    await typeAndOpen('zzz');
+    fireEvent.mouseDown(screen.getByRole('option', { name: /Thêm mới đối tượng "zzz"/ }));
+    expect(onAddNew).toHaveBeenCalledWith('zzz');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('mouse down on the catalog row calls onOpenCatalog with the keyword and closes the list', async () => {
+    renderFooter();
+    await typeAndOpen('zzz');
+    fireEvent.mouseDown(screen.getByRole('option', { name: /Xem danh mục đầy đủ/ }));
+    expect(onOpenCatalog).toHaveBeenCalledWith('zzz');
+    expect(onAddNew).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('passes the trimmed keyword on', async () => {
+    renderFooter();
+    await typeAndOpen('  zzz  ');
+    const addRow = screen.getByRole('option', { name: /Thêm mới đối tượng "zzz"/ });
+    fireEvent.mouseDown(addRow);
+    expect(onAddNew).toHaveBeenCalledWith('zzz');
+  });
+
+  it('names customers for noun="khách hàng"', async () => {
+    renderFooter({ noun: 'khách hàng' });
+    await typeAndOpen('zzz');
+    expect(screen.getByText('Thêm mới khách hàng "zzz"')).toBeInTheDocument();
+  });
+
+  it('without the props neither footer row renders', async () => {
+    renderAutocomplete({ requireReason: false });
+    await typeAndOpen('zzz');
     expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
     expect(screen.queryByText('Xem danh mục đầy đủ')).not.toBeInTheDocument();
   });

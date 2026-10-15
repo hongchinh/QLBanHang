@@ -60,6 +60,9 @@ export type PartnerAutocompleteProps = PartnerSearchSource & {
   onUnpickedChange?: (hasUnpickedText: boolean) => void;
 };
 
+// What ↑↓ / Tab walk over: the results, then the add-new row, then the catalog row.
+type ListRow = { kind: 'result'; item: PartnerSearchItem } | { kind: 'addNew' } | { kind: 'catalog' };
+
 // Same interaction as CustomerAutocomplete, backed by GET /stock-vouchers/partners (D3).
 export function PartnerAutocomplete({
   type,
@@ -76,6 +79,7 @@ export function PartnerAutocomplete({
   noun = 'đối tượng',
   compact,
   onAddNew,
+  onOpenCatalog,
 }: PartnerAutocompleteProps) {
   const [keyword, setKeyword] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -124,13 +128,37 @@ export function PartnerAutocomplete({
   const isDisabled = disabled || blocked;
 
   const showDropdown = isOpen && !isDisabled && debouncedKeyword.trim().length > 0;
-  const activeOptionId =
-    showDropdown && results[highlightedIndex] ? `partner-option-${results[highlightedIndex].id}` : undefined;
+
+  // Pending: the results shown are not (yet) the results of the typed keyword.
+  const hasList = !isLoading && !isError;
+  const pending = keyword.trim() !== debouncedKeyword.trim() || !!search.isFetching;
+  const rows: ListRow[] = [];
+  if (hasList) for (const item of results) rows.push({ kind: 'result', item });
+  if (onAddNew && hasList && !pending) rows.push({ kind: 'addNew' });
+  if (onOpenCatalog) rows.push({ kind: 'catalog' });
+  const activeIndex = Math.min(highlightedIndex, rows.length - 1);
+  const activeRow = rows[activeIndex];
+  const addNewId = `${listboxId}-add-new`;
+  const catalogId = `${listboxId}-catalog`;
+  function rowId(row: ListRow) {
+    return row.kind === 'result' ? `partner-option-${row.item.id}` : row.kind === 'addNew' ? addNewId : catalogId;
+  }
+  const activeOptionId = showDropdown && activeRow ? rowId(activeRow) : undefined;
 
   function selectPartner(p: PartnerSearchItem) {
     onSelect(p);
     setKeyword('');
     setIsOpen(false);
+  }
+
+  function activateFooter(kind: 'addNew' | 'catalog') {
+    setIsOpen(false);
+    (kind === 'addNew' ? onAddNew : onOpenCatalog)?.(keyword.trim());
+  }
+
+  function moveHighlight(step: 1 | -1) {
+    if (rows.length === 0) return;
+    setHighlightedIndex((i) => (Math.min(i, rows.length - 1) + step + rows.length) % rows.length);
   }
 
   function handleClear() {
@@ -151,27 +179,23 @@ export function PartnerAutocomplete({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        if (results.length === 0) return;
-        setHighlightedIndex((i) => (i + 1) % results.length);
+        moveHighlight(1);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        if (results.length === 0) return;
-        setHighlightedIndex((i) => (i - 1 + results.length) % results.length);
+        moveHighlight(-1);
         break;
       case 'Tab':
-        if (results.length === 0) return;
+        if (rows.length === 0) return;
         e.preventDefault();
-        setHighlightedIndex((i) =>
-          e.shiftKey ? (i - 1 + results.length) % results.length : (i + 1) % results.length,
-        );
+        moveHighlight(e.shiftKey ? -1 : 1);
         break;
       case 'Enter': {
         e.preventDefault();
         if (results.length === 0) return;
         const upper = keyword.trim().toUpperCase();
         const exact = upper.length > 0 ? results.find((r) => r.code.toUpperCase() === upper) : undefined;
-        const pick = exact ?? results[highlightedIndex];
+        const pick = exact ?? (activeRow?.kind === 'result' ? activeRow.item : undefined);
         if (pick) selectPartner(pick);
         break;
       }
@@ -257,22 +281,25 @@ export function PartnerAutocomplete({
                       </td>
                     </tr>
                   )}
-                  {!isLoading &&
-                    !isError &&
-                    results.map((p, i) => {
-                      const highlighted = i === highlightedIndex;
+                  {rows.map((row, i) => {
+                    const highlighted = i === activeIndex;
+                    const common = {
+                      id: rowId(row),
+                      role: 'option' as const,
+                      'aria-selected': highlighted,
+                      onMouseEnter: () => setHighlightedIndex(i),
+                    };
+                    if (row.kind === 'result') {
+                      const p = row.item;
                       return (
                         <tr
                           key={p.id}
-                          id={`partner-option-${p.id}`}
-                          role="option"
-                          aria-selected={highlighted}
+                          {...common}
                           onMouseDown={(e) => {
                             // Avoid blur before the selection runs.
                             e.preventDefault();
                             selectPartner(p);
                           }}
-                          onMouseEnter={() => setHighlightedIndex(i)}
                           className={cn('cursor-pointer border-t', highlighted && 'qldh-lookup-row-highlight')}
                         >
                           <td className="px-2 py-1 align-top">{p.code}</td>
@@ -288,7 +315,34 @@ export function PartnerAutocomplete({
                           </td>
                         </tr>
                       );
-                    })}
+                    }
+                    const isAddNew = row.kind === 'addNew';
+                    return (
+                      <tr
+                        key={row.kind}
+                        {...common}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          activateFooter(row.kind);
+                        }}
+                        className={cn('cursor-pointer border-t', highlighted && 'qldh-lookup-row-highlight')}
+                      >
+                        <td colSpan={6} className="px-2 py-1.5">
+                          <span className="flex items-center gap-2">
+                            <AppIcon name={isAddNew ? 'add' : 'listPicker'} size={14} />
+                            <span>
+                              {isAddNew ? `Thêm mới ${noun} "${keyword.trim()}"` : 'Xem danh mục đầy đủ'}
+                            </span>
+                            {isAddNew && (
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                {results.length === 0 ? 'Enter / F4' : 'F4'}
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

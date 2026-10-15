@@ -3,7 +3,7 @@ key: reports-debt-ledger
 title: Sổ chi tiết công nợ
 routes: [/reports/debt-ledger]
 sources: [frontend/src/pages/cash-reports/debt-ledger-page.tsx, frontend/src/pages/cash-reports/debt-ledger-table.tsx, frontend/src/pages/cash-reports/report-partner-picker.tsx, frontend/src/pages/cash-reports/document-code-link.tsx, frontend/src/pages/cash-reports/document-link.ts, frontend/src/features/cash-reports/hooks.ts, frontend/src/components/period-preset-select/**, frontend/src/components/report-scope-select/**, frontend/src/components/tt133-export/**]
-related: []
+related: [debt-opening, receipts.form, payments.form]
 updated: 2026-10-15
 ---
 ## Dùng để
@@ -18,7 +18,7 @@ Xem từng dòng phát sinh công nợ của một khách hàng hoặc nhà cung
 6. {#export} Bấm **Xuất theo mẫu TT133**, chọn **Excel** hoặc **PDF**, chọn đối tượng cần xuất rồi bấm **Xuất**.
 
 ## Lưu ý
-- Nút ← chỉ hiện khi mở từ báo cáo khác, và quay lại báo cáo đó với bộ lọc cũ. Số dư công nợ giữ phía, khoảng ngày, ô tìm kiếm và phạm vi trên địa chỉ trang nên khi quay lại vẫn như lúc bạn rời đi.
+- Nút ← chỉ hiện khi mở từ báo cáo khác (bấm một đối tượng trong Số dư công nợ), và quay lại báo cáo đó với bộ lọc cũ. Khi mở như vậy, phía, đối tượng, khoảng ngày và phạm vi đã được chọn sẵn; Số dư công nợ giữ phía, khoảng ngày, ô tìm kiếm và phạm vi trên địa chỉ trang nên khi quay lại vẫn như lúc bạn rời đi.
 - Chưa chọn **Đối tượng** thì màn hình báo Chọn đối tượng để xem sổ chi tiết công nợ. Đổi **Phía** sẽ bỏ đối tượng đã chọn vì mỗi phía có danh sách riêng.
 - Mặc định xem từ ngày đầu tháng đến hôm nay. Nếu **Từ ngày** sau **Đến ngày**, màn hình báo Từ ngày không được sau Đến ngày, không hiện sổ và nút **Xuất theo mẫu TT133** bị mờ.
 - Cột **Tăng**, **Giảm** để trống khi không phát sinh. Cột **Số dư** ghi Nợ hoặc Có theo phía đang xem. Khoảng ngày không có phát sinh thì bảng báo Không có phát sinh trong khoảng thời gian này.

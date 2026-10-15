@@ -21,7 +21,7 @@ Quản lý cài đặt riêng của bạn: file Excel mẫu khi xuất báo giá
 - Nút ← quay lại Cấu hình nằm ở đầu trang, trước tiêu đề.
 - Chưa tải template riêng thì hệ thống dùng template mặc định (Đang dùng template mặc định của hệ thống). Có template riêng thì dùng **Tải về**, **Tải lên thay thế** hoặc **Xoá**; xoá xong hệ thống quay về template mặc định.
 - **Tải template hiện tại** tải về file đang được dùng, **Tải template mặc định** tải file gốc của hệ thống để bạn sửa làm mẫu.
-- File template phải là .xlsx và tối đa 5MB; quá thì hệ thống báo File quá lớn hoặc Tải lên thất bại kèm lý do.
+- File template phải là .xlsx và tối đa 5MB. File quá 5MB thì hệ thống báo File quá lớn; file không hợp lệ thì báo Tải lên thất bại kèm lý do.
 - Khung **Khoá theo trạng thái** chỉ để xem, do quản trị viên đặt. Hiện thông báo báo giá từ trạng thái **Đã gửi** hoặc **Đã xác nhận** trở lên không cho bạn chỉnh sửa; chưa cấu hình thì hiện Không có giới hạn nào.
 - **Số tài khoản** gồm 6 đến 19 chữ số, **Chủ tài khoản** không được để trống. Tài khoản đầu tiên tự thành mặc định, và xoá tài khoản mặc định thì một tài khoản còn lại được thay vào.
-- Thẻ **Logo công ty** chỉ hiện với người có quyền quản lý cài đặt người dùng. Logo là PNG, JPEG hoặc SVG, tối đa 2MB; **Logo ngang** hiện khi thanh bên mở rộng, **Logo vuông** khi thanh bên thu gọn hoặc trên màn hình nhỏ. Cần chọn ít nhất một logo mới lưu được.
+- Thẻ **Logo công ty** chỉ hiện với người có quyền quản lý cài đặt người dùng. Logo là PNG, JPEG hoặc SVG, tối đa 2MB; **Logo ngang** hiện khi thanh bên mở rộng, **Logo vuông** khi thanh bên thu gọn hoặc trên màn hình nhỏ. Cần chọn ít nhất một logo mới lưu được. Logo áp dụng cho mọi người dùng.

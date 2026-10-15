@@ -17,5 +17,7 @@ Chọn trường ngày dùng để lọc và tổng hợp doanh thu trên các b
 ## Lưu ý
 - Nút ← quay lại Cấu hình nằm ở đầu trang, trước tiêu đề.
 - Thay đổi có hiệu lực ngay lập tức, nên số doanh thu trên báo cáo và dashboard đổi theo.
+- Chọn **Theo ngày kế toán xác nhận nhận tiền** thì báo cáo chỉ tính báo giá kế toán đã xác nhận nhận tiền; hai cách còn lại tính báo giá khách đã xác nhận trở lên. Báo giá đã hủy không được tính.
+- Bộ lọc N. Doanh thu trên danh sách báo giá cũng lọc theo trường ngày này.
 - Dưới ô chọn có dòng Cập nhật lần cuối, ghi thời điểm và người đã lưu lần gần nhất.
 - Lưu không được thì hệ thống báo Lưu thất bại kèm lý do.

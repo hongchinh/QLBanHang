@@ -10,7 +10,7 @@ updated: 2026-10-15
 Quản lý danh sách chi nhánh: thêm, sửa, xóa và đặt ngày đầu kỳ. Có thể tạo thêm chi nhánh demo kèm dữ liệu mẫu để đào tạo.
 
 ## Các bước
-1. {#add} Bấm **Thêm chi nhánh**, nhập **Mã chi nhánh** và **Tên chi nhánh**, có thể nhập **Địa chỉ**.
+1. {#add} Bấm **Thêm chi nhánh**, nhập **Mã chi nhánh**, **Tên chi nhánh** và có thể nhập **Địa chỉ**, rồi bấm **Tạo mới**.
 2. {#demo} Muốn chi nhánh để đào tạo, tích **Tạo kèm dữ liệu mẫu để đào tạo** trước khi bấm **Tạo mới**.
 3. {#edit} Sửa tên hoặc địa chỉ bằng nút hình bút ở cuối dòng (Sửa chi nhánh), rồi bấm **Cập nhật**.
 4. {#opening} Đặt ngày bắt đầu sổ sách bằng nút hình lịch ở cuối dòng (Đặt ngày đầu kỳ), chọn **Ngày đầu kỳ** rồi bấm **Lưu**.
@@ -23,6 +23,7 @@ Quản lý danh sách chi nhánh: thêm, sửa, xóa và đặt ngày đầu k�
 - Mã đã có thì hệ thống báo Mã chi nhánh đã tồn tại.
 - Chi nhánh demo có nhãn **Demo** ở cột **Loại**. Trong lúc tạo dữ liệu mẫu, nhãn hiện Đang tạo dữ liệu kèm phần trăm, và nút xóa demo bị khóa; nếu tạo hỏng thì nhãn hiện Lỗi tạo dữ liệu.
 - Hộp thoại xóa demo cho biết số chứng từ sẽ mất; toàn bộ dữ liệu của chi nhánh bị xóa vĩnh viễn, kể cả chứng từ do bạn tự nhập. Người dùng đang lấy chi nhánh này làm mặc định được chuyển về Chi nhánh chính.
-- **Ngày đầu kỳ** chỉ đổi được khi chi nhánh chưa có chứng từ, và không được sau ngày của chứng từ sớm nhất. Đã có tồn đầu kỳ, công nợ đầu kỳ hoặc số dư đầu quỹ thì không xóa được ngày này.
+- **Ngày đầu kỳ** chỉ đổi được khi chi nhánh chưa có chứng từ. Chi nhánh đã có chứng từ mà chưa có ngày đầu kỳ thì vẫn đặt được lần đầu, nhưng không được sau ngày của chứng từ sớm nhất. Đã có tồn đầu kỳ, công nợ đầu kỳ hoặc số dư đầu quỹ thì không xóa được ngày này.
+- Ngày đầu kỳ cũ hoặc mới nằm trong kỳ đã khóa sổ thì không đổi được; hệ thống báo Ngày chứng từ đã khóa sổ.
 - Không xóa được chi nhánh chính, chi nhánh là mặc định của người dùng, chi nhánh còn kho, hoặc đã có chứng từ hay số dư đầu kỳ; hệ thống báo lý do cụ thể.
 - Cột **Khóa sổ đến** chỉ để xem; đặt ngày khóa ở mục Khóa sổ.

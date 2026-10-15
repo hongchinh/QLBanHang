@@ -22,3 +22,4 @@ updated: 2026-10-15
 - Cài đặt này theo chi nhánh làm việc đang chọn ở đầu trang; mỗi chi nhánh có mẫu riêng.
 - **Mẫu** phải có `{STT}`. Chọn **Theo tháng** thì mẫu phải có cả `{THANG}` và `{NAM}`; chọn **Theo năm** thì mẫu phải có `{NAM}`. Sai thì lỗi hiện ngay dưới ô **Mẫu**.
 - **Độ dài số** từ 1 đến 10, **Ký hiệu** tối đa 20 ký tự, **Mẫu** tối đa 100 ký tự. Số chứng từ sinh ra không được dài quá 50 ký tự.
+- Mẫu mới chỉ dùng cho chứng từ lập sau khi lưu; số của chứng từ đã lập giữ nguyên.

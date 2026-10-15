@@ -122,3 +122,79 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Giá trị | frontend/src/pages/inventory/opening-stock-page.tsx:224 |
 | Đơn giá | frontend/src/pages/inventory/opening-stock-page.tsx:225 |
 | Lưu | frontend/src/pages/inventory/opening-stock-page.tsx:178 |
+
+## payments.form
+
+| label | evidence |
+|---|---|
+| Ngày giờ | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:97 |
+| Quỹ | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:99 |
+| Lý do | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:129 |
+| Đối tượng | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:143 |
+| Kèm theo | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:172 |
+| Diễn giải | frontend/src/pages/cash-vouchers/components/cash-line-grid.tsx:78 |
+| Số tiền | frontend/src/pages/cash-vouchers/components/cash-line-grid.tsx:79 |
+| Thêm dòng | frontend/src/pages/cash-vouchers/components/cash-line-grid.tsx:175 |
+| Tổng | frontend/src/pages/cash-vouchers/components/cash-line-grid.tsx:156 |
+| Phân bổ chứng từ | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:562 |
+| Phân bổ | frontend/src/pages/cash-vouchers/components/allocation-grid.tsx:89 |
+| Gợi ý | frontend/src/pages/cash-vouchers/components/allocation-grid.tsx:184 |
+| Lưu tạm | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:473 |
+| Lưu và thoát | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:469 |
+| Cập nhật | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:486 |
+| In | frontend/src/components/voucher-print/voucher-print-button.tsx:36 (default label, outside sources) |
+| Tự động | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:451 |
+| Mở phiếu kho | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:519 |
+| Đóng | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:480 |
+| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 (shared 422 dialog title, outside sources) |
+| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 (shared 422 dialog title, outside sources) |
+| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 (shared 422 dialog title, outside sources) |
+| Người nhận | dynamic: the page picks personLabel by voucher type, text at frontend/src/pages/cash-vouchers/labels.ts:29 |
+| Lý do chi | dynamic: the page picks descriptionLabel by voucher type, text at frontend/src/pages/cash-vouchers/labels.ts:30 |
+
+## receipts.form
+
+| label | evidence |
+|---|---|
+| Ngày giờ | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:97 |
+| Quỹ | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:99 |
+| Lý do | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:129 |
+| Đối tượng | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:143 |
+| Kèm theo | frontend/src/pages/cash-vouchers/components/cash-voucher-header.tsx:172 |
+| Diễn giải | frontend/src/pages/cash-vouchers/components/cash-line-grid.tsx:78 |
+| Số tiền | frontend/src/pages/cash-vouchers/components/cash-line-grid.tsx:79 |
+| Thêm dòng | frontend/src/pages/cash-vouchers/components/cash-line-grid.tsx:175 |
+| Tổng | frontend/src/pages/cash-vouchers/components/cash-line-grid.tsx:156 |
+| Phân bổ chứng từ | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:562 |
+| Phân bổ | frontend/src/pages/cash-vouchers/components/allocation-grid.tsx:89 |
+| Gợi ý | frontend/src/pages/cash-vouchers/components/allocation-grid.tsx:184 |
+| Lưu tạm | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:473 |
+| Lưu và thoát | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:469 |
+| Cập nhật | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:486 |
+| In | frontend/src/components/voucher-print/voucher-print-button.tsx:36 (default label, outside sources) |
+| Tự động | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:451 |
+| Mở phiếu kho | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:519 |
+| Đóng | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:480 |
+| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 (shared 422 dialog title, outside sources) |
+| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 (shared 422 dialog title, outside sources) |
+| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 (shared 422 dialog title, outside sources) |
+| Người nộp | dynamic: the page picks personLabel by voucher type, text at frontend/src/pages/cash-vouchers/labels.ts:19 |
+| Lý do nộp | dynamic: the page picks descriptionLabel by voucher type, text at frontend/src/pages/cash-vouchers/labels.ts:20 |
+
+## fund-transfers.form
+
+| label | evidence |
+|---|---|
+| Số phiếu | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:349 |
+| Ngày giờ | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:358 |
+| Quỹ đi | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:364 |
+| Quỹ đến | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:383 |
+| Số tiền | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:406 |
+| Diễn giải | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:413 |
+| Ghi chú | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:419 |
+| Lưu tạm | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:289 |
+| Lưu và thoát | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:285 |
+| Cập nhật | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:296 |
+| Khôi phục | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:308 |
+| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 (shared 422 dialog title, outside sources) |
+| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 (shared 422 dialog title, outside sources) |

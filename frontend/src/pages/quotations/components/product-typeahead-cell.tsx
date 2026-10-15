@@ -245,7 +245,8 @@ export function ProductTypeaheadCell({
       case 'Tab':
         e.preventDefault();
         setHighlightedIndex((i) =>
-          e.shiftKey ? (i - 1 + items.length) % items.length : (i + 1) % items.length,
+          // Clamp first: from the add row (index = items.length) Tab goes to the first result.
+          e.shiftKey ? (i - 1 + items.length) % items.length : (Math.min(i, items.length - 1) + 1) % items.length,
         );
         break;
       case 'Enter': {

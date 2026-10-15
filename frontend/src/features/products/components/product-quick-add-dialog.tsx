@@ -33,7 +33,7 @@ export function ProductQuickAddDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        className="max-w-4xl max-h-[90vh] overflow-y-auto focus:outline-none"
         // The form renders after the lookups load, so QuickAddBody focuses the first field itself; until then
         // focus sits on the dialog so keystrokes do not reach the cell behind it.
         onOpenAutoFocus={(e) => {

@@ -426,6 +426,18 @@ describe('ProductTypeaheadCell', () => {
         expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
       });
 
+      it('Tab from the add row goes to the first result', () => {
+        searchState = { ...settledSearch(), data: [sheet, created] };
+        const { input } = setup();
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        expect(screen.getByRole('option', { name: new RegExp(ADD_ROW) })).toHaveAttribute('aria-selected', 'true');
+
+        fireEvent.keyDown(input, { key: 'Tab' });
+
+        expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
+      });
+
       it('F4 opens the dialog with the list closed', async () => {
         const { input } = setup({ openOnFocus: false });
         expect(screen.queryByRole('listbox')).toBeNull();

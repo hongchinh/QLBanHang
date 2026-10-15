@@ -96,21 +96,18 @@ export function ProductFormFields({
   // One submit at a time: react-hook-form does not block a second handleSubmit while the first onSubmit runs,
   // and the ref is checked before validation so that time is covered too (state would lag a repeating key).
   const busy = useRef(false);
-  const submitGuarded = form.handleSubmit(async (parsed) => {
-    try {
-      await onSubmit(parsed);
-    } finally {
-      busy.current = false;
-    }
-  });
+  const submitGuarded = form.handleSubmit(onSubmit);
   async function guardedSubmit(e?: React.BaseSyntheticEvent) {
     if (busy.current) {
       e?.preventDefault();
       return;
     }
     busy.current = true;
-    await submitGuarded(e);
-    busy.current = false; // validation failed: onSubmit never ran
+    try {
+      await submitGuarded(e);
+    } finally {
+      busy.current = false;
+    }
   }
 
   function handleEnterKeys(e: React.KeyboardEvent<HTMLFormElement>) {

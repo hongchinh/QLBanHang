@@ -1,6 +1,8 @@
 using ClosedXML.Excel;
+using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Application.Tt133.Vouchers;
+using OrderMgmt.Infrastructure.Qr;
 
 namespace OrderMgmt.Infrastructure.Excel.Tt133.Vouchers;
 
@@ -26,6 +28,17 @@ public sealed class VoucherFormBuilder
     private const double PageHeightTolerance = 0.03;
     // The sheet font size set by Tt133FormBuilder; Sheet.RowHeight is the height of a row of it.
     private const double DefaultFontSize = 11;
+    // The transfer QR beside the lines (01-TT): its side on paper, in the last QrColumns columns. The A5 landscape sheet
+    // is fitted to the page by LibreOffice; the zoom is a first guess to be measured on a real PDF.
+    private const double QrPrintMillimetres = 25;
+    private const double A5LandscapeScale = 0.90;
+    private const int QrColumns = 2;
+    private const int QrTopOffsetPixels = 2;
+    private const double QrCaptionFontSize = 8;
+    private const double PointsPerPixel = 0.75;
+    // A column of width w is about w * 7 + 5 pixels wide (Calibri 11).
+    private const double PixelsPerWidthUnit = 7;
+    private const double ColumnPaddingPixels = 5;
 
     private readonly Tt133FormContext _context;
     private readonly IReadOnlyList<Tt133Column> _columns;
@@ -35,6 +48,9 @@ public sealed class VoucherFormBuilder
     private int _lastBodyRow;
     private int _signatureFirstRow;
     private int _signatureLastRow;
+    private VoucherPaymentQrDto? _qr;
+    private int _qrFirstRow;
+    private int? _textLastColumn;
 
     public VoucherFormBuilder(IXLWorksheet sheet, Tt133FormContext context, IReadOnlyList<Tt133Column> columns,
         VoucherPaper paper, int? labelColumn = null)
@@ -150,9 +166,59 @@ public sealed class VoucherFormBuilder
 
     /// "{label} {value}", or "{label} {Dots}" when the value is blank.
     public void WriteLine(string label, string? value) =>
-        Table.WriteText(string.IsNullOrWhiteSpace(value)
+        WriteText(string.IsNullOrWhiteSpace(value)
             ? $"{label} {VoucherPrintRules.Dots}"
             : $"{label} {value.Trim()}");
+
+    /// One text line; while a QR block is open it covers the columns left of the QR only.
+    public void WriteText(string text) => Table.WriteText(text, lastColumn: _textLastColumn);
+
+    /// Opens a block of lines (WriteLine, WriteText) that stop two columns short of the right edge, to leave room for
+    /// the transfer QR beside them. EndQrBeside closes it and draws the QR.
+    public void BeginQrBeside(VoucherPaymentQrDto qr)
+    {
+        if (_columns.Count < 4)
+            throw new InvalidOperationException("A QR beside the lines needs at least four columns.");
+        _qr = qr;
+        _qrFirstRow = Table.Row;
+        _textLastColumn = _columns.Count - QrColumns;
+    }
+
+    /// The QR picture in the last two columns from the first line of the block, with its two captions in the last two
+    /// rows of the block. Blank rows are added after the lines until the rows above the captions hold the picture.
+    public void EndQrBeside()
+    {
+        var qr = _qr ?? throw new InvalidOperationException("BeginQrBeside was not called.");
+        var count = _columns.Count;
+        var first = _qrFirstRow;
+        var pixels = QrPixels;
+        var needed = pixels * PointsPerPixel + QrTopOffsetPixels;
+
+        var rows = Math.Max(3, Table.Row - first);
+        if (Table.Row - first < rows) Table.Skip(rows - (Table.Row - first));
+        while (HeightOfRows(first, first + rows - 3) < needed)
+        {
+            rows++;
+            Table.Skip();
+        }
+
+        var firstColumn = count - QrColumns + 1;
+        var columnsPixels = 0d;
+        for (var i = firstColumn; i <= count; i++) columnsPixels += _columns[i - 1].Width * PixelsPerWidthUnit + ColumnPaddingPixels;
+        var xOffset = Math.Max(0, (int)Math.Round((columnsPixels - pixels) / 2));
+
+        using var png = new MemoryStream(QrPngRenderer.Render(qr.Payload));
+        Sheet.AddPicture(png, "payment-qr")
+            .MoveTo(Sheet.Cell(first, firstColumn), xOffset, QrTopOffsetPixels)
+            .WithSize(pixels, pixels);
+
+        var last = first + rows - 1;
+        PutQrCaption(last - 1, firstColumn, VoucherPrintRules.QrScanCaption, bold: true);
+        PutQrCaption(last, firstColumn, VoucherPrintRules.QrBankCaption(qr), bold: false);
+
+        _qr = null;
+        _textLastColumn = null;
+    }
 
     /// One table body row (see Tt133FormBuilder.WriteRow); the builder keeps the last ones with the signatures.
     public void WriteRow(params object?[] cells)
@@ -213,9 +279,7 @@ public sealed class VoucherFormBuilder
             ? Math.Max(Table.TableHeaderLastRow + 1, _lastBodyRow - 1)
             : _signatureFirstRow;
 
-        var tableWidth = _columns.Sum(c => (c.Width + SavedWidthPadding) * PointsPerWidthUnit);
-        var scale = Math.Min(1, Math.Floor(100 * (A4WidthPoints - 2 * MarginPoints) / tableWidth) / 100);
-        var pageHeight = (A4HeightPoints - 2 * MarginPoints) / scale;
+        var pageHeight = (A4HeightPoints - 2 * MarginPoints) / A4PrintScale();
 
         // A break cannot help when the kept rows and the repeated header do not fit on one page.
         var kept = RepeatedHeaderHeight();
@@ -226,6 +290,42 @@ public sealed class VoucherFormBuilder
         var high = PagesOf(keepFrom, pageHeight * (1 + PageHeightTolerance));
         if (low.First != low.Last || high.First != high.Last || low.First != high.First)
             Sheet.PageSetup.AddHorizontalPageBreak(keepFrom - 1);
+    }
+
+    /// The zoom (0-1) that LibreOffice prints an A4 portrait voucher at: the table width fitted to the page width.
+    private double A4PrintScale()
+    {
+        var tableWidth = _columns.Sum(c => (c.Width + SavedWidthPadding) * PointsPerWidthUnit);
+        return Math.Min(1, Math.Floor(100 * (A4WidthPoints - 2 * MarginPoints) / tableWidth) / 100);
+    }
+
+    /// Side of the QR picture in sheet pixels. The sheet is shrunk to the page, so the picture is drawn larger in the
+    /// sheet to come out at QrPrintMillimetres on paper.
+    private int QrPixels
+    {
+        get
+        {
+            var scale = _paper == VoucherPaper.A5Landscape ? A5LandscapeScale : A4PrintScale();
+            var points = QrPrintMillimetres * 72 / 25.4 / scale;
+            return (int)Math.Round(points / PointsPerPixel);
+        }
+    }
+
+    private double HeightOfRows(int firstRow, int lastRow)
+    {
+        var height = 0d;
+        for (var r = firstRow; r <= lastRow; r++) height += Sheet.Row(r).Height;
+        return height;
+    }
+
+    private void PutQrCaption(int row, int firstColumn, string text, bool bold)
+    {
+        var cell = Merged(row, firstColumn, _columns.Count);
+        cell.Value = text;
+        cell.Style.Font.FontSize = QrCaptionFontSize;
+        cell.Style.Font.Bold = bold;
+        cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+        cell.Style.Alignment.ShrinkToFit = true;
     }
 
     /// The pages (1-based) of the row `from` and of the names row, for a page of the given height in sheet points;

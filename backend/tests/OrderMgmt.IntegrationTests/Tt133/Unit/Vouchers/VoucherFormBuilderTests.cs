@@ -1,5 +1,7 @@
 using ClosedXML.Excel;
 using FluentAssertions;
+using OrderMgmt.Application.CashDebt.PaymentQr;
+using OrderMgmt.Application.Payments.Services;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Application.Tt133.Vouchers;
 using OrderMgmt.Infrastructure.Excel.Tt133;
@@ -402,5 +404,52 @@ public class VoucherFormBuilderTests
         ws.PageSetup.PagesTall.Should().Be(0);
         ws.PageSetup.CenterHorizontally.Should().BeFalse();
         ws.PageSetup.FirstRowToRepeatAtTop.Should().Be(b.Table.TableHeaderFirstRow);
+    }
+
+    private static VoucherPaymentQrDto Qr() => new()
+    {
+        Payload = VietQrPayloadBuilder.Build("970436", "0123456789", "CONG TY ABC", 1_500_000m, "PT00001"),
+        Amount = 1_500_000m,
+        Total = 1_500_000m,
+        BankShortName = "Vietcombank",
+        AccountNumber = "0123456789",
+    };
+
+    private static int LastColumnOf(IXLWorksheet sheet, string text) => SpanOf(sheet, text).Last;
+
+    [Fact]
+    public void Qr_block_narrows_the_lines_and_the_lines_after_it_are_full_width()
+    {
+        var (b, ws) = NewBuilder(Context());
+
+        b.BeginQrBeside(Qr());
+        b.WriteLine("Địa chỉ:", "Hà Nội");
+        b.WriteText("Kèm theo: 2 chứng từ gốc");
+        b.EndQrBeside();
+        b.WriteLine("Sau khối:", "x");
+
+        LastColumnOf(ws, "Địa chỉ: Hà Nội").Should().Be(8);
+        LastColumnOf(ws, "Kèm theo: 2 chứng từ gốc").Should().Be(8);
+        LastColumnOf(ws, "Sau khối: x").Should().Be(10);
+        ws.Pictures.Count.Should().Be(1);
+        ws.Pictures.First().TopLeftCell.Address.RowNumber.Should().Be(1);
+        // Two lines are not tall enough for the picture: blank rows are added before the next line.
+        RowOf(ws, "Sau khối: x").Should().BeGreaterThan(3);
+    }
+
+    [Theory]
+    [InlineData(VoucherPaper.A5Landscape)]
+    [InlineData(VoucherPaper.A4Portrait)]
+    public void Qr_picture_is_square_and_about_25_mm_on_paper(VoucherPaper paper)
+    {
+        var (b, ws) = NewBuilder(Context(), paper);
+
+        b.BeginQrBeside(Qr());
+        b.WriteLine("Địa chỉ:", "Hà Nội");
+        b.EndQrBeside();
+
+        var picture = ws.Pictures.First();
+        picture.Width.Should().Be(picture.Height);
+        picture.Width.Should().BeInRange(90, 130);
     }
 }

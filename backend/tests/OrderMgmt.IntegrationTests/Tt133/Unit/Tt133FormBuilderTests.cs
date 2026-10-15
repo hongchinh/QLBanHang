@@ -468,6 +468,35 @@ public class Tt133FormBuilderTests
     }
 
     [Fact]
+    public void A_text_line_with_a_last_column_merges_only_up_to_it()
+    {
+        var (b, ws) = NewBuilder(Context());
+        var row = b.Row;
+
+        b.WriteText("x", lastColumn: 2);
+        b.WriteText("y");
+
+        ws.Cell(row, 1).MergedRange().RangeAddress.LastAddress.ColumnNumber.Should().Be(2);
+        ws.Cell(row + 1, 1).MergedRange().RangeAddress.LastAddress.ColumnNumber.Should().Be(4);
+    }
+
+    [Fact]
+    public void A_text_line_wraps_by_the_width_of_its_last_column()
+    {
+        var (b, ws) = NewBuilder(Context());
+        var text = "Tính đến ngày 31/10/2026, Bên B còn nợ Bên A số tiền: 368.775.000 đồng "
+            + "(Bằng chữ: Ba trăm sáu mươi tám triệu bảy trăm bảy mươi lăm nghìn đồng).";
+
+        var allRow = b.Row;
+        b.WriteText(text);
+        var narrowRow = b.Row;
+        b.WriteText(text, lastColumn: 2);
+
+        ws.Row(allRow).Height.Should().Be(2 * ws.RowHeight); // 70 column units
+        ws.Row(narrowRow).Height.Should().Be(3 * ws.RowHeight); // 42 column units
+    }
+
+    [Fact]
     public void A_long_unit_line_of_the_header_block_wraps()
     {
         var context = Context();

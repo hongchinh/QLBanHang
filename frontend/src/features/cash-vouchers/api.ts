@@ -19,8 +19,8 @@ export const cashVouchersApi = {
     return apiGet<CashVoucherListResult>('/cash-vouchers', serialized);
   },
   defaults: (type: CashVoucherType) => apiGet<CashVoucherDefaults>('/cash-vouchers/defaults', { type }),
-  partners: (type: CashVoucherType, keyword: string, reasonId?: string) =>
-    apiGet<CashPartnerSearchItem[]>('/cash-vouchers/partners', { type, keyword, reasonId }),
+  partners: (type: CashVoucherType, keyword: string, activeOnly?: boolean) =>
+    apiGet<CashPartnerSearchItem[]>('/cash-vouchers/partners', { type, keyword, activeOnly }),
   get: (id: string) => apiGet<CashVoucher>(`/cash-vouchers/${id}`),
   activities: (id: string) => apiGet<CashDocumentActivity[]>(`/cash-vouchers/${id}/activities`),
   create: (data: UpsertCashVoucherRequest) => apiPost<CashVoucher>('/cash-vouchers', data),

@@ -2,7 +2,7 @@
 key: stock-in.form
 title: Phiếu nhập kho
 routes: [/stock-in/new, /stock-in/:id]
-sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts]
+sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx]
 related: [stock-out.form]
 updated: 2026-10-15
 ---
@@ -11,7 +11,7 @@ Ghi nhận hàng nhập vào kho: mua từ nhà cung cấp, khách trả lại h
 
 ## Các bước
 1. {#reason} Kiểm tra **Ngày nhập**, chọn **Lý do nhập** (ví dụ Nhập mua hàng) và **Kho**.
-2. {#partner} Gõ mã, tên hoặc MST nhà cung cấp (hoặc khách, tùy lý do) ở **Mã đối tượng**, Enter để chọn.
+2. {#partner} Gõ mã, tên hoặc MST nhà cung cấp (hoặc khách, tùy lý do) ở **Đối tượng**, Enter để chọn; `F4` để thêm nhanh nếu chưa có.
 3. {#lines} Nhập hàng ở tab **Hàng hóa**: **Mã hàng**, **SL**, **Đơn giá**. Enter sang ô kế tiếp, `Insert` thêm dòng.
 4. {#extras} Nếu có, nhập **Phí vận chuyển**, **CK cả đơn** ở tab **Thanh toán** và **Người giao hàng** ở tab **Thông tin khác**.
 5. {#totals} Xem **Tổng thanh toán** ở thanh cuối phiếu; nếu có quyền xem công nợ, xem thêm Phải trả của nhà cung cấp trước và sau phiếu.
@@ -19,8 +19,14 @@ Ghi nhận hàng nhập vào kho: mua từ nhà cung cấp, khách trả lại h
 7. {#save} Bấm **Lưu tạm** hoặc **Lưu và thoát** (**Cập nhật** khi sửa phiếu), rồi in phiếu nếu cần.
 
 ## Lưu ý
-- Lý do quyết định đối tượng: nhà cung cấp, khách, bất kỳ hoặc không cần (ô hiện Không cần đối tượng). Lý do yêu cầu nhà cung cấp hoặc khách, hay có ghi công nợ, thì bắt buộc chọn đối tượng. Đổi lý do thì đối tượng không còn phù hợp bị bỏ chọn.
-- Đối tượng ngừng sử dụng không hiện trong ô **Mã đối tượng**; nếu bị ngừng sau khi đã chọn, lúc lưu sẽ báo Đối tượng đã ngừng hoạt động. Phiếu cũ vẫn sửa được.
+- Lý do quyết định đối tượng: nhà cung cấp, khách, bất kỳ hoặc không cần (ô hiện Không cần đối tượng).
+- Chọn **Đối tượng** trước **Lý do nhập** cũng được: nếu đối tượng không hợp với lý do, hệ thống đổi sang lý do hợp đầu tiên, ô lý do nháy lên và hiện dòng vàng "Đã đổi lý do cho hợp với KH001 (khách hàng)." Lý do yêu cầu khách hàng hay nhà cung cấp thì đối tượng phải đúng vai trò đó.
+- Đổi **Lý do nhập** sau khi đã chọn đối tượng thì đối tượng được giữ; nếu không hợp, dòng đỏ hiện dưới ô lý do (ví dụ Lý do "…" cần khách hàng — KH001 không phải khách hàng) nhưng vẫn bấm lưu được, hệ thống từ chối lúc lưu và báo lỗi dưới ô **Đối tượng**. Khi ô lý do đang trống và không lý do nào hợp thì dòng đỏ báo Không có lý do nào hợp với KH001 (khách hàng). Chỉ lý do không dùng đối tượng (ô hiện Không cần đối tượng) mới xóa đối tượng.
+- Lý do yêu cầu nhà cung cấp hoặc khách, hay có ghi công nợ, thì bắt buộc chọn đối tượng. Gõ chữ ở **Đối tượng** mà chưa chọn từ danh sách thì chưa lưu được và ô báo Vui lòng chọn đối tượng từ danh sách.
+- Danh sách gợi ý của **Đối tượng** gồm khách hàng và nhà cung cấp đang dùng (tìm theo mã, tên, MST), hiện Mã, Tên, MST, Địa chỉ, SĐT, Loại. Enter chọn dòng đang sáng, mã gõ khớp hoàn toàn được ưu tiên; Enter khi kết quả chưa về thì chờ rồi mới chọn. Chọn xong, con trỏ sang ô tên.
+- `F4` hoặc nút **+** (cũng là dòng Thêm mới trong danh sách) mở **Thêm nhanh đối tượng**: vai trò chọn sẵn theo lý do, Enter đi qua từng ô, `Ctrl Enter` lưu đối tượng mới (không lưu phiếu), `Esc` hủy và về ô mã. Cần quyền tạo khách hàng hoặc nhà cung cấp.
+- **Xem danh mục đầy đủ** (dòng cuối danh sách) mở danh mục có hai tab Khách hàng và Nhà cung cấp; ↑↓ rồi Enter để chọn. Cần quyền xem khách hàng hoặc nhà cung cấp.
+- Đối tượng ngừng sử dụng không hiện trong ô **Đối tượng**; nếu bị ngừng sau khi đã chọn, lúc lưu sẽ báo Đối tượng đã ngừng hoạt động. Phiếu cũ vẫn sửa được.
 - **Đơn giá** tự điền giá vốn của hàng và là giá chưa VAT, **%CK** tự điền chiết khấu mua; sửa lại nếu khác. **CK cả đơn** được chia cho các dòng theo giá trị, **Phí vận chuyển** cộng vào tổng thanh toán và vào giá trị hàng nhập kho.
 - Hàng tính theo mét (m dài, m², m³) nhập **Số tấm** và **Dài**, **Rộng**, **Dày** theo loại hàng; **SL** tự tính, không nhập tay.
 - Ở tab **Thanh toán**, nhập % rồi bấm **Áp dụng** ở **% VAT cho mọi dòng** để đặt thuế cho tất cả dòng. Lý do làm tăng công nợ còn hiện **Hạn thanh toán**, tự tính từ số ngày nợ của đối tượng.
@@ -33,3 +39,5 @@ Ghi nhận hàng nhập vào kho: mua từ nhà cung cấp, khách trả lại h
 - `Alt 1–4` Chuyển tab (Alt 4 chỉ khi sửa phiếu)
 - `Insert` Thêm dòng
 - `Ctrl Del` Xóa dòng
+- `F4` Thêm nhanh đối tượng (ở ô mã **Đối tượng**)
+- `Enter` Sang ô kế tiếp: **Ngày nhập**, **Lý do nhập**, **Kho**, **HTTT**, **Đối tượng** (mã), tên, **Đ.chỉ**, rồi vào bảng hàng

@@ -1,0 +1,720 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ô đối tượng dùng chung — mockup v2</title>
+<style>
+  :root {
+    --fg: #020817; --muted-fg: #64748B; --border: #E2E8F0; --muted: #F1F5F9; --card: #FFFFFF;
+    --primary: #2563EB; --header-bg: #1457A3; --group-bg: #F4F7FA; --page: #F8FAFC;
+    --grid-head: #0F5FB0; --destructive: #DC2626; --amber: #F59E0B;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: #E9EDF2; }
+  button, input, select { font: inherit; color: inherit; }
+
+  .bar { position: sticky; top: 0; z-index: 50; background: #0F172A; color: #E2E8F0; padding: 8px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .bar h1 { font-size: 15px; margin: 0 6px 0 0; font-weight: 700; }
+  .seg { display: inline-flex; background: #1E293B; border-radius: 8px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: transparent; color: #CBD5E1; font-weight: 600; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: #F8FAFC; color: #0F172A; }
+  .seg.hidden { display: none; }
+  .bar label.tg { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; cursor: pointer; }
+  .bar .reset { border: 1px solid #334155; background: transparent; color: #E2E8F0; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+
+  .wrap { display: flex; gap: 14px; padding: 14px; align-items: flex-start; }
+  .stage { flex: 1 1 auto; min-width: 0; overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 3px rgba(15,23,42,.15); }
+  .notes { width: 360px; flex: none; background: #fff; border-radius: 10px; padding: 14px 16px; box-shadow: 0 1px 3px rgba(15,23,42,.15); position: sticky; top: 62px; max-height: calc(100vh - 76px); overflow: auto; font-size: 13px; }
+  .notes h2 { margin: 0 0 2px; font-size: 15px; }
+  .notes h3 { font-size: 13px; margin: 14px 0 6px; }
+  .notes p { margin: 0 0 8px; }
+  .notes ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .notes .new { background: #EDE9FE; color: #5B21B6; border-radius: 6px; padding: 0 5px; font-size: 11.5px; font-weight: 700; }
+  .notes .try { background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 8px 10px; }
+  .notes .try ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+  kbd { font: 11px ui-monospace, monospace; background: var(--muted); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; color: var(--fg); }
+  @media (max-width: 1200px) { .wrap { flex-direction: column; } .notes { width: 100%; position: static; max-height: none; } }
+
+  .app { min-width: 1180px; background: var(--page); display: grid; grid-template-columns: 230px 1fr; grid-template-rows: 60px auto; }
+  .hdr { grid-column: 1 / -1; background: var(--header-bg); color: #fff; display: flex; align-items: center; gap: 14px; padding: 0 16px; }
+  .hdr .brand { width: 200px; font-weight: 700; font-size: 16px; }
+  .hdr .hs { width: 360px; height: 36px; border-radius: 8px; background: #fff; color: var(--muted-fg); display: flex; align-items: center; padding: 0 12px; font-size: 13px; }
+  .hdr .hr { margin-left: auto; display: flex; gap: 14px; align-items: center; font-size: 13px; }
+  .hdr .br { background: #fff; color: var(--fg); border-radius: 6px; padding: 6px 12px; }
+  .side { background: #fff; border-right: 1px solid var(--border); padding: 12px 10px; min-height: 860px; font-size: 13.5px; }
+  .side .g { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px; border-radius: 6px; background: var(--group-bg); font-weight: 600; margin-top: 8px; }
+  .side .t { width: 24px; height: 24px; border-radius: 6px; background: var(--c); }
+  .side .i { height: 32px; display: flex; align-items: center; padding: 0 12px 0 22px; color: var(--muted-fg); border-radius: 6px; }
+  .side .i.on { background: var(--primary); color: #fff; }
+
+  .main { padding: 0 20px 28px; }
+  .ph { display: flex; align-items: center; gap: 10px; padding: 14px 0; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .ph h1 { font-size: 20px; margin: 0; }
+  .ph .exp { color: var(--muted-fg); font-size: 13px; }
+  .ph .acts { margin-left: auto; display: flex; gap: 8px; }
+  .btn { height: 34px; border-radius: 6px; padding: 0 14px; border: 1px solid var(--border); background: #fff; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  .btn.pri { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .back { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; color: var(--muted-fg); }
+
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 14px; }
+  .card-h { height: 36px; display: flex; align-items: center; padding: 0 12px; background: #EFF6FF; border-bottom: 1px solid var(--border); font-weight: 600; border-radius: 8px 8px 0 0; }
+  .card-b { padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 6px; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 8px; }
+  .tabs span { padding: 7px 12px; font-size: 13px; color: var(--muted-fg); }
+  .tabs span.on { color: var(--primary); border-bottom: 2px solid var(--primary); font-weight: 600; }
+
+  .fg { display: grid; grid-template-columns: var(--cols, 90px 1fr); gap: 8px 10px; align-items: center; }
+  .fg.c3 { --cols: 90px minmax(220px, 2fr) 90px minmax(120px, 1fr) 90px minmax(120px, 1fr); }
+  .fg.c2 { --cols: 90px minmax(180px, 1fr) 90px minmax(180px, 1fr); }
+  .fg.c2w { --cols: 90px minmax(160px, 1fr) 90px minmax(220px, 2fr); }
+  .fg.ccu { --cols: 90px minmax(180px, 1fr) 90px minmax(220px, 2fr); }
+  .fg.sm1 { --cols: 90px minmax(150px, 1fr) 90px minmax(150px, 1.2fr) 50px minmax(140px, 1fr) 50px minmax(150px, 1fr); }
+  .fg.sm2 { --cols: 90px minmax(170px, 1fr) 90px minmax(220px, 1.6fr) 50px minmax(260px, 2.6fr); }
+  .fg.sm2n { --cols: 90px minmax(420px, 2.2fr) 50px minmax(260px, 2fr); }
+  .lbl { text-align: right; white-space: nowrap; color: var(--muted-fg); font-size: 14px; }
+  .lbl.req::after { content: " *"; color: var(--destructive); font-weight: 700; }
+  .inp { height: 28px; width: 100%; border: 1px solid var(--border); border-radius: 6px; background: #fff; padding: 0 8px; font-size: 14px; min-width: 0; }
+  .inp:focus { outline: 2px solid #93C5FD; outline-offset: 0; border-color: var(--primary); }
+  .inp.ro { background: var(--muted); color: var(--muted-fg); }
+  .inp.err { border-color: var(--destructive); }
+  select.inp { padding: 0 6px; }
+  .pill { font-size: 11px; background: var(--muted); border-radius: 10px; padding: 1px 8px; white-space: nowrap; font-weight: 600; }
+  .msg { grid-column: 2 / -1; font-size: 12px; margin-top: -3px; }
+  .msg.e { color: var(--destructive); }
+  .msg.w { color: #B45309; }
+  .flash { animation: flash 1.6s ease-out; }
+  @keyframes flash { 0%, 40% { background: #FEF3C7; border-color: var(--amber); } 100% { background: #fff; } }
+  .fieldset { border: 1px solid var(--border); border-radius: 8px; background: #fff; padding: 8px 12px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+
+  .fw { position: relative; display: flex; min-width: 0; align-items: center; gap: 8px; }
+  .fw > .inp { flex: 1 1 auto; }
+  .aids .fw[data-o]::before { content: attr(data-o); position: absolute; left: -9px; top: -8px; z-index: 3; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--amber); color: #111; font-size: 10.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 2px #fff; }
+  .aids .fw.start[data-o]::before { background: #16A34A; color: #fff; content: "▶ " attr(data-o); }
+  .chip-auto { display: none; position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 10.5px; color: #6D28D9; background: #EDE9FE; border-radius: 8px; padding: 0 6px; pointer-events: none; }
+  .aids .is-auto .chip-auto { display: inline-block; }
+  .aids .shared { outline: 2px dashed #A78BFA; outline-offset: 3px; border-radius: 6px; }
+
+  /* Shared partner field */
+  .pf { display: flex; gap: 6px; min-width: 0; align-items: center; }
+  .combo { position: relative; width: 250px; flex: none; display: flex; }
+  .combo .inp { padding-right: 26px; border-radius: 6px 0 0 6px; }
+  .combo .clr { position: absolute; right: 38px; top: 4px; width: 20px; height: 20px; border: 0; background: transparent; color: var(--muted-fg); cursor: pointer; display: none; }
+  .combo.has .clr { display: block; }
+  .combo .plus { width: 32px; height: 28px; flex: none; border: 1px solid var(--border); border-left: 0; border-radius: 0 6px 6px 0; background: #F0FDF4; color: #15803D; font-size: 18px; line-height: 1; cursor: pointer; font-weight: 700; }
+  .combo .plus:hover { background: #DCFCE7; }
+  .dd { position: absolute; left: 0; top: 31px; z-index: 40; width: 820px; background: #fff; border: 1px solid var(--border); border-radius: 6px; box-shadow: 0 10px 24px rgba(15,23,42,.18); display: none; flex-direction: column; max-height: 360px; }
+  .dd.open { display: flex; }
+  .dd .dh { display: flex; justify-content: space-between; gap: 10px; padding: 5px 8px; background: #F8FAFC; border-bottom: 1px solid var(--border); font-size: 12px; color: var(--muted-fg); border-radius: 6px 6px 0 0; }
+  .dd .dh kbd { font-size: 10px; }
+  .dd .body { overflow: auto; flex: 1; }
+  .dd table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .dd th { position: sticky; top: 0; background: #F1F5F9; text-align: left; padding: 4px 8px; font-weight: 600; color: #334155; }
+  .dd td { padding: 4px 8px; border-top: 1px solid var(--border); vertical-align: top; }
+  .dd tr.opt { cursor: pointer; }
+  .dd tr.hl td { background: #DBEAFE; }
+  .dd .tag { font-size: 11px; background: var(--muted); border-radius: 8px; padding: 0 6px; margin-right: 4px; white-space: nowrap; }
+  .dd .empty td { text-align: center; color: var(--muted-fg); padding: 10px; }
+  .dd .foot { border-top: 1px solid var(--border); }
+  .dd .fi { display: flex; align-items: center; gap: 8px; padding: 7px 10px; cursor: pointer; font-size: 13px; }
+  .dd .fi.add { color: #15803D; font-weight: 600; }
+  .dd .fi.cat { color: var(--muted-fg); border-top: 1px solid var(--border); }
+  .dd .fi.hl { background: #DBEAFE; }
+  .dd .fi.add.hl { background: #BBF7D0; }
+  .dd .fi kbd { margin-left: auto; }
+
+  table.grid { width: 100%; border-collapse: collapse; font-size: 14px; }
+  table.grid th { background: var(--grid-head); color: #fff; font-weight: 600; padding: 7px 8px; position: relative; }
+  table.grid td { border-top: 1px solid var(--border); border-right: 1px solid var(--border); padding: 0; height: 36px; position: relative; }
+  table.grid td.no { text-align: center; color: var(--muted-fg); width: 44px; }
+  table.grid td input { width: 100%; height: 35px; border: 0; padding: 0 8px; background: transparent; }
+  table.grid td input:focus { outline: 2px solid #93C5FD; outline-offset: -2px; background: #F8FBFF; }
+  table.grid td.num input { text-align: right; }
+  table.grid td.del { width: 44px; text-align: center; }
+  table.grid td.del button { border: 0; background: transparent; color: var(--destructive); cursor: pointer; font-size: 15px; }
+  table.grid tfoot td { font-weight: 700; padding: 0 8px; }
+  .aids table.grid th[data-o]::before { content: attr(data-o); position: absolute; left: 4px; top: 6px; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--amber); color: #111; font-size: 10.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .toolbar { padding: 6px 8px; border-top: 1px solid var(--border); }
+  .lib { height: 30px; border: 1px solid var(--border); background: #fff; border-radius: 6px; padding: 0 12px; cursor: pointer; }
+  .placeholder-grid { padding: 26px; text-align: center; color: var(--muted-fg); font-size: 13px; }
+
+  .ov { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 100; display: none; align-items: flex-start; justify-content: center; padding-top: 6vh; }
+  .ov.open { display: flex; }
+  .modal { background: #fff; width: 760px; max-width: calc(100vw - 32px); border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
+  .modal .mh { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+  .modal .mh b { font-size: 17px; }
+  .modal .mh span { margin-left: auto; color: var(--muted-fg); font-size: 12px; }
+  .modal .mb { padding: 14px 18px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .modal .mb .f { display: flex; flex-direction: column; gap: 4px; }
+  .modal .mb .f.w { grid-column: 1 / -1; }
+  .modal .mb label { font-size: 13px; font-weight: 600; }
+  .modal .mb .h { font-size: 11.5px; color: var(--muted-fg); font-weight: 400; }
+  .modal .mb .inp { height: 34px; }
+  .modal .roles { display: flex; gap: 18px; align-items: center; grid-column: 1 / -1; background: #F8FAFC; border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; font-size: 13px; }
+  .modal .mf { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; align-items: center; }
+  .modal .mf .hint { margin-right: auto; font-size: 12px; color: var(--muted-fg); }
+  .cat-list { max-height: 50vh; overflow: auto; border-top: 1px solid var(--border); }
+  .cat-list table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .cat-list th { position: sticky; top: 0; background: #F1F5F9; text-align: left; padding: 6px 10px; }
+  .cat-list td { padding: 6px 10px; border-top: 1px solid var(--border); cursor: pointer; }
+  .cat-list tr.hl td { background: #DBEAFE; }
+
+  .toast { position: fixed; right: 18px; bottom: 18px; z-index: 120; max-width: 420px; background: #0F172A; color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 13px; box-shadow: 0 8px 20px rgba(0,0,0,.25); display: none; white-space: pre-line; }
+  .toast.ok { background: #166534; }
+  .toast.bad { background: #991B1B; }
+  .cur .inp, .cur button { pointer-events: none; }
+  .cur-note { background: #FEF2F2; border: 1px solid #FECACA; color: #991B1B; border-radius: 8px; padding: 8px 12px; font-size: 13px; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>Ô đối tượng dùng chung</h1>
+  <div class="seg" id="seg-screen">
+    <button data-v="cash" aria-pressed="true">Phiếu thu chi</button>
+    <button data-v="stock" aria-pressed="false">Phiếu nhập/xuất kho</button>
+    <button data-v="quote" aria-pressed="false">Báo giá</button>
+  </div>
+  <div class="seg" id="seg-mode">
+    <button data-v="cur" aria-pressed="false">Hiện tại</button>
+    <button data-v="new" aria-pressed="true">Đề xuất</button>
+  </div>
+  <div class="seg" id="seg-type"></div>
+  <label class="tg"><input type="checkbox" id="aids" checked> Số thứ tự Enter, nhãn "tự điền", viền ô dùng chung (chỉ có trong mockup)</label>
+  <button class="reset" id="reset">Làm lại</button>
+</div>
+
+<div class="wrap">
+  <div class="stage">
+    <div class="app">
+      <div class="hdr">
+        <div class="brand">QLBanHang</div>
+        <div class="hs">Tìm khách hàng, mã báo giá...</div>
+        <div class="hr"><span class="br">CN01 — Chi nhánh chính</span><span>🔔</span><span>Quản trị hệ thống</span></div>
+      </div>
+      <div class="side" id="side"></div>
+      <div class="main" id="main"></div>
+    </div>
+  </div>
+
+  <aside class="notes">
+    <h2>Ô đối tượng dùng chung — v2</h2>
+    <p>Ba màn hình dùng <b>cùng một ô</b> (viền tím nét đứt): ô mã có nút <b>+</b>, ô tên đứng ngay bên cạnh dưới một nhãn chung.</p>
+    <h3>Giống nhau ở cả 3 màn hình</h3>
+    <ul>
+      <li>Danh sách tìm: dòng đầu báo số kết quả và các phím; các cột Mã · Tên · MST · Địa chỉ · SĐT · Loại.</li>
+      <li><span class="new">MỚI</span> Cuối danh sách có dòng <b>＋ Thêm mới “…”</b>. Không có kết quả mà ấn <kbd>Enter</kbd> thì mở hộp thêm nhanh.</li>
+      <li><span class="new">MỚI</span> <kbd>F4</kbd> ở ô mã (hoặc bấm <b>+</b>) mở hộp thêm nhanh; chữ đang gõ được điền sẵn vào Tên. Tạo xong tự chọn đối tượng đó và con trỏ quay về ô mã.</li>
+      <li><span class="new">MỚI</span> <b>Xem danh mục đầy đủ</b> có ở cả 3 màn hình (hiện chỉ báo giá có), dùng danh mục KH hoặc NCC theo vai trò.</li>
+      <li>Nút <b>+</b> và <kbd>F4</kbd> chỉ có khi người dùng có quyền thêm KH hoặc NCC; ô vai trò trong hộp thêm nhanh cũng theo quyền.</li>
+    </ul>
+    <h3>Khác nhau theo màn hình</h3>
+    <ul>
+      <li><b>Phiếu thu chi</b>: tìm cả KH và NCC, lý do tự khớp (đã duyệt ở v1). Vai trò trong hộp thêm nhanh chọn sẵn theo lý do.</li>
+      <li><b>Phiếu kho</b>: vẫn tìm theo vai trò của lý do (lý do nhập trước đối tượng). Hàng dưới đổi thành <i>Đối tượng [mã][tên] | Đ.chỉ</i>. Thứ tự Enter giữ như cũ.</li>
+      <li><b>Báo giá</b>: chỉ khách hàng; "Mã KH" + "Tên KH" gộp thành một nhãn <i>Khách hàng</i>. Hộp thêm nhanh không có ô vai trò (luôn là KH), như hiện nay.</li>
+    </ul>
+    <h3>Thử nhanh</h3>
+    <div class="try"><ol>
+      <li>Ở mỗi màn hình, gõ <b>hoang</b> → <kbd>Enter</kbd> → hộp thêm nhanh.</li>
+      <li>Đứng ở ô mã, ấn <kbd>F4</kbd>.</li>
+      <li>Gõ <b>cong ty</b> → <kbd>↓</kbd> đến "Xem danh mục đầy đủ" → <kbd>Enter</kbd>.</li>
+      <li>Phiếu kho: đổi lý do sang "Xuất trả hàng NCC" rồi tìm <b>dong a</b>.</li>
+    </ol></div>
+  </aside>
+</div>
+
+<div class="ov" id="qa">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="qa-title">
+    <div class="mh"><b id="qa-title">Thêm nhanh đối tượng</b><span>Cùng các ô như màn hình Khách hàng / NCC</span></div>
+    <div class="mb">
+      <div class="f"><label for="qa-code">Mã <span class="h">Để trống để tự sinh</span></label><input class="inp" id="qa-code"></div>
+      <div class="f"><label for="qa-name">Tên *</label><input class="inp" id="qa-name"></div>
+      <div class="f"><label for="qa-tax">Mã số thuế</label><input class="inp" id="qa-tax"></div>
+      <div class="f"><label for="qa-phone">Số điện thoại</label><input class="inp" id="qa-phone"></div>
+      <div class="f"><label for="qa-email">Email</label><input class="inp" id="qa-email"></div>
+      <div class="f"><label for="qa-group">Nhóm</label><select class="inp" id="qa-group"><option>Công ty</option><option>Đại lý</option><option>Khách lẻ</option><option>Công trình</option></select></div>
+      <div class="f"><label for="qa-days">Số ngày được nợ</label><input class="inp" id="qa-days" value="0"></div>
+      <div class="f"><label for="qa-contact">Người liên hệ</label><input class="inp" id="qa-contact"></div>
+      <div class="f w"><label for="qa-addr">Địa chỉ công ty</label><input class="inp" id="qa-addr"></div>
+      <div class="roles" id="qa-roles"><b>Vai trò</b>
+        <label><input type="checkbox" id="qa-cus"> Là khách hàng</label>
+        <label><input type="checkbox" id="qa-sup"> Là nhà cung cấp</label>
+        <span id="qa-roles-msg" style="color:var(--muted-fg);font-size:12px"></span>
+      </div>
+    </div>
+    <div class="mf">
+      <span class="hint"><kbd>Enter</kbd> ô kế tiếp · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> tạo · <kbd>Esc</kbd> đóng</span>
+      <button class="btn" id="qa-cancel">Hủy</button>
+      <button class="btn pri" id="qa-save">Tạo mới</button>
+    </div>
+  </div>
+</div>
+
+<div class="ov" id="cat">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="cat-title" style="width:860px">
+    <div class="mh"><b id="cat-title">Danh mục</b><span class="seg" id="cat-roles" style="background:#E2E8F0"></span></div>
+    <div style="padding:10px 18px"><input class="inp" id="cat-q" placeholder="Lọc theo mã, tên, MST, SĐT..." style="height:34px"></div>
+    <div class="cat-list"><table><thead><tr><th>Mã</th><th>Tên</th><th>MST</th><th>SĐT</th><th>Địa chỉ</th></tr></thead><tbody id="cat-rows"></tbody></table></div>
+    <div class="mf"><span class="hint"><kbd>↑</kbd><kbd>↓</kbd> chọn dòng · <kbd>Enter</kbd> chọn · <kbd>Esc</kbd> đóng</span><button class="btn" id="cat-close">Đóng</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const fmt = new Intl.NumberFormat('vi-VN');
+  const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const SEED = [
+    { code: 'KH0001', name: 'Công ty TNHH Xây dựng An Phát', tax: '0312345678', phone: '0903 111 222', addr: '12 Nguyễn Văn Linh, Q.7, TP.HCM', cus: true, sup: false },
+    { code: 'KH0002', name: 'Công ty CP Cơ điện lạnh Minh Long', tax: '0309876543', phone: '0938 456 789', addr: '45 Cộng Hòa, Q. Tân Bình, TP.HCM', cus: true, sup: false },
+    { code: 'KH0003', name: 'Anh Trần Văn Bình', tax: '', phone: '0912 345 678', addr: 'Linh Trung, TP. Thủ Đức', cus: true, sup: false },
+    { code: 'NCC001', name: 'Công ty TNHH Cách nhiệt Đông Á', tax: '0101234567', phone: '024 3888 9999', addr: 'KCN Quang Minh, Mê Linh, Hà Nội', cus: false, sup: true },
+    { code: 'NCC002', name: 'Công ty CP Tôn thép Hòa Bình', tax: '3701112223', phone: '0274 377 1234', addr: 'KCN Sóng Thần, Dĩ An, Bình Dương', cus: true, sup: true },
+  ];
+  // pt = partner type of the reason (Any + debt effect resolves to a side role, like the server).
+  const CASH_REASONS = {
+    Receipt: [{ code: 'TKH', name: 'Thu tiền khách hàng', pt: 'Customer' }, { code: 'THNCC', name: 'Thu hoàn tiền NCC', pt: 'Supplier' }, { code: 'TK', name: 'Thu khác', pt: 'Any' }],
+    Payment: [{ code: 'TNCC', name: 'Trả tiền nhà cung cấp', pt: 'Supplier' }, { code: 'CHKH', name: 'Chi hoàn tiền khách hàng', pt: 'Customer' }, { code: 'CK', name: 'Chi khác', pt: 'Any' }],
+  };
+  const STOCK_REASONS = {
+    Out: [{ code: 'XBH', name: 'Xuất bán hàng', pt: 'Customer' }, { code: 'XTL', name: 'Xuất trả hàng NCC', pt: 'Supplier' }, { code: 'XKH', name: 'Xuất khác', pt: 'Any' }],
+    In: [{ code: 'NMH', name: 'Nhập mua hàng', pt: 'Supplier' }, { code: 'NTL', name: 'Nhập hàng bán bị trả lại', pt: 'Customer' }, { code: 'NKH', name: 'Nhập khác', pt: 'Any' }],
+  };
+  const TYPES = {
+    cash: [['Receipt', 'Phiếu thu'], ['Payment', 'Phiếu chi']],
+    stock: [['Out', 'Phiếu xuất'], ['In', 'Phiếu nhập']],
+    quote: [],
+  };
+
+  let partners, screen = 'cash', mode = 'new', type = 'Receipt';
+  let field = null; // the shared partner field of the screen
+
+  /* ================= Shared partner field ================= */
+  // o: { id, kind, roleScope: () => 'all'|'customer'|'supplier', quickRole: () => 'customer'|'supplier', showRoles, roleHint,
+  //      namePlaceholder, onPick(p), onClear(), orderCode, orderName, start }
+  function partnerFieldHtml(o) {
+    return `<div class="pf shared">
+      <span class="fw${o.start ? ' start' : ''}" ${o.orderCode ? `data-o="${o.orderCode}"` : ''}><span class="combo" id="${o.id}-combo">
+        <input class="inp" id="${o.id}-code" role="combobox" aria-expanded="false" placeholder="${o.codePlaceholder}" autocomplete="off">
+        <button type="button" class="clr" id="${o.id}-clear" tabindex="-1" aria-label="Bỏ chọn">✕</button>
+        <button type="button" class="plus" id="${o.id}-add" tabindex="-1" title="Thêm nhanh ${o.kind} (F4)" aria-label="Thêm nhanh ${o.kind}">+</button>
+        <div class="dd" id="${o.id}-dd" role="listbox"></div>
+      </span></span>
+      <span class="fw" ${o.orderName ? `data-o="${o.orderName}"` : ''} style="flex:1"><input class="inp" id="${o.id}-name" placeholder="${o.namePlaceholder}" aria-label="${o.namePlaceholder}"></span>
+    </div>`;
+  }
+
+  function PartnerField(o) {
+    const code = $(o.id + '-code'), dd = $(o.id + '-dd'), combo = $(o.id + '-combo');
+    const st = { partner: null, keyword: '', results: [], hl: 0 };
+    const roleOk = (p) => { const r = o.roleScope(); return r === 'all' || (r === 'customer' ? p.cus : p.sup); };
+    function search() {
+      const k = norm(st.keyword.trim());
+      return k ? partners.filter((p) => roleOk(p) && norm(`${p.code} ${p.name} ${p.tax} ${p.addr} ${p.phone}`).includes(k)).slice(0, 20) : [];
+    }
+    const itemCount = () => st.results.length + 2; // results + "Thêm mới" + "Xem danh mục"
+    function open() { st.results = search(); st.hl = st.results.length ? 0 : st.results.length; draw(); }
+    function close() { dd.classList.remove('open'); code.setAttribute('aria-expanded', 'false'); }
+    function draw() {
+      const kw = st.keyword.trim();
+      if (!kw) return close();
+      const scope = o.roleScope();
+      const noun = scope === 'all' ? 'đối tượng (KH + NCC)' : scope === 'customer' ? 'khách hàng' : 'nhà cung cấp';
+      const n = st.results.length;
+      const rows = st.results.map((p, i) => `<tr class="opt${i === st.hl ? ' hl' : ''}" data-i="${i}"><td>${esc(p.code)}</td><td>${esc(p.name)}</td>
+          <td style="color:var(--muted-fg)">${esc(p.tax)}</td><td style="color:var(--muted-fg)">${esc(p.addr)}</td><td style="color:var(--muted-fg);white-space:nowrap">${esc(p.phone)}</td>
+          <td>${p.cus ? '<span class="tag">Khách hàng</span>' : ''}${p.sup ? '<span class="tag">NCC</span>' : ''}</td></tr>`).join('');
+      const empty = n ? '' : `<tr class="empty"><td colspan="6">Không tìm thấy ${noun.replace(' (KH + NCC)', '')} “${esc(kw)}”</td></tr>`;
+      dd.innerHTML = `<div class="dh"><span>Tìm thấy ${n} ${noun} đang dùng</span><span><kbd>↑↓</kbd> duyệt <kbd>Enter</kbd> chọn <kbd>F4</kbd> thêm mới <kbd>Esc</kbd> đóng</span></div>
+        <div class="body"><table><thead><tr><th>Mã</th><th>Tên</th><th>MST</th><th>Địa chỉ</th><th>SĐT</th><th>Loại</th></tr></thead><tbody>${empty}${rows}</tbody></table></div>
+        <div class="foot"><div class="fi add${st.hl === n ? ' hl' : ''}" data-i="${n}">＋ Thêm mới ${o.kind} “${esc(kw)}”<kbd>${n ? 'F4' : 'Enter / F4'}</kbd></div>
+        <div class="fi cat${st.hl === n + 1 ? ' hl' : ''}" data-i="${n + 1}">☰ Xem danh mục đầy đủ</div></div>`;
+      dd.classList.add('open');
+      code.setAttribute('aria-expanded', 'true');
+      dd.querySelector('.hl')?.scrollIntoView({ block: 'nearest' });
+    }
+    function pickIndex(i) {
+      if (i < st.results.length) select(st.results[i]);
+      else if (i === st.results.length) quickAdd();
+      else openCatalog();
+    }
+    function select(p) {
+      st.partner = p; st.keyword = '';
+      code.value = p.code;
+      $(o.id + '-name').value = p.name;
+      combo.classList.add('has');
+      close();
+      o.onPick(p);
+      code.focus();
+    }
+    function clear(keepKeyword) {
+      st.partner = null;
+      if (!keepKeyword) { st.keyword = ''; code.value = ''; }
+      $(o.id + '-name').value = '';
+      combo.classList.remove('has');
+      o.onClear();
+    }
+    function quickAdd() {
+      close();
+      openQuickAdd({ kind: o.kind, name: st.partner ? '' : st.keyword, role: o.quickRole(), showRoles: o.showRoles, hint: o.roleHint?.(), onCreated: select, back: code });
+    }
+    function openCatalog() {
+      close();
+      openCatalogDialog({ scope: o.roleScope(), defaultRole: o.quickRole(), query: st.keyword, onPick: select, back: code });
+    }
+    // Returns true when the key was handled here.
+    function onKey(e) {
+      if (e.key === 'F4') { e.preventDefault(); quickAdd(); return true; }
+      const isOpen = dd.classList.contains('open');
+      if (isOpen) {
+        const max = itemCount();
+        if (e.key === 'ArrowDown' || (e.key === 'Tab' && !e.shiftKey)) { e.preventDefault(); st.hl = (st.hl + 1) % max; draw(); return true; }
+        if (e.key === 'ArrowUp' || (e.key === 'Tab' && e.shiftKey)) { e.preventDefault(); st.hl = (st.hl + max - 1) % max; draw(); return true; }
+        if (e.key === 'Escape') { e.preventDefault(); close(); return true; }
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          const exact = st.results.find((p) => p.code.toUpperCase() === st.keyword.trim().toUpperCase());
+          if (exact) select(exact); else pickIndex(st.hl);
+          return true;
+        }
+      } else if (e.key === 'Enter' && !e.shiftKey && !st.partner && st.keyword.trim()) {
+        e.preventDefault(); open(); return true;
+      }
+      return false;
+    }
+    code.addEventListener('keydown', (e) => { if (onKey(e)) e.stopPropagation(); });
+    code.addEventListener('input', () => { if (st.partner) clear(true); st.keyword = code.value; open(); });
+    code.addEventListener('blur', () => setTimeout(() => { if (document.activeElement !== code) close(); }, 150));
+    dd.addEventListener('mousedown', (e) => {
+      const it = e.target.closest('[data-i]');
+      if (!it) return;
+      e.preventDefault();
+      pickIndex(Number(it.dataset.i));
+    });
+    $(o.id + '-clear').onclick = () => { clear(false); code.focus(); };
+    $(o.id + '-add').onclick = quickAdd;
+    return { get partner() { return st.partner; }, select, clear, refresh: () => dd.classList.contains('open') && open() };
+  }
+
+  /* ================= Quick add dialog ================= */
+  let qa = null;
+  function openQuickAdd(cfg) {
+    qa = cfg;
+    $('qa-title').textContent = `Thêm nhanh ${cfg.kind}`;
+    ['qa-code', 'qa-tax', 'qa-phone', 'qa-email', 'qa-contact', 'qa-addr'].forEach((id) => ($(id).value = ''));
+    $('qa-days').value = '0';
+    $('qa-name').value = (cfg.name || '').trim();
+    $('qa-cus').checked = cfg.role === 'customer';
+    $('qa-sup').checked = cfg.role === 'supplier';
+    $('qa-roles').style.display = cfg.showRoles ? '' : 'none';
+    $('qa-roles-msg').textContent = cfg.hint || '';
+    $('qa').classList.add('open');
+    setTimeout(() => { const n = $('qa-name'); n.focus(); n.setSelectionRange(n.value.length, n.value.length); }, 0);
+  }
+  function closeQuickAdd() { $('qa').classList.remove('open'); const b = qa?.back; setTimeout(() => b?.focus(), 0); }
+  function saveQuickAdd() {
+    const name = $('qa-name').value.trim();
+    const cus = $('qa-cus').checked, sup = $('qa-sup').checked;
+    if (!name) return toast('bad', 'Nhập tên.');
+    if (!cus && !sup) return toast('bad', 'Chọn ít nhất một vai trò.');
+    const prefix = cus ? 'KH' : 'NCC';
+    let code = $('qa-code').value.trim().toUpperCase();
+    if (!code) code = prefix + String(partners.filter((p) => p.code.startsWith(prefix)).length + 1).padStart(prefix === 'KH' ? 4 : 3, '0');
+    const p = { code, name, tax: $('qa-tax').value.trim(), phone: $('qa-phone').value.trim(), addr: $('qa-addr').value.trim(), cus, sup };
+    partners.push(p);
+    $('qa').classList.remove('open');
+    toast('ok', `Đã tạo ${cus ? 'khách hàng' : 'nhà cung cấp'} ${code}`);
+    qa.onCreated(p);
+  }
+  const QA_ORDER = ['qa-code', 'qa-name', 'qa-tax', 'qa-phone', 'qa-email', 'qa-group', 'qa-days', 'qa-contact', 'qa-addr', 'qa-cus', 'qa-sup'];
+  $('qa').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); return closeQuickAdd(); }
+    if (e.key !== 'Enter' || e.isComposing) return;
+    e.preventDefault();
+    if (e.ctrlKey) return saveQuickAdd();
+    const order = QA_ORDER.filter((id) => $(id).offsetParent !== null);
+    const i = order.indexOf(e.target.id);
+    if (i === -1) return;
+    const j = i + (e.shiftKey ? -1 : 1);
+    if (j >= order.length) return saveQuickAdd();
+    if (j >= 0) $(order[j]).focus();
+  });
+  $('qa-cancel').onclick = closeQuickAdd;
+  $('qa-save').onclick = saveQuickAdd;
+
+  /* ================= Catalog dialog ================= */
+  let cat = null;
+  function openCatalogDialog(cfg) {
+    cat = { ...cfg, role: cfg.scope === 'all' ? cfg.defaultRole : cfg.scope, hl: 0, rows: [] };
+    $('cat-roles').innerHTML = cfg.scope === 'all'
+      ? `<button data-r="customer">Khách hàng</button><button data-r="supplier">Nhà cung cấp</button>` : '';
+    $('cat-q').value = cfg.query || '';
+    $('cat').classList.add('open');
+    drawCatalog();
+    setTimeout(() => $('cat-q').focus(), 0);
+  }
+  function drawCatalog() {
+    $('cat-title').textContent = cat.role === 'customer' ? 'Danh mục khách hàng' : 'Danh mục nhà cung cấp';
+    $('cat-roles').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.r === cat.role)));
+    const k = norm($('cat-q').value.trim());
+    cat.rows = partners.filter((p) => (cat.role === 'customer' ? p.cus : p.sup) && (!k || norm(`${p.code} ${p.name} ${p.tax} ${p.phone} ${p.addr}`).includes(k)));
+    cat.hl = Math.min(cat.hl, Math.max(cat.rows.length - 1, 0));
+    $('cat-rows').innerHTML = cat.rows.map((p, i) => `<tr class="${i === cat.hl ? 'hl' : ''}" data-i="${i}"><td>${esc(p.code)}</td><td>${esc(p.name)}</td><td>${esc(p.tax)}</td><td>${esc(p.phone)}</td><td>${esc(p.addr)}</td></tr>`).join('')
+      || '<tr><td colspan="5" style="text-align:center;color:var(--muted-fg)">Không có dòng nào</td></tr>';
+  }
+  function closeCatalog() { $('cat').classList.remove('open'); const b = cat?.back; setTimeout(() => b?.focus(), 0); }
+  function pickCatalog(i) { const p = cat.rows[i]; if (!p) return; $('cat').classList.remove('open'); cat.onPick(p); }
+  $('cat-roles').onclick = (e) => { const b = e.target.closest('button'); if (b) { cat.role = b.dataset.r; cat.hl = 0; drawCatalog(); $('cat-q').focus(); } };
+  $('cat-q').addEventListener('input', () => { cat.hl = 0; drawCatalog(); });
+  $('cat').addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); return closeCatalog(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); cat.hl = Math.min(cat.hl + 1, cat.rows.length - 1); drawCatalog(); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); cat.hl = Math.max(cat.hl - 1, 0); drawCatalog(); }
+    if (e.key === 'Enter') { e.preventDefault(); pickCatalog(cat.hl); }
+  });
+  $('cat-rows').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-i]'); if (tr) pickCatalog(Number(tr.dataset.i)); });
+  $('cat-close').onclick = closeCatalog;
+
+  /* ================= Helpers ================= */
+  function focusEl(el) {
+    if (!el) return;
+    el.focus();
+    if (el.select && el.tagName === 'INPUT' && el.type !== 'datetime-local' && el.type !== 'date') el.select();
+  }
+  // Enter / Shift+Enter over an id list; `onEnd` runs past the last id.
+  function bindEnterOrder(root, order, onEnd, extra) {
+    root.addEventListener('keydown', (e) => {
+      if (extra && extra(e)) return;
+      if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
+      const at = order.indexOf(e.target.id);
+      if (at === -1) return;
+      e.preventDefault();
+      const list = e.shiftKey ? order.slice(0, at).reverse() : order.slice(at + 1);
+      const next = list.map($).find((el) => el && !el.disabled);
+      if (next) focusEl(next); else if (!e.shiftKey && onEnd) onEnd();
+    });
+  }
+  const roleOfReason = (r) => (!r || r.pt === 'Any' ? 'all' : r.pt === 'Customer' ? 'customer' : 'supplier');
+  const fits = (r, p) => !r || !p || r.pt === 'Any' || (r.pt === 'Customer' && p.cus) || (r.pt === 'Supplier' && p.sup);
+  const roleText = (p) => [p.cus && 'khách hàng', p.sup && 'nhà cung cấp'].filter(Boolean).join(', ');
+  let toastTimer;
+  function toast(kind, text) {
+    const t = $('toast');
+    t.className = 'toast ' + kind; t.textContent = text; t.style.display = 'block';
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.style.display = 'none'), 5000);
+  }
+
+  /* ================= Screens ================= */
+  function renderSide() {
+    const items = screen === 'quote'
+      ? [['g', 'Bán hàng', '#2563EB'], ['i', 'Báo giá', 1], ['i', 'Khách hàng'], ['g', 'Kho', '#D97706'], ['g', 'Thu chi', '#059669']]
+      : screen === 'stock'
+        ? [['g', 'Bán hàng', '#2563EB'], ['g', 'Kho', '#D97706'], ['i', 'Phiếu nhập kho', type === 'In'], ['i', 'Phiếu xuất kho', type === 'Out'], ['g', 'Thu chi', '#059669']]
+        : [['g', 'Bán hàng', '#2563EB'], ['g', 'Kho', '#D97706'], ['g', 'Thu chi', '#059669'], ['i', 'Phiếu thu', type === 'Receipt'], ['i', 'Phiếu chi', type === 'Payment'], ['i', 'Chuyển quỹ']];
+    $('side').innerHTML = items.map(([k, t, x]) => k === 'g' ? `<div class="g"><span class="t" style="--c:${x}"></span>${t}</div>` : `<div class="i${x ? ' on' : ''}">${t}</div>`).join('');
+  }
+  function render() {
+    document.querySelectorAll('#seg-screen button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === screen)));
+    document.querySelectorAll('#seg-mode button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.v === mode)));
+    const ts = TYPES[screen];
+    $('seg-type').classList.toggle('hidden', !ts.length);
+    $('seg-type').innerHTML = ts.map(([v, l]) => `<button data-v="${v}" aria-pressed="${v === type}">${l}</button>`).join('');
+    renderSide();
+    field = null;
+    ({ cash: renderCash, stock: renderStock, quote: renderQuote })[screen]();
+  }
+  const head = (title, exp, acts) => `<div class="ph"><span class="back">←</span><h1>${title}</h1>${exp ? `<span class="exp">${exp}</span>` : ''}<div class="acts">${acts || '<button class="btn">Lưu và thoát</button><button class="btn pri">💾 Lưu tạm</button>'}</div></div>`;
+  const opts = (list, sel) => list.map((r) => `<option value="${r.code}"${r.code === sel ? ' selected' : ''}>${esc(r.name)}</option>`).join('');
+
+  /* ---- Cash voucher (approved v1 + shared field) ---- */
+  function renderCash() {
+    const L = type === 'Receipt'
+      ? { title: 'Thêm phiếu thu', code: 'PT00002', person: 'Người nộp', desc: 'Lý do nộp' }
+      : { title: 'Thêm phiếu chi', code: 'PC00002', person: 'Người nhận', desc: 'Lý do chi' };
+    const reasons = CASH_REASONS[type];
+    if (mode === 'cur') {
+      $('main').innerHTML = head(L.title, 'Số phiếu dự kiến: ' + L.code) + `<div class="cur-note">Hiện tại: ô đối tượng không có thêm nhanh, không có danh mục; MST nhập tay; mã và tên hai dòng.</div><div class="cur">
+        <div class="card"><div class="card-h">Thông tin chung</div><div class="card-b">
+        <div class="fg ccu"><span class="lbl req">Lý do</span><select class="inp">${opts(reasons, reasons[0].code)}</select><span class="lbl">Đối tượng</span><input class="inp" placeholder="Nhập mã / tên / MST đối tượng..."></div>
+        <div class="fg c2"><span class="lbl">Tên đối tượng</span><input class="inp"><span class="lbl">MST</span><input class="inp"></div>
+        <div class="fg"><span class="lbl">Địa chỉ</span><input class="inp"></div></div></div></div>`;
+      return;
+    }
+    const S = { reason: reasons[0].code, prevAuto: '', prevDesc: '', rows: [{ desc: '', amt: 0, note: '' }] };
+    $('main').innerHTML = head(L.title, 'Số phiếu dự kiến: ' + L.code) + `<form id="pform" autocomplete="off" onsubmit="return false">
+      <div class="card"><div class="card-h">Thông tin chung</div><div class="card-b">
+        <div class="fg c3"><span class="lbl">Số phiếu</span><span class="fw"><input class="inp ro" placeholder="Tự động" tabindex="-1" readonly></span>
+          <label class="lbl req" for="f-at">Ngày giờ</label><span class="fw" data-o="1"><input class="inp" id="f-at" type="datetime-local" value="2026-10-15T05:48"></span>
+          <label class="lbl req" for="f-fund">Quỹ</label><span class="fw" data-o="2"><select class="inp" id="f-fund"><option>QTM – Quỹ tiền mặt</option><option>NH01 – Vietcombank</option></select><span class="pill">Tiền mặt</span></span></div>
+        <div class="fg"><label class="lbl" for="pf-code">Đối tượng</label>${partnerFieldHtml({ id: 'pf', kind: 'đối tượng', codePlaceholder: 'Mã / tên / MST / SĐT...', namePlaceholder: 'Tên đối tượng', orderCode: 3, orderName: 4, start: true })}</div>
+        <div class="fg c2"><label class="lbl req" for="f-reason">Lý do</label><span class="fw" data-o="5"><select class="inp" id="f-reason">${opts(reasons, S.reason)}</select></span>
+          <label class="lbl" for="f-person">${L.person}</label><span class="fw" data-o="6"><input class="inp" id="f-person"></span>
+          <p class="msg" id="reason-msg" style="grid-column:2/3;display:none"></p></div>
+        <div class="fg"><label class="lbl" for="f-addr">Địa chỉ</label><span class="fw" data-o="7"><input class="inp" id="f-addr"></span></div>
+        <div class="fg"><label class="lbl" for="f-desc">${L.desc}</label><span class="fw" id="w-desc" data-o="8"><input class="inp" id="f-desc"><span class="chip-auto">tự điền</span></span></div>
+        <div class="fg c2w"><label class="lbl" for="f-att">Kèm theo</label><span class="fw" data-o="9"><input class="inp" id="f-att" placeholder="Số chứng từ gốc"></span>
+          <label class="lbl" for="f-note">Ghi chú</label><span class="fw" data-o="10"><input class="inp" id="f-note"></span></div>
+      </div></div>
+      <div class="card"><table class="grid"><thead><tr><th style="width:44px">#</th><th data-o="11">Diễn giải</th><th data-o="12" style="width:170px;text-align:right">Số tiền</th><th data-o="13">Ghi chú</th><th style="width:44px"></th></tr></thead>
+        <tbody id="rows"></tbody><tfoot><tr><td colspan="2" style="text-align:right;height:36px">Tổng</td><td style="text-align:right" id="total">0</td><td colspan="2"></td></tr></tfoot></table>
+        <div class="toolbar"><button type="button" class="lib" id="add-row">+ Thêm dòng</button></div></div></form>`;
+
+    const reasonOf = (c) => reasons.find((r) => r.code === c);
+    const drawRows = () => {
+      const d = $('f-desc').value;
+      $('rows').innerHTML = S.rows.map((r, i) => `<tr><td class="no">${i + 1}</td>
+        <td class="${r.desc && r.desc === d ? 'is-auto' : ''}"><input id="g-desc-${i}" value="${esc(r.desc)}"><span class="chip-auto">tự điền</span></td>
+        <td class="num"><input id="g-amt-${i}" value="${r.amt ? fmt.format(r.amt) : ''}" placeholder="0"></td>
+        <td><input id="g-note-${i}" value="${esc(r.note)}"></td><td class="del"><button type="button" data-del="${i}" tabindex="-1">🗑</button></td></tr>`).join('');
+      $('total').textContent = fmt.format(S.rows.reduce((s, r) => s + r.amt, 0));
+    };
+    const marks = () => {
+      const d = $('f-desc').value;
+      $('w-desc').classList.toggle('is-auto', d !== '' && d === S.prevAuto);
+      S.rows.forEach((r, i) => $('g-desc-' + i)?.parentElement.classList.toggle('is-auto', r.desc !== '' && r.desc === d));
+    };
+    const propagate = (oldV, newV) => {
+      S.rows.forEach((r, i) => { if (r.desc === '' || r.desc === oldV) { r.desc = newV; const el = $('g-desc-' + i); if (el) el.value = newV; } });
+      S.prevDesc = newV;
+    };
+    const recompute = () => {
+      const r = reasonOf(S.reason), name = $('pf-name').value.trim();
+      const next = r ? (name ? `${r.name} - ${name}` : r.name) : '';
+      const d = $('f-desc');
+      if (d.value === '' || d.value === S.prevAuto) { const old = d.value; d.value = next; propagate(old, next); }
+      S.prevAuto = next; marks();
+    };
+    const msg = (kind, text) => {
+      const m = $('reason-msg'); m.className = 'msg' + (kind ? ' ' + kind : ''); m.textContent = text; m.style.display = text ? '' : 'none';
+      $('f-reason').classList.toggle('err', kind === 'e');
+    };
+    const checkFit = () => {
+      const r = reasonOf(S.reason), p = field.partner;
+      if (p && !fits(r, p)) { const need = r.pt === 'Customer' ? 'khách hàng' : 'nhà cung cấp'; msg('e', `Lý do "${r.name}" cần ${need} — ${p.code} không phải ${need}.`); return false; }
+      msg('', ''); return true;
+    };
+    field = PartnerField({
+      id: 'pf', kind: 'đối tượng', showRoles: true,
+      roleScope: () => 'all',
+      quickRole: () => { const r = roleOfReason(reasonOf(S.reason)); return r === 'all' ? (type === 'Receipt' ? 'customer' : 'supplier') : r; },
+      roleHint: () => `chọn sẵn theo lý do "${reasonOf(S.reason).name}"`,
+      onPick: (p) => {
+        $('f-addr').value = p.addr;
+        if (!fits(reasonOf(S.reason), p)) {
+          const next = reasons.find((r) => r.pt !== 'Any' && fits(r, p)) || reasons.find((r) => fits(r, p));
+          S.reason = next.code;
+          const sel = $('f-reason'); sel.value = next.code; sel.classList.remove('flash'); void sel.offsetWidth; sel.classList.add('flash');
+          msg('w', `Đã đổi lý do cho hợp với ${p.code} (${roleText(p)}).`);
+        } else msg('', '');
+        recompute();
+      },
+      onClear: () => { $('f-addr').value = ''; msg('', ''); recompute(); },
+    });
+    drawRows(); recompute();
+    const ORDER = ['f-at', 'f-fund', 'pf-code', 'pf-name', 'f-reason', 'f-person', 'f-addr', 'f-desc', 'f-att', 'f-note'];
+    const CELLS = ['desc', 'amt', 'note'];
+    const addRow = () => { S.rows.push({ desc: $('f-desc').value, amt: 0, note: '' }); drawRows(); marks(); focusEl($('g-desc-' + (S.rows.length - 1))); };
+    bindEnterOrder($('pform'), ORDER, () => focusEl($('g-desc-' + (S.rows.length - 1))), (e) => {
+      const g = /^g-(desc|amt|note)-(\d+)$/.exec(e.target.id);
+      if (!g || e.key !== 'Enter' || e.ctrlKey || e.isComposing) return false;
+      e.preventDefault();
+      const c = CELLS.indexOf(g[1]), i = Number(g[2]);
+      if (!e.shiftKey) { if (c < 2) focusEl($(`g-${CELLS[c + 1]}-${i}`)); else if (i < S.rows.length - 1) focusEl($('g-desc-' + (i + 1))); else addRow(); }
+      else if (c > 0) focusEl($(`g-${CELLS[c - 1]}-${i}`)); else if (i > 0) focusEl($('g-note-' + (i - 1))); else focusEl($('f-note'));
+      return true;
+    });
+    $('pf-name').addEventListener('input', recompute);
+    $('f-reason').addEventListener('change', (e) => { S.reason = e.target.value; checkFit(); recompute(); });
+    $('f-desc').addEventListener('input', (e) => { propagate(S.prevDesc, e.target.value); marks(); });
+    $('rows').addEventListener('input', (e) => {
+      const g = /^g-(desc|amt|note)-(\d+)$/.exec(e.target.id); if (!g) return;
+      const r = S.rows[Number(g[2])];
+      if (g[1] === 'desc') { r.desc = e.target.value; marks(); }
+      if (g[1] === 'note') r.note = e.target.value;
+      if (g[1] === 'amt') { r.amt = Number(e.target.value.replace(/\D/g, '')) || 0; $('total').textContent = fmt.format(S.rows.reduce((s, x) => s + x.amt, 0)); }
+    });
+    $('rows').addEventListener('focusout', (e) => { const g = /^g-amt-(\d+)$/.exec(e.target.id); if (g) { const r = S.rows[Number(g[1])]; e.target.value = r.amt ? fmt.format(r.amt) : ''; } });
+    $('rows').addEventListener('click', (e) => { const b = e.target.closest('button[data-del]'); if (b) { S.rows.splice(Number(b.dataset.del), 1); drawRows(); marks(); } });
+    $('add-row').onclick = addRow;
+    setTimeout(() => $('pf-code').focus(), 0);
+  }
+
+  /* ---- Stock voucher ---- */
+  function renderStock() {
+    const L = type === 'Out' ? { title: 'Thêm phiếu xuất kho', code: 'PX00012', date: 'Ngày xuất' } : { title: 'Thêm phiếu nhập kho', code: 'PN00008', date: 'Ngày nhập' };
+    const reasons = STOCK_REASONS[type];
+    const row1 = `<div class="fg sm1">
+        <label class="lbl req" for="s-at">${L.date}</label><span class="fw" data-o="1"><input class="inp" id="s-at" type="datetime-local" value="2026-10-15T07:30"></span>
+        <label class="lbl req" for="s-reason">Lý do</label><span class="fw" data-o="2"><select class="inp" id="s-reason">${opts(reasons, reasons[0].code)}</select></span>
+        <label class="lbl req" for="s-wh">Kho</label><span class="fw" data-o="3"><select class="inp" id="s-wh"><option>KHO01 – Kho chính</option></select></span>
+        <label class="lbl" for="s-pm">HTTT</label><span class="fw" data-o="4"><select class="inp" id="s-pm"><option>-- Hình thức thanh toán --</option><option>Tiền mặt</option><option>Chuyển khoản</option></select></span></div>`;
+    const tabs = `<div class="card"><div class="tabs"><span class="on">Hàng tiền (Alt+1)</span><span>Thông tin khác (Alt+2)</span><span>Thanh toán (Alt+3)</span></div>
+      <div class="placeholder-grid">Lưới hàng hoá — không đổi trong thiết kế này</div></div>`;
+    if (mode === 'cur') {
+      $('main').innerHTML = head(L.title, 'Số phiếu dự kiến: ' + L.code) + `<div class="cur-note">Hiện tại: ba nhãn Mã đối tượng / Tên đối tượng / Địa chỉ; không có thêm nhanh, không có danh mục.</div><div class="cur"><div class="fieldset">${row1}
+        <div class="fg sm2"><span class="lbl">Mã đối tượng</span><input class="inp" placeholder="Nhập mã / tên / MST đối tượng..."><span class="lbl">Tên đối tượng</span><input class="inp"><span class="lbl">Địa chỉ</span><input class="inp"></div></div>${tabs}</div>`;
+      return;
+    }
+    $('main').innerHTML = head(L.title, 'Số phiếu dự kiến: ' + L.code) + `<form id="sform" autocomplete="off" onsubmit="return false"><div class="fieldset">${row1}
+        <div class="fg sm2n"><label class="lbl" for="sp-code">Đối tượng</label>${partnerFieldHtml({ id: 'sp', kind: 'đối tượng', codePlaceholder: 'Mã / tên / MST / SĐT...', namePlaceholder: 'Tên đối tượng', orderCode: 5, orderName: 6 })}
+        <label class="lbl" for="s-addr">Đ.chỉ</label><span class="fw" data-o="7"><input class="inp" id="s-addr"></span></div></div>${tabs}</form>`;
+    const reasonOf = () => reasons.find((r) => r.code === $('s-reason').value);
+    field = PartnerField({
+      id: 'sp', kind: 'đối tượng', showRoles: true,
+      roleScope: () => roleOfReason(reasonOf()),
+      quickRole: () => { const r = roleOfReason(reasonOf()); return r === 'all' ? (type === 'Out' ? 'customer' : 'supplier') : r; },
+      roleHint: () => `chọn sẵn theo lý do "${reasonOf().name}"`,
+      onPick: (p) => ($('s-addr').value = p.addr),
+      onClear: () => ($('s-addr').value = ''),
+    });
+    // Like today: a reason whose role the partner lacks drops the partner.
+    $('s-reason').addEventListener('change', () => { if (field.partner && !fits(reasonOf(), field.partner)) { field.clear(false); toast('', 'Đối tượng không hợp lý do mới nên đã bỏ chọn (như hiện nay).'); } });
+    bindEnterOrder($('sform'), ['s-at', 's-reason', 's-wh', 's-pm', 'sp-code', 'sp-name', 's-addr'], () => toast('', 'Enter → ô Mã hàng dòng cuối của lưới (như hiện nay)'));
+    setTimeout(() => $('s-at').focus(), 0);
+  }
+
+  /* ---- Quotation ---- */
+  function renderQuote() {
+    const top = `<div class="fg c3"><span class="lbl">Số BG</span><input class="inp ro" placeholder="Tự động">
+      <label class="lbl req" for="q-date">Ngày BG</label><input class="inp" id="q-date" type="date" value="2026-10-15">
+      <label class="lbl" for="q-deliv">Ngày giao</label><input class="inp" id="q-deliv" type="date"></div>`;
+    const rest = `<div class="fg"><label class="lbl" for="q-addr">Địa chỉ giao</label><input class="inp" id="q-addr"></div>
+      <div class="fg c3"><span class="lbl">Người nhận</span><input class="inp"><span class="lbl">Điện thoại</span><input class="inp" id="q-phone"><span class="lbl">Số xe</span><input class="inp"></div>`;
+    const grid = `<div class="card"><div class="placeholder-grid">Lưới hàng báo giá — không đổi</div></div>`;
+    if (mode === 'cur') {
+      $('main').innerHTML = head('Thêm báo giá', '') + `<div class="cur-note">Hiện tại: Mã KH có nút + rời bên phải, danh sách tìm có "Xem danh mục đầy đủ" nhưng không có dòng Thêm mới và không có phím tắt.</div><div class="cur">
+        <div class="card"><div class="card-h">Thông tin chung</div><div class="card-b">${top}
+        <div class="fg ccu"><span class="lbl req">Mã KH</span><span class="fw"><input class="inp" placeholder="Nhập mã / tên / MST / địa chỉ / SĐT..."><button class="btn" style="height:28px;padding:0 8px">+</button></span><span class="lbl">Tên KH</span><input class="inp"></div>
+        ${rest}</div></div>${grid}</div>`;
+      return;
+    }
+    $('main').innerHTML = head('Thêm báo giá', '') + `<form id="qform" autocomplete="off" onsubmit="return false">
+      <div class="card"><div class="card-h">Thông tin chung</div><div class="card-b">${top}
+      <div class="fg"><label class="lbl req" for="qp-code">Khách hàng</label>${partnerFieldHtml({ id: 'qp', kind: 'khách hàng', codePlaceholder: 'Mã / tên / MST / địa chỉ / SĐT...', namePlaceholder: 'Tên khách hàng' })}</div>
+      ${rest}</div></div>${grid}</form>`;
+    field = PartnerField({
+      id: 'qp', kind: 'khách hàng', showRoles: false,
+      roleScope: () => 'customer', quickRole: () => 'customer',
+      onPick: (p) => { $('q-addr').value = p.addr; $('q-phone').value = p.phone; },
+      onClear: () => { $('q-addr').value = ''; $('q-phone').value = ''; },
+    });
+    setTimeout(() => $('qp-code').focus(), 0);
+  }
+
+  /* ================= Bar ================= */
+  const defaultType = () => (screen === 'cash' ? 'Receipt' : screen === 'stock' ? 'Out' : '');
+  function reset() { partners = SEED.map((p) => ({ ...p })); render(); }
+  $('seg-screen').onclick = (e) => { const b = e.target.closest('button'); if (b) { screen = b.dataset.v; type = defaultType(); render(); } };
+  $('seg-mode').onclick = (e) => { const b = e.target.closest('button'); if (b) { mode = b.dataset.v; render(); } };
+  $('seg-type').onclick = (e) => { const b = e.target.closest('button'); if (b) { type = b.dataset.v; render(); } };
+  $('aids').onchange = (e) => document.body.classList.toggle('aids', e.target.checked);
+  $('reset').onclick = reset;
+  document.body.classList.add('aids');
+  reset();
+})();
+</script>
+</body>
+</html>

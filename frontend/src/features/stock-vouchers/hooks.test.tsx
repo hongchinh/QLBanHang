@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cashKeys } from '@/features/cash-common/keys';
 import { productKeys } from '@/features/products/keys';
+import type { StockDirection } from '@/features/stock-reasons/types';
 import {
   useCancelStockVoucher,
   useCreateStockVoucher,
@@ -11,7 +12,7 @@ import {
   useRestoreStockVoucher,
   useUpdateStockVoucher,
 } from './hooks';
-import { inventoryKeys } from './keys';
+import { inventoryKeys, stockVoucherKeys } from './keys';
 import { stockVouchersApi } from './api';
 import type { PartnerSearchItem, StockVoucher, UpsertStockVoucherRequest } from './types';
 
@@ -44,27 +45,61 @@ describe('usePartnerSearch', () => {
     vi.mocked(stockVouchersApi.partners).mockReset();
   });
 
-  it('keeps previous results for a new keyword but not for another reason', async () => {
+  it('keeps previous results for a new keyword but not for another type', async () => {
     let resolveNext: ((items: PartnerSearchItem[]) => void) | undefined;
     vi.mocked(stockVouchersApi.partners)
       .mockResolvedValueOnce([partner('KH01')])
       .mockImplementation(() => new Promise((resolve) => (resolveNext = resolve)));
     const { wrapper } = setup();
     const { result, rerender } = renderHook(
-      ({ keyword, reasonId }) => usePartnerSearch('In', keyword, reasonId),
-      { wrapper, initialProps: { keyword: 'KH', reasonId: 'r1' } },
+      ({ keyword, type }) => usePartnerSearch(type, keyword),
+      { wrapper, initialProps: { keyword: 'KH', type: 'In' as StockDirection } },
     );
     await waitFor(() => expect(result.current.data).toEqual([partner('KH01')]));
 
-    rerender({ keyword: 'KH0', reasonId: 'r1' });
+    rerender({ keyword: 'KH0', type: 'In' });
     expect(result.current.data).toEqual([partner('KH01')]);
     expect(result.current.isPlaceholderData).toBe(true);
     act(() => resolveNext?.([partner('KH02')]));
     await waitFor(() => expect(result.current.data).toEqual([partner('KH02')]));
 
-    rerender({ keyword: 'KH0', reasonId: 'r2' });
+    rerender({ keyword: 'KH0', type: 'Out' });
     expect(result.current.data).toBeUndefined();
     expect(result.current.isLoading).toBe(true);
+  });
+
+  it('passes activeOnly to the api', async () => {
+    vi.mocked(stockVouchersApi.partners).mockResolvedValue([]);
+    const { wrapper } = setup();
+    renderHook(() => usePartnerSearch('In', 'abc', true), { wrapper });
+    await waitFor(() => expect(stockVouchersApi.partners).toHaveBeenCalledWith('In', 'abc', true));
+  });
+
+  it('activeOnly is part of the query key', () => {
+    expect(stockVoucherKeys.partners('In', 'abc', true)).not.toEqual(
+      stockVoucherKeys.partners('In', 'abc'),
+    );
+  });
+
+  it('keeps previous results for the same activeOnly but not when it differs', async () => {
+    vi.mocked(stockVouchersApi.partners)
+      .mockResolvedValueOnce([partner('KH01')])
+      .mockImplementation(() => new Promise(() => undefined));
+    const { wrapper } = setup();
+    const { result, rerender } = renderHook(
+      ({ keyword, activeOnly }: { keyword: string; activeOnly?: boolean }) =>
+        usePartnerSearch('In', keyword, activeOnly),
+      { wrapper, initialProps: { keyword: 'a' } as { keyword: string; activeOnly?: boolean } },
+    );
+    await waitFor(() => expect(result.current.data).toEqual([partner('KH01')]));
+
+    rerender({ keyword: 'ab', activeOnly: true });
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isLoading).toBe(true);
+
+    rerender({ keyword: 'ab' });
+    expect(result.current.data).toEqual([partner('KH01')]);
+    expect(result.current.isPlaceholderData).toBe(true);
   });
 });
 

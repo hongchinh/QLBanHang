@@ -1,7 +1,13 @@
 import { toOptionalNumber } from '@/lib/to-number';
 
 // Header fields that show their own server message.
-export const HEADER_ERROR_FIELDS: ReadonlySet<string> = new Set(['fundId', 'dueDate', 'paidAmount', 'paymentMethodId']);
+export const HEADER_ERROR_FIELDS: ReadonlySet<string> = new Set([
+  'fundId',
+  'dueDate',
+  'paidAmount',
+  'partnerId',
+  'paymentMethodId',
+]);
 
 // Line fields that take a server message, on their grid cell.
 export const LINE_ERROR_FIELDS: ReadonlySet<string> = new Set([
@@ -33,6 +39,7 @@ const HEADER_DRIVERS: Record<string, readonly string[]> = {
   fundId: ['paymentMethodId'],
   paidAmount: ['paymentMethodId'],
   dueDate: ['voucherAt', 'reasonId'],
+  partnerId: ['reasonId'],
 };
 
 // The same inside one line, for a cell whose value is computed from other cells of that line.

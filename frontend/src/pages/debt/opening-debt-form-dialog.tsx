@@ -212,7 +212,6 @@ export function OpeningDebtFormDialog({ open, onOpenChange, initial, openingDate
             <PartnerAutocomplete
               inputId="opening-debt-partner"
               useSearch={PARTNER_SEARCH[side]}
-              requireReason={false}
               value={partner}
               placeholder={side === 'Receivable' ? 'Nhập mã / tên / MST khách hàng...' : 'Nhập mã / tên / MST nhà cung cấp...'}
               onSelect={(p) => {

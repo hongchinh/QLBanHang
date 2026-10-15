@@ -245,8 +245,9 @@ public class StockVoucherService : IStockVoucherService
 
     /// Partner picker (D3). With a reason (form): its partner type, active partners only.
     /// Without one (list filter): any role, inactive partners included.
+    /// `activeOnly` overrides that default (a reason means active only).
     public async Task<List<CustomerSearchItemDto>> SearchPartnersAsync(StockDirection type, string? keyword, int limit,
-        Guid? reasonId, CancellationToken ct = default)
+        Guid? reasonId, bool? activeOnly = null, CancellationToken ct = default)
     {
         EnsurePermission(StockVoucherPermissions.View(type));
         var partnerType = PartnerType.Any;
@@ -265,7 +266,7 @@ public class StockVoucherService : IStockVoucherService
         {
             Keyword = keyword ?? string.Empty,
             Limit = limit,
-            ActiveOnly = reasonId.HasValue,
+            ActiveOnly = activeOnly ?? reasonId.HasValue,
         }, partnerType, ct);
     }
 

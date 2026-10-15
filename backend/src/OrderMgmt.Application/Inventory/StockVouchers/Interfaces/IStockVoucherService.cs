@@ -10,7 +10,8 @@ public interface IStockVoucherService
     Task<IReadOnlyList<StockVoucherOwnerDto>> ListOwnersAsync(StockDirection type, CancellationToken ct = default);
     Task<StockVoucherDefaultsDto> GetDefaultsAsync(StockDirection type, DateTimeOffset? voucherAt, CancellationToken ct = default);
     Task<IReadOnlyList<StockAtResult>> GetStockAtAsync(StockAtRequest request, CancellationToken ct = default);
-    Task<List<CustomerSearchItemDto>> SearchPartnersAsync(StockDirection type, string? keyword, int limit, Guid? reasonId, CancellationToken ct = default);
+    Task<List<CustomerSearchItemDto>> SearchPartnersAsync(StockDirection type, string? keyword, int limit, Guid? reasonId,
+        bool? activeOnly = null, CancellationToken ct = default);
     Task<StockVoucherDto> GetAsync(Guid id, CancellationToken ct = default);
     Task<IReadOnlyList<StockVoucherActivityDto>> ListActivitiesAsync(Guid id, CancellationToken ct = default);
     Task<StockVoucherDto> CreateAsync(UpsertStockVoucherRequest request, CancellationToken ct = default);

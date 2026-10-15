@@ -355,7 +355,6 @@ export function StockVoucherListPage({ type }: { type: StockDirection }) {
             <div className="w-60">
               <PartnerAutocomplete
                 type={type}
-                requireReason={false}
                 placeholder="Lọc theo đối tượng..."
                 value={partnerId ? { id: partnerId, code: partnerName || partnerId, name: partnerName } : null}
                 onSelect={handlePartnerSelect}

@@ -10,7 +10,7 @@ public interface ICashVoucherService
     Task<CashVoucherListResult> ListAsync(CashVoucherListRequest request, CancellationToken ct = default);
     Task<CashVoucherDefaultsDto> GetDefaultsAsync(CashVoucherType type, CancellationToken ct = default);
     Task<List<CustomerSearchItemDto>> SearchPartnersAsync(CashVoucherType type, string? keyword, int limit, Guid? reasonId,
-        CancellationToken ct = default);
+        bool? activeOnly = null, CancellationToken ct = default);
     Task<IReadOnlyList<CashDocumentActivityDto>> ListActivitiesAsync(Guid id, CancellationToken ct = default);
     Task<CashVoucherDto> GetAsync(Guid id, CancellationToken ct = default);
     Task<CashVoucherDto> CreateAsync(UpsertCashVoucherRequest request, CancellationToken ct = default);

@@ -232,7 +232,6 @@ export function OpeningDebtPage() {
               <PartnerAutocomplete
                 inputId="opening-debt-filter-partner"
                 useSearch={useOpeningDebtPartnerSearch}
-                requireReason={false}
                 placeholder="Lọc theo đối tượng..."
                 value={partnerId ? { id: partnerId, code: partnerCode || partnerId, name: partnerCode } : null}
                 onSelect={(p) => updateParams({ partnerId: p?.id, partnerCode: p?.code })}

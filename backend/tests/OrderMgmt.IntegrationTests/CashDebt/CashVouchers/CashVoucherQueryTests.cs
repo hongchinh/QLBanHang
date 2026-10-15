@@ -225,6 +225,34 @@ public class CashVoucherQueryTests : CashDebtTestBase
     }
 
     [Fact]
+    public async Task Partner_search_active_only_flag()
+    {
+        var (_, client, _) = await BranchClientAsync();
+        var key = NewCode("AO");
+        var customer = await CreatePartnerAsync(key + "C", isCustomer: true, isSupplier: false);
+        var supplier = await CreatePartnerAsync(key + "S", isCustomer: false, isSupplier: true);
+        var inactive = await CreatePartnerAsync(key + "X", isCustomer: false, isSupplier: true);
+        await InDbAsync(async db =>
+        {
+            (await db.Customers.SingleAsync(c => c.Id == inactive)).Status = CustomerStatus.Inactive;
+            await db.SaveChangesAsync();
+        });
+        var tncc = await CashReasonIdAsync("TNCC");
+
+        // New: no reason, every role, active only.
+        (await SearchAsync(client, CashVoucherType.Receipt, key, null, activeOnly: true))
+            .Should().BeEquivalentTo(new[] { customer, supplier });
+        // Unchanged defaults: no reason = filter mode (inactive included); a reason = active only.
+        (await SearchAsync(client, CashVoucherType.Receipt, key, null))
+            .Should().BeEquivalentTo(new[] { customer, supplier, inactive });
+        (await SearchAsync(client, CashVoucherType.Payment, key, tncc))
+            .Should().BeEquivalentTo(new[] { supplier });
+        // Explicit false with a reason keeps the reason's role and adds the inactive partner.
+        (await SearchAsync(client, CashVoucherType.Payment, key, tncc, activeOnly: false))
+            .Should().BeEquivalentTo(new[] { supplier, inactive });
+    }
+
+    [Fact]
     public async Task Reason_and_fund_in_use_locks()
     {
         var (_, client, _) = await BranchClientAsync();
@@ -367,9 +395,11 @@ public class CashVoucherQueryTests : CashDebtTestBase
     private static async Task<CashVoucherDefaultsDto> DefaultsAsync(HttpClient client, CashVoucherType type) =>
         await ReadDataAsync<CashVoucherDefaultsDto>(await client.GetAsync($"/api/cash-vouchers/defaults?type={type}"));
 
-    private static async Task<List<Guid>> SearchAsync(HttpClient client, CashVoucherType type, string keyword, Guid? reasonId)
+    private static async Task<List<Guid>> SearchAsync(HttpClient client, CashVoucherType type, string keyword, Guid? reasonId,
+        bool? activeOnly = null)
     {
-        var query = $"type={type}&keyword={keyword}" + (reasonId is { } id ? $"&reasonId={id}" : "");
+        var query = $"type={type}&keyword={keyword}" + (reasonId is { } id ? $"&reasonId={id}" : "")
+            + (activeOnly is { } flag ? $"&activeOnly={(flag ? "true" : "false")}" : "");
         var items = await ReadDataAsync<List<CustomerSearchItemDto>>(await client.GetAsync($"/api/cash-vouchers/partners?{query}"));
         return items.Select(i => i.Id).ToList();
     }

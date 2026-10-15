@@ -10,8 +10,17 @@
   --qldh-form-grid-columns: 90px minmax(180px, 1fr) 90px minmax(180px, 1fr);
 }
 
-.form-inline-grid.form-cols-customer {
-  --qldh-form-grid-columns: 90px minmax(180px, 1fr) 90px minmax(220px, 2fr);
+/* Cash voucher: a narrow attached-documents field and a wide note. */
+.form-inline-grid.form-cols-attached-note {
+  --qldh-form-grid-columns: 90px minmax(140px, 1fr) 90px minmax(260px, 3fr);
+}
+
+/* A row whose cell can grow (a message under its control): labels and inputs stay level with the 28px controls. */
+.form-inline-grid.form-align-top {
+  align-items: start;
+}
+.form-inline-grid.form-align-top .field-label {
+  line-height: 1.75rem;
 }
 
 .form-inline-grid.info-row-3,
@@ -21,13 +30,15 @@
 .form-inline-grid.form-cols-stock-main-1 {
   --qldh-form-grid-columns: 90px minmax(150px, 1fr) 90px minmax(150px, 1.2fr) 50px minmax(140px, 1fr) 50px minmax(150px, 1fr);
 }
-.form-inline-grid.form-cols-stock-main-2 {
-  --qldh-form-grid-columns: 90px minmax(170px, 1fr) 90px minmax(220px, 1.6fr) 50px minmax(260px, 2.6fr);
+.form-inline-grid.form-cols-stock-partner {
+  --qldh-form-grid-columns: 90px minmax(430px, 2.2fr) 50px minmax(220px, 2fr);
 }
 @media (max-width: 1279px) {
-  .form-inline-grid.form-cols-stock-main-1,
-  .form-inline-grid.form-cols-stock-main-2 {
+  .form-inline-grid.form-cols-stock-main-1 {
     --qldh-form-grid-columns: 90px minmax(160px, 1fr) 90px minmax(160px, 1fr);
+  }
+  .form-inline-grid.form-cols-stock-partner {
+    --qldh-form-grid-columns: 90px minmax(300px, 1.6fr) 50px minmax(180px, 1fr);
   }
 }
 
@@ -60,15 +71,21 @@
   grid-column: span 3;
 }
 
+/* Stock voucher partner row: the field's error sits under the code, so Đ.chỉ and the address stay on row 1. */
+@media (min-width: 1024px) {
+  .form-inline-grid.form-cols-stock-partner > .field-message-code {
+    grid-row: 2;
+  }
+}
+
 @media (max-width: 1023px) {
-  .form-inline-grid.customer-row,
   .form-inline-grid.info-row-2,
   .form-inline-grid.info-row-3,
   .form-inline-grid.form-cols-2,
   .form-inline-grid.form-cols-3,
   .form-inline-grid.form-cols-stock-main-1,
-  .form-inline-grid.form-cols-stock-main-2,
-  .form-inline-grid.form-cols-customer {
+  .form-inline-grid.form-cols-stock-partner,
+  .form-inline-grid.form-cols-attached-note {
     grid-template-columns: 90px 1fr;
   }
 
@@ -76,4 +93,22 @@
   .form-inline-grid .field-message-code {
     grid-column: 2 / -1;
   }
+}
+
+.partner-code-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.partner-code-name > :first-child {
+  flex: 0 1 250px;
+  min-width: 180px;
+}
+
+.partner-code-name > :last-child {
+  flex: 1 1 220px;
+  min-width: 0;
 }

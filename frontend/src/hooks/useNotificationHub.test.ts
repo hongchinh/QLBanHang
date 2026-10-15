@@ -145,8 +145,24 @@ describe('useNotificationHub: dashboard signal and connection status', () => {
 
     expect(listener).toHaveBeenCalledTimes(1)
     expect(listener).toHaveBeenCalledWith(signal)
-    expect(invalidateQueries).toHaveBeenCalledTimes(1)
+    expect(invalidateQueries).toHaveBeenCalledTimes(2)
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['executive'], refetchType: 'none' })
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['dashboard'], refetchType: 'none' })
+  })
+
+  it('forwards QuotationsChanged to the bus and marks the overview queries stale without refetching them', () => {
+    const listener = vi.fn()
+    const off = realtimeBus.onQuotationsChanged(listener)
+    renderHook(() => useNotificationHub())
+
+    const handler = handlerOf('QuotationsChanged')
+    expect(handler).toEqual(expect.any(Function))
+    handler?.()
+    off()
+
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(invalidateQueries).toHaveBeenCalledTimes(1)
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['dashboard'], refetchType: 'none' })
   })
 
   it('NewNotification still touches the notification queries only', () => {

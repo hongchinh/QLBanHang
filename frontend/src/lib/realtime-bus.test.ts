@@ -90,6 +90,25 @@ describe('realtimeBus', () => {
     expect(kept).toHaveBeenCalledTimes(1);
   });
 
+  it('emitQuotationsChanged reaches the quotation listeners, and an unsubscribed one is not called', () => {
+    const gone = vi.fn();
+    const kept = vi.fn();
+    const signal = vi.fn();
+    const off = realtimeBus.onQuotationsChanged(gone);
+    cleanups.push(realtimeBus.onQuotationsChanged(kept));
+    onSignal(signal);
+
+    realtimeBus.emitQuotationsChanged();
+    expect(gone).toHaveBeenCalledTimes(1);
+    expect(kept).toHaveBeenCalledTimes(1);
+    expect(signal).not.toHaveBeenCalled();
+
+    off();
+    realtimeBus.emitQuotationsChanged();
+    expect(gone).toHaveBeenCalledTimes(1);
+    expect(kept).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the two channels apart', () => {
     const status = vi.fn();
     const signal = vi.fn();

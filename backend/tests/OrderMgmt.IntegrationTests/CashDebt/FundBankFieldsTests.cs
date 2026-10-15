@@ -189,4 +189,59 @@ public class FundBankFieldsTests : CashDebtTestBase
             BankFund("NH02", bank.Id, "0123456789", new string('A', 255))));
         fits.AccountHolderName.Should().HaveLength(255);
     }
+
+    [Fact]
+    public async Task Update_applies_bank_rules()
+    {
+        var banks = await BanksAsync();
+        var other = banks[1];
+        var (client, _) = await NewBranchClientAsync();
+        var created = await ReadDataAsync<FundDto>(await client.PostAsJsonAsync("/api/funds",
+            BankFund("NH01", banks[0].Id, "0123456789", "CONG TY ABC")));
+
+        async Task ExpectRejectedAsync(Action<UpdateFundRequest> change, string key)
+        {
+            var update = ToUpdate(created);
+            change(update);
+            var response = await client.PutAsJsonAsync($"/api/funds/{created.Id}", update);
+            response.StatusCode.Should().Be(HttpStatusCode.BadRequest, key);
+            (await ErrorKeysAsync(response)).Should().Contain(key);
+        }
+
+        await ExpectRejectedAsync(u => u.BankId = Guid.NewGuid(), "bankId");
+        await ExpectRejectedAsync(u => u.AccountNumber = "12 34", "accountNumber");
+        await ExpectRejectedAsync(u => u.AccountHolderName = new string('A', 256), "accountHolderName");
+
+        await InDbAsync(db => db.Banks.Where(b => b.Id == other.Id)
+            .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, false)));
+        try
+        {
+            await ExpectRejectedAsync(u => u.BankId = other.Id, "bankId");
+        }
+        finally
+        {
+            await InDbAsync(db => db.Banks.Where(b => b.Id == other.Id)
+                .ExecuteUpdateAsync(s => s.SetProperty(b => b.IsActive, true)));
+        }
+
+        var unchanged = await ReadDataAsync<FundDto>(await client.GetAsync($"/api/funds/{created.Id}"));
+        unchanged.BankId.Should().Be(banks[0].Id);
+        unchanged.AccountNumber.Should().Be("0123456789");
+    }
+
+    [Fact]
+    public async Task Account_number_is_trimmed_before_matching()
+    {
+        var bank = (await BanksAsync()).First();
+        var (client, _) = await NewBranchClientAsync();
+
+        var created = await ReadDataAsync<FundDto>(await client.PostAsJsonAsync("/api/funds",
+            BankFund("NH01", bank.Id, " 0123456789 ")));
+        created.AccountNumber.Should().Be("0123456789");
+
+        var update = ToUpdate(created);
+        update.AccountNumber = " 9876543210 ";
+        var updated = await ReadDataAsync<FundDto>(await client.PutAsJsonAsync($"/api/funds/{created.Id}", update));
+        updated.AccountNumber.Should().Be("9876543210");
+    }
 }

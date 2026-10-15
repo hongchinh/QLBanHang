@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useCustomersSearch } from '@/features/customers/hooks';
-import { CustomerCatalogDialog } from '@/features/customers/components/customer-catalog-dialog';
+import { PartnerCatalogDialog } from '@/components/partner-autocomplete/partner-catalog-dialog';
 import type { CustomerSearchItem } from '@/features/customers/types';
 
 export interface CustomerAutocompleteProps {
@@ -201,10 +201,12 @@ export function CustomerAutocomplete({
 
       {errorMessage && <p className="text-sm text-destructive">{errorMessage}</p>}
 
-      <CustomerCatalogDialog
+      <PartnerCatalogDialog
         open={catalogOpen}
         onOpenChange={setCatalogOpen}
         initialQuery={keyword}
+        scope="customer"
+        preferredRole="customer"
         onSelect={onSelect}
       />
 

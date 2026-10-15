@@ -66,10 +66,12 @@ export function useUnits() {
 
 export function useProductSearch(query: string) {
   const debounced = useDebouncedValue(query, 200);
-  return useQuery({
+  const result = useQuery({
     queryKey: productKeys.search(debounced),
     queryFn: () => productsApi.search(debounced),
     enabled: debounced.trim().length >= 1,
     staleTime: 30_000,
   });
+  // The query the results belong to: lets the cell tell results of older text from results of the text shown.
+  return { ...result, settledQuery: debounced };
 }

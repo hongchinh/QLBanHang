@@ -6,7 +6,8 @@ export const productKeys = {
   list: (params: ProductListParams) => [...productKeys.lists(), params] as const,
   details: () => [...productKeys.all, 'detail'] as const,
   detail: (id: string) => [...productKeys.details(), id] as const,
-  search: (q: string) => [...productKeys.all, 'search', q] as const,
+  searches: () => [...productKeys.all, 'search'] as const,
+  search: (q: string) => [...productKeys.searches(), q] as const,
 };
 
 export const lookupKeys = {

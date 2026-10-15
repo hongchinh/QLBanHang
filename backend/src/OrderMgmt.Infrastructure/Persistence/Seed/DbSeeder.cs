@@ -192,10 +192,12 @@ public static class DbSeeder
         var roleDefs = new (string Code, string Name, string[] Permissions)[]
         {
             (RoleCodes.Admin, "Quản trị hệ thống", allPermissions.Select(p => p.Code).ToArray()),
+            // Product quick add from the product code cell (brainstorm 261015-2033, D2). Existing databases: an admin
+            // enables products.create in the permission matrix; the seeder grants only new permission codes.
             (RoleCodes.Sales, "Nhân viên kinh doanh", new[]
             {
                 Permissions.Customers.View, Permissions.Customers.Create, Permissions.Customers.Update,
-                Permissions.Products.View,
+                Permissions.Products.View, Permissions.Products.Create,
                 Permissions.Quotations.View, Permissions.Quotations.Create, Permissions.Quotations.Update,
                 Permissions.Quotations.Print,
                 Permissions.Quotations.TransferOwn,
@@ -205,7 +207,7 @@ public static class DbSeeder
             // enables these in the permission matrix; the seeder grants only new permission codes.
             (RoleCodes.Accountant, "Kế toán", new[]
             {
-                Permissions.Customers.View, Permissions.Products.View,
+                Permissions.Customers.View, Permissions.Products.View, Permissions.Products.Create,
                 Permissions.Customers.Create, Permissions.Suppliers.View, Permissions.Suppliers.Create,
                 Permissions.Quotations.View,
                 Permissions.Quotations.ViewAll,
@@ -228,7 +230,7 @@ public static class DbSeeder
             }),
             (RoleCodes.Warehouse, "Kho / giao hàng", new[]
             {
-                Permissions.Customers.View, Permissions.Products.View,
+                Permissions.Customers.View, Permissions.Products.View, Permissions.Products.Create,
                 Permissions.Customers.Create,
                 Permissions.StockIn.View, Permissions.StockIn.Create, Permissions.StockIn.Edit,
                 Permissions.StockIn.Delete, Permissions.StockIn.Cancel,

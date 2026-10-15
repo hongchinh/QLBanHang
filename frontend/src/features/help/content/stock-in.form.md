@@ -2,7 +2,7 @@
 key: stock-in.form
 title: Phiếu nhập kho
 routes: [/stock-in/new, /stock-in/:id]
-sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/voucher-print/stock-price-mode-dialog.tsx]
+sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/voucher-print/stock-price-mode-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/features/products/split-typed-text.ts, frontend/src/lib/use-dialog-opening.ts]
 related: [stock-out.form]
 updated: 2026-10-15
 ---
@@ -25,6 +25,8 @@ Ghi nhận hàng nhập vào kho: mua từ nhà cung cấp, khách trả lại h
 - Lý do yêu cầu nhà cung cấp hoặc khách, hay có ghi công nợ, thì bắt buộc chọn đối tượng. Gõ chữ ở **Đối tượng** mà chưa chọn từ danh sách thì chưa lưu được và ô báo Vui lòng chọn đối tượng từ danh sách.
 - Danh sách gợi ý của **Đối tượng** gồm khách hàng và nhà cung cấp đang dùng (tìm theo mã, tên, MST), hiện Mã, Tên, MST, Địa chỉ, SĐT, Loại. Enter chọn dòng đang sáng, mã gõ khớp hoàn toàn được ưu tiên; Enter khi kết quả chưa về thì chờ rồi mới chọn. Chọn xong, con trỏ sang ô tên.
 - `F4` hoặc nút **+** (cũng là dòng Thêm mới trong danh sách) mở **Thêm nhanh đối tượng**: vai trò chọn sẵn theo lý do, Enter đi qua từng ô, `Ctrl Enter` lưu đối tượng mới (không lưu phiếu), `Esc` hủy và về ô mã. Cần quyền tạo khách hàng hoặc nhà cung cấp.
+- `F4` trong ô **Mã hàng**, hoặc dòng **Thêm mới hàng hóa** ở cuối danh sách gợi ý (gõ mã chưa có rồi Enter là chọn dòng này), mở **Thêm nhanh hàng hóa**: chữ đã gõ điền sẵn vào Mã nếu không có dấu cách và không dấu, nếu không thì vào Tên; Enter đi qua từng ô, `Ctrl Enter` hoặc **Lưu và chọn** lưu hàng mới và điền vào dòng (không lưu phiếu), `Esc` hủy và về ô mã. Cần quyền tạo hàng hóa.
+- Lưu hàng mới trong **Thêm nhanh hàng hóa** không được (ví dụ Mã hàng '…' đã tồn tại.) thì lỗi hiện ở đầu hộp thoại và hộp thoại vẫn mở để bạn sửa.
 - **Xem danh mục đầy đủ** (dòng cuối danh sách) mở danh mục có hai tab Khách hàng và Nhà cung cấp; ↑↓ rồi Enter để chọn. Cần quyền xem khách hàng hoặc nhà cung cấp.
 - Đối tượng ngừng sử dụng không hiện trong ô **Đối tượng**; nếu bị ngừng sau khi đã chọn, lúc lưu sẽ báo Đối tượng đã ngừng hoạt động. Phiếu cũ vẫn sửa được.
 - **Đơn giá** tự điền giá vốn của hàng và là giá chưa VAT, **%CK** tự điền chiết khấu mua; sửa lại nếu khác. **CK cả đơn** được chia cho các dòng theo giá trị, **Phí vận chuyển** cộng vào tổng thanh toán và vào giá trị hàng nhập kho.
@@ -40,4 +42,5 @@ Ghi nhận hàng nhập vào kho: mua từ nhà cung cấp, khách trả lại h
 - `Insert` Thêm dòng
 - `Ctrl Del` Xóa dòng
 - `F4` Thêm nhanh đối tượng (ở ô mã **Đối tượng**)
+- `F4` Thêm nhanh hàng hóa (ở ô **Mã hàng**)
 - `Enter` Sang ô kế tiếp: **Ngày nhập**, **Lý do nhập**, **Kho**, **HTTT**, **Đối tượng** (mã), tên, **Đ.chỉ**, rồi vào bảng hàng

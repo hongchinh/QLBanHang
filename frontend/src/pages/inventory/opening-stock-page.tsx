@@ -248,6 +248,7 @@ export function OpeningStockPage() {
                         <ProductTypeaheadCell
                           variant="cell"
                           inputId={`opening-product-code-${idx}`}
+                          allowQuickAdd
                           value={row.code}
                           onChange={(code) => updateRow(row.key, { code })}
                           onSelect={(s) => selectProduct(row, s)}

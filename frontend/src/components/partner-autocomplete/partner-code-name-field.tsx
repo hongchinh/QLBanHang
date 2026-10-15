@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useEffect, useRef, type ComponentProps } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { focusById } from '@/lib/enter-focus';
+import { useDialogOpening } from '@/lib/use-dialog-opening';
 import { usePartnerPermissions } from '@/features/customers/use-partner-permissions';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 import type { PartnerType, StockDirection } from '@/features/stock-reasons/types';
@@ -42,29 +43,6 @@ export interface PartnerCodeNameFieldProps {
 }
 
 const CUSTOMER_CODE_PLACEHOLDER = 'Nhập mã / tên / MST / địa chỉ / SĐT...';
-
-// Open state of a dialog plus a token per opening. Closing retires the token, so the callbacks a dialog handed out
-// during an earlier opening (a save or a detail load that finishes after Esc, even after reopening) become no-ops.
-function useDialogOpening() {
-  const current = useRef(0);
-  const [state, setState] = useState({ open: false, seed: '', token: 0 });
-  const renderToken = state.token;
-  return {
-    open: state.open,
-    seed: state.seed,
-    show(seed: string) {
-      current.current += 1;
-      setState({ open: true, seed, token: current.current });
-    },
-    onOpenChange(open: boolean) {
-      if (renderToken !== current.current) return;
-      if (!open) current.current += 1;
-      setState((s) => ({ ...s, open }));
-    },
-    // Only for the callbacks of this render; true while its opening is still the current one.
-    isCurrent: () => renderToken === current.current,
-  };
-}
 
 // Label, partner code combobox and partner name input in one inline row. The code combobox only picks active
 // partners and never needs a reason; the name input belongs to the caller (it may differ from the partner's name).

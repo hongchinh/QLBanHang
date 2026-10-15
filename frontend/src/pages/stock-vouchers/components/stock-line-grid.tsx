@@ -568,6 +568,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                 value={line.productCode ?? ''}
                 onChange={(v) => setLineField(idx, 'productCode', v)}
                 openOnFocus={false}
+                allowQuickAdd
                 onSelect={(s) => {
                   applyProduct(idx, s);
                   const next = nextStop(enterPath(s.pricingMode, prefs.enterStops[s.pricingMode], isVisible), 'product-code');

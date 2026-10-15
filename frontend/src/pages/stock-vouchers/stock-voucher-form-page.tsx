@@ -521,33 +521,23 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   }
 
   // Switches to the first tab with an error and focuses its first erroring field. A main-area field with an error
-  // (the partner) takes the focus before any tab field; the tab is still shown so its dot and panel are visible.
+  // (the partner) is tried before any tab field; the tab is still shown so its dot and panel are visible.
   function focusFirstError(keys: string[]) {
     const tab = firstErrorTab(keys);
     if (tab) setActiveTab(tab);
-    const mainIds = keys.filter((k) => tabOfField(k) === null).map(focusIdsOf).find((v) => v.length > 0);
-    if (mainIds) {
-      setTimeout(() => {
-        for (const id of mainIds) {
-          const el = document.getElementById(id);
-          el?.focus();
-          if (el && document.activeElement === el) return;
-        }
-      }, 0);
-      return;
-    }
-    if (!tab) return;
-    const ids = keys.filter((k) => tabOfField(k) === tab).map(focusIdsOf).find((v) => v.length > 0) ?? [];
+    const firstIdsOf = (match: (key: string) => boolean) =>
+      keys.filter(match).map(focusIdsOf).find((ids) => ids.length > 0) ?? [];
+    const mainIds = firstIdsOf((k) => tabOfField(k) === null);
+    const tabIds = tab ? firstIdsOf((k) => tabOfField(k) === tab) : [];
+    if (mainIds.length === 0 && !tab) return;
     // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
-    // A missing target (e.g. a voucher with no lines has no first cell) falls back to a control inside the form.
     setTimeout(() => {
       const candidates = [
-        ...ids.map((id) => document.getElementById(id)),
-        document.getElementById('stock-line-add'),
+        ...[...mainIds, ...tabIds, 'stock-line-add'].map((id) => document.getElementById(id)),
         document.querySelector<HTMLElement>('[role="tab"][data-state="active"]'),
       ];
-      // A control in a hidden panel, or a disabled one, refuses focus, so take the first candidate that actually
-      // receives it.
+      // A control in a hidden panel, or a disabled one (the partner locked by a reason without a partner), refuses
+      // focus, so take the first candidate that actually receives it.
       for (const el of candidates) {
         el?.focus();
         if (el && document.activeElement === el) return;

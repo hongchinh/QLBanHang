@@ -28,11 +28,12 @@ describe('useQuotationCustomerSearch', () => {
   });
 
   it('passes the query flags through', () => {
-    searchMock.mockReturnValue({ data: undefined, isFetching: true, isLoading: true, isError: true });
+    // Distinct values: a flag read from the wrong source field would show.
+    searchMock.mockReturnValue({ data: undefined, isFetching: true, isLoading: false, isError: true });
 
     const { result } = renderHook(() => useQuotationCustomerSearch('kh'));
 
-    expect(result.current).toEqual({ data: undefined, isFetching: true, isLoading: true, isError: true });
+    expect(result.current).toEqual({ data: undefined, isFetching: true, isLoading: false, isError: true });
   });
 
   it('keeps the same data while the source data does not change', () => {

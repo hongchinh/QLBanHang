@@ -1149,6 +1149,23 @@ describe('StockVoucherFormPage', () => {
       await waitFor(() => expect(screen.queryByText('Đối tượng không hợp lệ')).toBeNull());
     });
 
+    // A partner locked by a reason without a partner cannot take the focus: the next error field gets it.
+    it('a locked partner falls back to the next field in error', async () => {
+      createMock.mockRejectedValueOnce(
+        apiError(400, 'VALIDATION', { partnerId: ['Đối tượng không hợp lệ'], fundId: ['Quỹ không hợp lệ'] }),
+      );
+      renderPage('In');
+      await fillPerUnitLine(3);
+      await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN2 } });
+      await waitFor(() => expect(byId('stock-partner')).toBeDisabled());
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-fund')));
+    });
+
     it('with a line error: both messages show, the lines tab is active with its dot, the focus is on the partner', async () => {
       createMock.mockRejectedValueOnce(
         apiError(400, 'VALIDATION', { partnerId: ['Đối tượng không hợp lệ'], 'lines[0].quantity': ['Số lượng không hợp lệ'] }),

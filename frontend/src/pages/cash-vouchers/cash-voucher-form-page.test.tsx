@@ -5,6 +5,7 @@ import type * as ReactRouterDom from 'react-router-dom';
 import { CashVoucherFormPage } from './cash-voucher-form-page';
 import { useBranchStore } from '@/stores/branch-store';
 import type { CashReason } from '@/features/cash-reasons/types';
+import type { Customer } from '@/features/customers/types';
 import type { Fund } from '@/features/funds/types';
 import type { OpenItem, OpenItemsParams } from '@/features/debt/types';
 import type {
@@ -74,8 +75,8 @@ vi.mock('@/features/cash-vouchers/hooks', () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  useCashPartnerSearch: (type: string, keyword: string, reasonId?: string) => {
-    partnerSearchMock(type, keyword, reasonId);
+  useCashPartnerSearch: (type: string, keyword: string, reasonId?: string, activeOnly?: boolean) => {
+    partnerSearchMock(type, keyword, reasonId, activeOnly);
     return { data: keyword ? partnerResults.data : [], isFetching: false, isLoading: false, isError: false };
   },
   useCreateCashVoucher: () => mutation(createMock),
@@ -83,6 +84,28 @@ vi.mock('@/features/cash-vouchers/hooks', () => ({
   useCancelCashVoucher: () => mutation(cancelMock),
   useRestoreCashVoucher: () => mutation(restoreMock),
   useDeleteCashVoucher: () => mutation(deleteMock),
+}));
+
+// The quick add dialog of the partner field (mounted only while open).
+const createCustomerMock = vi.fn();
+const createSupplierMock = vi.fn();
+vi.mock('@/features/customers/hooks', () => ({
+  useCreateCustomer: () => ({
+    mutateAsync: createCustomerMock,
+    reset: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
+}));
+vi.mock('@/features/suppliers/hooks', () => ({
+  useCreateSupplier: () => ({
+    mutateAsync: createSupplierMock,
+    reset: vi.fn(),
+    isPending: false,
+    isError: false,
+    error: null,
+  }),
 }));
 
 vi.mock('@/features/debt/hooks', () => ({
@@ -107,6 +130,8 @@ const R_TKH = '22222222-2222-4222-8222-222222222221';
 const R_TK = '22222222-2222-4222-8222-222222222222';
 const R_TNCC = '22222222-2222-4222-8222-222222222223';
 const R_TPX = '22222222-2222-4222-8222-222222222224';
+const R_THNCC = '22222222-2222-4222-8222-222222222225';
+const R_OLD = '22222222-2222-4222-8222-222222222226';
 const V1 = '55555555-5555-4555-8555-555555555555';
 const L1 = '66666666-6666-4666-8666-666666666666';
 const SV1 = '77777777-7777-4777-8777-777777777777';
@@ -158,6 +183,16 @@ const reasons: CashReason[] = [
     isAuto: false,
   },
   {
+    id: R_THNCC,
+    code: 'THNCC',
+    name: 'Thu hoàn tiền NCC',
+    type: 'Receipt',
+    partnerType: 'Supplier',
+    debtEffect: 'PayableIncrease',
+    isSystem: true,
+    isAuto: false,
+  },
+  {
     id: R_TNCC,
     code: 'TNCC',
     name: 'Trả tiền nhà cung cấp',
@@ -186,6 +221,28 @@ const customer: CashPartnerSearchItem = {
   taxCode: '0100000001',
   companyAddress: '12 Đường Số 1',
   status: 'Active',
+  isCustomer: true,
+  isSupplier: false,
+};
+
+const supplier: CashPartnerSearchItem = {
+  id: '88888888-8888-4888-8888-888888888889',
+  code: 'NCC001',
+  name: 'Công ty TNHH Cách nhiệt Đông Á',
+  companyAddress: '5 Đường Số 2',
+  status: 'Active',
+  isCustomer: false,
+  isSupplier: true,
+};
+
+// What POST /customers returns for the quick add.
+const createdCustomer: Customer = {
+  id: '88888888-8888-4888-8888-888888888890',
+  code: 'KH0099',
+  name: 'Công ty mới',
+  group: 'Company',
+  status: 'Active',
+  createdAt: DEFAULT_AT,
   isCustomer: true,
   isSupplier: false,
 };
@@ -330,6 +387,8 @@ describe('CashVoucherFormPage', () => {
     useCashReasonsMock.mockReset();
     useOpenItemsMock.mockReset();
     partnerSearchMock.mockReset();
+    createCustomerMock.mockReset();
+    createSupplierMock.mockReset();
     defaultsMock.mockReset();
     defaultsMock.mockImplementation((type: CashVoucherType) => ({
       data: defaultsFor(type),
@@ -372,7 +431,7 @@ describe('CashVoucherFormPage', () => {
     );
     await waitFor(() => expect(allocationInput('PX00002')).toHaveValue('1.500'));
     expect(allocationInput('PX00001')).toHaveValue('1.000');
-    expect(partnerSearchMock).toHaveBeenLastCalledWith('Receipt', expect.any(String), R_TKH);
+    expect(partnerSearchMock).toHaveBeenLastCalledWith('Receipt', expect.any(String), undefined, true);
 
     fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
 
@@ -695,5 +754,451 @@ describe('CashVoucherFormPage', () => {
     renderPage('Receipt');
 
     expect(navigateMock).toHaveBeenCalledWith(`/payments/${V1}`, { replace: true });
+  });
+
+  describe('redesign', () => {
+    const line = (n: number) => screen.getByRole('textbox', { name: `Diễn giải dòng ${n}` }) as HTMLInputElement;
+    const active = () => document.activeElement as HTMLElement;
+    const enterOn = (el: Element, init: KeyboardEventInit = {}) => fireEvent.keyDown(el, { key: 'Enter', ...init });
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 20));
+    const AUTO_KH01 = 'Thu tiền khách hàng - Công ty ABC';
+    const PICK_MESSAGE = 'Vui lòng chọn đối tượng từ danh sách';
+
+    async function pickPartner(item: CashPartnerSearchItem, typed: string) {
+      partnerResults.data = [item];
+      fireEvent.change(byId('cash-partner'), { target: { value: typed } });
+      fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText(item.code));
+      await waitFor(() => expect(byId('cash-partner-name').value).toBe(item.name));
+    }
+
+    function withoutDefaultReason() {
+      defaultsMock.mockImplementation((type: CashVoucherType) => ({
+        data: { ...defaultsFor(type), reasonId: '' },
+        isLoading: false,
+        isFetchedAfterMount: true,
+      }));
+    }
+
+    async function addLineWithButton(n: number) {
+      fireEvent.click(screen.getByRole('button', { name: /Thêm dòng/ }));
+      await waitFor(() => expect(line(n)).toHaveFocus());
+    }
+
+    const readOnlyVouchers = () => [
+      voucher({ isManaged: true, canEdit: false, allocations: [], description: '' }),
+      voucher({ status: 'Cancelled', canEdit: false, description: '' }),
+    ];
+
+    it('1. a new voucher opens on the partner code', async () => {
+      renderPage('Receipt');
+
+      await waitFor(() => expect(byId('cash-partner')).toHaveFocus());
+    });
+
+    it('1. a saved or read-only voucher does not take the focus', async () => {
+      routeParams.id = V1;
+      for (const data of [voucher(), ...readOnlyVouchers()]) {
+        voucherState.data = data;
+        const view = renderPage('Receipt');
+        await settle();
+        expect(document.activeElement).toBe(document.body);
+        view.unmount();
+      }
+    });
+
+    it('2. auto text follows the section-01 §3.3 example', async () => {
+      renderPage('Receipt');
+      expect(byId('cash-description').value).toBe('Thu tiền khách hàng');
+      expect(line(1).value).toBe('Thu tiền khách hàng');
+
+      await pickCustomer();
+      expect(byId('cash-description').value).toBe(AUTO_KH01);
+      expect(line(1).value).toBe(AUTO_KH01);
+      await waitFor(() => expect(byId('cash-partner-name')).toHaveFocus());
+
+      fireEvent.change(byId('cash-partner-name'), { target: { value: 'Công ty ABC Hà Nội' } });
+      expect(byId('cash-description').value).toBe('Thu tiền khách hàng - Công ty ABC Hà Nội');
+      expect(line(1).value).toBe('Thu tiền khách hàng - Công ty ABC Hà Nội');
+
+      fireEvent.change(byId('cash-description'), { target: { value: 'Thu nợ tháng 10' } });
+      expect(line(1).value).toBe('Thu nợ tháng 10');
+
+      fireEvent.change(byId('cash-reason'), { target: { value: R_THNCC } });
+      expect(byId('cash-reason').value).toBe(R_THNCC);
+      expect(byId('cash-description').value).toBe('Thu nợ tháng 10');
+      expect(line(1).value).toBe('Thu nợ tháng 10');
+    });
+
+    it('3. a saved voucher opens clean and keeps its hand-written description', () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ description: 'Thu theo hợp đồng 12' });
+      renderPage('Receipt');
+
+      expect(screen.getByTestId('voucher-print')).toBeEnabled();
+      expect(printProps.disabled).toBeFalsy();
+      expect(byId('cash-description').value).toBe('Thu theo hợp đồng 12');
+
+      fireEvent.change(byId('cash-reason'), { target: { value: R_THNCC } });
+      expect(byId('cash-description').value).toBe('Thu theo hợp đồng 12');
+      expect(line(1).value).toBe('Thu tiền hàng');
+    });
+
+    it('3. a saved voucher whose description is the auto text follows a partner change', () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({
+        description: AUTO_KH01,
+        lines: [{ id: L1, sortOrder: 0, description: AUTO_KH01, amount: 1_000 }],
+      });
+      renderPage('Receipt');
+      expect(printProps.disabled).toBeFalsy();
+
+      fireEvent.change(byId('cash-partner-name'), { target: { value: 'Công ty ABC Hà Nội' } });
+
+      expect(byId('cash-description').value).toBe('Thu tiền khách hàng - Công ty ABC Hà Nội');
+      expect(line(1).value).toBe('Thu tiền khách hàng - Công ty ABC Hà Nội');
+      expect(printProps.disabled).toBe(true);
+    });
+
+    it('3. a background refetch writes nothing and the reloaded voucher becomes the baseline', () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ description: 'Tự ghi' });
+      const view = renderPage('Receipt');
+
+      const reloadedAuto = 'Thu tiền khách hàng - Công ty ABC Mới';
+      voucherState.data = voucher({
+        version: 8,
+        note: 'Ghi chú máy chủ',
+        partnerName: 'Công ty ABC Mới',
+        description: reloadedAuto,
+      });
+      view.rerender(<CashVoucherFormPage type="Receipt" />);
+
+      expect(byId('cash-voucher-note').value).toBe('Ghi chú máy chủ');
+      expect(printProps.disabled).toBeFalsy();
+      expect(byId('cash-description').value).toBe(reloadedAuto);
+
+      fireEvent.change(byId('cash-reason'), { target: { value: R_THNCC } });
+      expect(byId('cash-description').value).toBe('Thu hoàn tiền NCC - Công ty ABC Mới');
+    });
+
+    it('3. after a concurrency reload the form is clean and follows the reloaded baseline', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ description: 'Tự ghi' });
+      updateMock.mockRejectedValueOnce(apiError(409, 'CONCURRENCY'));
+      const reloadedAuto = 'Thu tiền khách hàng - Công ty ABC Mới';
+      refetchMock.mockResolvedValueOnce({
+        status: 'success',
+        data: voucher({ version: 8, note: 'Ghi chú máy chủ', partnerName: 'Công ty ABC Mới', description: reloadedAuto }),
+      });
+      renderPage('Receipt');
+
+      fireEvent.change(byId('cash-voucher-note'), { target: { value: 'Sửa cục bộ' } });
+      expect(printProps.disabled).toBe(true);
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+      await waitFor(() => expect(byId('cash-voucher-note').value).toBe('Ghi chú máy chủ'));
+      await waitFor(() => expect(printProps.disabled).toBeFalsy());
+      expect(byId('cash-description').value).toBe(reloadedAuto);
+
+      fireEvent.change(byId('cash-reason'), { target: { value: R_THNCC } });
+      expect(byId('cash-description').value).toBe('Thu hoàn tiền NCC - Công ty ABC Mới');
+    });
+
+    it('4. picking a supplier switches the reason; a later reason change keeps it with a red line', async () => {
+      renderPage('Receipt');
+
+      await pickPartner(supplier, 'NCC');
+
+      expect(byId('cash-reason').value).toBe(R_THNCC);
+      const notice = screen.getByText('Đã đổi lý do cho hợp với NCC001 (nhà cung cấp).');
+      expect(notice).toHaveAttribute('role', 'status');
+      expect(byId('cash-reason')).toHaveClass('ring-amber-400');
+      expect(byId('cash-description').value).toBe('Thu hoàn tiền NCC - Công ty TNHH Cách nhiệt Đông Á');
+
+      fireEvent.change(byId('cash-reason'), { target: { value: R_TKH } });
+      expect(byId('cash-partner').value).toBe('NCC001');
+      expect(byId('cash-partner-name').value).toBe(supplier.name);
+      expect(
+        screen.getByText('Lý do "Thu tiền khách hàng" cần khách hàng — NCC001 không phải khách hàng'),
+      ).toHaveClass('text-destructive');
+      expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+
+      fireEvent.change(byId('cash-reason'), { target: { value: R_TK } });
+      expect(byId('cash-partner').value).toBe('');
+      expect(byId('cash-partner-name').value).toBe('');
+      expect(byId('cash-partner-address').value).toBe('');
+      expect(screen.queryByText(/không phải khách hàng/)).toBeNull();
+      expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+    });
+
+    it('4. clearing the picked partner drops the yellow line and the partner from the auto text', async () => {
+      renderPage('Receipt');
+      await pickPartner(supplier, 'NCC');
+      expect(screen.getByText(/Đã đổi lý do/)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Bỏ chọn đối tượng' }));
+
+      await waitFor(() => expect(screen.queryByText(/Đã đổi lý do/)).toBeNull());
+      expect(byId('cash-reason').value).toBe(R_THNCC);
+      expect(byId('cash-partner-name').value).toBe('');
+      expect(byId('cash-description').value).toBe('Thu hoàn tiền NCC');
+      expect(line(1).value).toBe('Thu hoàn tiền NCC');
+    });
+
+    it('4. the partner of a saved voucher (roles unknown) gets no red line', () => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      renderPage('Receipt');
+
+      fireEvent.change(byId('cash-reason'), { target: { value: R_THNCC } });
+
+      expect(byId('cash-partner').value).toBe('KH01');
+      expect(screen.queryByText(/không phải/)).toBeNull();
+    });
+
+    it('4. a saved voucher keeps a reason no longer offered when the picked partner fits it', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({
+        reasonId: R_OLD,
+        reasonCode: 'TCU',
+        reasonName: 'Thu tiền cũ',
+        reasonDebtEffect: 'None',
+        partnerId: undefined,
+        partnerCode: undefined,
+        partnerName: undefined,
+        allocations: [],
+      });
+      renderPage('Receipt');
+      expect(byId('cash-reason').value).toBe(R_OLD);
+
+      await pickCustomer();
+
+      expect(byId('cash-reason').value).toBe(R_OLD);
+      expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+    });
+
+    it('5. Enter walks the header into the last grid row and appends a row after the last cell', async () => {
+      renderPage('Receipt');
+      await addLineWithButton(2);
+      fireEvent.change(line(2), { target: { value: 'Dòng hai' } });
+
+      byId('cash-voucher-at').focus();
+      for (let i = 0; i < 9; i++) enterOn(active());
+      expect(byId('cash-voucher-note')).toHaveFocus();
+
+      enterOn(active());
+      const last = line(2);
+      await waitFor(() => expect(last).toHaveFocus());
+      expect([last.selectionStart, last.selectionEnd]).toEqual([0, 'Dòng hai'.length]);
+
+      enterOn(active());
+      expect(screen.getByRole('textbox', { name: 'Số tiền dòng 2' })).toHaveFocus();
+      enterOn(active());
+      expect(screen.getByRole('textbox', { name: 'Ghi chú dòng 2' })).toHaveFocus();
+      enterOn(active());
+      await waitFor(() => expect(line(3)).toHaveFocus());
+      expect(line(3).value).toBe('Thu tiền khách hàng');
+      await settle();
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('5. Enter in Ghi chú adds a row first when the grid is empty', async () => {
+      renderPage('Receipt');
+      fireEvent.click(screen.getByRole('button', { name: 'Xóa dòng 1' }));
+      expect(screen.queryByRole('textbox', { name: 'Diễn giải dòng 1' })).toBeNull();
+
+      byId('cash-voucher-note').focus();
+      enterOn(active());
+
+      await waitFor(() => expect(line(1)).toHaveFocus());
+      expect(line(1).value).toBe('Thu tiền khách hàng');
+    });
+
+    it('6. text typed in the partner code but not picked blocks saving until it is cleared', async () => {
+      createMock.mockResolvedValue(voucher());
+      partnerResults.data = [];
+      renderPage('Receipt');
+      fillLine('1000');
+      fireEvent.change(byId('cash-partner'), { target: { value: 'zzz' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+      await settle();
+
+      expect(createMock).not.toHaveBeenCalled();
+      const message = screen.getByText(PICK_MESSAGE);
+      const row = byId('cash-partner').closest('.partner-code-name') as HTMLElement;
+      expect(message.parentElement).toBe(row.parentElement);
+      expect(byId('cash-partner')).toHaveFocus();
+
+      fireEvent.change(byId('cash-partner'), { target: { value: '' } });
+      await waitFor(() => expect(screen.queryByText(PICK_MESSAGE)).toBeNull());
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    });
+
+    it('6. a locked partner field never blocks saving', async () => {
+      createMock.mockResolvedValue(voucher());
+      partnerResults.data = [];
+      renderPage('Receipt');
+      fireEvent.change(byId('cash-partner'), { target: { value: 'zzz' } });
+      fireEvent.change(byId('cash-reason'), { target: { value: R_TK } });
+      fillLine('1000');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText(PICK_MESSAGE)).toBeNull();
+    });
+
+    it('7. the payload has no tax code and drops trailing untouched rows', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderPage('Receipt');
+      await pickCustomer();
+      fillLine('2500', 'Thu tiền hàng');
+      await addLineWithButton(2);
+      expect(line(2).value).toBe(AUTO_KH01);
+      await addLineWithButton(3);
+      fireEvent.change(line(3), { target: { value: '' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      const payload = createMock.mock.calls[0][0];
+      expect(payload).not.toHaveProperty('partnerTaxCode');
+      expect(payload).toMatchObject({ partnerName: customer.name, partnerAddress: customer.companyAddress });
+      expect(payload.lines).toEqual([expect.objectContaining({ description: 'Thu tiền hàng', amount: 2_500 })]);
+    });
+
+    it('7. when every row is untouched nothing is dropped and the rows ask for an amount', async () => {
+      renderPage('Receipt');
+      await addLineWithButton(2);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      await waitFor(() => expect(screen.getAllByText('Số tiền phải lớn hơn 0')).toHaveLength(2));
+      expect([line(1).value, line(2).value]).toEqual(['Thu tiền khách hàng', 'Thu tiền khách hàng']);
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('8. quick add with F4 picks the new partner and never saves the voucher', async () => {
+      withoutDefaultReason();
+      createCustomerMock.mockResolvedValue(createdCustomer);
+      renderPage('Receipt');
+      // The quick add walks its fields by these global ids: the page must not use them.
+      for (const id of [
+        'code', 'name', 'taxCode', 'phoneNumber', 'email', 'group', 'creditDays', 'contactPerson',
+        'companyAddress', 'defaultShippingAddress', 'note', 'status', 'role-customer', 'role-supplier',
+      ]) {
+        expect(document.getElementById(id)).toBeNull();
+      }
+      expect(screen.getByRole('button', { name: /Thêm nhanh/ })).toBeInTheDocument();
+
+      fireEvent.change(byId('cash-partner'), { target: { value: 'Công ty mới' } });
+      fireEvent.keyDown(byId('cash-partner'), { key: 'F4' });
+      const quickAdd = await screen.findByRole('dialog');
+      const name = within(quickAdd).getByLabelText('Tên *');
+      await waitFor(() => expect(name).toHaveFocus());
+
+      enterOn(active());
+      expect(quickAdd).toContainElement(active());
+      expect(active()).not.toBe(name);
+      enterOn(active(), { shiftKey: true });
+      expect(name).toHaveFocus();
+      fireEvent.keyDown(active(), { key: 's', ctrlKey: true });
+      await settle();
+      expect(createMock).not.toHaveBeenCalled();
+      expect(createCustomerMock).not.toHaveBeenCalled();
+      expect(quickAdd).toContainElement(active());
+
+      fireEvent.keyDown(active(), { key: 'Enter', ctrlKey: true });
+
+      await waitFor(() => expect(createCustomerMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await waitFor(() => expect(byId('cash-partner-name')).toHaveFocus());
+      expect(byId('cash-partner').value).toBe('KH0099');
+      expect(byId('cash-partner-name').value).toBe('Công ty mới');
+      expect(byId('cash-reason').value).toBe(R_TKH);
+      expect(screen.getByText('Đã đổi lý do cho hợp với KH0099 (khách hàng).')).toBeInTheDocument();
+      expect(byId('cash-description').value).toBe('Thu tiền khách hàng - Công ty mới');
+      await settle();
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('9. a read-only voucher has no quick add', async () => {
+      routeParams.id = V1;
+      for (const data of readOnlyVouchers()) {
+        voucherState.data = data;
+        const view = renderPage('Receipt');
+        expect(screen.queryByRole('button', { name: /Thêm nhanh/ })).toBeNull();
+        fireEvent.keyDown(byId('cash-partner'), { key: 'F4' });
+        await settle();
+        expect(screen.queryByRole('dialog')).toBeNull();
+        view.unmount();
+      }
+    });
+
+    it('10. a server partnerId error shows under the partner row', async () => {
+      createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', { partnerId: ['Đối tượng không hợp với lý do'] }));
+      renderPage('Receipt');
+      await pickCustomer();
+      fillLine('2500');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      const message = await screen.findByText('Đối tượng không hợp với lý do');
+      const row = byId('cash-partner').closest('.partner-code-name') as HTMLElement;
+      expect(message.parentElement).toBe(row.parentElement);
+      expect(byId('cash-reason').parentElement).not.toContainElement(message);
+    });
+
+    it('11. a read-only voucher is not auto filled', () => {
+      routeParams.id = V1;
+      for (const data of readOnlyVouchers()) {
+        voucherState.data = data;
+        const view = renderPage('Receipt');
+        expect(byId('cash-description').value).toBe('');
+        expect(line(1).value).toBe('Thu tiền hàng');
+        expect(printProps.disabled).toBeFalsy();
+        view.unmount();
+      }
+    });
+
+    it('12. a new voucher without a default reason fills in once a partner is picked', async () => {
+      withoutDefaultReason();
+      renderPage('Receipt');
+      expect(byId('cash-reason').value).toBe('');
+      expect(byId('cash-description').value).toBe('');
+      expect(line(1).value).toBe('');
+      expect(byId('cash-partner')).toBeEnabled();
+
+      await pickCustomer();
+
+      expect(byId('cash-reason').value).toBe(R_TKH);
+      expect(screen.getByText('Đã đổi lý do cho hợp với KH01 (khách hàng).')).toHaveAttribute('role', 'status');
+      expect(byId('cash-description').value).toBe(AUTO_KH01);
+      expect(line(1).value).toBe(AUTO_KH01);
+    });
+
+    it('13. added and deleted rows keep following the header; a hand-typed row does not', async () => {
+      renderPage('Receipt');
+      await pickCustomer();
+      fireEvent.change(line(1), { target: { value: 'Dòng tay' } });
+      await addLineWithButton(2);
+      expect(line(2).value).toBe(AUTO_KH01);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Xóa dòng 1' }));
+      expect(screen.queryByRole('textbox', { name: 'Diễn giải dòng 2' })).toBeNull();
+      expect(line(1).value).toBe(AUTO_KH01);
+
+      fireEvent.change(byId('cash-partner-name'), { target: { value: 'Công ty ABC Hà Nội' } });
+      expect(line(1).value).toBe('Thu tiền khách hàng - Công ty ABC Hà Nội');
+
+      await addLineWithButton(2);
+      fireEvent.change(line(2), { target: { value: 'Tự ghi' } });
+      fireEvent.change(byId('cash-partner-name'), { target: { value: 'Công ty ABC Hải Phòng' } });
+      expect(line(1).value).toBe('Thu tiền khách hàng - Công ty ABC Hải Phòng');
+      expect(line(2).value).toBe('Tự ghi');
+    });
   });
 });

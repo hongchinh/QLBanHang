@@ -20,7 +20,9 @@ import {
   type CashVoucherFormParsed,
   type CashVoucherFormValues,
 } from '@/features/cash-vouchers/schema';
-import { isOwnAllocation, toFormDefaults, toUpsertPayload } from '@/features/cash-vouchers/payload';
+import { createEmptyCashLine, isOwnAllocation, toFormDefaults, toUpsertPayload } from '@/features/cash-vouchers/payload';
+import { isUntouchedLine } from '@/features/cash-vouchers/auto-text';
+import { useCashAutoText } from '@/features/cash-vouchers/use-cash-auto-text';
 import { allocationTotal, checkAllocations, suggestAllocations } from '@/features/cash-vouchers/allocation';
 import type {
   CashVoucher,
@@ -30,13 +32,21 @@ import type {
   UpsertCashVoucherRequest,
 } from '@/features/cash-vouchers/types';
 import type { DebtDirection, DebtEffect, DebtSide, SettlementOrigin } from '@/features/cash-common/types';
+import {
+  matchReasonForPartner,
+  partnerFitsReason,
+  partnerRolesKnown,
+  reasonMismatchMessage,
+  reasonSwitchMessage,
+} from '@/features/cash-common/reason-match';
+import { useReasonSwitchNotice } from '@/features/cash-common/use-reason-notice';
 import { useCashReasons } from '@/features/cash-reasons/hooks';
 import { useFunds } from '@/features/funds/hooks';
 import { selectableFunds } from '@/features/funds/utils';
 import { useOpenItems } from '@/features/debt/hooks';
-import type { PartnerType } from '@/features/stock-reasons/types';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 import { ActivityHistory } from '@/components/activity-history/activity-history';
+import { useUnpickedPartnerGuard } from '@/components/partner-autocomplete/use-unpicked-partner-guard';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -48,6 +58,8 @@ import { useDocumentActions } from '@/hooks/useDocumentActions';
 import { getErrorMessage } from '@/lib/api-client';
 import type { ConfirmFlags } from '@/lib/confirm-required';
 import { formatDateOnly } from '@/lib/date-only';
+import { focusById } from '@/lib/enter-focus';
+import { DIALOG_SELECTOR } from '@/lib/focus';
 import { roundAwayFromZero } from '@/lib/round';
 import { toNumberOrZero } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
@@ -60,6 +72,7 @@ import {
   type CashVoucherSelectedPartner,
 } from './components/cash-voucher-header';
 import { CASH_VOUCHER_LABELS, type CashVoucherLabels } from './labels';
+import { cashLineCellId } from './utils/cash-navigation';
 
 type SubmitIntent = 'save-stay' | 'save-exit' | 'update';
 type VoucherActionKind = 'cancel' | 'restore' | 'delete';
@@ -174,6 +187,16 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     >,
     defaultValues: toFormDefaults(voucher, defaults, type),
   });
+  const autoText = useCashAutoText(form);
+  const switchNotice = useReasonSwitchNotice();
+  const guard = useUnpickedPartnerGuard('cash-partner');
+
+  // A saved voucher opens without any write: the auto text only learns what it would be (section-01 §3.2).
+  // Before the other effects, and never in the render body (that would reset the baseline on every render).
+  useEffect(() => {
+    if (voucher) baselineFrom(voucher);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [selectedPartner, setSelectedPartner] = useState<CashVoucherSelectedPartner | null>(() =>
     partnerOf(voucher),
@@ -197,6 +220,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     lastVersionRef.current = voucher.version;
     if (isDirty) return;
     form.reset(toFormDefaults(voucher, undefined, type));
+    baselineFrom(voucher);
     setSelectedPartner(partnerOf(voucher));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voucher?.version]);
@@ -218,15 +242,49 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   // Automatic reasons (TPX/CPN) are never offered on a manual voucher.
   const { data: allReasons = [] } = useCashReasons({ type });
   const reasons = allReasons.filter((r) => r.type === type && !r.isAuto);
-  const selectedReason = reasons.find((r) => r.id === reasonId);
   const reasonOptions: CashReasonOption[] = [...reasons];
-  if (voucher && reasonId === voucher.reasonId && !selectedReason) {
-    reasonOptions.push({ id: voucher.reasonId, name: voucher.reasonName });
+  // The voucher DTO has no partner type for its reason: 'Any' never locks the field and, with the stored debt
+  // effect, needs the same role as the server.
+  if (voucher && reasonId === voucher.reasonId && !reasons.some((r) => r.id === reasonId)) {
+    reasonOptions.push({
+      id: voucher.reasonId,
+      name: voucher.reasonName,
+      partnerType: 'Any',
+      debtEffect: voucher.reasonDebtEffect,
+    });
   }
+  const selectedReason = reasonOptions.find((r) => r.id === reasonId);
+  const nameOfReason = (id: string) => reasonOptions.find((r) => r.id === id)?.name ?? '';
   const debtEffectOf = (id: string): DebtEffect =>
     reasons.find((r) => r.id === id)?.debtEffect ??
     (voucher && id === voucher.reasonId ? voucher.reasonDebtEffect : 'None');
   const debtEffect = debtEffectOf(reasonId);
+
+  // A new voucher fills Lý do nộp once the default reason has a name (the reasons may arrive after mount).
+  useEffect(() => {
+    if (!isEdit && !readOnly) autoText.initNew(nameOfReason(reasonId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reasonId, reasons.length]);
+
+  // A new voucher starts on the partner code (section-01 §2.1); focusById skips a locked field.
+  useEffect(() => {
+    if (!isEdit && !readOnly) focusById('cash-partner');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The red line is derived: roles known (picked in this session) and the partner does not fit the reason.
+  const mismatch =
+    selectedPartner &&
+    selectedReason &&
+    partnerRolesKnown(selectedPartner) &&
+    !partnerFitsReason(selectedPartner, selectedReason)
+      ? reasonMismatchMessage(selectedReason, selectedPartner.code)
+      : undefined;
+  const reasonNotice = mismatch
+    ? { text: mismatch, tone: 'error' as const }
+    : switchNotice.notice
+      ? { text: switchNotice.notice, tone: 'info' as const }
+      : null;
   const ownEntry = OWN_ENTRY[debtEffect];
   const showAllocations = !!ownEntry && !!partnerId;
 
@@ -273,9 +331,14 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
 
   const activitiesQuery = useCashVoucherActivities(id, isEdit);
 
+  function baselineFrom(v: CashVoucher) {
+    autoText.baseline({ reasonName: v.reasonName, partnerName: v.partnerName, description: v.description });
+  }
+
   function resetTo(fresh: CashVoucher) {
     lastVersionRef.current = fresh.version;
     form.reset(toFormDefaults(fresh, undefined, type));
+    baselineFrom(fresh);
     setSelectedPartner(partnerOf(fresh));
     clearAllocationErrors();
   }
@@ -351,15 +414,18 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     return allMapped;
   }
 
-  // Trailing rows the user never filled are dropped instead of failing validation.
+  // Rows the user never filled (no amount; the header text or nothing) are dropped instead of failing validation.
   function dropBlankLines() {
     const lines = form.getValues('lines');
-    const kept = lines.filter((l) => !!l.description?.trim() || toNumberOrZero(l.amount) !== 0);
+    const header = form.getValues('description') ?? '';
+    const kept = lines.filter((l) => !isUntouchedLine(l, header));
     if (kept.length > 0 && kept.length < lines.length) form.setValue('lines', kept, { shouldDirty: true });
   }
 
   function submitWithIntent(intent: SubmitIntent) {
     if (submittingRef.current || busy || readOnly || allocationsInvalid) return;
+    // Text typed in the partner code but never picked blocks the save; a locked field never does.
+    if (selectedReason?.partnerType !== 'None' && !guard.assertPicked()) return;
     submittingRef.current = true;
     dropBlankLines();
     void form
@@ -372,6 +438,8 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   }
 
   function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    // The partner field's dialogs sit inside the form in the React tree (section-01 §6.6).
+    if ((e.target as Element).closest?.(DIALOG_SELECTOR)) return;
     if (e.defaultPrevented) return;
     if (e.key === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
@@ -386,6 +454,22 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     clearAllocationErrors();
   }
 
+  function clearPartnerFields() {
+    form.setValue('partnerId', '', { shouldDirty: true });
+    form.setValue('partnerName', '', { shouldDirty: true });
+    form.setValue('partnerAddress', '', { shouldDirty: true });
+    setSelectedPartner(null);
+    resetAllocations();
+  }
+
+  function clearPartner() {
+    clearPartnerFields();
+    switchNotice.clear();
+    autoText.onInputsChanged({ reasonName: nameOfReason(form.getValues('reasonId')), partnerName: '' });
+  }
+
+  // A picked partner (list, catalog or quick add) keeps a reason that fits it, else switches to the first one that
+  // does (section-01 §4.2). Each user action updates the auto text once, with the final reason and partner.
   function handleSelectPartner(p: PartnerSearchItem | null) {
     if (!p) {
       clearPartner();
@@ -396,25 +480,38 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     form.setValue('partnerAddress', p.companyAddress ?? '', { shouldDirty: true });
     setSelectedPartner({ id: p.id, code: p.code, name: p.name, isCustomer: p.isCustomer, isSupplier: p.isSupplier });
     resetAllocations();
+    switchNotice.clear();
+    let nextReasonId = form.getValues('reasonId');
+    const match = matchReasonForPartner(p, nextReasonId, reasonOptions);
+    if (match.kind === 'switch') {
+      nextReasonId = match.reasonId;
+      form.setValue('reasonId', nextReasonId, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
+      switchNotice.show(reasonSwitchMessage(p.code, p));
+    }
+    autoText.onInputsChanged({ reasonName: nameOfReason(nextReasonId), partnerName: p.name });
   }
 
-  function clearPartner() {
-    form.setValue('partnerId', '', { shouldDirty: true });
-    form.setValue('partnerName', '', { shouldDirty: true });
-    form.setValue('partnerAddress', '', { shouldDirty: true });
-    setSelectedPartner(null);
-    resetAllocations();
-  }
-
-  // A partner that does not fit the new reason's role is dropped (the server would reject it).
+  // A changed reason keeps the partner (a mismatch shows the red line), except a reason without a partner.
   function handleReasonChange(nextId: string) {
-    const previousType = selectedReason?.partnerType;
-    const nextType = reasons.find((r) => r.id === nextId)?.partnerType;
+    const next = reasonOptions.find((r) => r.id === nextId);
     const effectChanged = debtEffectOf(nextId) !== debtEffect;
     form.setValue('reasonId', nextId, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
-    if (nextType === 'None') clearPartner();
-    else if (selectedPartner && !partnerFits(selectedPartner, nextType, previousType)) clearPartner();
+    switchNotice.clear();
+    if (next?.partnerType === 'None') clearPartnerFields();
     else if (effectChanged) resetAllocations();
+    autoText.onInputsChanged({
+      reasonName: next?.name ?? '',
+      partnerName: next?.partnerType === 'None' ? '' : (form.getValues('partnerName') ?? ''),
+    });
+  }
+
+  // Enter in Ghi chú: down to the Diễn giải of the last row, adding a row when there is none (section-01 §2.1).
+  function enterGrid() {
+    if (form.getValues('lines').length === 0) {
+      form.setValue('lines', [createEmptyCashLine(form.getValues('description') ?? '')]);
+    }
+    const lastIndex = form.getValues('lines').length - 1;
+    setTimeout(() => focusById(cashLineCellId('description', lastIndex), 'select'), 0);
   }
 
   function handleAllocationsChange(rows: CashAllocationFormValues[]) {
@@ -541,10 +638,19 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
           code={voucher?.code}
           funds={fundOptions}
           reasons={reasonOptions}
-          partnerType={selectedReason?.partnerType}
+          selectedReason={selectedReason}
           selectedPartner={selectedPartner}
           onSelectPartner={handleSelectPartner}
           onReasonChange={handleReasonChange}
+          reasonNotice={reasonNotice}
+          reasonFlash={switchNotice.flash}
+          partnerError={guard.error ?? form.formState.errors.partnerId?.message}
+          onUnpickedPartnerChange={guard.onUnpickedChange}
+          onPartnerNameChange={(name) =>
+            autoText.onInputsChanged({ reasonName: nameOfReason(form.getValues('reasonId')), partnerName: name })
+          }
+          onDescriptionEdited={autoText.onDescriptionEdited}
+          onEnterGrid={enterGrid}
           readOnly={readOnly}
         />
 
@@ -677,18 +783,6 @@ function StoredAllocations({ rows }: { rows: CashVoucherAllocation[] }) {
 function partnerOf(voucher?: CashVoucher): CashVoucherSelectedPartner | null {
   if (!voucher?.partnerId) return null;
   return { id: voucher.partnerId, code: voucher.partnerCode ?? '', name: voucher.partnerName ?? '' };
-}
-
-// Role flags are known only for a partner picked in this session; otherwise the partner is kept
-// only while the required role stays the same.
-function partnerFits(
-  partner: CashVoucherSelectedPartner,
-  nextType: PartnerType | undefined,
-  previousType: PartnerType | undefined,
-): boolean {
-  if (nextType !== 'Customer' && nextType !== 'Supplier') return true;
-  const role = nextType === 'Customer' ? partner.isCustomer : partner.isSupplier;
-  return role ?? nextType === previousType;
 }
 
 function sameAllocations(a: CashAllocationFormValues[], b: CashAllocationFormValues[]): boolean {

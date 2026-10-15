@@ -1,7 +1,11 @@
+import { useRef } from 'react';
 import { AppIcon } from '@/components/icons';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
 import { useLogout } from '@/features/auth/hooks';
+import { useFirstVisitHint } from '@/features/help/use-first-visit-hint';
+import { FirstVisitHint } from '@/components/help/first-visit-hint';
+import { HelpButton } from '@/components/help/help-button';
 import { BrandBlock } from './brand-block';
 import { HeaderSearch } from './header-search';
 import { HeaderSearchMobileSheet } from './header-search-mobile-sheet';
@@ -14,7 +18,11 @@ export function AppHeader() {
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
   const openMobileDrawer = useUiStore((s) => s.openMobileDrawer);
+  const openHelp = useUiStore((s) => s.openHelp);
   const logout = useLogout();
+  const hint = useFirstVisitHint();
+  const helpRef = useRef<HTMLButtonElement>(null);
+  const userRef = useRef<HTMLButtonElement>(null);
 
   return (
     <header
@@ -37,9 +45,16 @@ export function AppHeader() {
         <HeaderSearchMobileSheet />
         <div className="hidden flex-1 md:block" />
         <HeaderBranchSwitcher />
+        <HelpButton ref={helpRef} showDot={hint.visible} />
         <HeaderNotifications />
-        <HeaderUserMenu user={user} onLogout={() => logout.mutate()} />
+        <HeaderUserMenu
+          user={user}
+          onLogout={() => logout.mutate()}
+          triggerRef={userRef}
+          onOpenHelp={openHelp}
+        />
       </div>
+      <FirstVisitHint hint={hint} desktopAnchorRef={helpRef} mobileAnchorRef={userRef} />
     </header>
   );
 }

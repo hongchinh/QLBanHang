@@ -127,11 +127,13 @@ QLBanHang/
 
 ```
 frontend/src/
+├── app-routes.tsx               # the route tree (appRoutes), rendered by App.tsx
 ├── components/
 │   ├── auth/                    # permission-aware UI helpers
 │   ├── confirm-required-dialog/ # dialog for confirmable/blocked 422 responses
 │   ├── activity-history/        # ActivityHistory: activity list of a document
 │   ├── customer-autocomplete/   # quotation customer picker + quick add
+│   ├── help/                    # HelpPanel (+ help-doc-view.tsx), HelpButton, FirstVisitHint
 │   ├── icons/                   # icon-registry.ts (business name → lucide drawing + tone, the only lucide-react importer), AppIcon, and the tests that block direct lucide imports and glyph-character icons
 │   ├── layout/                  # app shell, header (header/header-branch-switcher.tsx marks a demo branch "(demo)"),
 │   │                            # sidebar, search, notifications
@@ -177,6 +179,9 @@ frontend/src/
 │   │                            # use-executive-params / -scope / -access / -live
 │   ├── fund-transfers/
 │   ├── funds/
+│   ├── help/                    # in-app user help: parse-help.ts (Markdown parser, stepHash), registry.ts (matchRoutes over the help files),
+│   │                            # load-help.ts + content-index.ts (one lazy chunk), content/<key>.md (one file per route),
+│   │                            # videos.json (written by the video tool), help-pending.ts (HELP_PENDING), stale.ts, guard tests
 │   ├── inventory-reports/       # stock-on-hand, stock-card and stock-summary queries
 │   ├── inventory-settings/      # costing settings, numbering, cost recalculation
 │   ├── me-settings/
@@ -233,6 +238,9 @@ frontend/src/
 │                                # blob-download.ts (requestBlob, saveBlob), pdf-tab.ts (openPdfTab), use-row-selection.ts
 ├── styles/
 └── test/
+
+frontend/scripts/
+└── help-stale.ts                # npm run help:stale: lists help that may be out of date
 ```
 
 Feature folders generally contain `api.ts`, `hooks.ts`, `types.ts`, optional `schema.ts` and `keys.ts` (every feature keeps its query keys there, `credit-limits`, `opening-debts` and `cash-settings` included). Pages compose those hooks with reusable UI components.
@@ -247,7 +255,7 @@ Feature folders generally contain `api.ts`, `hooks.ts`, `types.ts`, optional `sc
 | EF DbContext | [../../backend/src/OrderMgmt.Infrastructure/Persistence/AppDbContext.cs](../../backend/src/OrderMgmt.Infrastructure/Persistence/AppDbContext.cs) |
 | Seed | [../../backend/src/OrderMgmt.Infrastructure/Persistence/Seed/DbSeeder.cs](../../backend/src/OrderMgmt.Infrastructure/Persistence/Seed/DbSeeder.cs) |
 | Frontend startup | [../../frontend/src/main.tsx](../../frontend/src/main.tsx) |
-| Frontend routes | [../../frontend/src/App.tsx](../../frontend/src/App.tsx) |
+| Frontend routes | [../../frontend/src/app-routes.tsx](../../frontend/src/app-routes.tsx) (rendered by `App.tsx`) |
 | API client | [../../frontend/src/lib/api-client.ts](../../frontend/src/lib/api-client.ts) |
 | Auth store | [../../frontend/src/stores/auth-store.ts](../../frontend/src/stores/auth-store.ts) |
 

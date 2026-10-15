@@ -13,6 +13,10 @@ interface UiState {
   sidebarGroupOpen: Record<string, boolean>;
   // Per user id, in pin order. Kept even when an item becomes invisible (hidden at render).
   pinnedNavPaths: Record<string, string[]>;
+  // Help panel: open state is per page load; the hint state is per user id and persisted.
+  helpOpen: boolean;
+  helpHintSeen: Record<string, string[]>;
+  helpHintsOff: Record<string, boolean>;
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setSidebarGroupOpen: (groupId: string, open: boolean) => void;
@@ -21,6 +25,11 @@ interface UiState {
   closeMobileDrawer: () => void;
   setQuotationStatusFilter: (next: string[]) => void;
   setStockVoucherStatusFilter: (type: StockDirection, value: StockVoucherStatusFilter) => void;
+  openHelp: () => void;
+  closeHelp: () => void;
+  toggleHelp: () => void;
+  markHelpHintSeen: (userId: string, key: string) => void;
+  turnOffHelpHints: (userId: string) => void;
 }
 
 export const useUiStore = create<UiState>()(
@@ -32,6 +41,9 @@ export const useUiStore = create<UiState>()(
       mobileDrawerOpen: false,
       quotationStatusFilter: null,
       stockVoucherStatusFilter: { In: null, Out: null },
+      helpOpen: false,
+      helpHintSeen: {},
+      helpHintsOff: {},
       toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
       setSidebarGroupOpen: (groupId, open) =>
@@ -47,6 +59,16 @@ export const useUiStore = create<UiState>()(
       setQuotationStatusFilter: (next) => set({ quotationStatusFilter: next }),
       setStockVoucherStatusFilter: (type, value) =>
         set((s) => ({ stockVoucherStatusFilter: { ...s.stockVoucherStatusFilter, [type]: value } })),
+      openHelp: () => set({ helpOpen: true }),
+      closeHelp: () => set({ helpOpen: false }),
+      toggleHelp: () => set((s) => ({ helpOpen: !s.helpOpen })),
+      markHelpHintSeen: (userId, key) =>
+        set((s) => {
+          const current = s.helpHintSeen[userId] ?? [];
+          if (current.includes(key)) return s;
+          return { helpHintSeen: { ...s.helpHintSeen, [userId]: [...current, key] } };
+        }),
+      turnOffHelpHints: (userId) => set((s) => ({ helpHintsOff: { ...s.helpHintsOff, [userId]: true } })),
     }),
     {
       name: 'qldonhang-ui-store',
@@ -57,6 +79,8 @@ export const useUiStore = create<UiState>()(
         pinnedNavPaths: state.pinnedNavPaths,
         quotationStatusFilter: state.quotationStatusFilter,
         stockVoucherStatusFilter: state.stockVoucherStatusFilter,
+        helpHintSeen: state.helpHintSeen,
+        helpHintsOff: state.helpHintsOff,
       }),
     },
   ),

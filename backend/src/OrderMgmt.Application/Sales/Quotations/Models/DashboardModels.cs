@@ -74,7 +74,6 @@ public sealed class SalesLeaderboardItemDto
     public Guid UserId { get; init; }
     public string FullName { get; init; } = default!;
     public decimal Revenue { get; init; }
-    public int ConfirmedCount { get; init; }
-    public decimal? ConversionRate { get; init; }
+    public int VoucherCount { get; init; }
     public decimal? DeltaPct { get; init; }
 }

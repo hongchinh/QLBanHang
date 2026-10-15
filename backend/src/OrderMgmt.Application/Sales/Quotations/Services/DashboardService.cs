@@ -436,64 +436,35 @@ public class DashboardService : IDashboardService
 
         if (limit <= 0) limit = 10;
         if (to < from) to = from;
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
 
-        var rangeLen = to.DayNumber - from.DayNumber + 1;
-        var prevTo = from.AddDays(-1);
-        var prevFrom = prevTo.AddDays(-(rangeLen - 1));
+        var period = ExecutivePeriod.Create(from, to, VnTime.ToVnDate(_clock.UtcNow));
 
-        var scope = _db.Quotations.AsNoTracking().Where(q => !q.IsDeleted);
-
-        var curRows = await RevenueFilterHelper.ApplyRevenueFilter(scope, dateMode, from, to)
-            .GroupBy(q => q.OwnerUserId)
-            .Select(g => new { UserId = g.Key, Revenue = g.Sum(x => x.Total), Count = g.Count() })
-            .ToListAsync(ct);
-
-        var prevRows = await RevenueFilterHelper.ApplyRevenueFilter(scope, dateMode, prevFrom, prevTo)
-            .GroupBy(q => q.OwnerUserId)
-            .Select(g => new { UserId = g.Key, Revenue = g.Sum(x => x.Total) })
-            .ToListAsync(ct);
-
-        var totalCountRows = await scope
-            .Where(q => q.QuotationDate >= from && q.QuotationDate <= to)
-            .GroupBy(q => q.OwnerUserId)
-            .Select(g => new { UserId = g.Key, Count = g.Count() })
-            .ToListAsync(ct);
-
-        var prevRevenueMap = prevRows.ToDictionary(r => r.UserId, r => r.Revenue);
-        var totalCountMap = totalCountRows.ToDictionary(r => r.UserId, r => r.Count);
-
-        var topUserIds = curRows
-            .OrderByDescending(r => r.Revenue)
-            .Take(limit)
-            .Select(r => r.UserId)
+        // The current and the previous period in one read, told apart by their instant; grouped by the voucher's owner.
+        var vouchers = await (await CountedAsync(period.PrevFrom, to, null, ct)).VoucherRevenues().ToListAsync(ct);
+        var current = vouchers.Where(v => v.VoucherAt >= period.Start)
+            .GroupBy(v => v.OwnerUserId)
+            // A return lowers the revenue but is not a sale, so it is not counted.
+            .Select(g => new { UserId = g.Key, Revenue = g.Sum(v => v.Revenue), Count = g.Count(v => !v.IsReturn) })
             .ToList();
+        var prevRevenueMap = vouchers.Where(v => v.VoucherAt < period.Start)
+            .GroupBy(v => v.OwnerUserId)
+            .ToDictionary(g => g.Key, g => g.Sum(v => v.Revenue));
 
-        var names = await _db.Users.IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(u => topUserIds.Contains(u.Id))
-            .Select(u => new { u.Id, u.FullName })
-            .ToListAsync(ct);
-        var nameMap = names.ToDictionary(n => n.Id, n => n.FullName);
-
-        return curRows
+        var top = current
             .OrderByDescending(r => r.Revenue)
+            .ThenBy(r => r.UserId)
             .Take(limit)
-            .Select(r =>
+            .ToList();
+        var nameMap = await _lookups.UserNamesAsync(top.Select(r => r.UserId).ToList(), ct);
+
+        return top
+            .Select(r => new SalesLeaderboardItemDto
             {
-                prevRevenueMap.TryGetValue(r.UserId, out var prevRevenue);
-                totalCountMap.TryGetValue(r.UserId, out var totalCount);
-                return new SalesLeaderboardItemDto
-                {
-                    UserId = r.UserId,
-                    FullName = nameMap.GetValueOrDefault(r.UserId) ?? "—",
-                    Revenue = r.Revenue,
-                    ConfirmedCount = r.Count,
-                    ConversionRate = totalCount == 0
-                        ? null
-                        : Math.Round((decimal)r.Count / totalCount * 100m, 2, MidpointRounding.AwayFromZero),
-                    DeltaPct = DeltaOf(r.Revenue, prevRevenue),
-                };
+                UserId = r.UserId,
+                FullName = nameMap.GetValueOrDefault(r.UserId) ?? "—",
+                Revenue = r.Revenue,
+                VoucherCount = r.Count,
+                DeltaPct = DeltaOf(r.Revenue, prevRevenueMap.GetValueOrDefault(r.UserId)),
             })
             .ToList();
     }

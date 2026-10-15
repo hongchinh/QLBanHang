@@ -139,6 +139,34 @@ public class DashboardRevenueTests : ExecutiveDashboardTestBase
         product.Quantity.Should().Be(5m);
     }
 
+    [Fact]
+    public async Task Leaderboard_groups_by_voucher_owner()
+    {
+        var data = await SeedAsync();
+
+        var board = await ReadDataAsync<List<SalesLeaderboardItemDto>>(await data.Branch.Client.GetAsync(
+            "/api/dashboard/sales-leaderboard?from=2026-10-01&to=2026-10-31"));
+
+        // The admin owns the 600 sale and the -150 return; the sales user owns the 300 sale.
+        var admin = board.Should().ContainSingle(r => r.UserId == data.AdminId).Subject;
+        admin.Revenue.Should().Be(450m);
+        admin.VoucherCount.Should().Be(1);
+        var sales = board.Should().ContainSingle(r => r.UserId == data.SalesId).Subject;
+        sales.Revenue.Should().Be(300m);
+        sales.VoucherCount.Should().Be(1);
+        board.IndexOf(admin).Should().BeLessThan(board.IndexOf(sales));
+    }
+
+    [Fact]
+    public async Task Leaderboard_forbidden_without_view_all()
+    {
+        var data = await SeedAsync();
+
+        var response = await data.SalesClient.GetAsync("/api/dashboard/sales-leaderboard?from=2026-10-01&to=2026-10-31");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
     private sealed record SeedData(FreshBranch Branch, Guid ProductId, Guid CustomerId, Guid AdminId, Guid SalesId,
         HttpClient SalesClient, Guid SaleVoucherId, uint SaleVoucherVersion, FreshBranch Other);
 

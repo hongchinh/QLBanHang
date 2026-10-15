@@ -6,7 +6,7 @@ Tick each item on the day the change reaches a running database.
 
 ## Deploy
 
-- [ ] 1. On every running database an admin enables, in the permission matrix (menu Phân quyền, `/admin/roles`), the permission **Tạo hàng hóa** (`products.create`, module catalog) for:
+- [ ] 1. On every running database an admin enables, in the permission matrix (menu Phân quyền, `/admin/roles`), the permission **Tạo hàng hóa** (`products.create`, nhóm **Danh mục**) for:
   - **Kho / giao hàng**
   - **Kế toán**
   - **Nhân viên kinh doanh**

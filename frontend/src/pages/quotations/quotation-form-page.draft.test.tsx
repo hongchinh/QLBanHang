@@ -9,10 +9,10 @@ import React from 'react';
 // Mock the module-level export so getState() returns a stable user.
 vi.mock('@/stores/auth-store', () => ({
   useAuthStore: Object.assign(
-    (selector: (s: { user: { id: string } | null; permissions: string[] }) => unknown) =>
-      selector({ user: { id: 'user-test' }, permissions: [] }),
+    (selector: (s: { user: { id: string } | null; permissions: string[]; hasPermission: () => boolean }) => unknown) =>
+      selector({ user: { id: 'user-test' }, permissions: [], hasPermission: () => false }),
     {
-      getState: () => ({ user: { id: 'user-test' } }),
+      getState: () => ({ user: { id: 'user-test' }, hasPermission: () => false }),
     },
   ),
 }));
@@ -61,15 +61,7 @@ vi.mock('@/features/quotations/hooks', () => ({
 
 vi.mock('@/features/customers/hooks', () => ({
   useCustomer: () => ({ data: undefined }),
-}));
-
-// CustomerAutocomplete makes network calls — stub it to avoid test complexity
-vi.mock('@/components/customer-autocomplete/customer-autocomplete', () => ({
-  CustomerAutocomplete: () => React.createElement('div', { 'data-testid': 'customer-autocomplete' }),
-}));
-
-vi.mock('@/components/customer-autocomplete/customer-quick-add-dialog', () => ({
-  CustomerQuickAddDialog: () => null,
+  useCustomersSearch: () => ({ data: [], isFetching: false }),
 }));
 
 vi.mock('@/components/auth/can', () => ({

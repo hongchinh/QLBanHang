@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { AppIcon } from '@/components/icons';
 import {
   customerSchema,
+  partnerSchema,
   supplierSchema,
   type CustomerFormParsed,
   type CustomerFormValues,
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { focusNextInOrder } from '@/lib/enter-focus';
 import type { Permission } from '@/lib/permissions';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -61,6 +63,38 @@ const ROLE_TEXT: Record<
   },
 };
 
+// 'free' mode (the quick add dialog): neither role belongs to a screen, so the labels are generic.
+const FREE_TEXT: (typeof ROLE_TEXT)[PartnerRole] = {
+  noun: 'đối tượng',
+  code: 'Mã',
+  name: 'Tên *',
+  group: 'Nhóm',
+  backTo: '/customers',
+  module: 'customers',
+};
+
+// Enter order of the quick add dialog; ids missing (hidden role box) or disabled are skipped.
+const QUICK_ADD_ORDER = [
+  'code',
+  'name',
+  'taxCode',
+  'phoneNumber',
+  'email',
+  'group',
+  'creditDays',
+  'contactPerson',
+  'companyAddress',
+  'defaultShippingAddress',
+  'note',
+  'role-customer',
+  'role-supplier',
+] as const;
+
+export interface PartnerInitialRoles {
+  isCustomer: boolean;
+  isSupplier: boolean;
+}
+
 export interface CustomerFormFieldsProps {
   isEdit: boolean;
   initial?: Customer;
@@ -77,6 +111,18 @@ export interface CustomerFormFieldsProps {
   role?: PartnerRole;
   /** Hidden in the quotation quick-add dialog (a customer created there is customer-only). */
   showRoles?: boolean;
+  /**
+   * 'locked' (default): the screen's own role is locked on.
+   * 'free': both roles are free (each needs its own create permission), take their flags only from
+   * `initialRoles` and the labels are generic; for new records (the quick add dialog).
+   */
+  rolesMode?: 'locked' | 'free';
+  /** Prefills Tên when there is no `initial` partner. */
+  initialName?: string;
+  /** 'free' mode only; default customer only. */
+  initialRoles?: PartnerInitialRoles;
+  /** Enter walks the fields (Shift+Enter back, last field submits), Ctrl+Enter submits. */
+  enterNavigation?: boolean;
 }
 
 export function CustomerFormFields({
@@ -93,20 +139,28 @@ export function CustomerFormFields({
   showHeader = true,
   role = 'customer',
   showRoles = true,
+  rolesMode = 'locked',
+  initialName,
+  initialRoles,
+  enterNavigation = false,
 }: CustomerFormFieldsProps) {
   const hasPermission = useAuthStore((s) => s.hasPermission);
+  const free = rolesMode === 'free';
   const form = useForm<CustomerFormValues, unknown, CustomerFormParsed>({
     // zodResolver@3 types only the input side; the parsed output (role flags filled
     // by their defaults) is what handleSubmit receives (same cast as product-form-page).
-    resolver: zodResolver(role === 'supplier' ? supplierSchema : customerSchema) as unknown as Resolver<
-      CustomerFormValues,
-      unknown,
-      CustomerFormParsed
-    >,
-    defaultValues: toFormDefaults(role, initial),
+    resolver: zodResolver(
+      free ? partnerSchema : role === 'supplier' ? supplierSchema : customerSchema,
+    ) as unknown as Resolver<CustomerFormValues, unknown, CustomerFormParsed>,
+    defaultValues: toFormDefaults(
+      role,
+      initial,
+      free ? (initialRoles ?? { isCustomer: true, isSupplier: false }) : undefined,
+      initialName,
+    ),
   });
 
-  const text = ROLE_TEXT[role];
+  const text = free ? FREE_TEXT : ROLE_TEXT[role];
   const otherRole: PartnerRole = role === 'customer' ? 'supplier' : 'customer';
   const other = ROLE_TEXT[otherRole];
   const otherFlag = otherRole === 'customer' ? 'isCustomer' : 'isSupplier';
@@ -114,9 +168,30 @@ export function CustomerFormFields({
   // editing a partner that already has the other role needs that role's update permission.
   const canToggleOther = hasPermission(`${other.module}.${isEdit ? 'update' : 'create'}` as Permission);
   const lockedByOtherRole =
-    isEdit && !!initial?.[otherFlag] && !hasPermission(`${other.module}.update` as Permission);
+    !free && isEdit && !!initial?.[otherFlag] && !hasPermission(`${other.module}.update` as Permission);
 
   const finalSubmitLabel = submitLabel ?? (isEdit ? 'Cập nhật' : 'Tạo mới');
+
+  function handleEnterKeys(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.altKey || e.metaKey) return;
+    const submit = () => {
+      if (!submitting && !lockedByOtherRole) void form.handleSubmit(onSubmit)();
+    };
+    if (e.ctrlKey) {
+      if (e.shiftKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      submit();
+      return;
+    }
+    const target = e.target as HTMLElement;
+    if (!(QUICK_ADD_ORDER as readonly string[]).includes(target.id)) return; // buttons keep their own Enter
+    if (target.id === 'group' && target.getAttribute('aria-expanded') === 'true') return; // an open Select is Radix's
+    e.preventDefault();
+    e.stopPropagation(); // capture phase: the Radix trigger would otherwise open on Enter
+    const step = focusNextInOrder(QUICK_ADD_ORDER, target.id, e.shiftKey ? -1 : 1);
+    if (step === 'end' && !e.shiftKey) submit();
+  }
 
   return (
     <div className="space-y-4">
@@ -129,7 +204,11 @@ export function CustomerFormFields({
         </div>
       )}
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        onKeyDownCapture={enterNavigation ? handleEnterKeys : undefined}
+        className="space-y-4"
+      >
         <Card>
           <CardHeader><CardTitle>Thông tin chung</CardTitle></CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
@@ -180,7 +259,21 @@ export function CustomerFormFields({
                 <legend className="text-sm font-medium">Vai trò</legend>
                 <div className="flex flex-wrap gap-6 pt-1">
                   {(['customer', 'supplier'] as const).map((r) =>
-                    r === role ? (
+                    free ? (
+                      <Controller
+                        key={r}
+                        control={form.control}
+                        name={r === 'customer' ? 'isCustomer' : 'isSupplier'}
+                        render={({ field }) => (
+                          <RoleCheckbox
+                            role={r}
+                            checked={!!field.value}
+                            disabled={!hasPermission(`${ROLE_TEXT[r].module}.create` as Permission)}
+                            onChange={field.onChange}
+                          />
+                        )}
+                      />
+                    ) : r === role ? (
                       <RoleCheckbox key={r} role={r} checked disabled onChange={() => {}} />
                     ) : (
                       <Controller
@@ -281,10 +374,15 @@ function RoleCheckbox({
   );
 }
 
-function toFormDefaults(role: PartnerRole, customer?: Customer): CustomerFormValues {
+function toFormDefaults(
+  role: PartnerRole,
+  customer?: Customer,
+  freeRoles?: PartnerInitialRoles,
+  initialName?: string,
+): CustomerFormValues {
   return {
     code: customer?.code ?? '',
-    name: customer?.name ?? '',
+    name: customer?.name ?? initialName ?? '',
     taxCode: customer?.taxCode ?? '',
     companyAddress: customer?.companyAddress ?? '',
     defaultShippingAddress: customer?.defaultShippingAddress ?? '',
@@ -294,9 +392,9 @@ function toFormDefaults(role: PartnerRole, customer?: Customer): CustomerFormVal
     group: customer?.group ?? 'Company',
     note: customer?.note ?? '',
     status: customer?.status ?? 'Active',
-    // The screen's own role is always on.
-    isCustomer: role === 'customer' || (customer?.isCustomer ?? false),
-    isSupplier: role === 'supplier' || (customer?.isSupplier ?? false),
+    // Locked mode: the screen's own role is always on. Free mode: only the initial roles.
+    isCustomer: freeRoles ? freeRoles.isCustomer : role === 'customer' || (customer?.isCustomer ?? false),
+    isSupplier: freeRoles ? freeRoles.isSupplier : role === 'supplier' || (customer?.isSupplier ?? false),
     creditDays: customer?.creditDays ?? '',
   };
 }

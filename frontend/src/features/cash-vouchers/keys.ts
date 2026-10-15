@@ -9,6 +9,11 @@ export const cashVoucherKeys = {
   detail: (id: string) => [...cashVoucherKeys.details(), id] as const,
   activities: (id: string) => [...cashVoucherKeys.detail(id), 'activities'] as const,
   defaults: (type: CashVoucherType) => [...cashVoucherKeys.all, 'defaults', type] as const,
-  partners: (type: CashVoucherType, keyword: string, reasonId?: string) =>
-    [...cashVoucherKeys.all, 'partners', { type, keyword, reasonId: reasonId ?? null }] as const,
+  partnersAll: () => [...cashVoucherKeys.all, 'partners'] as const,
+  partners: (type: CashVoucherType, keyword: string, activeOnly?: boolean) =>
+    [
+      ...cashVoucherKeys.all,
+      'partners',
+      { type, keyword, activeOnly: activeOnly ?? null },
+    ] as const,
 };

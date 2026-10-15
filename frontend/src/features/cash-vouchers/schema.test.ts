@@ -19,7 +19,6 @@ function voucher(overrides: Partial<CashVoucherFormValues> = {}): CashVoucherFor
     partnerId: '',
     partnerName: '',
     partnerAddress: '',
-    partnerTaxCode: '',
     personName: '',
     description: '',
     attachedDocs: '',
@@ -67,6 +66,12 @@ describe('cashVoucherSchema', () => {
     expect(result.lines).toEqual([{ _uiKey: 'k1', description: 'Thu tiền hàng', amount: 2_500, note: undefined }]);
     expect(result.allocations).toEqual([{ entryId: ENTRY, docCode: 'PX00001', amount: 0 }]);
     expect(result.version).toBe(7);
+  });
+
+  it('does not know partnerTaxCode', () => {
+    const result = cashVoucherSchema.parse({ ...voucher(), partnerTaxCode: '0101234567' });
+
+    expect(result).not.toHaveProperty('partnerTaxCode');
   });
 
   it('rejects negative allocations and over-long texts', () => {

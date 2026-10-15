@@ -31,8 +31,8 @@ export const stockVouchersApi = {
       voucherAt: voucherAt ? fromDateTimeLocalValue(voucherAt) : undefined,
     }),
   stockAt: (body: StockAtRequest) => apiPost<StockAtResult[]>('/stock-vouchers/stock-at', body),
-  partners: (type: StockDirection, keyword: string, reasonId?: string) =>
-    apiGet<PartnerSearchItem[]>('/stock-vouchers/partners', { type, keyword, reasonId }),
+  partners: (type: StockDirection, keyword: string, activeOnly?: boolean) =>
+    apiGet<PartnerSearchItem[]>('/stock-vouchers/partners', { type, keyword, activeOnly }),
   get: (id: string) => apiGet<StockVoucher>(`/stock-vouchers/${id}`),
   activities: (id: string) => apiGet<StockVoucherActivity[]>(`/stock-vouchers/${id}/activities`),
   create: (data: UpsertStockVoucherRequest) => apiPost<StockVoucher>('/stock-vouchers', data),

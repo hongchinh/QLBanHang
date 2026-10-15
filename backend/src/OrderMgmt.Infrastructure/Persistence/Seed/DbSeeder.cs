@@ -201,9 +201,12 @@ public static class DbSeeder
                 Permissions.Quotations.TransferOwn,
                 Permissions.Debt.PartnerSummary,
             }),
+            // Quick add of partners from the voucher forms (brainstorm 261015-0644, D12). Existing databases: an admin
+            // enables these in the permission matrix; the seeder grants only new permission codes.
             (RoleCodes.Accountant, "Kế toán", new[]
             {
                 Permissions.Customers.View, Permissions.Products.View,
+                Permissions.Customers.Create, Permissions.Suppliers.View, Permissions.Suppliers.Create,
                 Permissions.Quotations.View,
                 Permissions.Quotations.ViewAll,
                 // AccountingConfirm predates the "grant new codes once" step below, so roles created before
@@ -226,11 +229,13 @@ public static class DbSeeder
             (RoleCodes.Warehouse, "Kho / giao hàng", new[]
             {
                 Permissions.Customers.View, Permissions.Products.View,
+                Permissions.Customers.Create,
                 Permissions.StockIn.View, Permissions.StockIn.Create, Permissions.StockIn.Edit,
                 Permissions.StockIn.Delete, Permissions.StockIn.Cancel,
                 Permissions.StockOut.View, Permissions.StockOut.Create, Permissions.StockOut.Edit,
                 Permissions.StockOut.Delete, Permissions.StockOut.Cancel,
                 Permissions.Inventory.OpeningStock, Permissions.Reports.Inventory, Permissions.Suppliers.View,
+                Permissions.Suppliers.Create,
             }),
             (RoleCodes.Manager, "Quản lý", allPermissions.Select(p => p.Code).ToArray()),
         };

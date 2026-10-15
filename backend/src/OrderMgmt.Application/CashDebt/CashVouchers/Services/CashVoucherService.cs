@@ -166,8 +166,9 @@ public class CashVoucherService : ICashVoucherService
 
     /// Partner picker. With a reason (form): its partner type narrowed by the side role of its debt effect (P19),
     /// active partners only. Without one (list filter): any role, inactive partners included.
+    /// `activeOnly` overrides that default (a reason means active only).
     public async Task<List<CustomerSearchItemDto>> SearchPartnersAsync(CashVoucherType type, string? keyword, int limit,
-        Guid? reasonId, CancellationToken ct = default)
+        Guid? reasonId, bool? activeOnly = null, CancellationToken ct = default)
     {
         EnsurePermission(CashVoucherPermissions.View(type));
         var partnerType = PartnerType.Any;
@@ -188,7 +189,7 @@ public class CashVoucherService : ICashVoucherService
         {
             Keyword = keyword ?? string.Empty,
             Limit = limit,
-            ActiveOnly = reasonId.HasValue,
+            ActiveOnly = activeOnly ?? reasonId.HasValue,
         }, partnerType, ct);
     }
 

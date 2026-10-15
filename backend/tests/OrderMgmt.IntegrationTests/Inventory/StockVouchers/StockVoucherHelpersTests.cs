@@ -178,6 +178,34 @@ public class StockVoucherHelpersTests : InventoryTestBase
             .StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
+    [Fact]
+    public async Task Partner_search_active_only_flag()
+    {
+        var customer = await CreatePartnerAsync("PS-KH", isCustomer: true, isSupplier: false);
+        var supplier = await CreatePartnerAsync("PS-NCC", isCustomer: false, isSupplier: true);
+        var both = await CreatePartnerAsync("PS-HH", isCustomer: true, isSupplier: true);
+        var inactive = await CreatePartnerAsync("PS-NGUNG", isCustomer: false, isSupplier: true);
+        await InDbAsync(async db =>
+        {
+            (await db.Customers.SingleAsync(c => c.Id == inactive)).Status = CustomerStatus.Inactive;
+            await db.SaveChangesAsync();
+        });
+        var nmh = await ReasonIdAsync("NMH");
+
+        async Task<List<Guid>> SearchAsync(HttpClient client, string query) =>
+            (await ReadDataAsync<List<CustomerSearchItemDto>>(
+                await client.GetAsync($"/api/stock-vouchers/partners?keyword=PS-&{query}"))).Select(x => x.Id).ToList();
+
+        // New: no reason, every role, active only.
+        (await SearchAsync(_client, "type=In&activeOnly=true")).Should().BeEquivalentTo(new[] { customer, supplier, both });
+        // Unchanged defaults: no reason = filter mode (inactive included); a reason = active only.
+        (await SearchAsync(_client, "type=In")).Should().BeEquivalentTo(new[] { customer, supplier, both, inactive });
+        (await SearchAsync(_client, $"type=In&reasonId={nmh}")).Should().BeEquivalentTo(new[] { supplier, both });
+        // Explicit false with a reason keeps the reason's role and adds the inactive partner.
+        (await SearchAsync(_client, $"type=In&reasonId={nmh}&activeOnly=false"))
+            .Should().BeEquivalentTo(new[] { supplier, both, inactive });
+    }
+
     /// POST /stock-at with `at` sent as a VN-offset instant (the service normalizes it to UTC).
     private async Task<List<StockAtResult>> StockAtAsync(string at, Guid? excludeVoucherId,
         params (Guid ProductId, Guid WarehouseId)[] items) =>

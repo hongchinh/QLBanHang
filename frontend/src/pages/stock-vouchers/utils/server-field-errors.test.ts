@@ -32,7 +32,7 @@ const staleWithPaid = (changed: string, paidAmount: unknown) =>
 
 describe('staleServerErrorKeys', () => {
   it('lists the fields that can carry a server error', () => {
-    expect([...HEADER_ERROR_FIELDS].sort()).toEqual(['dueDate', 'fundId', 'paidAmount', 'paymentMethodId']);
+    expect([...HEADER_ERROR_FIELDS].sort()).toEqual(['dueDate', 'fundId', 'paidAmount', 'partnerId', 'paymentMethodId']);
     expect(LINE_ERROR_FIELDS.has('quantity')).toBe(true);
     expect(LINE_ERROR_FIELDS.has('productCode')).toBe(false);
   });
@@ -153,7 +153,12 @@ describe('staleServerErrorKeys', () => {
 
     it('the voucher date and the reason drive the due date', () => {
       expect(stale('voucherAt')).toEqual(['dueDate']);
-      expect(stale('reasonId')).toEqual(['dueDate']);
+      expect(stale('reasonId')).toEqual(['dueDate', 'partnerId']);
+    });
+
+    it('the partner error is stale with the partner or the reason', () => {
+      expect(stale('partnerId')).toEqual(['partnerId']);
+      expect(stale('voucherAt')).toEqual(['dueDate']);
     });
 
     it.each([0, '', undefined, null, -5])(

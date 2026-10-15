@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { isOwnAllocation, toFormDefaults, toUpsertPayload } from './payload';
+import { createEmptyCashLine, isOwnAllocation, toFormDefaults, toUpsertPayload } from './payload';
 import { cashVoucherSchema, type CashVoucherFormValues } from './schema';
 import type { CashVoucher, CashVoucherAllocation, CashVoucherDefaults } from './types';
 
@@ -30,7 +30,6 @@ function formValues(overrides: Partial<CashVoucherFormValues> = {}): CashVoucher
     partnerId: PARTNER,
     partnerName: 'Công ty A',
     partnerAddress: '',
-    partnerTaxCode: '',
     personName: 'Nguyễn Văn A',
     description: 'Thu nợ',
     attachedDocs: '',
@@ -113,7 +112,6 @@ describe('toUpsertPayload', () => {
       partnerId: PARTNER,
       partnerName: 'Công ty A',
       partnerAddress: undefined,
-      partnerTaxCode: undefined,
       personName: 'Nguyễn Văn A',
       description: 'Thu nợ',
       attachedDocs: undefined,
@@ -125,6 +123,12 @@ describe('toUpsertPayload', () => {
         { entryId: ENTRY_2, amount: 1_500 },
       ],
     });
+  });
+
+  it('does not send a tax code', () => {
+    const parsed = cashVoucherSchema.parse(formValues());
+
+    expect(toUpsertPayload(parsed, 'None')).not.toHaveProperty('partnerTaxCode');
   });
 
   it('sends empty allocations for reasons without debt effect', () => {
@@ -189,6 +193,23 @@ describe('toFormDefaults', () => {
     });
     expect(values.lines).toHaveLength(1);
     expect(values.lines[0]).toMatchObject({ description: '', amount: 0, note: '' });
+  });
+
+  it('has no tax code in the form values, new or edited', () => {
+    expect(toFormDefaults(undefined, undefined, 'Receipt')).not.toHaveProperty('partnerTaxCode');
+    expect(toFormDefaults(serverVoucher({ partnerTaxCode: '010' }), undefined, 'Receipt')).not.toHaveProperty(
+      'partnerTaxCode',
+    );
+  });
+
+  it('createEmptyCashLine takes the description of the new row', () => {
+    expect(createEmptyCashLine('Thu tiền')).toEqual({
+      description: 'Thu tiền',
+      amount: 0,
+      note: '',
+      _uiKey: expect.any(String),
+    });
+    expect(createEmptyCashLine().description).toBe('');
   });
 
   it('new voucher without defaults leaves fund and reason empty', () => {

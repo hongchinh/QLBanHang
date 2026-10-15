@@ -31,6 +31,7 @@ function createPartnerSchema(nameRequiredMessage: string) {
 
 export const customerSchema = createPartnerSchema('Tên khách hàng là bắt buộc');
 export const supplierSchema = createPartnerSchema('Tên nhà cung cấp là bắt buộc');
+export const partnerSchema = createPartnerSchema('Tên là bắt buộc');
 
 export type CustomerFormValues = z.input<typeof customerSchema>;
 export type CustomerFormParsed = z.output<typeof customerSchema>;

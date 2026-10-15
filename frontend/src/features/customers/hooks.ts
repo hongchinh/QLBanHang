@@ -6,19 +6,19 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 import { customersApi } from './api';
+import { cashVoucherKeys } from '@/features/cash-vouchers/keys';
+import { stockVoucherKeys } from '@/features/stock-vouchers/keys';
 import { supplierKeys } from '@/features/suppliers/keys';
 import { customerKeys } from './keys';
 import type { CustomerListParams, UpsertCustomerRequest } from './types';
 
-// Stock-voucher partner search (Phase 09 keeps stockVoucherKeys.partners(...) under this prefix).
-const STOCK_VOUCHER_PARTNERS_KEY = ['inventory', 'stock-vouchers', 'partners'] as const;
-
 // A dual-role partner shows up in both catalogs, so customer and supplier
-// mutations refresh both, plus the voucher partner search.
+// mutations refresh both, plus the cash and stock voucher partner searches.
 export function invalidatePartnerQueries(qc: QueryClient) {
   qc.invalidateQueries({ queryKey: customerKeys.all });
   qc.invalidateQueries({ queryKey: supplierKeys.all });
-  qc.invalidateQueries({ queryKey: STOCK_VOUCHER_PARTNERS_KEY });
+  qc.invalidateQueries({ queryKey: cashVoucherKeys.partnersAll() });
+  qc.invalidateQueries({ queryKey: stockVoucherKeys.partnersAll() });
 }
 
 export function useCustomers(params: CustomerListParams) {

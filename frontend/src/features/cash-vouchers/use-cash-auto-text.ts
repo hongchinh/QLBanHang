@@ -9,7 +9,9 @@ import type { CashLineFormValues, CashVoucherFormParsed, CashVoucherFormValues }
 export function useCashAutoText(form: UseFormReturn<CashVoucherFormValues, unknown, CashVoucherFormParsed>) {
   const prevAuto = useRef(''); // what the system last wrote (or would have written) in Lý do nộp
   const prevDescription = useRef(''); // the last known Lý do nộp, for the lines that follow it
-  const settled = useRef(false); // initNew runs once, never after a baseline or a user action
+  // initNew runs once, never after a baseline; a user action settles it only when its auto text is non-empty
+  // (a partner picked before the reasons loaded still lets the default reason fill in).
+  const settled = useRef(false);
 
   const followLines = useCallback(
     (next: string, dirty: boolean) => {

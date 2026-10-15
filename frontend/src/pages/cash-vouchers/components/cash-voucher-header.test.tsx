@@ -249,6 +249,8 @@ describe('CashVoucherHeader messages (section-01 §1.1, §4)', () => {
     expect(info).not.toHaveClass('text-destructive');
     expect(byId('cash-reason').parentElement).not.toContainElement(byId('cash-person-name'));
     expect(byId('cash-reason').parentElement).toContainElement(info);
+    // The message makes the cell taller: the row aligns its labels and the person input to the top.
+    expect(byId('cash-reason').closest('.form-inline-grid')).toHaveClass('form-align-top');
 
     rerender({ reasonNotice: { text: 'Lý do cần khách hàng', tone: 'error' } });
     const error = screen.getByText('Lý do cần khách hàng');

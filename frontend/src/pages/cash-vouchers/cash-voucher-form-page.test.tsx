@@ -892,6 +892,8 @@ describe('CashVoucherFormPage', () => {
       });
       renderPage('Receipt');
 
+      await pickPartner(supplier, 'NCC');
+      expect(screen.getByText('Đã đổi lý do cho hợp với NCC001 (nhà cung cấp).')).toHaveAttribute('role', 'status');
       fireEvent.change(byId('cash-voucher-note'), { target: { value: 'Sửa cục bộ' } });
       expect(printProps.disabled).toBe(true);
       fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
@@ -899,6 +901,11 @@ describe('CashVoucherFormPage', () => {
       await waitFor(() => expect(byId('cash-voucher-note').value).toBe('Ghi chú máy chủ'));
       await waitFor(() => expect(printProps.disabled).toBeFalsy());
       expect(byId('cash-description').value).toBe(reloadedAuto);
+      // The other user's reason and partner are shown: the switch notice of the dropped edit is gone.
+      expect(byId('cash-reason').value).toBe(R_TKH);
+      expect(byId('cash-partner').value).toBe('KH01');
+      expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+      expect(screen.queryByRole('status')).toBeNull();
 
       fireEvent.change(byId('cash-reason'), { target: { value: R_THNCC } });
       expect(byId('cash-description').value).toBe('Thu hoàn tiền NCC - Công ty ABC Mới');
@@ -943,6 +950,35 @@ describe('CashVoucherFormPage', () => {
       expect(byId('cash-partner-name').value).toBe('');
       expect(byId('cash-description').value).toBe('Thu hoàn tiền NCC');
       expect(line(1).value).toBe('Thu hoàn tiền NCC');
+    });
+
+    it('4. a second pick that fits the switched reason keeps it and drops the yellow line', async () => {
+      createSupplierMock.mockResolvedValue({
+        ...createdCustomer,
+        id: '88888888-8888-4888-8888-888888888891',
+        code: 'NCC0099',
+        name: 'Công ty NCC mới',
+        isCustomer: false,
+        isSupplier: true,
+      });
+      renderPage('Receipt');
+      await pickPartner(supplier, 'NCC');
+      expect(byId('cash-reason').value).toBe(R_THNCC);
+      expect(screen.getByRole('status')).toHaveTextContent('Đã đổi lý do cho hợp với NCC001 (nhà cung cấp).');
+
+      // F4 with a partner picked: the quick add picks the new one straight away, without clearing the first.
+      fireEvent.keyDown(byId('cash-partner'), { key: 'F4' });
+      const quickAdd = await screen.findByRole('dialog');
+      const name = within(quickAdd).getByLabelText('Tên *');
+      await waitFor(() => expect(name).toHaveFocus());
+      fireEvent.change(name, { target: { value: 'Công ty NCC mới' } });
+      fireEvent.keyDown(name, { key: 'Enter', ctrlKey: true });
+
+      await waitFor(() => expect(createSupplierMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(byId('cash-partner').value).toBe('NCC0099'));
+      expect(byId('cash-reason').value).toBe(R_THNCC);
+      expect(screen.queryByRole('status')).toBeNull();
+      expect(createMock).not.toHaveBeenCalled();
     });
 
     it('4. the partner of a saved voucher (roles unknown) gets no red line', () => {

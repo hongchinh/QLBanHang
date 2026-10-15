@@ -219,9 +219,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     if (!voucher || voucher.version === lastVersionRef.current) return;
     lastVersionRef.current = voucher.version;
     if (isDirty) return;
-    form.reset(toFormDefaults(voucher, undefined, type));
-    baselineFrom(voucher);
-    setSelectedPartner(partnerOf(voucher));
+    applyServerVoucher(voucher);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voucher?.version]);
 
@@ -335,11 +333,18 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     autoText.baseline({ reasonName: v.reasonName, partnerName: v.partnerName, description: v.description });
   }
 
+  // The form shows a voucher as the server has it (after a save, a reload or a background refetch): nothing is
+  // written by the auto text, and the notice of a reason switch made before is gone.
+  function applyServerVoucher(v: CashVoucher) {
+    form.reset(toFormDefaults(v, undefined, type));
+    baselineFrom(v);
+    setSelectedPartner(partnerOf(v));
+    switchNotice.clear();
+  }
+
   function resetTo(fresh: CashVoucher) {
     lastVersionRef.current = fresh.version;
-    form.reset(toFormDefaults(fresh, undefined, type));
-    baselineFrom(fresh);
-    setSelectedPartner(partnerOf(fresh));
+    applyServerVoucher(fresh);
     clearAllocationErrors();
   }
 
@@ -508,7 +513,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   // Enter in Ghi chú: down to the Diễn giải of the last row, adding a row when there is none (section-01 §2.1).
   function enterGrid() {
     if (form.getValues('lines').length === 0) {
-      form.setValue('lines', [createEmptyCashLine(form.getValues('description') ?? '')]);
+      form.setValue('lines', [createEmptyCashLine(form.getValues('description') ?? '')], { shouldDirty: true });
     }
     const lastIndex = form.getValues('lines').length - 1;
     setTimeout(() => focusById(cashLineCellId('description', lastIndex), 'select'), 0);

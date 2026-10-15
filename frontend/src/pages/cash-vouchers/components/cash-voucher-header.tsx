@@ -178,7 +178,7 @@ export function CashVoucherHeader({
             />
           </div>
 
-          <div className="form-inline-grid form-cols-2">
+          <div className="form-inline-grid form-cols-2 form-align-top">
             <Label htmlFor="cash-reason" className="field-label required">Lý do</Label>
             {/* The message stays in the select's cell, so it sits under Lý do at every width. */}
             <div className="min-w-0">

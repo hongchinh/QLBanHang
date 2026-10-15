@@ -19,6 +19,14 @@
   --qldh-form-grid-columns: 90px minmax(140px, 1fr) 90px minmax(260px, 3fr);
 }
 
+/* A row whose cell can grow (a message under its control): labels and inputs stay level with the 28px controls. */
+.form-inline-grid.form-align-top {
+  align-items: start;
+}
+.form-inline-grid.form-align-top .field-label {
+  line-height: 1.75rem;
+}
+
 .form-inline-grid.info-row-3,
 .form-inline-grid.form-cols-3 {
   --qldh-form-grid-columns: 90px minmax(220px, 2fr) 90px minmax(120px, 1fr) 90px minmax(120px, 1fr);

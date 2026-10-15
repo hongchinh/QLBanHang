@@ -150,13 +150,13 @@ describe('DebtTab', () => {
       expect(cells(rowOf('Cơ cấu nợ phải trả', 'Quá hạn 61–90 ngày'))).toEqual(['Quá hạn 61–90 ngày', '1.000', '20%']);
     });
 
-    it('"Tuổi nợ →" opens the aging of each side as at today', () => {
+    it('"Tuổi nợ" opens the aging of each side as at today', () => {
       renderTab();
 
-      const receivable = within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Tuổi nợ →' });
+      const receivable = within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Tuổi nợ' });
       expect(receivable).toHaveAttribute('href', `/reports/debt-aging?side=Receivable&at=${todayYmd()}`);
       expect(receivable).toHaveAttribute('title', HINT);
-      const payable = within(tile('Cơ cấu nợ phải trả')).getByRole('link', { name: 'Tuổi nợ →' });
+      const payable = within(tile('Cơ cấu nợ phải trả')).getByRole('link', { name: 'Tuổi nợ' });
       expect(payable).toHaveAttribute('href', `/reports/debt-aging?side=Payable&at=${todayYmd()}`);
       expect(payable).toHaveAttribute('title', HINT);
     });
@@ -196,10 +196,10 @@ describe('DebtTab', () => {
       expect(within(rowOf('Khách nợ nhiều nhất', 'Khách lẻ')).getByText('0')).not.toHaveClass('text-rose-700');
     });
 
-    it('"Số dư công nợ →" opens the receivable balance of the period', () => {
+    it('"Số dư công nợ" opens the receivable balance of the period', () => {
       renderTab();
 
-      const link = within(tile('Khách nợ nhiều nhất')).getByRole('link', { name: 'Số dư công nợ →' });
+      const link = within(tile('Khách nợ nhiều nhất')).getByRole('link', { name: 'Số dư công nợ' });
       expect(link).toHaveAttribute('href', '/reports/debt-balance?side=Receivable&from=2026-10-01&to=2026-10-13');
       expect(link).toHaveAttribute('title', HINT);
     });
@@ -231,10 +231,10 @@ describe('DebtTab', () => {
     });
 
     // The credit limits page shows the limits of the working branch only, while the list covers the scope.
-    it('"Hạn mức nợ →" opens the credit limits with the hint of the working branch', () => {
+    it('"Hạn mức nợ" opens the credit limits with the hint of the working branch', () => {
       renderTab();
 
-      const link = within(tile('Khách vượt hạn mức')).getByRole('link', { name: 'Hạn mức nợ →' });
+      const link = within(tile('Khách vượt hạn mức')).getByRole('link', { name: 'Hạn mức nợ' });
       expect(link).toHaveAttribute('href', '/credit-limits');
       expect(link).toHaveAttribute('title', HINT);
     });
@@ -249,10 +249,10 @@ describe('DebtTab', () => {
       expect(cells(rowOf('Công nợ theo nhân viên', 'Không xác định'))).toEqual(['Không xác định', '1.000', '1.000']);
     });
 
-    it('"Công nợ theo nhân viên →" opens the report of the period', () => {
+    it('"Công nợ theo nhân viên" opens the report of the period', () => {
       renderTab();
 
-      const link = within(tile('Công nợ theo nhân viên')).getByRole('link', { name: 'Công nợ theo nhân viên →' });
+      const link = within(tile('Công nợ theo nhân viên')).getByRole('link', { name: 'Công nợ theo nhân viên' });
       expect(link).toHaveAttribute('href', '/reports/debt-by-salesperson?side=Receivable&from=2026-10-01&to=2026-10-13');
       expect(link).toHaveAttribute('title', HINT);
     });
@@ -277,10 +277,10 @@ describe('DebtTab', () => {
       expect(within(payables).getByText('NK00007')).toHaveAttribute('title', 'Chứng từ của chi nhánh CN02');
     });
 
-    it('"Số dư công nợ →" opens the payable balance of the period', () => {
+    it('"Số dư công nợ" opens the payable balance of the period', () => {
       renderTab();
 
-      expect(within(tile('Phải trả đến hạn 30 ngày')).getByRole('link', { name: 'Số dư công nợ →' })).toHaveAttribute(
+      expect(within(tile('Phải trả đến hạn 30 ngày')).getByRole('link', { name: 'Số dư công nợ' })).toHaveAttribute(
         'href',
         '/reports/debt-balance?side=Payable&from=2026-10-01&to=2026-10-13',
       );
@@ -304,9 +304,9 @@ describe('DebtTab', () => {
     state.scope = branchScope();
     renderTab({ ...MONTH, branchId: 'b1' });
 
-    expect(within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Tuổi nợ →' })).not.toHaveAttribute('title');
+    expect(within(tile('Cơ cấu nợ phải thu')).getByRole('link', { name: 'Tuổi nợ' })).not.toHaveAttribute('title');
     expect(within(tile('Khách nợ nhiều nhất')).getByRole('link', { name: 'KH001 – CT Xây dựng An Phát' })).not.toHaveAttribute('title');
-    expect(within(tile('Khách vượt hạn mức')).getByRole('link', { name: 'Hạn mức nợ →' })).not.toHaveAttribute('title');
+    expect(within(tile('Khách vượt hạn mức')).getByRole('link', { name: 'Hạn mức nợ' })).not.toHaveAttribute('title');
   });
 
   it('empty lists show "Chưa có dữ liệu."', () => {

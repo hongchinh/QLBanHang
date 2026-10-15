@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
-import { X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
@@ -90,7 +90,7 @@ export function CashPartnerFilter({ type, value, onSelect }: CashPartnerFilterPr
           onClick={() => pick(null)}
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent"
         >
-          <X className="h-4 w-4" />
+          <AppIcon name="close" />
         </button>
       )}
       {showDropdown && (

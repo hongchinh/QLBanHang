@@ -1,5 +1,5 @@
-import { Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { AppIcon } from '@/components/icons';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import type { NavItem } from '../nav-config';
@@ -32,7 +32,7 @@ function Highlight({ text, match }: { text: string; match?: MatchRange }) {
 }
 
 export function SidebarItem({ item, active, collapsed = false, match, pins, onNavigate }: SidebarItemProps) {
-  const { to, label, icon: Icon } = item;
+  const { to, label } = item;
   const pinned = pins?.pinned.has(to) ?? false;
   const link = (
     <Link
@@ -48,7 +48,7 @@ export function SidebarItem({ item, active, collapsed = false, match, pins, onNa
           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
       )}
     >
-      <Icon className="h-4 w-4 shrink-0" />
+      <AppIcon name={item.icon} />
       {!collapsed && <span className="truncate"><Highlight text={label} match={match} /></span>}
     </Link>
   );
@@ -78,7 +78,7 @@ export function SidebarItem({ item, active, collapsed = false, match, pins, onNa
                 : 'opacity-0 group-hover/item:opacity-100 [@media(hover:none)]:opacity-60',
             )}
           >
-            <Star className={cn('h-3.5 w-3.5', pinned && 'fill-current')} aria-hidden />
+            <AppIcon name="pin" size={14} className={cn(pinned && 'fill-current')} />
           </button>
         )}
       </div>

@@ -277,4 +277,12 @@ describe('OpeningStockPage', () => {
       lines: [{ productId: P1, quantity: 12.5, amount: 1_500_000 }],
     });
   });
+
+  it('uses the registry icons with their tones for add and delete row', () => {
+    render(<OpeningStockPage />);
+    const addIcon = screen.getByRole('button', { name: /Thêm dòng/ }).querySelector('[data-icon="add"]');
+    expect(addIcon).toHaveClass('text-icon-create');
+    const delIcon = screen.getAllByRole('button', { name: 'Xóa dòng' })[0].querySelector('[data-icon="delete"]');
+    expect(delIcon).toHaveClass('text-icon-danger');
+  });
 });

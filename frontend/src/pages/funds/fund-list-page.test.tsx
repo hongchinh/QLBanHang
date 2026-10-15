@@ -211,4 +211,12 @@ describe('FundListPage', () => {
     expect(within(cashRow).getByRole('button', { name: 'Xóa quỹ' })).toBeInTheDocument();
     expect(within(cashRow).queryByRole('button', { name: 'Số dư đầu kỳ' })).not.toBeInTheDocument();
   });
+
+  it('shows the opening-balance icon in the confirm tone', () => {
+    granted = new Set(['cash.opening_balance']);
+    renderPage();
+    const cashRow = screen.getByText('Quỹ tiền mặt').closest('tr')!;
+    const icon = within(cashRow).getByRole('button', { name: 'Số dư đầu kỳ' }).querySelector('[data-icon="openingBalance"]');
+    expect(icon).toHaveClass('text-icon-confirm');
+  });
 });

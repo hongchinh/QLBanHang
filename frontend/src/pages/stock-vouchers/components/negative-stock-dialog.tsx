@@ -1,4 +1,4 @@
-import { AlertTriangle } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -38,7 +38,7 @@ export function NegativeStockDialog({
       <DialogContent showClose={false} className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className={blocked ? 'h-5 w-5 text-red-600' : 'h-5 w-5 text-amber-600'} />
+            <AppIcon name="warning" size={20} tone={blocked ? 'danger' : 'warn'} />
             {blocked ? 'Không đủ tồn kho' : 'Cảnh báo âm kho'}
           </DialogTitle>
           <DialogDescription>

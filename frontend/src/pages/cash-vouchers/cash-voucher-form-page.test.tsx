@@ -576,6 +576,15 @@ describe('CashVoucherFormPage', () => {
     expect(screen.getByRole('textbox', { name: 'Diễn giải dòng 1' })).toHaveAttribute('aria-invalid', 'true');
   });
 
+  it('the close button of a managed voucher carries the muted closeForm icon', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher({ isManaged: true, canEdit: false, allocations: [] });
+    renderPage('Receipt');
+
+    const icon = screen.getByRole('button', { name: 'Đóng' }).querySelector('[data-icon="closeForm"]');
+    expect(icon).toHaveClass('text-icon-muted');
+  });
+
   it('managed voucher is read-only with a link to the stock voucher', () => {
     routeParams.id = V1;
     voucherState.data = voucher({

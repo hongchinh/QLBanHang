@@ -171,6 +171,12 @@ describe('CustomerAutocomplete', () => {
     expect(onAddNewClick).toHaveBeenCalled();
   });
 
+  it('Add-new button shows the add icon in the create tone', () => {
+    renderWithClient(<CustomerAutocomplete {...baseProps()} />);
+    const button = screen.getByRole('button', { name: /thêm mới khách hàng/i });
+    expect(button.querySelector('[data-icon="add"]')).toHaveClass('text-icon-create');
+  });
+
   it('renders empty state when no results', async () => {
     searchMock.mockResolvedValueOnce([]);
     renderWithClient(<CustomerAutocomplete {...baseProps()} inputAriaLabel="cust" />);

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from '@tanstack/react-table';
-import { CalendarDays, Pencil, Plus, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { branchesApi } from '@/features/branches/api';
 import { useBranches, useDeleteBranch } from '@/features/branches/hooks';
 import { branchKeys } from '@/features/branches/keys';
@@ -100,7 +100,7 @@ export function BranchesPage() {
               aria-label="Đặt ngày đầu kỳ"
               onClick={() => setOpeningDateTarget(row.original)}
             >
-              <CalendarDays className="h-4 w-4 text-slate-600" />
+              <AppIcon name="calendar" className="text-slate-600" />
             </Button>
             <Button
               variant="ghost"
@@ -111,7 +111,7 @@ export function BranchesPage() {
                 setDialogOpen(true);
               }}
             >
-              <Pencil className="h-4 w-4 text-blue-600" />
+              <AppIcon name="edit" />
             </Button>
             {row.original.isDemo ? (
               <Button
@@ -123,7 +123,7 @@ export function BranchesPage() {
                 title={row.original.sampleDataStatus === 'Running' ? 'Đang tạo dữ liệu mẫu' : undefined}
                 onClick={() => setPendingDemoDelete(row.original)}
               >
-                <Trash2 className="h-4 w-4 text-red-600" />
+                <AppIcon name="delete" />
               </Button>
             ) : (
               <Button
@@ -132,7 +132,7 @@ export function BranchesPage() {
                 aria-label="Xóa chi nhánh"
                 onClick={() => setPendingDelete(row.original)}
               >
-                <Trash2 className="h-4 w-4 text-red-600" />
+                <AppIcon name="delete" />
               </Button>
             )}
           </div>
@@ -167,7 +167,7 @@ export function BranchesPage() {
           <p className="text-sm text-muted-foreground">Quản lý danh sách chi nhánh</p>
         </div>
         <Button onClick={openCreate}>
-          <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm chi nhánh
+          <AppIcon name="add" className="mr-2" /> Thêm chi nhánh
         </Button>
       </div>
 

@@ -44,6 +44,29 @@ describe('VoucherPrintButton', () => {
     localStorage.clear();
   });
 
+  it('shows the print and chevron icons when idle, and the format icons in the menu', async () => {
+    const user = userEvent.setup();
+    renderButton();
+    const button = screen.getByRole('button', { name: 'In' });
+    expect(button.querySelector('[data-icon="print"]')).not.toBeNull();
+    expect(button.querySelector('[data-icon="print"]')).not.toHaveClass('text-icon-print');
+    expect(button.querySelector('[data-icon="chevronDown"]')).not.toBeNull();
+    await user.click(button);
+    expect(screen.getByRole('menuitem', { name: 'In (PDF)' }).querySelector('[data-icon="exportPdf"]')).not.toBeNull();
+    expect(screen.getByRole('menuitem', { name: 'Excel' }).querySelector('[data-icon="exportExcel"]')).not.toBeNull();
+  });
+
+  it.each([
+    ['button', 'In'],
+    ['icon', 'In PT00001'],
+  ] as const)('%s variant shows the button loader while printing', (variant, name) => {
+    printState.isPending = true;
+    renderButton({ variant });
+    const button = screen.getByRole('button', { name });
+    expect(button.querySelector('.button-loader')).not.toBeNull();
+    expect(button.querySelector('svg.animate-spin')).toBeNull();
+  });
+
   it('prints a PDF', async () => {
     const user = userEvent.setup();
     renderButton();

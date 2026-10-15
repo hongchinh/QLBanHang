@@ -177,3 +177,61 @@ describe('QuotationListPage status filter persistence', () => {
     });
   });
 });
+
+describe('QuotationListPage row action icons', () => {
+  beforeEach(() => {
+    useAuthStore.setState({
+      accessToken: 'test-token',
+      expiresAt: new Date(Date.now() + 3_600_000).toISOString(),
+      user: ADMIN_USER,
+    });
+    vi.mocked(quotationsApi.list).mockResolvedValue({
+      items: [
+        {
+          id: 'q1',
+          code: 'BG-0001',
+          quotationDate: '2026-01-01',
+          customerName: 'Khach A',
+          subtotal: 100,
+          discount: 0,
+          freight: 0,
+          taxRate: 0,
+          taxAmount: 0,
+          total: 100,
+          advancePayment: 0,
+          status: 'Draft',
+          ownerUserId: 'u1',
+          isOwnerDeleted: false,
+          canClone: true,
+          createdAt: '2026-01-01T00:00:00Z',
+        },
+      ],
+      totalItems: 1,
+      totalPages: 1,
+      hasPreviousPage: false,
+      hasNextPage: false,
+      aggregates: {},
+    } as never);
+  });
+
+  it('shows the print and clone icons in the row menu and a button loader while an export runs', async () => {
+    const user = userEvent.setup();
+    vi.mocked(quotationsApi.downloadPdf).mockReturnValue(new Promise(() => {}));
+    renderPage();
+    await screen.findByText('BG-0001');
+
+    await user.click(screen.getByRole('button', { name: 'Thao tác khác' }));
+    const menu = await screen.findByRole('menu');
+    expect(menu.querySelector('[data-icon="print"]')).not.toBeNull();
+    expect(menu.querySelector('[data-icon="clone"]')).not.toBeNull();
+
+    await user.click(within(menu).getAllByRole('menuitem', { name: /Báo giá/ })[0]);
+    await user.click(screen.getByRole('button', { name: 'Thao tác khác' }));
+    const busyMenu = await screen.findByRole('menu');
+    const item = within(busyMenu).getAllByRole('menuitem', { name: /Báo giá/ })[0];
+    expect(item.querySelector('.button-loader')).not.toBeNull();
+    const trigger = screen.getByRole('button', { name: 'Thao tác khác', hidden: true });
+    expect(trigger.querySelector('.button-loader')).not.toBeNull();
+    expect(trigger.querySelector('[data-icon="loading"]')).toBeNull();
+  });
+});

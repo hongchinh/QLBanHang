@@ -146,6 +146,16 @@ describe('RolesMatrixPage', () => {
       expect(screen.getByText(/1 thay đổi chưa lưu/i)).toBeInTheDocument(),
     );
     expect(screen.getByRole('button', { name: /Lưu thay đổi/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Hủy/i }).querySelector('[data-icon="discardChanges"]')).not.toBeNull();
+  });
+
+  it('add-role button keeps a white (untoned) add icon on the filled button', async () => {
+    renderPage();
+    await waitForMatrix();
+
+    const icon = screen.getByRole('button', { name: /Thêm role/i }).querySelector('[data-icon="add"]');
+    expect(icon).not.toBeNull();
+    expect([...icon!.classList].some((c) => c.startsWith('text-icon-'))).toBe(false);
   });
 
   it('saves only dirty role via updatePermissions and clears dirty state', async () => {

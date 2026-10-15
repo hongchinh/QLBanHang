@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
-import { Plus, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { CellError, MoneyCell } from '@/components/money-cell/money-cell';
 import { createEmptyCashLine } from '@/features/cash-vouchers/payload';
 import type {
@@ -132,8 +132,8 @@ export function CashLineGrid({ form, readOnly }: CashLineGridProps) {
                   {!readOnly && (
                     <td className="cell-action">
                       <button type="button" aria-label={`Xóa dòng ${idx + 1}`} onClick={() => remove(idx)}>
-                        <Trash2
-                          className="h-4 w-4 text-red-600"
+                        <AppIcon
+                          name="delete"
                           style={{ display: 'inline-block', verticalAlign: 'middle' }}
                         />
                       </button>
@@ -171,7 +171,7 @@ export function CashLineGrid({ form, readOnly }: CashLineGridProps) {
       {!readOnly && (
         <div className="line-items-toolbar">
           <button type="button" className="lib-btn" onClick={addLine}>
-            <Plus className="h-4 w-4 text-cyan-600" />
+            <AppIcon name="add" />
             Thêm dòng
           </button>
         </div>

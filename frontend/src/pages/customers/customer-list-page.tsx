@@ -6,7 +6,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from '@tanstack/react-table';
-import { Plus, Pencil, Trash2, Search } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useCustomers, useDeleteCustomer } from '@/features/customers/hooks';
 import type { CustomerGroup, CustomerListItem } from '@/features/customers/types';
 import { Button } from '@/components/ui/button';
@@ -74,7 +74,7 @@ export function CustomerListPage() {
             <Can permission="customers.update">
               <Button asChild variant="ghost" size="icon" aria-label="Sửa khách hàng">
                 <Link to={`/customers/${row.original.id}`}>
-                  <Pencil className="h-4 w-4 text-blue-600" />
+                  <AppIcon name="edit" />
                 </Link>
               </Button>
             </Can>
@@ -85,7 +85,7 @@ export function CustomerListPage() {
                 aria-label="Xóa khách hàng"
                 onClick={() => setPendingDelete(row.original)}
               >
-                <Trash2 className="h-4 w-4 text-red-600" />
+                <AppIcon name="delete" />
               </Button>
             </Can>
           </div>
@@ -133,7 +133,7 @@ export function CustomerListPage() {
         <Can permission="customers.create">
           <Button asChild>
             <Link to="/customers/new">
-              <Plus className="mr-2 h-4 w-4 text-cyan-600" /> Thêm khách hàng
+              <AppIcon name="add" className="mr-2" /> Thêm khách hàng
             </Link>
           </Button>
         </Can>
@@ -143,7 +143,7 @@ export function CustomerListPage() {
         <CardContent className="p-4">
           <div className="mb-4 flex items-center gap-2">
             <div className="relative max-w-sm flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+              <AppIcon name="search" className="absolute left-3 top-1/2 -translate-y-1/2" />
               <Input
                 placeholder="Tìm theo tên / mã / SĐT / MST..."
                 value={search}

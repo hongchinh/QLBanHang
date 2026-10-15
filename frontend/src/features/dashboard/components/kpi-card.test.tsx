@@ -21,7 +21,8 @@ describe('KpiCard', () => {
         kpi={{ value: 10, deltaPct: 12.5, spark: [] }}
       />,
     );
-    const badge = screen.getByText(/▲\s*12\.5%/);
+    const badge = screen.getByText('12.5%');
+    expect(screen.getByRole('img', { name: 'tăng' })).toBeInTheDocument();
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain('emerald');
   });
@@ -33,7 +34,8 @@ describe('KpiCard', () => {
         kpi={{ value: 10, deltaPct: -3.2, spark: [] }}
       />,
     );
-    const badge = screen.getByText(/▼\s*3\.2%/);
+    const badge = screen.getByText('3.2%');
+    expect(screen.getByRole('img', { name: 'giảm' })).toBeInTheDocument();
     expect(badge).toBeInTheDocument();
     expect(badge.className).toContain('rose');
   });
@@ -56,6 +58,33 @@ describe('KpiCard', () => {
       />,
     );
     expect(container.querySelector('svg')).toBeNull();
+  });
+
+  it('renders a label icon without a tone class', () => {
+    const { container } = render(
+      <KpiCard
+        label="Doanh thu hôm nay"
+        icon="kpiRevenueToday"
+        kpi={{ value: 1, deltaPct: 5, spark: [] }}
+      />,
+    );
+    const icon = container.querySelector('[data-icon="kpiRevenueToday"]');
+    expect(icon).not.toBeNull();
+    expect(icon!.getAttribute('class')).not.toMatch(/text-icon-/);
+    expect(screen.getByText('Doanh thu hôm nay').parentElement!.contains(icon)).toBe(true);
+    expect(icon).toHaveAttribute('width', '18');
+  });
+
+  it('renders no icon in the label row when icon is omitted', () => {
+    const { container } = render(
+      <KpiCard
+        label="Doanh thu hôm nay"
+        kpi={{ value: 1, deltaPct: 5, spark: [] }}
+      />,
+    );
+    const labelRow = screen.getByText('Doanh thu hôm nay').parentElement!;
+    expect(labelRow.querySelector('svg[data-icon]')).toBeNull();
+    expect(container.querySelector('[data-icon="kpiRevenueToday"]')).toBeNull();
   });
 
   it('renders sparkline when spark has data', () => {

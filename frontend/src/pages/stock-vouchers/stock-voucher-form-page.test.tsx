@@ -655,6 +655,17 @@ describe('StockVoucherFormPage', () => {
     expect(createMock).toHaveBeenCalledTimes(1);
   });
 
+  it('edit mode of an effective voucher shows the cancel and delete buttons with red icons', () => {
+    routeParams.id = V1;
+    voucherState.data = voucher();
+    renderPage('In');
+
+    const cancelIcon = screen.getByRole('button', { name: 'Hủy phiếu' }).querySelector('[data-icon="cancelVoucher"]');
+    expect(cancelIcon).toHaveClass('text-icon-danger');
+    const deleteIcon = screen.getByRole('button', { name: 'Xóa' }).querySelector('[data-icon="delete"]');
+    expect(deleteIcon).toHaveClass('text-icon-danger');
+  });
+
   it('cancel warning resends cancel with acknowledgement', async () => {
     routeParams.id = V1;
     voucherState.data = voucher();

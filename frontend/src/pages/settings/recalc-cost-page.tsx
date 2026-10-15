@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calculator, X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { useInventorySettings, useRecalcCost } from '@/features/inventory-settings/hooks';
 import type { CostingPeriod } from '@/features/inventory-settings/types';
 import { listPeriodStarts, RECALC_TIMEOUT_TOAST } from '@/features/inventory-settings/utils';
@@ -139,7 +139,7 @@ export function RecalcCostPage() {
                     aria-label="Bỏ chọn hàng hóa"
                     onClick={() => setProduct(null)}
                   >
-                    <X className="h-4 w-4 text-red-600" />
+                    <AppIcon name="remove" />
                   </Button>
                 </div>
               ) : (
@@ -161,7 +161,7 @@ export function RecalcCostPage() {
               onClick={() => setConfirmOpen(true)}
               disabled={!settings.data || !selectedPeriod || recalc.isPending}
             >
-              <Calculator className="mr-2 h-4 w-4 text-blue-600" /> Tính lại giá vốn
+              <AppIcon name="recalcCost" className="mr-2" /> Tính lại giá vốn
             </Button>
           </div>
         </CardContent>

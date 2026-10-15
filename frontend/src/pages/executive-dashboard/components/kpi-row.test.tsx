@@ -201,18 +201,24 @@ describe('KpiRow', () => {
   it('shows the hints and the deltas', () => {
     renderRow();
 
-    expect(within(tileOf('Doanh thu xuất bán')).getByText('▲ 12,4%')).toBeInTheDocument();
+    expect(within(tileOf('Doanh thu xuất bán')).getByText('12,4%')).toBeInTheDocument();
+    expect(within(tileOf('Doanh thu xuất bán')).getByRole('img', { name: 'tăng' })).toBeInTheDocument();
     expect(within(tileOf('Doanh thu xuất bán')).getByText('so với kỳ trước')).toBeInTheDocument();
-    expect(within(tileOf('Thu − chi ròng')).getByText('▲ 24%')).toBeInTheDocument();
+    expect(within(tileOf('Thu − chi ròng')).getByText('24%')).toBeInTheDocument();
+    expect(within(tileOf('Thu − chi ròng')).getByRole('img', { name: 'tăng' })).toBeInTheDocument();
     expect(within(tileOf('Thu − chi ròng')).getByText('Thu 2,10 tỷ · Chi 1,91 tỷ')).toBeInTheDocument();
     expect(within(tileOf('Tồn quỹ')).getByText('TM 210 tr · NH 1,05 tỷ')).toBeInTheDocument();
     expect(within(tileOf('Phải thu')).getByText('Quá hạn 420 tr')).toBeInTheDocument();
     expect(within(tileOf('Phải trả')).getByText('Đến hạn 7 ngày: 310 tr')).toBeInTheDocument();
     expect(within(tileOf('Giá trị tồn kho')).getByText('318 mã · 3 kho')).toBeInTheDocument();
-    // The balance tiles and the gross profit have no delta.
-    for (const label of ['Lãi gộp', 'Tồn quỹ', 'Phải thu', 'Phải trả', 'Giá trị tồn kho']) {
-      expect(within(tileOf(label)).queryByText(/[▲▼] \d+(,\d)?%/)).not.toBeInTheDocument();
+    // The balance tiles have no delta (the gross profit has an arrow only in its margin hint).
+    for (const label of ['Tồn quỹ', 'Phải thu', 'Phải trả', 'Giá trị tồn kho']) {
+      expect(within(tileOf(label)).queryByRole('img', { name: /tăng|giảm/ })).not.toBeInTheDocument();
     }
+    // The gross profit tile has exactly one arrow, inside its margin hint.
+    const arrows = within(tileOf('Lãi gộp')).getAllByRole('img', { name: /tăng|giảm/ });
+    expect(arrows).toHaveLength(1);
+    expect(within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/)).toContainElement(arrows[0]);
   });
 
   it('a revenue without a previous one has "—" as delta', () => {
@@ -228,29 +234,37 @@ describe('KpiRow', () => {
 
       const hint = within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/);
       expect(hint).toHaveTextContent('Tỷ suất 14,5%');
-      expect(hint).toHaveTextContent('▲ 0,8 điểm');
-      expect(hint.textContent).toBe('Tỷ suất 14,5% (▲ 0,8 điểm)');
+      expect(hint).toHaveTextContent('0,8 điểm');
+      expect(hint.textContent).toBe('Tỷ suất 14,5% (0,8 điểm)');
+      expect(within(hint).getByRole('img', { name: 'tăng' })).toBeInTheDocument();
+      expect(within(hint).getByText('0,8').closest('span')).toHaveClass('whitespace-nowrap');
     });
 
     it('rounds the change to one decimal', () => {
       answer(useSalesSummary, ok({ ...SALES, marginPct: 14.56, prevMarginPct: 13.71 }));
       renderRow();
 
-      expect(within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/).textContent).toBe('Tỷ suất 14,6% (▲ 0,9 điểm)');
+      const hint = within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/);
+      expect(hint.textContent).toBe('Tỷ suất 14,6% (0,9 điểm)');
+      expect(within(hint).getByRole('img', { name: 'tăng' })).toBeInTheDocument();
     });
 
     it('rounds a fall the same way as a rise', () => {
       answer(useSalesSummary, ok({ ...SALES, marginPct: 13.71, prevMarginPct: 14.56 }));
       renderRow();
 
-      expect(within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/).textContent).toBe('Tỷ suất 13,7% (▼ 0,9 điểm)');
+      const hint = within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/);
+      expect(hint.textContent).toBe('Tỷ suất 13,7% (0,9 điểm)');
+      expect(within(hint).getByRole('img', { name: 'giảm' })).toBeInTheDocument();
     });
 
-    it('a lower margin than before is ▼', () => {
+    it('a lower margin than before is a down arrow', () => {
       answer(useSalesSummary, ok({ ...SALES, marginPct: 13, prevMarginPct: 14.5 }));
       renderRow();
 
-      expect(within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/).textContent).toBe('Tỷ suất 13% (▼ 1,5 điểm)');
+      const hint = within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/);
+      expect(hint.textContent).toBe('Tỷ suất 13% (1,5 điểm)');
+      expect(within(hint).getByRole('img', { name: 'giảm' })).toBeInTheDocument();
     });
 
     // A change that rounds to 0 points has no arrow: "▲ 0" would read as a rise of a margin that fell.
@@ -262,9 +276,9 @@ describe('KpiRow', () => {
       answer(useSalesSummary, ok({ ...SALES, marginPct, prevMarginPct }));
       renderRow();
 
-      const hint = within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/).textContent;
-      expect(hint).toMatch(/^Tỷ suất 14,5% \(±0 điểm\)$/);
-      expect(hint).not.toMatch(/[▲▼]/);
+      const hint = within(tileOf('Lãi gộp')).getByText(/^Tỷ suất/);
+      expect(hint.textContent).toMatch(/^Tỷ suất 14,5% \(±0 điểm\)$/);
+      expect(within(hint).queryByRole('img')).not.toBeInTheDocument();
     });
 
     it('has no change without a previous margin', () => {
@@ -491,11 +505,15 @@ describe('KpiRow', () => {
       expect(element).toHaveClass('truncate');
       expect(element).toHaveAttribute('title', label);
     }
-    for (const hint of ['so với kỳ trước', 'Thu 2,10 tỷ · Chi 1,91 tỷ', 'TM 210 tr · NH 1,05 tỷ', 'Quá hạn 420 tr', 'Đến hạn 7 ngày: 310 tr', '318 mã · 3 kho', 'Tỷ suất 14,5% (▲ 0,8 điểm)']) {
+    for (const hint of ['so với kỳ trước', 'Thu 2,10 tỷ · Chi 1,91 tỷ', 'TM 210 tr · NH 1,05 tỷ', 'Quá hạn 420 tr', 'Đến hạn 7 ngày: 310 tr', '318 mã · 3 kho']) {
       const element = screen.getByText(hint);
       expect(element).not.toHaveClass('truncate');
       expect(element.parentElement?.className).not.toMatch(/\b(whitespace-nowrap|truncate|line-clamp-\d)\b/);
       expect(element).toHaveAttribute('title', hint);
     }
+    // The margin hint holds an icon, so it is not text: it flows the same way but has no title.
+    const margin = screen.getByText(/^Tỷ suất 14,5%/);
+    expect(margin).not.toHaveClass('truncate');
+    expect(margin.parentElement?.className).not.toMatch(/\b(whitespace-nowrap|truncate|line-clamp-\d)\b/);
   });
 });

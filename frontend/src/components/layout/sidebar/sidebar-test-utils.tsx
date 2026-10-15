@@ -1,12 +1,11 @@
 import { act, render } from '@testing-library/react';
 import { MemoryRouter, useLocation, useNavigate, type NavigateFunction } from 'react-router-dom';
-import { LayoutDashboard } from 'lucide-react';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { useUiStore } from '@/stores/ui-store';
 import { visibleNavGroups, type NavGroup, type NavItem } from '../nav-config';
 import { Sidebar } from './sidebar';
 
-const DASHBOARD: NavItem = { to: '/admin/dashboard', label: 'Tổng quan', icon: LayoutDashboard };
+const DASHBOARD: NavItem = { to: '/admin/dashboard', label: 'Tổng quan', icon: 'overview' };
 
 export function allNavGroups(): NavGroup[] {
   return visibleNavGroups(() => true, () => true);

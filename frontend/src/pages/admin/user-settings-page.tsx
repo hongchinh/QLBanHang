@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowRightLeft } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Can } from '@/components/auth/can';
@@ -107,7 +107,7 @@ export function UserSettingsPage() {
               variant="outline"
               onClick={() => navigate(`/admin/users/${userId}/transfer-quotations`)}
             >
-              <ArrowRightLeft className="mr-2 h-4 w-4" />
+              <AppIcon name="transferOwnership" className="mr-2" />
               Mở trang chuyển nhượng
             </Button>
           </CardContent>

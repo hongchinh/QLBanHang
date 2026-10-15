@@ -1,7 +1,7 @@
 import { createPortal } from 'react-dom';
 import { useLayoutEffect, useRef, useState, type CSSProperties, type FocusEvent, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
-import { Keyboard, Plus, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CellError } from '@/components/money-cell/money-cell';
@@ -716,7 +716,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
               // The button disappears with its row: move the focus to the line that takes its place.
               removeLine(idx, 'product-code');
             }}>
-            <Trash2 className="h-4 w-4 text-red-600" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
+            <AppIcon name="delete" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
           </button>
         );
     }
@@ -733,7 +733,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         <div className="flex items-center gap-2">
           {!readOnly && (
             <button type="button" id="stock-line-add" className="lib-btn" onClick={addLine}>
-              <Plus className="h-4 w-4 text-cyan-600" />
+              <AppIcon name="add" />
               Thêm dòng
             </button>
           )}
@@ -746,7 +746,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
         <Popover>
           <PopoverTrigger asChild>
             <Button type="button" variant="outline" size="sm" className="keyboard-guide-trigger h-7">
-              <Keyboard className="mr-1.5 h-4 w-4" />
+              <AppIcon name="keyboard" className="mr-1.5" />
               Phím tắt
             </Button>
           </PopoverTrigger>

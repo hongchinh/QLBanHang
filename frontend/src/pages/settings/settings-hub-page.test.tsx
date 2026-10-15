@@ -48,6 +48,13 @@ describe('SettingsHubPage', () => {
     }
   });
 
+  it('draws the branches card with its settings icon', () => {
+    granted = new Set(['branches.manage']);
+    renderHub();
+
+    expect(screen.getByText('Chi nhánh').closest('a')?.querySelector('[data-icon="settingsBranches"]')).not.toBeNull();
+  });
+
   it('shows the cash settings card', () => {
     granted = new Set(['cash.settings']);
     renderHub();

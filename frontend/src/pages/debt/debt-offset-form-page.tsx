@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ArrowLeft, Ban, Eraser, Save, Sparkles, Trash2 } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
 import { useOpenItems } from '@/features/debt/hooks';
 import { suggestMatching, type MatchRow } from '@/features/debt/matching';
@@ -155,7 +155,7 @@ function DebtOffsetCreateForm({ defaults }: { defaults?: DebtOffsetDefaults }) {
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
               <Link to={BASE_PATH}>
-                <ArrowLeft className="h-4 w-4 text-slate-500" />
+                <AppIcon name="back" />
               </Link>
             </Button>
             <h1 className="truncate text-xl font-bold">Thêm {TITLE.toLowerCase()}</h1>
@@ -165,7 +165,7 @@ function DebtOffsetCreateForm({ defaults }: { defaults?: DebtOffsetDefaults }) {
           </div>
           {canCreate && (
             <Button type="button" size="sm" onClick={() => void save()} disabled={!canSave}>
-              {busy ? <ButtonLoader className="mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+              {busy ? <ButtonLoader className="mr-2" /> : <AppIcon name="save" tone="none" className="mr-2" />}
               Lưu
             </Button>
           )}
@@ -276,7 +276,7 @@ function DebtOffsetCreateForm({ defaults }: { defaults?: DebtOffsetDefaults }) {
                 onClick={suggest}
                 disabled={!canCreate || receivableItems.length === 0 || payableItems.length === 0}
               >
-                <Sparkles className="mr-1 h-4 w-4 text-violet-600" />
+                <AppIcon name="autoMatch" className="mr-1" />
                 Gợi ý
               </Button>
               <Button
@@ -285,7 +285,7 @@ function DebtOffsetCreateForm({ defaults }: { defaults?: DebtOffsetDefaults }) {
                 onClick={clear}
                 disabled={receivables.length === 0 && payables.length === 0}
               >
-                <Eraser className="mr-1 h-4 w-4 text-red-600" />
+                <AppIcon name="clearMatches" className="mr-1" />
                 Bỏ chọn
               </Button>
             </div>
@@ -399,7 +399,7 @@ function DebtOffsetDetail({ offset, refetch, activities }: DetailProps) {
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
               <Link to={BASE_PATH}>
-                <ArrowLeft className="h-4 w-4 text-slate-500" />
+                <AppIcon name="back" />
               </Link>
             </Button>
             <h1 className="truncate text-xl font-bold">{`${TITLE} ${offset.code}`}</h1>
@@ -408,14 +408,14 @@ function DebtOffsetDetail({ offset, refetch, activities }: DetailProps) {
           <div className="flex flex-wrap justify-end gap-2">
             {offset.canCancel && !isCancelled && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('cancel')} disabled={busy}>
-                <Ban className="mr-2 h-4 w-4 text-red-600" />
+                <AppIcon name="cancelVoucher" className="mr-2" />
                 Hủy phiếu
               </Button>
             )}
             {/* The server deletes an offset in any status. */}
             {offset.canDelete && (
               <Button type="button" variant="outline" size="sm" onClick={() => setConfirmKind('delete')} disabled={busy}>
-                <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                <AppIcon name="delete" className="mr-2" />
                 Xóa
               </Button>
             )}

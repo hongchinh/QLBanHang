@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Presentation } from 'lucide-react';
+import { iconDef, type IconName } from '@/components/icons';
 import type { Permission, Role } from '@/lib/permissions';
 import { visibleNavGroups } from './nav-config';
 
@@ -96,7 +96,7 @@ describe('visibleNavGroups', () => {
 
   it('the executive dashboard is the first report item and follows dashboard.executive', () => {
     const first = all().find((g) => g.id === 'reports')!.items[0];
-    expect(first).toEqual({ to: '/dashboard/executive', label: 'Điều hành', icon: Presentation, section: 'Tổng hợp' });
+    expect(first).toEqual({ to: '/dashboard/executive', label: 'Điều hành', icon: 'executiveDashboard', section: 'Tổng hợp' });
     expect(paths(['dashboard.executive'], 'reports')).toEqual(['/dashboard/executive']);
     expect(paths(ACCOUNTANT_CASH_PERMS, 'reports')).not.toContain('/dashboard/executive');
   });
@@ -128,11 +128,12 @@ describe('visibleNavGroups', () => {
     expect(paths(SALES_PERMS, 'system')).not.toContain('/settings');
   });
 
-  it('every item icon is unique and differs from every group icon', () => {
+  it('every item drawing is unique and differs from every group drawing', () => {
     const groups = all();
-    const itemIcons = groups.flatMap((g) => g.items.map((i) => i.icon));
+    const drawing = (name: IconName) => iconDef(name).icon;
+    const itemIcons = groups.flatMap((g) => g.items.map((i) => drawing(i.icon)));
     expect(new Set(itemIcons).size).toBe(itemIcons.length);
-    const groupIcons = new Set(groups.map((g) => g.icon));
+    const groupIcons = new Set(groups.map((g) => drawing(g.icon)));
     expect(groupIcons.size).toBe(groups.length);
     expect(itemIcons.filter((icon) => groupIcons.has(icon))).toEqual([]);
   });

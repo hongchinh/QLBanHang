@@ -2,23 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useForm, useWatch, Controller, type Resolver } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
-  ArrowLeft,
-  ArrowRightLeft,
-  BadgeCheck,
-  Ban,
-  CheckCircle2,
-  ChevronDown,
-  CirclePlus,
-  Clock,
-  Copy,
-  FileSpreadsheet,
-  Loader2,
-  Printer,
-  Save,
-  Send,
-  X,
-} from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   useCloneQuotation,
   useCreateQuotation,
@@ -498,7 +482,7 @@ function QuotationFormInner({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2">
           <Button variant="ghost" size="icon" asChild aria-label="Quay lại">
-            <Link to="/quotations"><ArrowLeft className="h-4 w-4 text-slate-500" /></Link>
+            <Link to="/quotations"><AppIcon name="back" /></Link>
           </Button>
           <h1 className="truncate text-xl font-bold">{isEdit ? 'Chỉnh sửa báo giá' : 'Thêm báo giá'}</h1>
           {isEdit && <StatusPill status={status} />}
@@ -515,7 +499,7 @@ function QuotationFormInner({
                 }}
                 aria-label="Xóa nháp"
               >
-                <X className="h-3 w-3" />
+                <AppIcon name="close" size={12} />
               </button>
             </div>
           )}
@@ -545,7 +529,7 @@ function QuotationFormInner({
                   disabled={isSubmitBusy}
                   aria-busy={pendingSubmitIntent === 'save-print'}
                 >
-                  {pendingSubmitIntent === 'save-print' ? <ButtonLoader className="mr-2" /> : <Printer className="mr-2 h-4 w-4 text-indigo-600" />}
+                  {pendingSubmitIntent === 'save-print' ? <ButtonLoader className="mr-2" /> : <AppIcon name="print" className="mr-2" />}
                   {pendingSubmitIntent === 'save-print' ? 'Đang xử lý...' : 'Lưu và in'}
                 </Button>
                 <Button
@@ -581,7 +565,7 @@ function QuotationFormInner({
                 disabled={isSubmitBusy}
                 aria-busy={pendingButtonAction === 'send'}
               >
-                {pendingButtonAction === 'send' ? <ButtonLoader className="mr-2" /> : <Send className="mr-2 h-4 w-4 text-cyan-600" />}
+                {pendingButtonAction === 'send' ? <ButtonLoader className="mr-2" /> : <AppIcon name="send" className="mr-2" />}
                 {pendingButtonAction === 'send' ? 'Đang gửi...' : 'Gửi'}
               </Button>
             )}
@@ -593,7 +577,7 @@ function QuotationFormInner({
                 disabled={isSubmitBusy}
                 aria-busy={pendingButtonAction === 'confirm'}
               >
-                {pendingButtonAction === 'confirm' ? <ButtonLoader className="mr-2" /> : <CheckCircle2 className="mr-2 h-4 w-4 text-emerald-600" />}
+                {pendingButtonAction === 'confirm' ? <ButtonLoader className="mr-2" /> : <AppIcon name="confirm" className="mr-2" />}
                 {pendingButtonAction === 'confirm' ? 'Đang xác nhận...' : 'Xác nhận'}
               </Button>
             )}
@@ -606,7 +590,7 @@ function QuotationFormInner({
                   disabled={isSubmitBusy}
                   aria-busy={pendingButtonAction === 'accounting-confirm'}
                 >
-                  {pendingButtonAction === 'accounting-confirm' ? <ButtonLoader className="mr-2" /> : <BadgeCheck className="mr-2 h-4 w-4" />}
+                  {pendingButtonAction === 'accounting-confirm' ? <ButtonLoader className="mr-2" /> : <AppIcon name="accountingConfirm" tone="none" className="mr-2" />}
                   {pendingButtonAction === 'accounting-confirm' ? 'Đang xác nhận...' : 'KT xác nhận'}
                 </Button>
               </Can>
@@ -627,7 +611,7 @@ function QuotationFormInner({
                 disabled={isSubmitBusy}
                 aria-busy={pendingButtonAction === 'cancel'}
               >
-                {pendingButtonAction === 'cancel' ? <ButtonLoader className="mr-2" /> : <Ban className="mr-2 h-4 w-4 text-red-600" />}
+                {pendingButtonAction === 'cancel' ? <ButtonLoader className="mr-2" /> : <AppIcon name="cancelVoucher" className="mr-2" />}
                 {pendingButtonAction === 'cancel' ? 'Đang hủy...' : 'Hủy'}
               </Button>
             )}
@@ -640,7 +624,7 @@ function QuotationFormInner({
                   disabled={isSubmitBusy}
                   aria-busy={pendingButtonAction === 'cancel'}
                 >
-                  {pendingButtonAction === 'cancel' ? <ButtonLoader className="mr-2" /> : <Ban className="mr-2 h-4 w-4 text-red-600" />}
+                  {pendingButtonAction === 'cancel' ? <ButtonLoader className="mr-2" /> : <AppIcon name="cancelVoucher" className="mr-2" />}
                   {pendingButtonAction === 'cancel' ? 'Đang hủy...' : 'Hủy'}
                 </Button>
               </Can>
@@ -653,7 +637,7 @@ function QuotationFormInner({
                 disabled={isSubmitBusy || !initial}
                 aria-busy={pendingButtonAction === 'clone' || clone.isPending}
               >
-                {pendingButtonAction === 'clone' || clone.isPending ? <ButtonLoader className="mr-2" /> : <Copy className="mr-2 h-4 w-4 text-violet-600" />}
+                {pendingButtonAction === 'clone' || clone.isPending ? <ButtonLoader className="mr-2" /> : <AppIcon name="clone" className="mr-2" />}
                 {pendingButtonAction === 'clone' || clone.isPending ? 'Đang nhân bản...' : 'Nhân bản'}
               </Button>
             </Can>
@@ -664,9 +648,9 @@ function QuotationFormInner({
                   size="sm"
                   disabled={isSubmitBusy}
                 >
-                  <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-700" />
+                  <AppIcon name="exportExcel" className="mr-2" />
                   Excel
-                  <ChevronDown className="ml-1 h-3 w-3" />
+                  <AppIcon name="chevronDown" size={12} className="ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -688,9 +672,9 @@ function QuotationFormInner({
                   size="sm"
                   disabled={isSubmitBusy}
                 >
-                  <Printer className="mr-2 h-4 w-4 text-indigo-600" />
+                  <AppIcon name="print" className="mr-2" />
                   In
-                  <ChevronDown className="ml-1 h-3 w-3" />
+                  <AppIcon name="chevronDown" size={12} className="ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -763,8 +747,8 @@ function QuotationFormInner({
                     className="h-7 gap-1.5 px-2.5 text-xs text-muted-foreground"
                     onClick={() => setActiveTab(activeTab === 'general' ? 'history' : 'general')}
                   >
-                    <Clock className="h-3.5 w-3.5" />
-                    {activeTab === 'general' ? 'Lịch sử' : '← Thông tin chung'}
+                    <AppIcon name="time" size={14} />
+                    {activeTab === 'general' ? 'Lịch sử' : <><AppIcon name="arrowLeft" size={14} /> Thông tin chung</>}
                   </Button>
                 )}
               </CardHeader>
@@ -999,7 +983,7 @@ function QuotationActivityHistory({
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-6 text-sm text-muted-foreground">
-        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+        <AppIcon name="loading" />
         Đang tải lịch sử...
       </div>
     );
@@ -1085,21 +1069,21 @@ function isoToDisplay(iso: string): string {
 function activityIcon(action: QuotationActivityAction) {
   switch (action) {
     case 'Created':
-      return <CirclePlus className="h-4 w-4 text-cyan-600" />;
+      return <AppIcon name="activityCreated" />;
     case 'Updated':
-      return <Save className="h-4 w-4 text-blue-600" />;
+      return <AppIcon name="activityUpdated" />;
     case 'Sent':
-      return <Send className="h-4 w-4 text-cyan-600" />;
+      return <AppIcon name="activitySent" />;
     case 'Confirmed':
-      return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+      return <AppIcon name="activityConfirmed" />;
     case 'AccountingConfirmed':
-      return <CheckCircle2 className="h-4 w-4 text-sky-600" />;
+      return <AppIcon name="activityAccountingConfirmed" />;
     case 'Cancelled':
-      return <Ban className="h-4 w-4 text-red-600" />;
+      return <AppIcon name="activityCancelled" />;
     case 'OwnerTransferred':
-      return <ArrowRightLeft className="h-4 w-4 text-violet-600" />;
+      return <AppIcon name="activityOwnerTransferred" />;
     case 'Cloned':
-      return <Copy className="h-4 w-4 text-violet-600" />;
+      return <AppIcon name="activityCloned" />;
   }
 }
 

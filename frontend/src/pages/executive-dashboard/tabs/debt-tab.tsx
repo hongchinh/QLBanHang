@@ -104,14 +104,14 @@ export function DebtTab({ params }: DebtTabProps) {
       <TileCard
         title="Cơ cấu nợ phải thu"
         query={summary}
-        action={{ label: 'Tuổi nợ →', to: executiveLinks.debtAging('Receivable', today), title: linkTitle }}
+        action={{ label: 'Tuổi nợ', to: executiveLinks.debtAging('Receivable', today), title: linkTitle }}
       >
         {summary.data && <DebtTermBar side={summary.data.receivable} buckets={summary.data.overdueBuckets} />}
       </TileCard>
       <TileCard
         title="Cơ cấu nợ phải trả"
         query={summary}
-        action={{ label: 'Tuổi nợ →', to: executiveLinks.debtAging('Payable', today), title: linkTitle }}
+        action={{ label: 'Tuổi nợ', to: executiveLinks.debtAging('Payable', today), title: linkTitle }}
       >
         {summary.data && <DebtTermBar side={summary.data.payable} buckets={summary.data.overdueBuckets} />}
       </TileCard>
@@ -119,7 +119,7 @@ export function DebtTab({ params }: DebtTabProps) {
         title="Khách nợ nhiều nhất"
         query={breakdown}
         isEmpty={topDebtors.length === 0}
-        action={{ label: 'Số dư công nợ →', to: executiveLinks.debtBalance('Receivable', from, to), title: linkTitle }}
+        action={{ label: 'Số dư công nợ', to: executiveLinks.debtBalance('Receivable', from, to), title: linkTitle }}
       >
         <DataTable columns={debtorColumns} rows={topDebtors} rowKey={(row) => row.partnerId} />
       </TileCard>
@@ -129,7 +129,7 @@ export function DebtTab({ params }: DebtTabProps) {
         isEmpty={overLimit.length === 0}
         // The credit limits page lists the limits of the working branch only (they are kept per branch), while
         // this list covers the scope: the branch hint applies.
-        action={{ label: 'Hạn mức nợ →', to: executiveLinks.creditLimits(), title: linkTitle }}
+        action={{ label: 'Hạn mức nợ', to: executiveLinks.creditLimits(), title: linkTitle }}
       >
         <DataTable columns={overLimitColumns} rows={overLimit} rowKey={(row) => `${row.partnerId}-${row.branchId}`} />
       </TileCard>
@@ -137,7 +137,7 @@ export function DebtTab({ params }: DebtTabProps) {
         title="Công nợ theo nhân viên"
         query={breakdown}
         isEmpty={byEmployee.length === 0}
-        action={{ label: 'Công nợ theo nhân viên →', to: executiveLinks.debtBySalesperson(from, to), title: linkTitle }}
+        action={{ label: 'Công nợ theo nhân viên', to: executiveLinks.debtBySalesperson(from, to), title: linkTitle }}
       >
         <DataTable columns={EMPLOYEE_COLUMNS} rows={byEmployee} rowKey={(row) => row.ownerUserId ?? 'none'} />
       </TileCard>
@@ -145,7 +145,7 @@ export function DebtTab({ params }: DebtTabProps) {
         title="Phải trả đến hạn 30 ngày"
         query={breakdown}
         isEmpty={payablesDue.length === 0}
-        action={{ label: 'Số dư công nợ →', to: executiveLinks.debtBalance('Payable', from, to), title: linkTitle }}
+        action={{ label: 'Số dư công nợ', to: executiveLinks.debtBalance('Payable', from, to), title: linkTitle }}
       >
         <DataTable columns={payableColumns} rows={payablesDue} rowKey={(row) => `${row.sourceType}-${row.sourceId}`} />
       </TileCard>

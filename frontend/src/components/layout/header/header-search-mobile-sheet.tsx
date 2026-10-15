@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { useGlobalSearch, SEARCH_MIN_LENGTH } from '@/features/search/hooks';
@@ -55,7 +55,7 @@ export function HeaderSearchMobileSheet() {
           aria-label="Mở tìm kiếm"
           className="flex h-11 w-11 items-center justify-center rounded-md text-header-fg hover:bg-header-active md:hidden"
         >
-          <Search className="h-5 w-5" />
+          <AppIcon name="search" size={20} tone="none" />
         </button>
       </SheetTrigger>
       {/* At least the old 12px, more where the notch (landscape) or status bar needs it. pt-safe would replace
@@ -66,7 +66,7 @@ export function HeaderSearchMobileSheet() {
       >
         <SheetTitle className="sr-only">Tìm kiếm</SheetTitle>
         <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <AppIcon name="search" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             ref={inputRef}
             type="search"

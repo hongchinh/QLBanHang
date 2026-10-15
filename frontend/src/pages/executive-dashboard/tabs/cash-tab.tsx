@@ -94,7 +94,7 @@ export function CashTab({ params }: CashTabProps) {
         title="Số dư các quỹ"
         query={summary}
         isEmpty={funds.length === 0}
-        action={{ label: 'Sổ quỹ →', to: executiveLinks.cashBook(), title: linkTitle }}
+        action={{ label: 'Sổ quỹ', to: executiveLinks.cashBook(), title: linkTitle }}
       >
         <FundBalanceTable funds={funds} showBranch={companyView} total={summary.data?.balance} />
       </TileCard>

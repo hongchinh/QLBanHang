@@ -1,16 +1,5 @@
 import { Link } from 'react-router-dom';
-import {
-  Building2,
-  Calculator,
-  Hash,
-  HandCoins,
-  Lock,
-  Settings,
-  SlidersHorizontal,
-  UserCog,
-  Users2,
-  type LucideIcon,
-} from 'lucide-react';
+import { AppIcon, type IconName } from '@/components/icons';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { Permission } from '@/lib/permissions';
 import { useAuthStore } from '@/stores/auth-store';
@@ -20,56 +9,56 @@ const INVENTORY_CARDS: {
   permission?: Permission;
   // Shown when the user has at least one of these.
   anyPermission?: Permission[];
-  icon: LucideIcon;
+  icon: IconName;
   title: string;
   description: string;
 }[] = [
   {
     to: '/settings/company',
     permission: 'settings.company',
-    icon: Building2,
+    icon: 'settingsCompany',
     title: 'Thông tin đơn vị',
     description: 'Tên, mã số thuế, người ký trên sổ sách.',
   },
   {
     to: '/settings/branches',
     permission: 'branches.manage',
-    icon: Building2,
+    icon: 'settingsBranches',
     title: 'Chi nhánh',
     description: 'Thêm, sửa, xóa chi nhánh.',
   },
   {
     to: '/settings/period-lock',
     permission: 'period_lock.manage',
-    icon: Lock,
+    icon: 'settingsPeriodLock',
     title: 'Khóa sổ',
     description: 'Khóa chứng từ kho đến một ngày theo từng chi nhánh.',
   },
   {
     to: '/settings/numbering',
     anyPermission: ['inventory.settings', 'cash.settings'],
-    icon: Hash,
+    icon: 'settingsNumbering',
     title: 'Đánh số chứng từ',
     description: 'Ký hiệu, độ dài và mẫu số phiếu kho, thu chi, chuyển quỹ, bù trừ công nợ.',
   },
   {
     to: '/settings/inventory',
     permission: 'inventory.settings',
-    icon: SlidersHorizontal,
+    icon: 'settingsInventory',
     title: 'Cấu hình kho',
     description: 'Phương pháp tính giá vốn, kỳ tính giá, chính sách xuất âm.',
   },
   {
     to: '/settings/recalc-cost',
     permission: 'inventory.recalc_cost',
-    icon: Calculator,
+    icon: 'settingsRecalcCost',
     title: 'Tính lại giá vốn',
     description: 'Tính lại giá vốn bình quân từ một kỳ đến nay.',
   },
   {
     to: '/settings/cash',
     permission: 'cash.settings',
-    icon: HandCoins,
+    icon: 'settingsCash',
     title: 'Cấu hình tiền & công nợ',
     description: 'Chính sách khi vượt hạn mức nợ và khi chi âm quỹ.',
   },
@@ -92,7 +81,7 @@ export function SettingsHubPage() {
             <Card className="h-full transition hover:border-primary">
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
+                  <AppIcon name="system" size={20} />
                   <CardTitle>Cấu hình hệ thống báo giá</CardTitle>
                 </div>
                 <CardDescription>
@@ -106,7 +95,7 @@ export function SettingsHubPage() {
           <Card className="h-full transition hover:border-primary">
             <CardHeader>
               <div className="flex items-center gap-2">
-                <UserCog className="h-5 w-5" />
+                <AppIcon name="mySettings" size={20} />
                 <CardTitle>Cài đặt báo giá của tôi</CardTitle>
               </div>
               <CardDescription>
@@ -121,7 +110,7 @@ export function SettingsHubPage() {
             <Card className="h-full transition hover:border-primary">
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Users2 className="h-5 w-5" />
+                  <AppIcon name="users" size={20} />
                   <CardTitle>Quản lý người dùng</CardTitle>
                 </div>
                 <CardDescription>
@@ -136,12 +125,12 @@ export function SettingsHubPage() {
           (c) =>
             (!c.permission || hasPermission(c.permission)) &&
             (!c.anyPermission || c.anyPermission.some((p) => hasPermission(p))),
-        ).map(({ to, icon: Icon, title, description }) => (
+        ).map(({ to, icon, title, description }) => (
           <Link key={to} to={to} className="block">
             <Card className="h-full transition hover:border-primary">
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Icon className="h-5 w-5" />
+                  <AppIcon name={icon} size={20} />
                   <CardTitle>{title}</CardTitle>
                 </div>
                 <CardDescription>{description}</CardDescription>

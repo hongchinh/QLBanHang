@@ -12,6 +12,12 @@ export default {
     },
     extend: {
       colors: {
+        icon: {
+          create: 'hsl(var(--icon-create))', edit: 'hsl(var(--icon-edit))', danger: 'hsl(var(--icon-danger))',
+          confirm: 'hsl(var(--icon-confirm))', info: 'hsl(var(--icon-info))', export: 'hsl(var(--icon-export))',
+          print: 'hsl(var(--icon-print))', accent: 'hsl(var(--icon-accent))', muted: 'hsl(var(--icon-muted))',
+          warn: 'hsl(var(--icon-warn))',
+        },
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

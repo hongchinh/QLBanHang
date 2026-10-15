@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Save, RotateCcw } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import {
   useAdminRoleDetails,
   useAdminRoles,
@@ -203,16 +203,16 @@ export function RolesMatrixPage() {
             <>
               <Badge variant="secondary">{dirty.size} thay đổi chưa lưu</Badge>
               <Button variant="outline" size="sm" onClick={handleReset}>
-                <RotateCcw className="h-4 w-4 mr-1" /> Hủy
+                <AppIcon name="discardChanges" className="mr-1" /> Hủy
               </Button>
               <Button size="sm" onClick={handleSaveClick} disabled={!canManage}>
-                <Save className="h-4 w-4 mr-1" /> Lưu thay đổi
+                <AppIcon name="save" tone="none" className="mr-1" /> Lưu thay đổi
               </Button>
             </>
           )}
           <Can permission="roles.manage">
             <Button size="sm" onClick={() => setCreateOpen(true)}>
-              <Plus className="h-4 w-4 mr-1" /> Thêm role
+              <AppIcon name="add" tone="none" className="mr-1" /> Thêm role
             </Button>
           </Can>
         </div>

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Check, Eraser, Sparkles } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide } from '@/features/cash-common/types';
 import { useCreateSettlementBatch, useOpenItems } from '@/features/debt/hooks';
@@ -140,15 +140,15 @@ function MatchingPanel({ partnerId, side }: { partnerId: string; side: DebtSide 
             onClick={suggest}
             disabled={decreaseItems.length === 0 || increaseItems.length === 0}
           >
-            <Sparkles className="mr-1 h-4 w-4 text-violet-600" />
+            <AppIcon name="autoMatch" className="mr-1" />
             Gợi ý
           </Button>
           <Button type="button" variant="outline" onClick={clear} disabled={left.length === 0 && right.length === 0}>
-            <Eraser className="mr-1 h-4 w-4 text-red-600" />
+            <AppIcon name="clearMatches" className="mr-1" />
             Xóa
           </Button>
           <Button type="button" onClick={save} disabled={!canSave}>
-            <Check className="mr-1 h-4 w-4" />
+            <AppIcon name="applyMatching" className="mr-1" />
             {create.isPending ? 'Đang lưu...' : 'Đối trừ'}
           </Button>
         </div>

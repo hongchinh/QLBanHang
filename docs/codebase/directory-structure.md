@@ -132,6 +132,7 @@ frontend/src/
 │   ├── confirm-required-dialog/ # dialog for confirmable/blocked 422 responses
 │   ├── activity-history/        # ActivityHistory: activity list of a document
 │   ├── customer-autocomplete/   # quotation customer picker + quick add
+│   ├── icons/                   # icon-registry.ts (business name → lucide drawing + tone, the only lucide-react importer), AppIcon, and the tests that block direct lucide imports and glyph-character icons
 │   ├── layout/                  # app shell, header (header/header-branch-switcher.tsx marks a demo branch "(demo)"),
 │   │                            # sidebar, search, notifications
 │   │   ├── nav-config.ts        # sidebar groups/items, permissions, icons, sections

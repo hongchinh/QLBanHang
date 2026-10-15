@@ -511,6 +511,12 @@ describe('StockLineGrid', () => {
     });
   });
 
+  it('the add-line button carries the create-toned add icon', () => {
+    renderGrid({ lines: [line()] });
+    const icon = screen.getByRole('button', { name: /Thêm dòng/ }).querySelector('[data-icon="add"]');
+    expect(icon).toHaveClass('text-icon-create');
+  });
+
   it('pins #, Mã and Tên left and Số còn lại + delete right with cumulative offsets', () => {
     renderGrid({ lines: [line()] });
     const ths = screen.getAllByRole('columnheader');

@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { X } from 'lucide-react';
+import { AppIcon } from '@/components/icons';
 import { canTakeFocus, currentFocus, giveFocusBack, isFocusLost } from '@/lib/focus';
 import { cn } from '@/lib/utils';
 
@@ -74,7 +74,7 @@ const DialogContent = React.forwardRef<
       {children}
       {showClose && (
         <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring">
-          <X className="h-4 w-4" />
+          <AppIcon name="close" />
           <span className="sr-only">Đóng</span>
         </DialogPrimitive.Close>
       )}

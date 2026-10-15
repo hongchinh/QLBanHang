@@ -356,7 +356,8 @@ function QuotationFormInner({
     if (e.defaultPrevented) return;
     // The quick add and catalog dialogs sit inside this tree (portals): their keys are not the form's.
     if ((e.target as Element).closest?.(DIALOG_SELECTOR)) return;
-    if (e.key !== 'Enter' || e.ctrlKey || e.altKey) return;
+    // `isComposing`: the Enter that commits a Telex/VNI composition must not jump to the next field.
+    if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
     const target = e.target as HTMLInputElement;
     if (target.id === 'quotationDate' || target.id === 'deliveryDate') return;
     const currentId = target.id;

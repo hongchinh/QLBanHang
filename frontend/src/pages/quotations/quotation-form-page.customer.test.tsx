@@ -386,6 +386,23 @@ describe('QuotationFormPage — customer row on the shared partner field', () =>
       await waitFor(() => expect(byId('customerName')).toHaveFocus());
       expect(byId('deliveryAddress')).not.toHaveFocus();
     });
+
+    it('a composing Enter (Telex/VNI) in the name, the address or a typed code keeps the focus', async () => {
+      render(<QuotationFormPage />);
+      byId('customerName').focus();
+      fireEvent.keyDown(byId('customerName'), { key: 'Enter', isComposing: true });
+      expect(document.activeElement).toBe(byId('customerName'));
+
+      byId('deliveryAddress').focus();
+      fireEvent.keyDown(byId('deliveryAddress'), { key: 'Enter', isComposing: true });
+      expect(document.activeElement).toBe(byId('deliveryAddress'));
+
+      byId('customerId').focus();
+      fireEvent.change(byId('customerId'), { target: { value: 'zzz' } });
+      fireEvent.keyDown(byId('customerId'), { key: 'Enter', isComposing: true });
+      await flush();
+      expect(document.activeElement).toBe(byId('customerId'));
+    });
   });
 
   describe('quick add and catalog', () => {

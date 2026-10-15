@@ -11,7 +11,7 @@ import {
   useRestoreStockVoucher,
   useUpdateStockVoucher,
 } from './hooks';
-import { inventoryKeys } from './keys';
+import { inventoryKeys, stockVoucherKeys } from './keys';
 import { stockVouchersApi } from './api';
 import type { PartnerSearchItem, StockVoucher, UpsertStockVoucherRequest } from './types';
 
@@ -65,6 +65,40 @@ describe('usePartnerSearch', () => {
     rerender({ keyword: 'KH0', reasonId: 'r2' });
     expect(result.current.data).toBeUndefined();
     expect(result.current.isLoading).toBe(true);
+  });
+
+  it('passes activeOnly to the api', async () => {
+    vi.mocked(stockVouchersApi.partners).mockResolvedValue([]);
+    const { wrapper } = setup();
+    renderHook(() => usePartnerSearch('In', 'abc', undefined, true), { wrapper });
+    await waitFor(() => expect(stockVouchersApi.partners).toHaveBeenCalledWith('In', 'abc', undefined, true));
+  });
+
+  it('activeOnly is part of the query key', () => {
+    expect(stockVoucherKeys.partners('In', 'abc', undefined, true)).not.toEqual(
+      stockVoucherKeys.partners('In', 'abc'),
+    );
+  });
+
+  it('keeps previous results for the same activeOnly but not when it differs', async () => {
+    vi.mocked(stockVouchersApi.partners)
+      .mockResolvedValueOnce([partner('KH01')])
+      .mockImplementation(() => new Promise(() => undefined));
+    const { wrapper } = setup();
+    const { result, rerender } = renderHook(
+      ({ keyword, activeOnly }: { keyword: string; activeOnly?: boolean }) =>
+        usePartnerSearch('In', keyword, undefined, activeOnly),
+      { wrapper, initialProps: { keyword: 'a' } as { keyword: string; activeOnly?: boolean } },
+    );
+    await waitFor(() => expect(result.current.data).toEqual([partner('KH01')]));
+
+    rerender({ keyword: 'ab', activeOnly: true });
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isLoading).toBe(true);
+
+    rerender({ keyword: 'ab' });
+    expect(result.current.data).toEqual([partner('KH01')]);
+    expect(result.current.isPlaceholderData).toBe(true);
   });
 });
 

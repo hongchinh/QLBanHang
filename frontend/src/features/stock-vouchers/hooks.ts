@@ -71,12 +71,17 @@ export function useStockAt(body: StockAtRequest) {
   });
 }
 
-export function usePartnerSearch(type: StockDirection, keyword: string, reasonId?: string) {
+export function usePartnerSearch(
+  type: StockDirection,
+  keyword: string,
+  reasonId?: string,
+  activeOnly?: boolean,
+) {
   const trimmed = keyword.trim();
-  const queryKey = stockVoucherKeys.partners(type, trimmed, reasonId);
+  const queryKey = stockVoucherKeys.partners(type, trimmed, reasonId, activeOnly);
   return useQuery({
     queryKey,
-    queryFn: () => stockVouchersApi.partners(type, trimmed, reasonId),
+    queryFn: () => stockVouchersApi.partners(type, trimmed, reasonId, activeOnly),
     enabled: trimmed.length > 0,
     staleTime: 30_000,
     // Keep the previous results only while the role filter is the same: results of another reason
@@ -88,11 +93,15 @@ export function usePartnerSearch(type: StockDirection, keyword: string, reasonId
 
 type PartnerSearchKey = ReturnType<typeof stockVoucherKeys.partners>;
 
-// The last key part is { type, keyword, reasonId }; only the keyword may differ.
+// The last key part is { type, keyword, reasonId, activeOnly }; only the keyword may differ.
 function sameRoleFilter(previous: readonly unknown[], next: PartnerSearchKey): boolean {
   const before = previous[previous.length - 1] as PartnerSearchKey[3] | undefined;
   const after = next[3];
-  return before?.type === after.type && before?.reasonId === after.reasonId;
+  return (
+    before?.type === after.type &&
+    before?.reasonId === after.reasonId &&
+    before?.activeOnly === after.activeOnly
+  );
 }
 
 // Every voucher change moves stock, costs and numbering: refresh the whole inventory root.

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { cashKeys } from '@/features/cash-common/keys';
@@ -10,15 +10,17 @@ import { cashVouchersApi } from './api';
 import {
   useCancelCashVoucher,
   useCreateCashVoucher,
+  useCashPartnerSearch,
   useDeleteCashVoucher,
   useRestoreCashVoucher,
   useUpdateCashVoucher,
 } from './hooks';
 import { cashVoucherKeys } from './keys';
-import type { CashVoucher, UpsertCashVoucherRequest } from './types';
+import type { CashPartnerSearchItem, CashVoucher, UpsertCashVoucherRequest } from './types';
 
 vi.mock('./api', () => ({
   cashVouchersApi: {
+    partners: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     cancel: vi.fn(),
@@ -93,6 +95,52 @@ describe('cash voucher mutations', () => {
 
     expect(cashVouchersApi.remove).toHaveBeenCalledWith('v1', { version: 3, confirmRemoveSettlements: true });
     expect(qc.getQueryData(cashVoucherKeys.detail('v1'))).toBeUndefined();
+  });
+});
+
+function cashPartner(code: string): CashPartnerSearchItem {
+  return { id: code, code, name: code, status: 'Active', isCustomer: true, isSupplier: false };
+}
+
+describe('useCashPartnerSearch', () => {
+  beforeEach(() => {
+    vi.mocked(cashVouchersApi.partners).mockReset();
+  });
+
+  it('passes activeOnly to the api', async () => {
+    vi.mocked(cashVouchersApi.partners).mockResolvedValue([]);
+    const { wrapper } = setup();
+    renderHook(() => useCashPartnerSearch('Receipt', 'abc', undefined, true), { wrapper });
+    await waitFor(() =>
+      expect(cashVouchersApi.partners).toHaveBeenCalledWith('Receipt', 'abc', undefined, true),
+    );
+  });
+
+  it('activeOnly is part of the query key', () => {
+    expect(cashVoucherKeys.partners('Receipt', 'abc', undefined, true)).not.toEqual(
+      cashVoucherKeys.partners('Receipt', 'abc'),
+    );
+  });
+
+  it('keeps previous results for the same activeOnly but not when it differs', async () => {
+    vi.mocked(cashVouchersApi.partners)
+      .mockResolvedValueOnce([cashPartner('KH01')])
+      .mockImplementation(() => new Promise(() => undefined));
+    const { wrapper } = setup();
+    const { result, rerender } = renderHook(
+      ({ keyword, activeOnly }: { keyword: string; activeOnly?: boolean }) =>
+        useCashPartnerSearch('Receipt', keyword, undefined, activeOnly),
+      { wrapper, initialProps: { keyword: 'a' } as { keyword: string; activeOnly?: boolean } },
+    );
+    await waitFor(() => expect(result.current.data).toEqual([cashPartner('KH01')]));
+
+    rerender({ keyword: 'ab', activeOnly: true });
+    expect(result.current.data).toBeUndefined();
+    expect(result.current.isLoading).toBe(true);
+
+    rerender({ keyword: 'ab' });
+    expect(result.current.data).toEqual([cashPartner('KH01')]);
+    expect(result.current.isPlaceholderData).toBe(true);
   });
 });
 

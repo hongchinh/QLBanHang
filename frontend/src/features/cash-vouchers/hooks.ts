@@ -48,12 +48,17 @@ export function useCashVoucherDefaults(
   });
 }
 
-export function useCashPartnerSearch(type: CashVoucherType, keyword: string, reasonId?: string) {
+export function useCashPartnerSearch(
+  type: CashVoucherType,
+  keyword: string,
+  reasonId?: string,
+  activeOnly?: boolean,
+) {
   const trimmed = keyword.trim();
-  const queryKey = cashVoucherKeys.partners(type, trimmed, reasonId);
+  const queryKey = cashVoucherKeys.partners(type, trimmed, reasonId, activeOnly);
   return useQuery({
     queryKey,
-    queryFn: () => cashVouchersApi.partners(type, trimmed, reasonId),
+    queryFn: () => cashVouchersApi.partners(type, trimmed, reasonId, activeOnly),
     enabled: trimmed.length > 0,
     staleTime: 30_000,
     // Keep the previous results only while the role filter is the same: results of another reason
@@ -65,11 +70,15 @@ export function useCashPartnerSearch(type: CashVoucherType, keyword: string, rea
 
 type CashPartnerSearchKey = ReturnType<typeof cashVoucherKeys.partners>;
 
-// The last key part is { type, keyword, reasonId }; only the keyword may differ.
+// The last key part is { type, keyword, reasonId, activeOnly }; only the keyword may differ.
 function sameRoleFilter(previous: readonly unknown[], next: CashPartnerSearchKey): boolean {
   const before = previous[previous.length - 1] as CashPartnerSearchKey[3] | undefined;
   const after = next[3];
-  return before?.type === after.type && before?.reasonId === after.reasonId;
+  return (
+    before?.type === after.type &&
+    before?.reasonId === after.reasonId &&
+    before?.activeOnly === after.activeOnly
+  );
 }
 
 // A cash voucher moves fund balances and debt settlements, and stock voucher lists show

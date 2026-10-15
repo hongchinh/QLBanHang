@@ -105,7 +105,7 @@ export function StockVoucherMainFields({
       className="m-0 min-w-0 shrink-0 space-y-[6px] rounded-md border bg-card px-3 py-1.5"
       onKeyDown={handleKeyDown}
     >
-      <div className="form-inline-grid form-cols-stock-main-1">
+      <div className="form-inline-grid form-cols-stock-main-1 form-align-top">
         <Label htmlFor="stock-voucher-at" className="field-label required">{labels.dateLabel}</Label>
         <div>
           <Input id="stock-voucher-at" type="datetime-local" className="h-7" {...form.register('voucherAt')} />

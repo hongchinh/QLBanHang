@@ -140,22 +140,8 @@ export function PartnerCodeNameField({
           onSelect={onSelect}
           disabled={disabled}
           onUnpickedChange={onUnpickedChange}
-          onAddNew={
-            canAdd
-              ? (seed) => {
-                  skipRestoreFocus.current = false;
-                  quickAdd.show(seed);
-                }
-              : undefined
-          }
-          onOpenCatalog={
-            canOpenCatalog
-              ? (seed) => {
-                  skipRestoreFocus.current = false;
-                  catalog.show(seed);
-                }
-              : undefined
-          }
+          onAddNew={canAdd ? (seed) => quickAdd.show(seed) : undefined}
+          onOpenCatalog={canOpenCatalog ? (seed) => catalog.show(seed) : undefined}
         />
         <Input
           id={nameInputId}

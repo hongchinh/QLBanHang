@@ -1060,6 +1060,22 @@ describe('StockVoucherFormPage', () => {
       await waitFor(() => expect(screen.queryByText(/Đã đổi lý do/)).toBeNull());
     });
 
+    it('a concurrency reload (the form is reset to the reloaded voucher) removes the notice', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ reasonId: R_IN_CUSTOMER, reasonDebtEffect: 'ReceivableDecrease' });
+      updateMock.mockRejectedValueOnce(apiError(409, 'CONCURRENCY'));
+      refetchMock.mockResolvedValueOnce({ status: 'success', data: voucher({ version: 8, note: 'Ghi chú máy chủ' }) });
+      renderPage('In');
+      await pickPartner(supplier);
+      expect(await screen.findByText('Đã đổi lý do cho hợp với NCC01 (nhà cung cấp).')).toHaveAttribute('role', 'status');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+      await waitFor(() => expect(byId('stock-voucher-note').value).toBe('Ghi chú máy chủ'));
+      expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+      expect(screen.queryByRole('status')).toBeNull();
+    });
+
     it('changing the reason by hand removes the notice', async () => {
       renderPage('Out');
       await pickPartner(supplier);

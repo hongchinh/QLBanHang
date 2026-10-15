@@ -460,7 +460,7 @@ describe('quick add and catalog', () => {
     expect(codeInput()).toHaveValue('abc');
   });
 
-  it('a pick from the catalog does not leak its focus choice into a later cancelled quick add', async () => {
+  it('after a pick from the catalog, a later cancelled quick add returns the focus to the code input', async () => {
     const user = userEvent.setup();
     renderHarness();
 

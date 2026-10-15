@@ -221,6 +221,16 @@ describe('StockVoucherMainFields', () => {
     });
   });
 
+  describe('row 1', () => {
+    it('aligns its cells to the top so a reason notice does not re-centre the other controls', () => {
+      render(<Harness />);
+
+      const row = byId('stock-reason').closest('.form-inline-grid');
+      expect(row).toHaveClass('form-cols-stock-main-1', 'form-align-top');
+      expect(row).toContainElement(byId('stock-warehouse'));
+    });
+  });
+
   describe('reason cell', () => {
     it('renders an info notice as an amber status line under the reason select', () => {
       render(<Harness reasonNotice={{ text: 'Đã đổi lý do cho hợp với NCC01 (nhà cung cấp).', tone: 'info' }} />);

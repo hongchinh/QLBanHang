@@ -85,7 +85,7 @@ describe('ProductFormFields', () => {
     expect(screen.queryByText('Trạng thái')).not.toBeInTheDocument();
   });
 
-  it('prefills code and name, and initial wins', () => {
+  it('prefills code and name from initialCode and initialName', () => {
     setup({ initialCode: 'TL-50', initialName: 'Tôn lạnh' });
     expect(screen.getByLabelText('Mã hàng hóa')).toHaveValue('TL-50');
     expect(screen.getByLabelText('Tên hàng hóa *')).toHaveValue('Tôn lạnh');
@@ -164,7 +164,7 @@ describe('ProductFormFields Enter navigation', () => {
     const { onSubmit } = setup({ enterNavigation: true });
     byId('code').focus();
     await user.keyboard('{Control>}{Enter}{/Control}');
-    await vi.waitFor(() => expect(screen.getAllByText(/bắt buộc|Vui lòng|không được/i).length).toBeGreaterThan(0));
+    await vi.waitFor(() => expect(screen.getByText('Tên hàng hóa là bắt buộc')).toBeInTheDocument());
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

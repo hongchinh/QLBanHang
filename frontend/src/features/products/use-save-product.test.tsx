@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { lookupKeys, productKeys } from '@/features/products/keys';
@@ -90,6 +90,39 @@ describe('useSaveProduct', () => {
     createMutate.mockRejectedValue(err);
     const { result } = setup();
     await expect(result.current.create(parsed())).rejects.toBe(err);
+  });
+
+  it('isPending covers the typed-unit step and a second create joins the first save', async () => {
+    let resolveUnit!: (u: { id: string }) => void;
+    getOrCreateUnit.mockReturnValue(new Promise((r) => (resolveUnit = r)));
+    createMutate.mockResolvedValue({ id: 'p1' });
+    const { result } = setup();
+    expect(result.current.isPending).toBe(false);
+
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      first = result.current.create(parsed({ unitId: 'Cuộn' }));
+      second = result.current.create(parsed({ unitId: 'Cuộn' }));
+    });
+    expect(result.current.isPending).toBe(true);
+    expect(second).toBe(first);
+
+    await act(async () => {
+      resolveUnit({ id: 'u-new' });
+      await first;
+    });
+    expect(getOrCreateUnit).toHaveBeenCalledTimes(1);
+    expect(createMutate).toHaveBeenCalledTimes(1);
+    expect(result.current.isPending).toBe(false);
+  });
+
+  it('a failed save clears the guard so the next save runs', async () => {
+    createMutate.mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ id: 'p1' });
+    const { result } = setup();
+    await expect(result.current.create(parsed())).rejects.toThrow('boom');
+    await expect(result.current.create(parsed())).resolves.toEqual({ id: 'p1' });
+    expect(createMutate).toHaveBeenCalledTimes(2);
   });
 
   it('a successful create invalidates cached product searches', async () => {

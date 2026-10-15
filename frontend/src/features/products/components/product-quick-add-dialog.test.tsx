@@ -122,6 +122,25 @@ describe('ProductQuickAddDialog', () => {
     expect(onCreated).toHaveBeenCalledWith(toProductSuggestion(CREATED));
   });
 
+  it('a repeated Ctrl+Enter while the save is in flight starts one save, one toast, one onCreated', async () => {
+    let resolveCreate!: (p: Product) => void;
+    createMock.mockReset().mockReturnValue(new Promise<Product>((r) => (resolveCreate = r)));
+    const user = userEvent.setup();
+    const { onCreated } = renderDialog('Tôn lạnh');
+    await user.click(await screen.findByRole('combobox', { name: 'Nhóm hàng hóa *' }));
+    await user.click(screen.getByRole('option', { name: 'Tôn' }));
+    await user.type(screen.getByLabelText('Đơn vị tính *'), 'Tấm');
+    await user.click(screen.getByLabelText('Tên hàng hóa *'));
+    await user.keyboard('{Control>}{Enter}{Enter}{/Control}');
+
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    resolveCreate(CREATED);
+    await waitFor(() => expect(onCreated).toHaveBeenCalled());
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(onCreated).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the dialog open and shows the error when saving fails', async () => {
     createMock.mockRejectedValue(new Error('Mã hàng hóa đã tồn tại'));
     const user = userEvent.setup();

@@ -34,7 +34,8 @@ public sealed class VoucherFormBuilder
     // The transfer QR: its side on paper, in the last QrColumns columns.
     private const double QrPrintMillimetres = 25;
     // The A5 landscape receipt is fitted to one page by its height, so its zoom is known only once the whole sheet is
-    // written (measured: 71 % to 76 % on the samples, while the width alone allows 89 %). EndQrBeside reserves the rows
+    // written (measured: 78 % with the short company profile, 73 % with the filled one, 71 % with a long reason, and 48 % with
+    // maximum-length fields, while the width alone allows 89 %). EndQrBeside reserves the rows
     // for a picture at this zoom, and Finish draws it at the real one.
     private const double A5ReserveScale = 0.75;
     // A height shortfall below this is rounding noise of the summed row heights, not a reason to grow a row.

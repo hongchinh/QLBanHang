@@ -5,8 +5,9 @@ namespace OrderMgmt.IntegrationTests.Tt133.Unit.Vouchers;
 
 /// How LibreOffice prints a voucher sheet, measured on the real PDFs of the voucher QR samples (Task 3.6): a column of
 /// width w is (w + 0.710625) * 5.56 pt wide, a picture pixel is 0.75 pt, and the margins are 0.59 inch. An A5 landscape
-/// sheet is fitted to one page at the largest whole percent that fits both ways: the receipt samples printed at 76 %
-/// (439.09 pt of rows) and 71 % (469.09 pt), both limited by the height, while the width alone allows 89 %.
+/// sheet is fitted to one page at the largest whole percent that fits both ways: the receipt samples with the filled company
+/// profile printed at 73 % and 71 % (a long reason), and 78 % with the short profile, all limited by the height, while
+/// the width alone allows 89 %.
 internal static class LibreOfficePrint
 {
     private const double MarginPoints = 0.59 * 72;

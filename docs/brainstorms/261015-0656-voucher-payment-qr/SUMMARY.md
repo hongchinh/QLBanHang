@@ -295,7 +295,7 @@ Những điểm đã sửa:
 
 | Mục | Kết quả |
 |---|---|
-| Bề rộng QR in trên 01-TT (A5 ngang) | 24,9 đến 25,07 mm, ≈ 25 mm như thiết kế |
+| Bề rộng QR in trên 01-TT (A5 ngang) | 24,9 đến 25,07 mm, ≈ 25 mm như thiết kế. Riêng phiếu thu có chữ rất dài (họ tên 255, địa chỉ 1000, lý do 500 ký tự) co còn 48 %, QR bị giới hạn trong hai cột nên in 19,2 mm, vẫn giải mã được |
 | Bề rộng QR in trên 02-VT (A4 dọc) | 24,9 đến 25,07 mm |
 | Khổ trang PDF | 01-TT: A5 ngang 595,3 × 419,6 pt. 02-VT: A4 dọc 595,3 × 841,9 pt |
 | Tỉ lệ co của 01-TT có QR | 71 đến 73 %, nhỏ hơn bản không QR (≈ 81 %) và nhỏ hơn dự đoán "khoảng 0,9" ở trên; nguyên nhân: khổ A5 được co theo chiều cao, mà QR cùng chú thích làm tờ cao hơn |

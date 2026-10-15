@@ -110,6 +110,7 @@ Cột "Trả lời" ghi lựa chọn và ngày. Câu 1 và 3 có thể dẫn t�
 | 6 | **Màn hình điện thoại** (tấm trượt từ dưới lên) | Mở trên điện thoại này, chụp ảnh màn hình, quét từ ảnh bằng một điện thoại khác | | | | |
 | 7 | Phiếu thu có tên chủ tài khoản **có dấu hoặc dài hơn 25 ký tự** | Quét giấy in: app hiện tên không dấu đã cắt, giấy in và hộp thoại hiện tên đầy đủ | | | | |
 | 8 | In **hàng loạt** (3 phiếu, ít nhất 1 phiếu không đủ điều kiện) | Phiếu đủ điều kiện quét được, phiếu kia in không có QR | | | | |
+| 8b | Giấy in **01-TT A5** mẫu **dài nhất** (họ tên 255, địa chỉ 1000, lý do 500 ký tự) | Vẫn một trang. QR in nhỏ hơn (khoảng 19,2 mm) nhưng phải quét được bằng cả 3 app | | | | |
 
 ### Tải ảnh, sao chép, chia sẻ
 
@@ -125,7 +126,7 @@ Quyết định cho dòng 11: ☐ giữ nguyên (máy tính có thể hiện b�
 
 ### Chữ nhỏ trên giấy
 
-QR in rộng khoảng **25 mm**, mỗi ô vuông của QR chỉ khoảng 0,5 mm (kết quả đo ở phần 5). Kiểm thử tự động chỉ chứng minh được file ảnh QR đúng; việc quét được từ **giấy in thật** (dòng 1 đến 3) mới chứng minh được cỡ này đủ lớn với máy in của đơn vị và camera điện thoại. Nếu một app không quét được:
+QR in rộng khoảng **25 mm** (phiếu thu có chữ rất dài bị co dưới khoảng 62 % thì QR bị giới hạn trong hai cột của nó và in nhỏ hơn: 19,2 mm với mẫu dài nhất), mỗi ô vuông của QR chỉ khoảng 0,5 mm (kết quả đo ở phần 5). Kiểm thử tự động chỉ chứng minh được file ảnh QR đúng; việc quét được từ **giấy in thật** (dòng 1 đến 3) mới chứng minh được cỡ này đủ lớn với máy in của đơn vị và camera điện thoại. Nếu một app không quét được:
 
 - Ghi lại: app nào, khoảng cách quét, máy in nào, giấy in sắc nét hay mờ.
 - Thử in lại ở chất lượng cao hơn. Nếu vẫn không quét được thì báo cho nhóm phát triển, vì lúc đó phải chọn: tăng cỡ QR (tốn thêm chỗ trên giấy) hoặc đổi cách vẽ QR. Không tự sửa.
@@ -140,7 +141,7 @@ QR in rộng khoảng **25 mm**, mỗi ô vuông của QR chỉ khoảng 0,5 mm 
 | 4 | **Sửa phiếu sau khi in** | QR trên bản in cũ **không đổi theo**. Phiếu sửa số tiền hoặc quỹ thì tờ giấy cũ sai | Hủy tờ cũ, in lại tờ mới. Hộp thoại trên màn hình luôn hỏi lại máy chủ mỗi lần mở nên luôn đúng với phiếu hiện tại | |
 | 5 | **Phiếu đã hủy** | Không có QR: bản in không vẽ QR, hộp thoại báo "Phiếu đã hủy." | Không cần làm gì | |
 | 6 | Ngân hàng bị **ngừng sử dụng** sau khi đã gắn vào quỹ | Quỹ đó **không sửa được** (kể cả đổi tên hay đổi số tài khoản) cho tới khi chọn lại một ngân hàng khác đang hoạt động, vì phần mềm từ chối lưu quỹ gắn với ngân hàng đã ngừng. Phiếu của quỹ đó không có QR trong lúc chờ. **Cần PO xác nhận đây là cách muốn làm việc**; nếu muốn cho sửa quỹ khi ngân hàng đã ngừng thì phải sửa phần mềm | Khi một ngân hàng ngừng sử dụng, kiểm tra các quỹ đang gắn với nó | |
-| 7 | Cỡ QR 25 mm trên giấy | Có máy in hoặc camera quét không được (xem "Chữ nhỏ trên giấy" ở phần 3) | Quét thử bằng giấy in thật, ít nhất 3 app | |
+| 7 | Cỡ QR 25 mm trên giấy (19,2 mm với phiếu thu dài nhất) | Có máy in hoặc camera quét không được (xem "Chữ nhỏ trên giấy" ở phần 3) | Quét thử bằng giấy in thật, ít nhất 3 app | |
 | 8 | Chưa có quỹ ngân hàng đủ thông tin | Phiếu in được nhưng **không có QR**; nút QR trên màn hình báo lỗi kèm câu giải thích | Làm đủ phần 2 trước khi dùng | |
 | 9 | Chưa xác nhận thanh toán | Phần mềm **chỉ tạo QR**, không biết khách đã chuyển chưa và không tự khớp giao dịch ngân hàng với phiếu. Việc xác nhận vẫn làm tay | Dùng nội dung chuyển khoản (số phiếu) để đối chiếu sao kê. Việc khớp tự động là phần riêng, sau này | |
 
@@ -156,7 +157,7 @@ Phần này do người thực hiện kế hoạch điền sau khi in thử mẫ
 | Khổ trang PDF của **02-VT** (có và không có cột Kho) | A4 dọc, **595,3 × 841,9 pt**. Chưa ghi riêng hai trường hợp có và không có cột Kho. Phiếu 40 dòng hàng in ra 2 trang, khối "Thông tin chuyển khoản" và chữ ký cùng nằm ở trang 2 |
 | Tỉ lệ co thật của A5 ngang sau khi thêm dòng cho QR | **71 đến 73 %**. Phiếu thu **không** có QR co khoảng 81 %, nên phiếu có QR in chữ nhỏ hơn khoảng 8 đến 10 điểm phần trăm. **PO quyết định**: (a) chấp nhận; (b) thu QR còn khoảng 22 mm để tờ bớt cao; (c) rút ngắn các dòng chú thích dưới QR. Phần mềm đang làm theo (a) |
 | Ảnh QR nhúng trong PDF (kích thước điểm ảnh, có bị nén mờ không) | PNG **không nén mất dữ liệu**, 295 × 295 điểm ảnh, khoảng 6 điểm ảnh mỗi module (QR phiên bản 6), không bị nén mờ. OpenCV giải mã được cả **8 trang mẫu** và nội dung khớp từng ký tự với payload. Đây là đo bằng máy, chưa thay thế bảng quét bằng giấy in thật và app ngân hàng ở phần 3 |
-| Bản in 01-TT có "Lý do nộp" dài vẫn nằm trên **một trang** A5 | Chưa đo riêng với lý do dài. Theo thiết kế tờ A5 luôn được co để vừa một trang (`FitToPages(1, 1)`), nên lý do dài làm tỉ lệ co thấp hơn 71 % chứ không sinh trang thứ hai; chữ nhỏ hơn nữa là điều cần nhìn khi in thử |
+| Bản in 01-TT có "Lý do nộp" dài vẫn nằm trên **một trang** A5 | Đã đo: mẫu dài nhất (họ tên 255, địa chỉ 1000, lý do 500 ký tự) vẫn nằm trên **một trang** A5, co còn khoảng **48 %** (chữ rất nhỏ, cần nhìn khi in thử). Dưới khoảng 62 % QR bị giới hạn trong bề rộng hai cột I–J nên in **19,2 mm** thay vì 25 mm (PNG 228 px, khoảng 4,7 điểm ảnh mỗi module), OpenCV vẫn giải mã được. Mẫu lý do dài vừa phải (400 ký tự) co 71 % và QR vẫn 25 mm |
 
 ## 6. Xác nhận
 

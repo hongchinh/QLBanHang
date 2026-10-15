@@ -1,13 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import { StockOnHandPage } from './stock-on-hand-page';
 import type { StockOnHandParams, StockOnHandReport } from '@/features/inventory-reports/types';
-
-const navigateMock = vi.fn();
-vi.mock('react-router-dom', async () => {
-  const actual = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
-  return { ...actual, useNavigate: () => navigateMock };
-});
 
 vi.mock('@/features/warehouses/hooks', () => ({
   useWarehouses: () => ({ data: [{ id: 'w1', code: 'KHO01', name: 'Kho chính', isActive: true }] }),
@@ -47,16 +42,34 @@ const report = (over: Partial<StockOnHandReport> = {}): StockOnHandReport => ({
   ...over,
 });
 
+function LocationDisplay() {
+  const loc = useLocation();
+  return (
+    <>
+      <div data-testid="location">{loc.pathname + loc.search}</div>
+      <div data-testid="state">{JSON.stringify(loc.state)}</div>
+    </>
+  );
+}
+
+function renderPage() {
+  return render(
+    <MemoryRouter initialEntries={['/inventory/stock-on-hand']}>
+      <StockOnHandPage />
+      <LocationDisplay />
+    </MemoryRouter>,
+  );
+}
+
 describe('StockOnHandPage', () => {
   beforeEach(() => {
-    navigateMock.mockReset();
     useStockOnHandMock.mockClear();
     reportState.error = undefined;
   });
 
   it('renders rows, provisional badge and opens the stock card on row click', () => {
     reportState.data = report();
-    render(<StockOnHandPage />);
+    renderPage();
 
     expect(screen.getByText('TON01')).toBeInTheDocument();
     expect(screen.getByText('12.5')).toBeInTheDocument();
@@ -66,12 +79,13 @@ describe('StockOnHandPage', () => {
     expect(screen.getAllByText('1.250.000')).toHaveLength(2); // vi-VN grouping
 
     fireEvent.click(screen.getByText('Tôn lạnh'));
-    expect(navigateMock).toHaveBeenCalledWith('/inventory/stock-card?productId=p1&warehouseId=w1');
+    expect(screen.getByTestId('location')).toHaveTextContent('/inventory/stock-card?productId=p1&warehouseId=w1');
+    expect(screen.getByTestId('state')).toHaveTextContent(JSON.stringify({ from: '/inventory/stock-on-hand' }));
   });
 
   it('sends the point in time as an ISO instant and the search text', async () => {
     reportState.data = report();
-    render(<StockOnHandPage />);
+    renderPage();
 
     fireEvent.change(screen.getByLabelText('Thời điểm'), { target: { value: '2026-10-05T08:30' } });
     fireEvent.change(screen.getByLabelText('Tìm kiếm'), { target: { value: 'TON' } });
@@ -90,7 +104,7 @@ describe('StockOnHandPage', () => {
       totalValue: null,
       rows: report().rows.map((r) => ({ ...r, value: null })),
     });
-    render(<StockOnHandPage />);
+    renderPage();
 
     expect(screen.queryByRole('columnheader', { name: 'Giá trị' })).not.toBeInTheDocument();
     expect(screen.queryByText('Tổng giá trị')).not.toBeInTheDocument();
@@ -100,7 +114,7 @@ describe('StockOnHandPage', () => {
   it('shows the request error instead of the empty state', () => {
     reportState.data = undefined;
     reportState.error = new Error('Máy chủ lỗi');
-    render(<StockOnHandPage />);
+    renderPage();
 
     expect(screen.getByText('Máy chủ lỗi')).toBeInTheDocument();
     expect(screen.queryByText('Không có hàng tồn')).not.toBeInTheDocument();

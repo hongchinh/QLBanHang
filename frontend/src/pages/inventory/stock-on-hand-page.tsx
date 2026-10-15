@@ -5,6 +5,7 @@ import type { StockOnHandParams } from '@/features/inventory-reports/types';
 import { useProductGroups } from '@/features/products/hooks';
 import { useWarehouses } from '@/features/warehouses/hooks';
 import { selectableWarehouses } from '@/features/warehouses/utils';
+import { useFromHere } from '@/components/layout/back-link';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,6 +22,7 @@ const ALL = 'all';
 // Route permission: reports.inventory. Values come back only with inventory.view_cost (canViewCost).
 export function StockOnHandPage() {
   const navigate = useNavigate();
+  const fromHere = useFromHere();
   const { data: warehouses = [] } = useWarehouses();
   const { data: groups = [] } = useProductGroups();
 
@@ -118,7 +120,9 @@ export function StockOnHandPage() {
                   key={`${r.productId}-${r.warehouseId}`}
                   className="cursor-pointer border-b hover:bg-muted/50"
                   onClick={() =>
-                    navigate(`/inventory/stock-card?productId=${r.productId}&warehouseId=${r.warehouseId}`)
+                    navigate(`/inventory/stock-card?productId=${r.productId}&warehouseId=${r.warehouseId}`, {
+                      state: fromHere,
+                    })
                   }
                 >
                   <td className="px-2 py-2 font-medium">{r.productCode}</td>

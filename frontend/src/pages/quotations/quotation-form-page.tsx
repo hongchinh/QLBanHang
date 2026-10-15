@@ -29,8 +29,10 @@ import type {
 } from '@/features/quotations/types';
 import { useCustomer } from '@/features/customers/hooks';
 import type { Customer, CustomerSearchItem } from '@/features/customers/types';
-import { CustomerAutocomplete } from '@/components/customer-autocomplete/customer-autocomplete';
-import { CustomerQuickAddDialog } from '@/components/customer-autocomplete/customer-quick-add-dialog';
+import { PartnerCodeNameField } from '@/components/partner-autocomplete/partner-code-name-field';
+import { useUnpickedPartnerGuard } from '@/components/partner-autocomplete/use-unpicked-partner-guard';
+import { useQuotationCustomerSearch } from '@/features/customers/use-quotation-customer-search';
+import { DIALOG_SELECTOR } from '@/lib/focus';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -319,7 +321,7 @@ function QuotationFormInner({
         : null;
     },
   );
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const customerGuard = useUnpickedPartnerGuard('customerId', 'khách hàng');
   const [confirmCloneOpen, setConfirmCloneOpen] = useState(false);
   const [confirmAccountingConfirmOpen, setConfirmAccountingConfirmOpen] = useState(false);
   const [pendingSubmitIntent, setPendingSubmitIntent] = useState<QuotationSubmitIntent | null>(null);
@@ -352,6 +354,8 @@ function QuotationFormInner({
 
   function handleGeneralInfoKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.defaultPrevented) return;
+    // The quick add and catalog dialogs sit inside this tree (portals): their keys are not the form's.
+    if ((e.target as Element).closest?.(DIALOG_SELECTOR)) return;
     if (e.key !== 'Enter' || e.ctrlKey || e.altKey) return;
     const target = e.target as HTMLInputElement;
     if (target.id === 'quotationDate' || target.id === 'deliveryDate') return;
@@ -371,6 +375,7 @@ function QuotationFormInner({
 
   function handleFormKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
     if (e.defaultPrevented) return;
+    if ((e.target as Element).closest?.(DIALOG_SELECTOR)) return;
     if (e.key === 's' && e.ctrlKey && !e.shiftKey && !e.altKey) {
       e.preventDefault();
       submitWithIntent(isEdit ? 'save-exit' : 'save-stay');
@@ -379,6 +384,7 @@ function QuotationFormInner({
 
   function submitWithIntent(intent: QuotationSubmitIntent) {
     if (isSubmitBusy) return;
+    if (!customerGuard.assertPicked()) return;
     setPendingSubmitIntent(intent);
     void form.handleSubmit(
       async (parsed) => {
@@ -426,8 +432,6 @@ function QuotationFormInner({
     if (!cur.deliveryPhone?.trim()) {
       form.setValue('deliveryPhone', c.phoneNumber ?? '', { shouldDirty: true });
     }
-
-    setTimeout(() => document.getElementById('customerName')?.focus(), 0);
   }
 
   function handleClearCustomer() {
@@ -806,33 +810,28 @@ function QuotationFormInner({
                 )}
               </div>
 
-              <div className="form-inline-grid form-cols-customer">
-                <Label htmlFor="customerId" className="field-label required">Mã KH</Label>
-                <CustomerAutocomplete
-                  inputId="customerId"
-                  inputAriaLabel="Mã khách hàng"
-                  placeholder="Nhập mã / tên / MST / địa chỉ / SĐT..."
-                  value={selectedCustomerView}
-                  errorMessage={
-                    form.formState.errors.customerId
-                      ? String(form.formState.errors.customerId.message)
-                      : undefined
-                  }
-                  onSelect={handleSelectCustomer}
-                  onClear={handleClearCustomer}
-                  onAddNewClick={() => setQuickAddOpen(true)}
-                />
-                <Label htmlFor="customerName" className="field-label">Tên KH</Label>
-                <Input
-                  id="customerName"
-                  className="h-7"
-                  {...form.register('customerName', {
+              <div className="form-inline-grid">
+                <PartnerCodeNameField
+                  label="Khách hàng"
+                  required
+                  scope="customer"
+                  codeInputId="customerId"
+                  nameInputId="customerName"
+                  nameInputProps={form.register('customerName', {
                     onBlur: (e) => {
                       if (!e.target.value.trim() && selectedCustomerView) {
                         form.setValue('customerName', selectedCustomerView.name, { shouldDirty: true });
                       }
                     },
                   })}
+                  useSearch={useQuotationCustomerSearch}
+                  value={selectedCustomerView}
+                  onSelect={(p) => (p ? handleSelectCustomer(p) : handleClearCustomer())}
+                  error={
+                    customerGuard.error ??
+                    (form.formState.errors.customerId ? String(form.formState.errors.customerId.message) : undefined)
+                  }
+                  onUnpickedChange={customerGuard.onUnpickedChange}
                 />
                 {isEdit && initialSelectedCustomer?.status === 'Inactive' && (
                   <p className="field-message field-message-code text-amber-600">Khách hàng đã ngừng sử dụng</p>
@@ -916,24 +915,6 @@ function QuotationFormInner({
           )}
 
       </form>
-
-      <CustomerQuickAddDialog
-        open={quickAddOpen}
-        onOpenChange={setQuickAddOpen}
-        onCreated={(c) =>
-          handleSelectCustomer({
-            id: c.id,
-            code: c.code,
-            name: c.name,
-            taxCode: c.taxCode,
-            companyAddress: c.companyAddress,
-            defaultShippingAddress: c.defaultShippingAddress,
-            contactPerson: c.contactPerson,
-            phoneNumber: c.phoneNumber,
-            status: c.status,
-          })
-        }
-      />
 
       <ConfirmDialog
         open={confirmCloneOpen}

@@ -67,7 +67,7 @@ export type PartnerAutocompleteProps = PartnerSearchSource & {
 // What ↑↓ / Tab walk over: the results, then the add-new row, then the catalog row.
 type ListRow = { kind: 'result'; item: PartnerSearchItem } | { kind: 'addNew' } | { kind: 'catalog' };
 
-// Same interaction as CustomerAutocomplete, backed by GET /stock-vouchers/partners (D3).
+// Combobox over a partner search; the default search is GET /stock-vouchers/partners (D3).
 export function PartnerAutocomplete({
   type,
   reasonId,

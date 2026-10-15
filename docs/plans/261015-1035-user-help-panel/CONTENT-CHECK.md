@@ -143,13 +143,16 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Lưu tạm | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:473 |
 | Lưu và thoát | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:469 |
 | Cập nhật | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:486 |
-| In | frontend/src/components/voucher-print/voucher-print-button.tsx:36 (default label, outside sources) |
+| Hủy phiếu | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:492 |
+| Khôi phục | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:498 |
+| Xóa | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:504 |
+| In | frontend/src/components/voucher-print/voucher-print-button.tsx:36 |
 | Tự động | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:451 |
 | Mở phiếu kho | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:519 |
 | Đóng | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:480 |
-| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 (shared 422 dialog title, outside sources) |
-| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 (shared 422 dialog title, outside sources) |
-| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 (shared 422 dialog title, outside sources) |
+| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 |
+| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 |
+| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 |
 | Người nhận | dynamic: the page picks personLabel by voucher type, text at frontend/src/pages/cash-vouchers/labels.ts:29 |
 | Lý do chi | dynamic: the page picks descriptionLabel by voucher type, text at frontend/src/pages/cash-vouchers/labels.ts:30 |
 
@@ -172,13 +175,16 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Lưu tạm | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:473 |
 | Lưu và thoát | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:469 |
 | Cập nhật | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:486 |
-| In | frontend/src/components/voucher-print/voucher-print-button.tsx:36 (default label, outside sources) |
+| Hủy phiếu | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:492 |
+| Khôi phục | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:498 |
+| Xóa | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:504 |
+| In | frontend/src/components/voucher-print/voucher-print-button.tsx:36 |
 | Tự động | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:451 |
 | Mở phiếu kho | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:519 |
 | Đóng | frontend/src/pages/cash-vouchers/cash-voucher-form-page.tsx:480 |
-| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 (shared 422 dialog title, outside sources) |
-| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 (shared 422 dialog title, outside sources) |
-| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 (shared 422 dialog title, outside sources) |
+| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 |
+| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 |
+| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 |
 | Người nộp | dynamic: the page picks personLabel by voucher type, text at frontend/src/pages/cash-vouchers/labels.ts:19 |
 | Lý do nộp | dynamic: the page picks descriptionLabel by voucher type, text at frontend/src/pages/cash-vouchers/labels.ts:20 |
 
@@ -197,8 +203,8 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Lưu và thoát | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:285 |
 | Cập nhật | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:296 |
 | Khôi phục | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:308 |
-| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 (shared 422 dialog title, outside sources) |
-| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 (shared 422 dialog title, outside sources) |
+| Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 |
+| Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 |
 
 ## debt-matching
 
@@ -235,7 +241,7 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Ghi chú | frontend/src/pages/debt/opening-debt-form-dialog.tsx:286 |
 | Lưu | frontend/src/pages/debt/opening-debt-form-dialog.tsx:296 |
 | Đã đối trừ | frontend/src/pages/debt/opening-debt-page.tsx:109 |
-| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 (shared 422 dialog title, outside sources) |
+| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 |
 
 ## dashboard-executive
 
@@ -283,4 +289,4 @@ Phase 01 reference file; the table covers every bold label (added in Task 4.4).
 | Lưu tạm | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:739 |
 | Lưu và thoát | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:735 |
 | Cập nhật | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:746 |
-| Vượt hạn mức nợ | frontend/src/lib/confirm-required.ts:37 (shared 422 dialog title, outside sources) |
+| Vượt hạn mức nợ | frontend/src/lib/confirm-required.ts:37 |

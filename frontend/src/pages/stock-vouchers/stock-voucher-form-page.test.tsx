@@ -247,7 +247,7 @@ vi.mock('@/features/warehouses/hooks', () => ({ useWarehouses: () => ({ data: wa
 vi.mock('@/features/stock-reasons/hooks', () => ({
   useStockReasons: (params: unknown) => {
     useStockReasonsMock(params);
-    return { data: reasonsState.override ?? reasons };
+    return { data: reasonsState.override ?? reasons, isSuccess: true };
   },
 }));
 vi.mock('@/features/payment-methods/hooks', () => ({
@@ -1143,6 +1143,42 @@ describe('StockVoucherFormPage', () => {
       fireEvent.change(byId('stock-reason'), { target: { value: R_IN } });
 
       expect(screen.queryByText(MISMATCH)).toBeNull();
+    });
+
+    describe('an empty reason', () => {
+      const NO_FIT = 'Không có lý do nào hợp với NCC01 (nhà cung cấp)';
+      const restoreSupplierDraftWithoutReason = () =>
+        localStorage.setItem(
+          'stock_voucher_draft_In_user-test_b1',
+          JSON.stringify({
+            savedAt: DEFAULT_AT,
+            values: {
+              ...toFormDefaults(undefined, defaultsFor('In')),
+              reasonId: '',
+              partnerId: supplier.id,
+              partnerName: supplier.name,
+            },
+            selectedPartner: { id: supplier.id, code: supplier.code, name: supplier.name, isCustomer: false, isSupplier: true },
+          }),
+        );
+
+      it('gets no red line when a reason fits the restored partner', () => {
+        restoreSupplierDraftWithoutReason();
+        renderPage('In');
+
+        expect(byId('stock-partner').value).toBe('NCC01');
+        expect(byId('stock-reason').value).toBe('');
+        expect(screen.queryByText(/Không có lý do nào hợp/)).toBeNull();
+      });
+
+      it('gets a red line when no configured reason fits the restored partner', () => {
+        reasonsState.override = reasons.filter((r) => r.id === R_IN_CUSTOMER || r.id === R_IN2);
+        restoreSupplierDraftWithoutReason();
+        renderPage('In');
+
+        expect(byId('stock-reason').value).toBe('');
+        expect(screen.getByText(NO_FIT)).toHaveClass('text-destructive');
+      });
     });
 
     it('a saved voucher\'s partner (roles unknown) gets no red line', () => {

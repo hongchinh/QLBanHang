@@ -33,7 +33,7 @@ import type {
 } from '@/features/cash-vouchers/types';
 import type { DebtDirection, DebtEffect, DebtSide, SettlementOrigin } from '@/features/cash-common/types';
 import { matchReasonForPartner, reasonSwitchMessage } from '@/features/cash-common/reason-match';
-import { reasonNoticeOf } from '@/features/cash-common/reason-notice';
+import { noReasonFits, reasonNoticeOf } from '@/features/cash-common/reason-notice';
 import { useReasonSwitchNotice } from '@/features/cash-common/use-reason-notice';
 import { useCashReasons } from '@/features/cash-reasons/hooks';
 import { useFunds } from '@/features/funds/hooks';
@@ -233,7 +233,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   }
 
   // Automatic reasons (TPX/CPN) are never offered on a manual voucher.
-  const { data: allReasons = [] } = useCashReasons({ type });
+  const { data: allReasons = [], isSuccess: reasonsLoaded } = useCashReasons({ type });
   const reasons = allReasons.filter((r) => r.type === type && !r.isAuto);
   const reasonOptions: CashReasonOption[] = [...reasons];
   // The voucher DTO has no partner type for its reason: 'Any' never locks the field and, with the stored debt
@@ -266,7 +266,12 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   }, []);
 
   // The red line is derived: roles known (picked in this session) and the partner does not fit the reason.
-  const reasonNotice = reasonNoticeOf(selectedPartner, selectedReason, switchNotice.notice);
+  const reasonNotice = reasonNoticeOf(
+    selectedPartner,
+    selectedReason,
+    switchNotice.notice,
+    noReasonFits(selectedPartner, reasonOptions, reasonsLoaded),
+  );
   const ownEntry = OWN_ENTRY[debtEffect];
   const showAllocations = !!ownEntry && !!partnerId;
 

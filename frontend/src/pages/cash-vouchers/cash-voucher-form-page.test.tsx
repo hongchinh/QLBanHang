@@ -55,6 +55,7 @@ const useCashReasonsMock = vi.fn();
 const useOpenItemsMock = vi.fn();
 const partnerSearchMock = vi.fn();
 const partnerResults: { data: CashPartnerSearchItem[] } = { data: [] };
+const reasonsState: { override: CashReason[] | null; loaded: boolean } = { override: null, loaded: true };
 const openItemsState: { data: OpenItem[] } = { data: [] };
 const voucherState: { data: CashVoucher | undefined } = { data: undefined };
 const activitiesState: { data: unknown[] } = { data: [] };
@@ -208,7 +209,7 @@ vi.mock('@/features/funds/hooks', () => ({ useFunds: () => ({ data: funds }) }))
 vi.mock('@/features/cash-reasons/hooks', () => ({
   useCashReasons: (params: { type?: CashVoucherType }) => {
     useCashReasonsMock(params);
-    return { data: reasons.filter((r) => !params?.type || r.type === params.type) };
+    return { data: (reasonsState.override ?? reasons).filter((r) => !params?.type || r.type === params.type), isSuccess: reasonsState.loaded };
   },
 }));
 
@@ -385,6 +386,8 @@ describe('CashVoucherFormPage', () => {
     deleteMock.mockReset();
     refetchMock.mockReset();
     useCashReasonsMock.mockReset();
+    reasonsState.override = null;
+    reasonsState.loaded = true;
     useOpenItemsMock.mockReset();
     partnerSearchMock.mockReset();
     createCustomerMock.mockReset();
@@ -1244,15 +1247,52 @@ describe('CashVoucherFormPage', () => {
       expect(line(1).value).toBe(AUTO_KH01);
     });
 
-    it('12. an empty reason and a picked partner that no reason fits get a red line', async () => {
+    // Only a supplier reason and a reason without partner are configured: no reason fits a customer.
+    const supplierOnlyReasons = () => reasons.filter((r) => r.id === R_THNCC || r.id === R_TK);
+
+    it('12. an empty reason and a picked customer that no configured reason fits get a red line', async () => {
+      reasonsState.override = supplierOnlyReasons();
       withoutDefaultReason();
       renderPage('Receipt');
 
-      await pickPartner({ ...customer, isCustomer: false, isSupplier: false }, 'KH');
+      await pickCustomer();
 
       expect(byId('cash-reason').value).toBe('');
-      expect(screen.getByText('Không có lý do nào hợp với KH01 (đối tượng)')).toHaveClass('text-destructive');
+      expect(screen.getByText('Không có lý do nào hợp với KH01 (khách hàng)')).toHaveClass('text-destructive');
       expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+    });
+
+    it('12. clearing the reason of a picked partner that a reason fits shows no red line', async () => {
+      renderPage('Receipt');
+      await pickCustomer();
+      expect(byId('cash-reason').value).toBe(R_TKH);
+
+      fireEvent.change(byId('cash-reason'), { target: { value: '' } });
+
+      expect(byId('cash-reason').value).toBe('');
+      expect(screen.queryByText(/Không có lý do nào hợp/)).toBeNull();
+    });
+
+    it('12. a partner picked while the reasons load gets no red line', async () => {
+      reasonsState.override = [];
+      reasonsState.loaded = false;
+      withoutDefaultReason();
+      renderPage('Receipt');
+
+      await pickCustomer();
+
+      expect(byId('cash-reason').value).toBe('');
+      expect(screen.queryByText(/Không có lý do nào hợp/)).toBeNull();
+    });
+
+    it('12. no configured reason at all gives no red line', async () => {
+      reasonsState.override = [];
+      withoutDefaultReason();
+      renderPage('Receipt');
+
+      await pickCustomer();
+
+      expect(screen.queryByText(/Không có lý do nào hợp/)).toBeNull();
     });
 
     it('13. added and deleted rows keep following the header; a hand-typed row does not', async () => {

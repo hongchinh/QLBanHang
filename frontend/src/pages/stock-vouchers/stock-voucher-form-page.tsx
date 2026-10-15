@@ -30,7 +30,7 @@ import {
 } from '@/features/stock-vouchers/use-stock-voucher-draft';
 import type { FundKind } from '@/features/cash-common/types';
 import { matchReasonForPartner, reasonSwitchMessage } from '@/features/cash-common/reason-match';
-import { reasonNoticeOf } from '@/features/cash-common/reason-notice';
+import { noReasonFits, reasonNoticeOf } from '@/features/cash-common/reason-notice';
 import { useReasonSwitchNotice } from '@/features/cash-common/use-reason-notice';
 import type {
   PartnerSearchItem,
@@ -350,7 +350,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   }, [voucher?.version]);
 
   const { data: warehouses = [] } = useWarehouses();
-  const { data: allReasons = [] } = useStockReasons({ direction: type });
+  const { data: allReasons = [], isSuccess: reasonsLoaded } = useStockReasons({ direction: type });
   const reasons = allReasons.filter((r) => r.direction === type);
   const { data: paymentMethods = [] } = usePaymentMethods();
   const { data: funds } = useFunds();
@@ -694,7 +694,12 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   const errors = form.formState.errors;
   // Derived: roles are known only for a partner picked in this session (or restored from a draft).
-  const reasonNotice = reasonNoticeOf(selectedPartner, selectedReason, switchNotice.notice);
+  const reasonNotice = reasonNoticeOf(
+    selectedPartner,
+    selectedReason,
+    switchNotice.notice,
+    noReasonFits(selectedPartner, reasons, reasonsLoaded),
+  );
   const linesError = errors.lines as { message?: string; root?: { message?: string } } | undefined;
   const linesRootMessage = linesError?.root?.message ?? linesError?.message;
 

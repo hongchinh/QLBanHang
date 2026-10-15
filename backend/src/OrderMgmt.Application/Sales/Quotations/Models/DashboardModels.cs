@@ -39,7 +39,7 @@ public sealed class RevenuePointDto
 {
     public DateOnly Date { get; init; }
     public decimal Total { get; init; }
-    public int ConfirmedCount { get; init; }
+    public int VoucherCount { get; init; }
 }
 
 public sealed class TopCustomerDto

@@ -81,6 +81,33 @@ public class DashboardRevenueTests : ExecutiveDashboardTestBase
         summary.RangeRevenue.DeltaPct.Should().Be(-75.00m);
     }
 
+    [Fact]
+    public async Task Series_by_day_fills_gaps()
+    {
+        var data = await SeedAsync();
+
+        var series = await ReadDataAsync<RevenueSeriesDto>(await data.Branch.Client.GetAsync(
+            "/api/dashboard/revenue-series?from=2026-10-01&to=2026-10-07&granularity=day"));
+
+        series.Points.Should().HaveCount(7);
+        series.Points.Sum(p => p.Total).Should().Be(750m);
+        var sold = series.Points.Single(p => p.Date == D(10, 4));
+        sold.Total.Should().Be(600m);
+        sold.VoucherCount.Should().Be(1);
+        series.Points.Single(p => p.Date == D(10, 5)).Total.Should().Be(0m);
+    }
+
+    [Fact]
+    public async Task Series_by_month()
+    {
+        var data = await SeedAsync();
+
+        var series = await ReadDataAsync<RevenueSeriesDto>(await data.Branch.Client.GetAsync(
+            "/api/dashboard/revenue-series?from=2026-10-01&to=2026-10-31&granularity=month"));
+
+        series.Points.Should().ContainSingle().Which.Total.Should().Be(750m);
+    }
+
     private sealed record SeedData(FreshBranch Branch, Guid ProductId, Guid CustomerId, Guid AdminId, Guid SalesId,
         HttpClient SalesClient, Guid SaleVoucherId, uint SaleVoucherVersion, FreshBranch Other);
 

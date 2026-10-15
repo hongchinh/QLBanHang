@@ -221,12 +221,12 @@ public class DashboardService : IDashboardService
     public async Task<RevenueSeriesDto> GetRevenueSeriesAsync(DateOnly from, DateOnly to, string granularity, Guid? saleUserId, CancellationToken ct)
     {
         if (to < from) to = from;
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
 
-        var dayRows = await GroupByRevenueDateAsync(
-            RevenueFilterHelper.ApplyRevenueFilter(ApplyScope(saleUserId), dateMode, from, to), dateMode, ct);
-
-        var byDay = dayRows.ToDictionary(r => r.Date, r => (r.Total, r.Count));
+        var vouchers = await (await CountedAsync(from, to, saleUserId, ct)).VoucherRevenues().ToListAsync(ct);
+        // A return lowers the day's total but is not a sale, so it is not counted.
+        var byDay = vouchers
+            .GroupBy(v => VnTime.ToVnDate(v.VoucherAt))
+            .ToDictionary(g => g.Key, g => (Total: g.Sum(v => v.Revenue), Count: g.Count(v => !v.IsReturn)));
         var points = new List<RevenuePointDto>();
 
         if (string.Equals(granularity, "month", StringComparison.OrdinalIgnoreCase))
@@ -240,7 +240,7 @@ public class DashboardService : IDashboardService
                 months[key] = (cur.Total + v.Total, cur.Count + v.Count);
             }
             foreach (var kv in months)
-                points.Add(new RevenuePointDto { Date = kv.Key, Total = kv.Value.Total, ConfirmedCount = kv.Value.Count });
+                points.Add(new RevenuePointDto { Date = kv.Key, Total = kv.Value.Total, VoucherCount = kv.Value.Count });
         }
         else if (string.Equals(granularity, "week", StringComparison.OrdinalIgnoreCase))
         {
@@ -254,14 +254,14 @@ public class DashboardService : IDashboardService
                 weeks[key] = (cur.Total + v.Total, cur.Count + v.Count);
             }
             foreach (var kv in weeks)
-                points.Add(new RevenuePointDto { Date = kv.Key, Total = kv.Value.Total, ConfirmedCount = kv.Value.Count });
+                points.Add(new RevenuePointDto { Date = kv.Key, Total = kv.Value.Total, VoucherCount = kv.Value.Count });
         }
         else
         {
             for (var d = from; d <= to; d = d.AddDays(1))
             {
                 byDay.TryGetValue(d, out var v);
-                points.Add(new RevenuePointDto { Date = d, Total = v.Total, ConfirmedCount = v.Count });
+                points.Add(new RevenuePointDto { Date = d, Total = v.Total, VoucherCount = v.Count });
             }
         }
 

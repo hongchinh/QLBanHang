@@ -2,7 +2,7 @@
 key: quotations.form
 title: Báo giá
 routes: [/quotations/new, /quotations/:id]
-sources: [frontend/src/pages/quotations/quotation-form-page.tsx, frontend/src/components/customer-autocomplete/**, frontend/src/pages/quotations/components/**, frontend/src/pages/quotations/utils/**, frontend/src/features/quotations/**, backend/src/OrderMgmt.Application/Sales/Quotations/**]
+sources: [frontend/src/pages/quotations/quotation-form-page.tsx, frontend/src/components/partner-autocomplete/**, frontend/src/features/customers/use-quotation-customer-search.ts, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/pages/quotations/components/**, frontend/src/pages/quotations/utils/**, frontend/src/features/quotations/**, backend/src/OrderMgmt.Application/Sales/Quotations/**]
 related: [customers.list]
 updated: 2026-10-15
 ---
@@ -10,7 +10,7 @@ updated: 2026-10-15
 Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng tiền rồi lưu, gửi, xác nhận hoặc in. Doanh thu của sale được ghi nhận khi báo giá được xác nhận.
 
 ## Các bước
-1. {#customer} Gõ mã, tên, MST hoặc SĐT ở **Mã KH**, Enter để chọn; chưa có khách thì bấm nút dấu cộng bên cạnh.
+1. {#customer} Gõ mã, tên, MST, địa chỉ hoặc SĐT ở **Khách hàng**, Enter để chọn; chưa có khách thì `F4` hoặc nút **+** để thêm nhanh.
 2. {#header} Kiểm tra **Ngày báo giá**, **Ngày giao** và điền **Địa chỉ giao**, **Người nhận**, **Điện thoại** nếu cần.
 3. {#lines} Nhập hàng ở **Chi tiết hàng hóa**: gõ **Mã hàng** để chọn sản phẩm, rồi nhập **SL** và **Đơn giá bán**.
 4. {#totals} Nhập **CK**, **VC**, **Thuế %**, **Tạm ứng** ở khung **Tổng cộng**, rồi xem tổng tiền và **Còn lại** (khi có tạm ứng).
@@ -19,8 +19,11 @@ Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng 
 7. {#output} Bấm **In** hoặc **Excel** khi sửa báo giá, rồi chọn Báo giá hoặc Biên bản bàn giao (có tiền, không tiền).
 
 ## Lưu ý
+- Gõ chữ ở **Khách hàng** mà chưa chọn từ danh sách thì chưa lưu được và ô báo Vui lòng chọn khách hàng từ danh sách.
 - Phải chọn khách, có ít nhất 1 dòng, và mỗi dòng cần **Tên hàng**, **ĐVT** và số lượng khác 0, nếu không hệ thống báo lỗi ngay trên màn hình.
-- Chọn khách sẽ tự điền Địa chỉ giao, Người nhận, Điện thoại nếu các ô này đang trống. Ô chọn khách chỉ hiện khách đang dùng; báo giá cũ của khách đã Ngừng sử dụng vẫn mở được, kèm dòng cảnh báo.
+- Chọn khách sẽ tự điền Địa chỉ giao, Người nhận, Điện thoại nếu các ô này đang trống. Danh sách gợi ý chỉ hiện khách đang dùng, gồm Mã, Tên, MST, Địa chỉ, SĐT, Loại; Enter chọn dòng đang sáng (mã gõ khớp hoàn toàn được ưu tiên), chọn xong con trỏ sang ô tên; báo giá cũ của khách đã Ngừng sử dụng vẫn mở được, kèm dòng cảnh báo.
+- `F4` hoặc nút **+** (cũng là dòng Thêm mới trong danh sách) mở **Thêm nhanh khách hàng**: Enter đi qua từng ô, `Ctrl Enter` lưu khách mới (không lưu báo giá), `Esc` hủy và về ô mã. Cần quyền tạo khách hàng.
+- **Xem danh mục đầy đủ** (dòng cuối danh sách) mở danh mục khách hàng; ↑↓ rồi Enter để chọn. Cần quyền xem khách hàng.
 - Hàng tính theo m, m² hoặc m³: **SL** tự tính từ **D × R × Dày × Tấm**, các ô không dùng bị khóa.
 - Báo giá mới tự lưu nháp trên máy này, hiện Nháp chưa lưu; mở lại màn hình sẽ khôi phục, bấm dấu x cạnh nhãn để bỏ.
 - Khi sửa báo giá, **Gửi**, **Xác nhận**, **In** và **Excel** làm việc trên bản đã lưu, nên hãy lưu thay đổi trước.
@@ -33,5 +36,6 @@ Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng 
 - `Enter` Sang ô kế tiếp
 - `Shift Enter` Về ô trước
 - `Ctrl Enter` Xuống dòng trong ô Tên hàng
+- `F4` Thêm nhanh khách hàng (ở ô mã **Khách hàng**)
 - `Insert` Thêm dòng
 - `Ctrl Delete` Xóa dòng đang chọn

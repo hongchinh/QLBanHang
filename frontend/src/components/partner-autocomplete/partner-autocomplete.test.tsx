@@ -692,3 +692,159 @@ describe('PartnerAutocomplete keyboard', () => {
     expect(lastUnpicked(props)).toBe(false);
   });
 });
+
+describe('PartnerAutocomplete hidden list and waiting Enter edge cases', () => {
+  type HookResult = { data?: PartnerSearchItem[]; isLoading?: boolean; isFetching?: boolean; isError?: boolean };
+  let hookResult: HookResult;
+
+  const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+
+  function renderField(overrides: Partial<Props> = {}) {
+    const props = {
+      type: 'In',
+      requireReason: false,
+      value: null,
+      onSelect: vi.fn(),
+      inputId: 'partner',
+      ...overrides,
+    } as Props;
+    const view = render(<PartnerAutocomplete {...props} />);
+    return {
+      props,
+      input: screen.getByRole('combobox') as HTMLInputElement,
+      rerenderWith: (next: Partial<Props>) => view.rerender(<PartnerAutocomplete {...props} {...next} />),
+    };
+  }
+
+  beforeEach(() => {
+    hookResult = { data: partners, isLoading: false, isError: false };
+    usePartnerSearchMock.mockReset();
+    usePartnerSearchMock.mockImplementation(() => hookResult);
+  });
+
+  it('Tab follows the DOM while the list is open but not shown yet', () => {
+    const { input } = renderField({ onOpenCatalog: vi.fn() });
+    fireEvent.change(input, { target: { value: 'K' } });
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+    expect(fireEvent.keyDown(input, { key: 'Tab', shiftKey: true })).toBe(true);
+  });
+
+  it('Tab follows the DOM when only spaces are typed', async () => {
+    const { input } = renderField({ onOpenCatalog: vi.fn() });
+    fireEvent.change(input, { target: { value: '   ' } });
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+    await settle();
+    expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+  });
+
+  it('Escape before the debounce cancels a waiting Enter', async () => {
+    const { props, input } = renderField();
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'Escape' });
+    await settle();
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('a waiting Enter does not pick when a value landed in the same commit as the results', async () => {
+    hookResult = { data: [partners[0]], isLoading: false, isFetching: true, isError: false };
+    const { props, input, rerenderWith } = renderField();
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    await waitFor(() => expect(usePartnerSearchMock.mock.lastCall?.[1]).toBe('KH01'));
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    hookResult = { data: [partners[1]], isLoading: false, isFetching: false, isError: false };
+    rerenderWith({ value: { id: partners[0].id, code: 'NCC01', name: 'x' } });
+    await settle();
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('a waiting Enter is cancelled when focus leaves the component', async () => {
+    const onSelect = vi.fn();
+    render(
+      <>
+        <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={onSelect} nameInputId="name" />
+        <input id="name" />
+        <input id="elsewhere" />
+      </>,
+    );
+    const input = screen.getByRole('combobox');
+    const elsewhere = document.getElementById('elsewhere')!;
+    input.focus();
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    elsewhere.focus();
+    await settle();
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(elsewhere);
+  });
+
+  it('keeps a waiting Enter when focus moves inside the component', async () => {
+    const onAddNew = vi.fn();
+    const { props, input } = renderField({ onAddNew });
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input, { relatedTarget: screen.getByRole('button', { name: /Thêm nhanh/ }) });
+    await waitFor(() => expect(props.onSelect).toHaveBeenCalledWith(partners[1]));
+  });
+
+  it('no empty row before the typed keyword was searched', async () => {
+    hookResult = { data: [], isLoading: false, isError: false };
+    const { input } = renderField();
+    await typeAndOpen('abc');
+    fireEvent.change(input, { target: { value: 'abcd' } });
+    expect(screen.queryByText(/Không tìm thấy/)).not.toBeInTheDocument();
+    expect(await screen.findByText('Không tìm thấy đối tượng "abcd"')).toBeInTheDocument();
+  });
+
+  it('Enter does not select data the list is not showing (error with old data)', async () => {
+    hookResult = { data: partners, isLoading: false, isError: true };
+    const { props, input } = renderField();
+    await typeAndOpen('KH01');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('option ids are namespaced with the instance', async () => {
+    renderField();
+    const input = await typeAndOpen('abc');
+    const option = screen.getAllByRole('option')[0];
+    expect(option.id).toMatch(/^partner-listbox-.+-11111111-1111-1111-1111-111111111111$/);
+    expect(input).toHaveAttribute('aria-activedescendant', option.id);
+  });
+
+  it('a waiting Enter never activates a footer row', async () => {
+    hookResult = { data: undefined, isLoading: false, isError: true };
+    const onOpenCatalog = vi.fn();
+    const { input } = renderField({ onOpenCatalog });
+    fireEvent.change(input, { target: { value: 'abc' } });
+    expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+    await screen.findByRole('listbox');
+    await settle();
+    expect(onOpenCatalog).not.toHaveBeenCalled();
+  });
+
+  it('a plain Enter in the error state with the list shown opens the catalog', async () => {
+    hookResult = { data: undefined, isLoading: false, isError: true };
+    const onOpenCatalog = vi.fn();
+    const { input } = renderField({ onOpenCatalog });
+    await typeAndOpen('abc');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onOpenCatalog).toHaveBeenCalledWith('abc');
+  });
+
+  it('the post-pick focus timer is cleared on unmount', async () => {
+    const outside = document.createElement('input');
+    outside.id = 'name';
+    document.body.appendChild(outside);
+    const view = render(
+      <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} nameInputId="name" />,
+    );
+    const input = await typeAndOpen('abc');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    view.unmount();
+    await settle();
+    expect(document.activeElement).not.toBe(outside);
+    outside.remove();
+  });
+});

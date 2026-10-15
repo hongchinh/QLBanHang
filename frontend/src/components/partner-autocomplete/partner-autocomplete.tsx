@@ -153,7 +153,7 @@ export function PartnerAutocomplete({
   const addNewId = `${listboxId}-add-new`;
   const catalogId = `${listboxId}-catalog`;
   function rowId(row: ListRow) {
-    return row.kind === 'result' ? `partner-option-${row.item.id}` : row.kind === 'addNew' ? addNewId : catalogId;
+    return row.kind === 'result' ? `${listboxId}-${row.item.id}` : row.kind === 'addNew' ? addNewId : catalogId;
   }
   const activeOptionId = showDropdown && activeRow ? rowId(activeRow) : undefined;
 
@@ -176,9 +176,13 @@ export function PartnerAutocomplete({
     onUnpickedChangeRef.current?.(hasUnpickedText);
   }, [hasUnpickedText]);
 
+  const focusTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(focusTimer.current), []);
+
+  // Only results the list is showing can be matched (not the old data behind an error).
   function exactMatch() {
     const upper = keyword.trim().toUpperCase();
-    return upper.length > 0 ? results.find((r) => r.code.toUpperCase() === upper) : undefined;
+    return hasList && upper.length > 0 ? results.find((r) => r.code.toUpperCase() === upper) : undefined;
   }
 
   function selectPartner(p: PartnerSearchItem) {
@@ -186,7 +190,10 @@ export function PartnerAutocomplete({
     setKeyword('');
     setIsOpen(false);
     setEnterWaiting(false);
-    if (nameInputId) setTimeout(() => focusById(nameInputId, 'end'), 0);
+    if (nameInputId) {
+      clearTimeout(focusTimer.current);
+      focusTimer.current = setTimeout(() => focusById(nameInputId, 'end'), 0);
+    }
   }
 
   // The + button, F4 and the add-new row. With a value picked the new partner starts with an empty name.
@@ -221,7 +228,7 @@ export function PartnerAutocomplete({
   // The results of a waiting Enter arrived: exact code, else the first result, else just show the add row.
   function settleWaitingEnter() {
     setEnterWaiting(false);
-    if (!hasList) return;
+    if (value || isDisabled || !hasList) return;
     const pick = exactMatch() ?? results[0];
     if (pick) {
       selectPartner(pick);
@@ -250,6 +257,8 @@ export function PartnerAutocomplete({
     setTimeout(() => inputRef.current?.focus(), 0);
   }
 
+  // A waiting Enter never activates a footer row. A plain Enter acts on the visible highlighted row; in the
+  // loading / error state the only row is the catalog row, so a plain Enter there opens the catalog.
   function handleEnter(e: KeyboardEvent<HTMLInputElement>) {
     // Modified or composing Enter belongs to the form / the input method.
     if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
@@ -272,10 +281,14 @@ export function PartnerAutocomplete({
       handleEnter(e);
       return;
     }
-    if (!isOpen) {
+    // The list is hidden (closed, or open but nothing searched yet): Tab follows the DOM, ArrowDown opens.
+    if (!showDropdown) {
       if (e.key === 'ArrowDown' && keyword.length > 0) {
         e.preventDefault();
         setIsOpen(true);
+      } else if (e.key === 'Escape' && isOpen) {
+        setIsOpen(false);
+        setEnterWaiting(false);
       }
       return;
     }
@@ -318,6 +331,9 @@ export function PartnerAutocomplete({
               setIsOpen(e.target.value.length > 0);
             }}
             onKeyDown={handleKeyDown}
+            onBlur={(e) => {
+              if (!containerRef.current?.contains(e.relatedTarget as Node | null)) setEnterWaiting(false);
+            }}
             onFocus={() => {
               if (keyword.length > 0) setIsOpen(true);
             }}
@@ -388,7 +404,7 @@ export function PartnerAutocomplete({
                   </tr>
                 </thead>
                 <tbody>
-                  {!isLoading && !isError && results.length === 0 && (
+                  {hasList && !pending && results.length === 0 && (
                     <tr>
                       <td colSpan={6} className="px-2 py-3 text-center text-muted-foreground">
                         {`Không tìm thấy ${noun} "${keyword.trim()}"`}

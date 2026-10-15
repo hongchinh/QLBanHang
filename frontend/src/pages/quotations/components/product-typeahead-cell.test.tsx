@@ -411,6 +411,21 @@ describe('ProductTypeaheadCell', () => {
         expect(await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' })).toBeInTheDocument();
       });
 
+      it('Tab leaves the cell when only the add row is there; with results it still cycles them', () => {
+        searchState.data = [];
+        const { input, rerender } = setup();
+        expect(screen.getByRole('option', { name: new RegExp(ADD_ROW) })).toBeInTheDocument();
+        expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+
+        searchState = { ...settledSearch(), data: [sheet, created] };
+        rerender();
+        expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
+        expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(false);
+        // Two results: the second Tab is back on the first, never on the add row.
+        expect(screen.getByRole('option', { name: /Tôn lạnh 0\.50/ })).toHaveAttribute('aria-selected', 'false');
+        expect(screen.getAllByRole('option')[0]).toHaveAttribute('aria-selected', 'true');
+      });
+
       it('F4 opens the dialog with the list closed', async () => {
         const { input } = setup({ openOnFocus: false });
         expect(screen.queryByRole('listbox')).toBeNull();
@@ -452,6 +467,38 @@ describe('ProductTypeaheadCell', () => {
           searchState = settledSearch();
           rerender();
           expect(onSelect).toHaveBeenCalledWith(sheet);
+        });
+
+        it('ends when the box loses the focus: nothing is picked and the focus is not moved', () => {
+          vi.useFakeTimers();
+          try {
+            const { input, onSelect, rerender } = setup({ nextFocusId: 'next' });
+            expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+            act(() => screen.getByLabelText('next').focus());
+            fireEvent.blur(input);
+            act(() => screen.getByLabelText('next').focus());
+
+            searchState = { ...settledSearch(), settledQuery: 'TL-50' };
+            rerender();
+            act(() => {
+              vi.runAllTimers();
+            });
+
+            expect(onSelect).not.toHaveBeenCalled();
+            expect(screen.getByLabelText('next')).toHaveFocus();
+          } finally {
+            vi.useRealTimers();
+          }
+        });
+
+        it('does not pick when the search failed, whatever stale data is there', () => {
+          const { input, onSelect, rerender } = setup();
+          fireEvent.keyDown(input, { key: 'Enter' });
+
+          searchState = { ...settledSearch(), isError: true, settledQuery: 'TL-50' };
+          rerender();
+
+          expect(onSelect).not.toHaveBeenCalled();
         });
 
         it('with no result arriving, keeps the list open on the add row and opens no dialog', () => {

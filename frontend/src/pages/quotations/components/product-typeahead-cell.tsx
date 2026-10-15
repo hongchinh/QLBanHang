@@ -192,6 +192,8 @@ export function ProductTypeaheadCell({
   // The results of a waiting Enter arrived: exact code, else the first result, else just show the add row.
   function settleWaitingEnter() {
     setEnterWaiting(false);
+    // A failed search leaves stale data behind: commit nothing from it.
+    if (isError) return;
     const upper = value.trim().toUpperCase();
     const pick = items.find((s) => s.code.toUpperCase() === upper) ?? items[0];
     if (pick) {
@@ -222,7 +224,8 @@ export function ProductTypeaheadCell({
       setEnterWaiting(true);
       return;
     }
-    if (!open || rows.length === 0) {
+    // Tab and the arrows only ever walk the results; the add row is reached with the arrows (or F4), never with Tab.
+    if (!open || rows.length === 0 || (e.key === 'Tab' && items.length === 0)) {
       if (e.key === 'Escape' && open) {
         e.preventDefault();
         setOpen(false);
@@ -242,7 +245,7 @@ export function ProductTypeaheadCell({
       case 'Tab':
         e.preventDefault();
         setHighlightedIndex((i) =>
-          e.shiftKey ? (i - 1 + rows.length) % rows.length : (i + 1) % rows.length,
+          e.shiftKey ? (i - 1 + items.length) % items.length : (i + 1) % items.length,
         );
         break;
       case 'Enter': {
@@ -276,6 +279,8 @@ export function ProductTypeaheadCell({
     },
     onBlur: () => {
       pickedAtRef.current = null;
+      // A waiting Enter belongs to the cell the user has just left.
+      setEnterWaiting(false);
     },
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange(e.target.value);

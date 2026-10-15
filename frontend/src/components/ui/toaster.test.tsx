@@ -49,5 +49,6 @@ describe('Toaster', () => {
       expect(li.className).toMatch(/\bbg-(background|emerald-50|red-50)\b/)
       expect(li.className).not.toMatch(/\bbg-[\w-]+\/\d+/)
     }
+    expect(screen.getByText('Lỗi').closest('li')).toHaveClass('dark:text-red-200')
   })
 })

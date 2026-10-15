@@ -49,7 +49,6 @@ describe('PaymentQrButton', () => {
   });
 
   it('has no title while enabled', () => {
-    const user = userEvent.setup();
     render(<PaymentQrButton kind="cash" id="v1" code="01-TT00001" disabledReason="Phiếu đã hủy" />);
 
     expect(screen.getByRole('button', { name: 'QR chuyển khoản' })).not.toHaveAttribute('title');

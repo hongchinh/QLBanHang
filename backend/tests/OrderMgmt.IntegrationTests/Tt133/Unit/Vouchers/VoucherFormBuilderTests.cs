@@ -437,6 +437,38 @@ public class VoucherFormBuilderTests
         RowOf(ws, "Sau khối: x").Should().BeGreaterThan(3);
     }
 
+    [Fact]
+    public void Beginning_a_second_qr_block_is_refused()
+    {
+        var (b, _) = NewBuilder(Context());
+        b.BeginQrBeside(Qr());
+
+        var act = () => b.BeginQrBeside(Qr());
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void A_qr_block_that_fails_to_draw_leaves_no_state_behind()
+    {
+        var (b, ws) = NewBuilder(Context());
+        var tooLong = Qr();
+        tooLong.Payload = new string('A', 5000);
+        b.BeginQrBeside(tooLong);
+        b.WriteLine("Địa chỉ:", "Hà Nội");
+
+        var failing = () => b.EndQrBeside();
+        failing.Should().Throw<Exception>();
+
+        // The block is closed: lines are full width again, a new block can be opened and a second end is refused.
+        b.WriteLine("Sau khối:", "x");
+        LastColumnOf(ws, "Sau khối: x").Should().Be(10);
+        var again = () => b.EndQrBeside();
+        again.Should().Throw<InvalidOperationException>().WithMessage("*BeginQrBeside was not called*");
+        var reopen = () => b.BeginQrBeside(Qr());
+        reopen.Should().NotThrow();
+    }
+
     [Theory]
     [InlineData(VoucherPaper.A5Landscape)]
     [InlineData(VoucherPaper.A4Portrait)]

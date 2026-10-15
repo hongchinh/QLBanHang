@@ -395,6 +395,8 @@ public class StockVoucherFormTests
         Texts(noCash.Worksheet(1)).Should().NotContain(BreakdownLine);
         Texts(noCash.Worksheet(1)).Should().NotContain(t => t.StartsWith("Tổng 1.500.000"));
         Texts(noCash.Worksheet(1)).Should().Contain(ContentLine);
+        RowOf(noCash.Worksheet(1), ContentLine).Should().Be(RowOf(noCash.Worksheet(1), BlockTitle) + 5);
+        RowOf(ws, ContentLine).Should().Be(RowOf(ws, BlockTitle) + 6);
     }
 
     [Theory]
@@ -443,19 +445,43 @@ public class StockVoucherFormTests
         height.Should().BeGreaterThanOrEqualTo(picture.Height * 0.75 + ws.RowHeight);
     }
 
+    [Theory]
+    [InlineData(0, false)]
+    [InlineData(0, true)]
+    [InlineData(500_000, true)]
+    public void Rows_above_the_caption_hold_the_picture(double cashPaid, bool warehouseColumn)
+    {
+        using var wb = Render(StockOutWithQr((decimal)cashPaid, warehouseColumn));
+        var ws = wb.Worksheet(1);
+
+        var above = 0d;
+        for (var r = RowOf(ws, BlockTitle); r < RowOf(ws, ContentLine); r++) above += ws.Row(r).Height;
+
+        // The picture and its 2 px offset from the top of the first row.
+        above.Should().BeGreaterThanOrEqualTo(ws.Pictures.First().Height * 0.75 + 1.5);
+        // The caption row keeps the height of its own line.
+        ws.Row(RowOf(ws, ContentLine)).Height.Should().Be(ws.RowHeight);
+    }
+
     [Fact]
     public void Payment_block_and_signatures_are_never_split_by_a_page_break()
     {
+        var anyBreak = false;
         for (var n = 30; n <= 110; n += 2)
         {
             using var wb = Render(StockOutWithLines(n));
             var ws = wb.Worksheet(1);
             var titleRow = RowOf(ws, BlockTitle);
             var namesRow = RowOf(ws, "Quản trị hệ thống");
+            var breaks = ws.PageSetup.RowBreaks;
 
-            ws.PageSetup.RowBreaks.Where(b => b >= titleRow && b <= namesRow - 1)
+            // The only break is the one in front of the kept end of the voucher (the last two body rows on).
+            if (breaks.Count > 0) breaks.Should().Equal([RowOf(ws, $"Hàng {n - 1}") - 1], $"{n} lines");
+            breaks.Where(b => b >= titleRow && b <= namesRow - 1)
                 .Should().BeEmpty($"{n} lines, block rows {titleRow}-{namesRow - 1}");
+            anyBreak |= breaks.Count > 0;
         }
+        anyBreak.Should().BeTrue("some of the voucher lengths put the end of the voucher across a page");
     }
 
     [Fact]

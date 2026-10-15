@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using ClosedXML.Excel.Drawings;
 using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Application.Tt133.Vouchers;
@@ -179,6 +180,8 @@ public sealed class VoucherFormBuilder
     {
         if (_columns.Count < 4)
             throw new InvalidOperationException("A QR beside the lines needs at least four columns.");
+        if (_qr != null)
+            throw new InvalidOperationException("A QR block is already open; call EndQrBeside first.");
         _qr = qr;
         _qrFirstRow = Table.Row;
         _textLastColumn = _columns.Count - QrColumns;
@@ -189,9 +192,13 @@ public sealed class VoucherFormBuilder
     public void EndQrBeside()
     {
         var qr = _qr ?? throw new InvalidOperationException("BeginQrBeside was not called.");
-        var count = _columns.Count;
         var first = _qrFirstRow;
-        var needed = QrPixels * PointsPerPixel + QrTopOffsetPixels;
+        // The block is closed first, so a failure below leaves no half-open state behind.
+        _qr = null;
+        _qrFirstRow = 0;
+        _textLastColumn = null;
+        var count = _columns.Count;
+        var needed = QrSpanPoints;
 
         var rows = Math.Max(3, Table.Row - first);
         if (Table.Row - first < rows) Table.Skip(rows - (Table.Row - first));
@@ -207,15 +214,12 @@ public sealed class VoucherFormBuilder
         var last = first + rows - 1;
         PutQrCaption(last - 1, firstColumn, VoucherPrintRules.QrScanCaption, bold: true);
         PutQrCaption(last, firstColumn, VoucherPrintRules.QrBankCaption(qr), bold: false);
-
-        _qr = null;
-        _textLastColumn = null;
     }
 
     /// The payment block of the stock-out voucher (02-VT), after the last text line and before the signatures: the
-    /// transfer details on the left in a thin outside border, the QR in the last two columns from the first row, its
-    /// caption in the last row. The rows get explicit heights (the page-break estimate reads only those) that hold
-    /// the picture and the caption.
+    /// transfer details on the left, the QR in the last two columns from the first row, its
+    /// caption in the last row, and a thin outside border around the whole block. The rows get explicit heights (the
+    /// page-break estimate reads only those): the rows above the caption hold the picture, the caption row keeps its own.
     public void WritePaymentBlock(VoucherPaymentQrDto qr)
     {
         var count = _columns.Count;
@@ -246,10 +250,11 @@ public sealed class VoucherFormBuilder
             heights[i] = Wrap(cell, text, 1, textEnd, bold) * Sheet.RowHeight;
         }
 
-        // The rows hold the picture and a default row for the caption; the missing height is shared equally.
-        var needed = QrPixels * PointsPerPixel + QrTopOffsetPixels + Sheet.RowHeight;
-        var extra = Math.Max(0, needed - heights.Sum()) / lines.Count;
-        for (var i = 0; i < lines.Count; i++) Sheet.Row(first + i).Height = heights[i] + extra;
+        // The rows above the caption hold the picture; the missing height is shared equally by them, and the caption
+        // row keeps its own height.
+        var above = lines.Count - 1;
+        var extra = Math.Max(0, QrSpanPoints - heights.Take(above).Sum()) / above;
+        for (var i = 0; i < lines.Count; i++) Sheet.Row(first + i).Height = heights[i] + (i < above ? extra : 0);
 
         var last = first + lines.Count - 1;
         Sheet.Range(first, 1, last, count).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
@@ -350,6 +355,9 @@ public sealed class VoucherFormBuilder
         }
     }
 
+    /// Height in points the picture takes from the top of its first row: the picture and its offset from the top.
+    private double QrSpanPoints => (QrPixels + QrTopOffsetPixels) * PointsPerPixel;
+
     private double HeightOfRows(int firstRow, int lastRow)
     {
         var height = 0d;
@@ -367,7 +375,7 @@ public sealed class VoucherFormBuilder
         var xOffset = Math.Max(0, (int)Math.Round((columnsPixels - pixels) / 2));
 
         using var png = new MemoryStream(QrPngRenderer.Render(qr.Payload));
-        Sheet.AddPicture(png, "payment-qr")
+        Sheet.AddPicture(png, XLPictureFormat.Png, "payment-qr")
             .MoveTo(Sheet.Cell(row, firstColumn), xOffset, QrTopOffsetPixels)
             .WithSize(pixels, pixels);
     }

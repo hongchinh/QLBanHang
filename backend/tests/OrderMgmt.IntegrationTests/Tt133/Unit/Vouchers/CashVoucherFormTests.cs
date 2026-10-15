@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using ClosedXML.Excel.Drawings;
 using FluentAssertions;
 using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Payments.Services;
@@ -229,9 +230,28 @@ public class CashVoucherFormTests
             ColumnOf(ws, caption).Should().Be(9, caption);
             RowOf(ws, caption).Should().BeGreaterThan(pictureRow, caption);
             LastColumnOf(ws, caption).Should().Be(10, caption);
-            CellWith(ws, caption).Style.Font.FontSize.Should().Be(8, caption);
+            var style = CellWith(ws, caption).Style;
+            style.Font.FontSize.Should().Be(8, caption);
+            style.Alignment.Horizontal.Should().Be(XLAlignmentHorizontalValues.Center, caption);
+            style.Alignment.ShrinkToFit.Should().BeTrue(caption);
         }
+        CellWith(ws, ScanCaption).Style.Font.Bold.Should().BeTrue();
+        CellWith(ws, "Vietcombank · 0123456789").Style.Font.Bold.Should().BeFalse();
         RowOf(ws, "Vietcombank · 0123456789").Should().Be(RowOf(ws, ScanCaption) + 1);
+        // The captions are the last two rows of the block: the signature date follows after one blank row.
+        RowOf(ws, "Vietcombank · 0123456789").Should().Be(SignatureDateRow(ws) - 2);
+    }
+
+    [Fact]
+    public void Qr_is_centred_in_columns_9_to_10_two_pixels_below_the_top()
+    {
+        using var wb = Render(ReceiptWithQr());
+        var picture = wb.Worksheet(1).Pictures.First();
+
+        var offset = picture.GetOffset(XLMarkerPosition.TopLeft);
+        offset.Y.Should().Be(2);
+        // Two columns of width 9.5: 9.5 * 7 + 5 pixels each.
+        offset.X.Should().BeInRange((int)((2 * (9.5 * 7 + 5) - picture.Width) / 2) - 1, (int)((2 * (9.5 * 7 + 5) - picture.Width) / 2) + 1);
     }
 
     [Fact]

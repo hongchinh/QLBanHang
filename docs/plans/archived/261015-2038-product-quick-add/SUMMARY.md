@@ -2,7 +2,7 @@
 
 ## Goal
 
-Let users add a missing product from the **Mã hàng** cell of the stock-in, stock-out, quotation and opening stock screens, without leaving the screen. A "Thêm mới hàng hóa" row in the suggestion list, or **F4**, opens a dialog. The dialog holds the full product form, shared with the catalog page. On save the new product fills the line exactly like a pick from the list, and the voucher itself is not saved. The Warehouse, Accountant and Sales seed roles get `products.create` so their users can do this. Source: brainstorm [261015-2033-product-quick-add](../../brainstorms/261015-2033-product-quick-add/SUMMARY.md); decisions D1–D6 were approved by the user on 2026-10-15.
+Let users add a missing product from the **Mã hàng** cell of the stock-in, stock-out, quotation and opening stock screens, without leaving the screen. A "Thêm mới hàng hóa" row in the suggestion list, or **F4**, opens a dialog. The dialog holds the full product form, shared with the catalog page. On save the new product fills the line exactly like a pick from the list, and the voucher itself is not saved. The Warehouse, Accountant and Sales seed roles get `products.create` so their users can do this. Source: brainstorm [261015-2033-product-quick-add](../../../brainstorms/261015-2033-product-quick-add/SUMMARY.md); decisions D1–D6 were approved by the user on 2026-10-15.
 
 ## Scope
 

@@ -1,7 +1,7 @@
 # Product quick add from the product code cell
 
 - **Created:** 2026-10-15 20:33:44
-- **Status:** design approved by the user; plan [261015-2038-product-quick-add](../../plans/261015-2038-product-quick-add/SUMMARY.md)
+- **Status:** design approved by the user; plan [261015-2038-product-quick-add](../../plans/archived/261015-2038-product-quick-add/SUMMARY.md)
 - **Mockup:** [mockup-01-quick-add-product.html](mockup-01-quick-add-product.html). Part 1 shows the entry points. Part 2 compares a short form (A) with the full form (B); the user chose **B**.
 
 ## Problem

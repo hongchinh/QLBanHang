@@ -1244,6 +1244,17 @@ describe('CashVoucherFormPage', () => {
       expect(line(1).value).toBe(AUTO_KH01);
     });
 
+    it('12. an empty reason and a picked partner that no reason fits get a red line', async () => {
+      withoutDefaultReason();
+      renderPage('Receipt');
+
+      await pickPartner({ ...customer, isCustomer: false, isSupplier: false }, 'KH');
+
+      expect(byId('cash-reason').value).toBe('');
+      expect(screen.getByText('Không có lý do nào hợp với KH01 (đối tượng)')).toHaveClass('text-destructive');
+      expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+    });
+
     it('13. added and deleted rows keep following the header; a hand-typed row does not', async () => {
       renderPage('Receipt');
       await pickCustomer();

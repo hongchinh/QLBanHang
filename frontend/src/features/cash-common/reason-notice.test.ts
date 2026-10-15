@@ -24,7 +24,21 @@ describe('reasonNoticeOf', () => {
   it('is null with nothing to say', () => {
     expect(reasonNoticeOf(supplier, supplierReason, null)).toBeNull();
     expect(reasonNoticeOf(null, supplierReason, null)).toBeNull();
-    expect(reasonNoticeOf(supplier, undefined, null)).toBeNull();
+  });
+
+  it('says no reason fits when the reason is empty and the roles of the picked partner are known (section-01 §4.2 step 3)', () => {
+    expect(reasonNoticeOf(supplier, undefined, null)).toEqual({
+      text: 'Không có lý do nào hợp với NCC01 (nhà cung cấp)',
+      tone: 'error',
+    });
+    expect(reasonNoticeOf({ code: 'KH01', isCustomer: true, isSupplier: true }, undefined, null)?.text).toBe(
+      'Không có lý do nào hợp với KH01 (khách hàng và nhà cung cấp)',
+    );
+  });
+
+  it('says nothing about an empty reason without a partner or with unknown roles', () => {
+    expect(reasonNoticeOf(null, undefined, null)).toBeNull();
+    expect(reasonNoticeOf({ code: 'NCC01' }, undefined, null)).toBeNull();
   });
 
   it('gives no mismatch for a partner whose roles are unknown (a saved voucher)', () => {

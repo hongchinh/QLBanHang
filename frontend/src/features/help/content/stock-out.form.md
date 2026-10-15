@@ -3,7 +3,7 @@ key: stock-out.form
 title: Phiếu xuất kho
 routes: [/stock-out/new, /stock-out/:id]
 sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts]
-related: []
+related: [receipts.form, debt-matching]
 updated: 2026-10-15
 ---
 ## Dùng để
@@ -13,7 +13,7 @@ Ghi nhận hàng xuất khỏi kho: bán cho khách, trả hàng nhà cung cấp
 1. {#reason} Chọn **Lý do xuất** (ví dụ Xuất bán hàng) và **Kho**.
 2. {#partner} Gõ mã hoặc tên khách ở **Mã đối tượng**, Enter để chọn.
 3. {#lines} Nhập hàng ở tab **Hàng hóa**: **Mã hàng**, **SL**, **Đơn giá**. Enter sang ô kế tiếp, `Insert` thêm dòng.
-4. {#totals} Xem **Tổng thanh toán** và công nợ của khách (Phải thu, Hạn mức, Còn được nợ) ở thanh cuối phiếu.
+4. {#totals} Xem **Tổng thanh toán** ở thanh cuối phiếu; nếu có quyền xem công nợ, xem thêm Phải thu, Hạn mức và Còn được nợ của khách.
 5. {#payment} Nếu khách trả ngay, chọn **HTTT** ở phần đầu phiếu rồi kiểm tra **Số tiền thanh toán** (mặc định bằng tổng tiền, sửa nếu khách trả một phần) ở tab **Thanh toán**, phiếu thu được tạo tự động.
 6. {#save} Bấm **Lưu tạm** hoặc **Lưu và thoát** (**Cập nhật** khi sửa phiếu), rồi in phiếu nếu cần.
 

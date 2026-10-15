@@ -199,3 +199,88 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Khôi phục | frontend/src/pages/fund-transfers/fund-transfer-form-page.tsx:308 |
 | Quỹ bị âm | frontend/src/lib/confirm-required.ts:39 (shared 422 dialog title, outside sources) |
 | Không đủ tiền trong quỹ | frontend/src/lib/confirm-required.ts:40 (shared 422 dialog title, outside sources) |
+
+## debt-matching
+
+| label | evidence |
+|---|---|
+| Phải thu | dynamic: DEBT_SIDE_LABELS[s] (frontend/src/features/cash-common/labels.ts:20, outside sources), button rendered at frontend/src/pages/debt/debt-matching-page.tsx:184 |
+| Phải trả | dynamic: DEBT_SIDE_LABELS[s] (frontend/src/features/cash-common/labels.ts:21, outside sources), button rendered at frontend/src/pages/debt/debt-matching-page.tsx:184 |
+| Đối tượng | frontend/src/pages/debt/debt-matching-page.tsx:210 |
+| Chưa đối trừ | frontend/src/pages/debt/debt-matching-page.tsx:225 |
+| Đã đối trừ | frontend/src/pages/debt/debt-matching-page.tsx:226 |
+| Đối trừ | frontend/src/pages/debt/components/open-item-grid.tsx:75 (column header); button frontend/src/pages/debt/debt-matching-page.tsx:152 |
+| Còn lại | frontend/src/pages/debt/components/open-item-grid.tsx:74 |
+| Gợi ý | frontend/src/pages/debt/debt-matching-page.tsx:144 |
+| Xóa | frontend/src/pages/debt/debt-matching-page.tsx:148 |
+| Bỏ | frontend/src/pages/debt/components/settlement-list.tsx:167 |
+| Bỏ cả lô | frontend/src/pages/debt/components/settlement-list.tsx:154 |
+
+## debt-opening
+
+| label | evidence |
+|---|---|
+| Ngày đầu kỳ | frontend/src/pages/debt/opening-debt-page.tsx:185 |
+| Thêm | frontend/src/pages/debt/opening-debt-page.tsx:195 |
+| Phía | frontend/src/pages/debt/opening-debt-form-dialog.tsx:170 |
+| Loại | frontend/src/pages/debt/opening-debt-form-dialog.tsx:191 |
+| Nợ | dynamic: OPENING_DEBT_KIND_LABELS.Debt (frontend/src/features/cash-common/labels.ts:49, outside sources), option rendered at frontend/src/pages/debt/opening-debt-form-dialog.tsx:204 |
+| Trả trước | dynamic: OPENING_DEBT_KIND_LABELS.Prepayment (frontend/src/features/cash-common/labels.ts:50, outside sources), option rendered at frontend/src/pages/debt/opening-debt-form-dialog.tsx:204 |
+| Đối tượng | frontend/src/pages/debt/opening-debt-form-dialog.tsx:211 |
+| Nhân viên | frontend/src/pages/debt/opening-debt-form-dialog.tsx:228 |
+| Số CT | frontend/src/pages/debt/opening-debt-form-dialog.tsx:250 |
+| Ngày CT | frontend/src/pages/debt/opening-debt-form-dialog.tsx:256 |
+| Hạn TT | frontend/src/pages/debt/opening-debt-form-dialog.tsx:263 |
+| Số tiền | frontend/src/pages/debt/opening-debt-form-dialog.tsx:270 |
+| Ghi chú | frontend/src/pages/debt/opening-debt-form-dialog.tsx:286 |
+| Lưu | frontend/src/pages/debt/opening-debt-form-dialog.tsx:296 |
+| Đã đối trừ | frontend/src/pages/debt/opening-debt-page.tsx:109 |
+| Bỏ đối trừ chứng từ | frontend/src/lib/confirm-required.ts:36 (shared 422 dialog title, outside sources) |
+
+## dashboard-executive
+
+| label | evidence |
+|---|---|
+| Toàn công ty | frontend/src/pages/executive-dashboard/components/scope-select.tsx:22 |
+| Hôm nay | frontend/src/features/executive-dashboard/presets.ts:5 |
+| Tuần này | frontend/src/features/executive-dashboard/presets.ts:6 |
+| Tháng này | frontend/src/features/executive-dashboard/presets.ts:7 |
+| Năm nay | frontend/src/features/executive-dashboard/presets.ts:8 |
+| Tuỳ chỉnh | frontend/src/features/dashboard/components/range-picker.tsx:93 (shared range picker, outside sources) |
+| Từ ngày | frontend/src/features/dashboard/components/range-picker.tsx:100 (shared range picker, outside sources) |
+| Đến ngày | frontend/src/features/dashboard/components/range-picker.tsx:104 (shared range picker, outside sources) |
+| Tổng quan | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:28 |
+| Kinh doanh | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:29 |
+| Tiền | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:30 |
+| Công nợ | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:31 |
+| Kho | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:32 |
+| Trong kỳ | frontend/src/pages/executive-dashboard/components/kpi-row.tsx:160 |
+| Hiện tại | frontend/src/pages/executive-dashboard/components/kpi-row.tsx:161 |
+| Cần chú ý | frontend/src/pages/executive-dashboard/tabs/overview-tab.tsx:175 |
+| Vừa phát sinh | frontend/src/pages/executive-dashboard/tabs/overview-tab.tsx:179 |
+| Doanh thu xuất bán | frontend/src/pages/executive-dashboard/components/kpi-row.tsx:75 |
+| Trực tiếp | frontend/src/features/dashboard/components/live-status.tsx:12 (shared status badge, outside sources) |
+| Mất kết nối | frontend/src/features/dashboard/components/live-status.tsx:14 (shared status badge, outside sources) |
+| Thử lại | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:91 |
+
+## stock-out.form
+
+Phase 01 reference file; the table covers every bold label (added in Task 4.4).
+
+| label | evidence |
+|---|---|
+| Lý do xuất | frontend/src/pages/stock-vouchers/labels.ts:27 (reasonLabel, shown in components/stock-voucher-main-fields.tsx:105) |
+| Kho | frontend/src/pages/stock-vouchers/components/stock-voucher-main-fields.tsx:122 |
+| Mã đối tượng | frontend/src/pages/stock-vouchers/components/stock-voucher-main-fields.tsx:159 |
+| Hàng hóa | frontend/src/pages/stock-vouchers/components/stock-voucher-tabs.tsx:30 |
+| Mã hàng | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:68 |
+| SL | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:76 |
+| Đơn giá | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:78 |
+| Tổng thanh toán | frontend/src/pages/stock-vouchers/components/stock-totals-bar.tsx:31 |
+| HTTT | frontend/src/pages/stock-vouchers/components/stock-voucher-main-fields.tsx:139 |
+| Số tiền thanh toán | frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx:84 |
+| Thanh toán | frontend/src/pages/stock-vouchers/components/stock-voucher-tabs.tsx:34 |
+| Lưu tạm | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:739 |
+| Lưu và thoát | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:735 |
+| Cập nhật | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:746 |
+| Vượt hạn mức nợ | frontend/src/lib/confirm-required.ts:37 (shared 422 dialog title, outside sources) |

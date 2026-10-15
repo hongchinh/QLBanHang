@@ -1,4 +1,5 @@
 using FluentAssertions;
+using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Tt133.Vouchers;
 using OrderMgmt.Domain.Enums;
 using Xunit;
@@ -97,5 +98,34 @@ public class VoucherPrintRulesTests
             new StockVoucherPrintTotal("Cước vận chuyển", 30_000),
             new StockVoucherPrintTotal("Tổng cộng", 530_000));
         (rows[0].Amount + rows[1].Amount).Should().Be(rows[^1].Amount);
+    }
+
+    private static VoucherPaymentQrDto Qr(decimal amount, decimal total, decimal cashPaid) => new()
+    {
+        Amount = amount,
+        Total = total,
+        CashPaid = cashPaid,
+        BankShortName = "Vietcombank",
+        AccountNumber = "0123456789",
+    };
+
+    [Fact]
+    public void QrAmountLine_formats_the_amount()
+        => VoucherPrintRules.QrAmountLine(Qr(1_000_000, 1_000_000, 0)).Should().Be("Số tiền: 1.000.000 đồng");
+
+    [Fact]
+    public void QrBreakdownLine_is_null_without_a_cash_part()
+        => VoucherPrintRules.QrBreakdownLine(Qr(1_000_000, 1_000_000, 0)).Should().BeNull();
+
+    [Fact]
+    public void QrBreakdownLine_shows_total_cash_and_transfer()
+        => VoucherPrintRules.QrBreakdownLine(Qr(1_000_000, 1_500_000, 500_000))
+            .Should().Be("Tổng 1.500.000 · Đã trả tiền mặt 500.000 · Cần chuyển khoản 1.000.000");
+
+    [Fact]
+    public void QrBankCaption_and_scan_caption()
+    {
+        VoucherPrintRules.QrBankCaption(Qr(1, 1, 0)).Should().Be("Vietcombank · 0123456789");
+        VoucherPrintRules.QrScanCaption.Should().Be("Quét để chuyển khoản");
     }
 }

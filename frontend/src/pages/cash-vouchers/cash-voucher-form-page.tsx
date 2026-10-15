@@ -48,6 +48,7 @@ import { Button } from '@/components/ui/button';
 import { ButtonLoader } from '@/components/ui/button-loader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { PaymentQrButton } from '@/components/payment-qr/payment-qr-button';
 import { VoucherPrintButton } from '@/components/voucher-print/voucher-print-button';
 import { useDocumentActions } from '@/hooks/useDocumentActions';
 import { getErrorMessage } from '@/lib/api-client';
@@ -562,6 +563,17 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
                 vouchers={[{ id: voucher.id, code: voucher.code }]}
                 disabled={isDirty || busy}
                 disabledReason={isDirty ? 'Lưu thay đổi trước khi in' : undefined}
+              />
+            )}
+            {isEdit && voucher && voucher.type === 'Receipt' && (
+              <PaymentQrButton
+                kind="cash"
+                id={voucher.id}
+                code={voucher.code}
+                disabled={isDirty || busy || status === 'Cancelled'}
+                disabledReason={
+                  status === 'Cancelled' ? 'Phiếu đã hủy' : isDirty ? 'Lưu thay đổi trước khi xem QR' : undefined
+                }
               />
             )}
             {!isEdit && (

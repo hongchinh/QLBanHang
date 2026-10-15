@@ -48,6 +48,13 @@ describe('useVoucherPrint', () => {
     expect(saveBlob).not.toHaveBeenCalled();
   });
 
+  it('passes the QR flag on to the request', async () => {
+    fetchVoucherPrint.mockResolvedValue(new Blob());
+    const { result } = renderHook(() => useVoucherPrint());
+    await act(() => result.current.print({ ...one, includeQr: true }));
+    expect(fetchVoucherPrint).toHaveBeenCalledWith(expect.objectContaining({ includeQr: true }));
+  });
+
   it('pdf of several vouchers uses a count as the tab title', async () => {
     fetchVoucherPrint.mockResolvedValue(new Blob());
     const { result } = renderHook(() => useVoucherPrint());

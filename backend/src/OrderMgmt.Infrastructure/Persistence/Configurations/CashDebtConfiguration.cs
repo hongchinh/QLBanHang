@@ -29,14 +29,17 @@ public class FundConfiguration : IEntityTypeConfiguration<Fund>
         b.Property(x => x.Name).IsRequired().HasMaxLength(255);
         b.Property(x => x.BankName).HasMaxLength(255);
         b.Property(x => x.AccountNumber).HasMaxLength(50);
+        b.Property(x => x.AccountHolderName).HasMaxLength(255);
         b.Property(x => x.OpeningAmount).HasColumnType("numeric(18,2)").HasDefaultValue(0m);
         b.Property(x => x.IsActive).HasDefaultValue(true).HasSentinel(true);
 
+        b.HasIndex(x => x.BankId);
         b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.BranchId, x.Kind }).IsUnique().HasFilter("is_default AND is_deleted = false");
         b.HasQueryFilter(x => !x.IsDeleted);
 
         b.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
+        b.HasOne(x => x.Bank).WithMany().HasForeignKey(x => x.BankId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

@@ -37,12 +37,16 @@ public static class CashVoucherForm
             $"Nợ: {VoucherPrintRules.Dots}",
             $"Có: {VoucherPrintRules.Dots}",
         ]);
+        // The transfer QR is printed beside the lines on the receipt only.
+        var qr = receipt ? m.Qr : null;
+        if (qr != null) builder.BeginQrBeside(qr);
         builder.WriteLine(receipt ? "Họ và tên người nộp tiền:" : "Họ và tên người nhận tiền:", m.PersonName);
         builder.WriteLine("Địa chỉ:", m.Address);
         builder.WriteLine(receipt ? "Lý do nộp:" : "Lý do chi:", m.Reason);
         builder.WriteLine("Số tiền:", $"{VoucherPrintRules.Money(m.Amount)} đồng");
         builder.WriteLine("(Viết bằng chữ):", m.AmountInWords);
-        builder.Table.WriteText(m.AttachedDocsLine);
+        builder.WriteText(m.AttachedDocsLine);
+        if (qr != null) builder.EndQrBeside();
 
         var director = new VoucherSigner("Giám đốc", StampHint, context.LegalRepresentativeName);
         var accountant = new VoucherSigner("Kế toán trưởng", Hint, context.ChiefAccountantName);

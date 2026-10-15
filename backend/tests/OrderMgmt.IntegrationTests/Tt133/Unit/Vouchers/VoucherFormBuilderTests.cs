@@ -1,5 +1,7 @@
 using ClosedXML.Excel;
 using FluentAssertions;
+using OrderMgmt.Application.CashDebt.PaymentQr;
+using OrderMgmt.Application.Payments.Services;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Application.Tt133.Vouchers;
 using OrderMgmt.Infrastructure.Excel.Tt133;
@@ -402,5 +404,121 @@ public class VoucherFormBuilderTests
         ws.PageSetup.PagesTall.Should().Be(0);
         ws.PageSetup.CenterHorizontally.Should().BeFalse();
         ws.PageSetup.FirstRowToRepeatAtTop.Should().Be(b.Table.TableHeaderFirstRow);
+    }
+
+    private static VoucherPaymentQrDto Qr() => new()
+    {
+        Payload = VietQrPayloadBuilder.Build("970436", "0123456789", "CONG TY ABC", 1_500_000m, "PT00001"),
+        Amount = 1_500_000m,
+        Total = 1_500_000m,
+        BankShortName = "Vietcombank",
+        AccountNumber = "0123456789",
+    };
+
+    private static int LastColumnOf(IXLWorksheet sheet, string text) => SpanOf(sheet, text).Last;
+
+    [Fact]
+    public void Qr_block_narrows_the_lines_and_the_lines_after_it_are_full_width()
+    {
+        var (b, ws) = NewBuilder(Context());
+
+        b.BeginQrBeside(Qr());
+        b.WriteLine("Địa chỉ:", "Hà Nội");
+        b.WriteText("Kèm theo: 2 chứng từ gốc");
+        b.EndQrBeside();
+        b.WriteLine("Sau khối:", "x");
+
+        LastColumnOf(ws, "Địa chỉ: Hà Nội").Should().Be(8);
+        LastColumnOf(ws, "Kèm theo: 2 chứng từ gốc").Should().Be(8);
+        LastColumnOf(ws, "Sau khối: x").Should().Be(10);
+        ws.Pictures.Count.Should().Be(1);
+        ws.Pictures.First().TopLeftCell.Address.RowNumber.Should().Be(1);
+        // Two lines are not tall enough for the picture: blank rows are added before the next line.
+        RowOf(ws, "Sau khối: x").Should().BeGreaterThan(3);
+    }
+
+    [Fact]
+    public void Beginning_a_second_qr_block_is_refused()
+    {
+        var (b, _) = NewBuilder(Context());
+        b.BeginQrBeside(Qr());
+
+        var act = () => b.BeginQrBeside(Qr());
+
+        act.Should().Throw<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void A_qr_block_that_fails_to_draw_leaves_no_state_behind()
+    {
+        var (b, ws) = NewBuilder(Context());
+        var tooLong = Qr();
+        tooLong.Payload = new string('A', 5000);
+        b.BeginQrBeside(tooLong);
+        b.WriteLine("Địa chỉ:", "Hà Nội");
+
+        var failing = () => b.EndQrBeside();
+        failing.Should().Throw<Exception>();
+
+        // The block is closed: lines are full width again, a new block can be opened and a second end is refused.
+        b.WriteLine("Sau khối:", "x");
+        LastColumnOf(ws, "Sau khối: x").Should().Be(10);
+        var again = () => b.EndQrBeside();
+        again.Should().Throw<InvalidOperationException>().WithMessage("*BeginQrBeside was not called*");
+        var reopen = () => b.BeginQrBeside(Qr());
+        reopen.Should().NotThrow();
+    }
+
+    [Fact]
+    public void Qr_beside_the_lines_of_a_tall_A5_sheet_gets_the_height_it_needs_and_prints_25_mm()
+    {
+        var (b, ws) = NewBuilder(Context());
+        b.BeginQrBeside(Qr());
+        for (var i = 1; i <= 8; i++) b.WriteLine($"Dòng {i}:", "x");
+        b.EndQrBeside();
+        var rowsAfterBlock = b.Table.Row;
+        // A tall sheet: the page fits it at a smaller zoom, so the picture is drawn larger than the block was made for.
+        for (var i = 1; i <= 25; i++) b.WriteLine($"Sau {i}:", "x");
+
+        b.Finish();
+
+        var picture = ws.Pictures.Single();
+        var zoom = LibreOfficePrint.A5Zoom(ws, 10);
+        picture.Width.Should().Be(LibreOfficePrint.QrPixels(zoom));
+        LibreOfficePrint.PrintedMillimetres(picture, zoom).Should().BeApproximately(25, 0.25);
+        var captionRow = RowOf(ws, VoucherPrintRules.QrScanCaption);
+        var above = 0d;
+        for (var r = picture.TopLeftCell.Address.RowNumber; r < captionRow; r++) above += ws.Row(r).Height;
+        above.Should().BeGreaterThanOrEqualTo(picture.Height * 0.75 + 1.5);
+        // No row is added: the lines after the block stay where they were written.
+        RowOf(ws, "Sau 1: x").Should().Be(rowsAfterBlock);
+    }
+
+    [Fact]
+    public void Payment_block_on_A5_is_refused()
+    {
+        // Only the A4 zoom is known when the block is written; on A5 the picture would keep a guessed size.
+        var (b, ws) = NewBuilder(Context());
+
+        var act = () => b.WritePaymentBlock(Qr());
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*A4*");
+        ws.Pictures.Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData(VoucherPaper.A5Landscape)]
+    [InlineData(VoucherPaper.A4Portrait)]
+    public void Qr_picture_is_square_and_about_25_mm_on_paper(VoucherPaper paper)
+    {
+        var (b, ws) = NewBuilder(Context(), paper);
+
+        b.BeginQrBeside(Qr());
+        b.WriteLine("Địa chỉ:", "Hà Nội");
+        b.EndQrBeside();
+
+        var picture = ws.Pictures.First();
+        picture.Width.Should().Be(picture.Height);
+        picture.Width.Should().BeInRange(90, 130);
     }
 }

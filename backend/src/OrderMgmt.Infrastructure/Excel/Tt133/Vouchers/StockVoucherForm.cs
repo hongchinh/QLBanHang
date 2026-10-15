@@ -89,6 +89,7 @@ public static class StockVoucherForm
 
         builder.WriteLine("- Tổng số tiền (viết bằng chữ):", m.AmountInWords);
         builder.WriteLine("- Số chứng từ gốc kèm theo:", null);
+        if (!stockIn && m.Qr is { } qr) builder.WritePaymentBlock(qr);
 
         var preparer = new VoucherSigner("Người lập phiếu", Hint, m.PreparerName);
         var treasurer = new VoucherSigner("Thủ kho", Hint, null);

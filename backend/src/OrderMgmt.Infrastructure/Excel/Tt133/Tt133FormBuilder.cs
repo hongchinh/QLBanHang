@@ -117,17 +117,18 @@ public sealed class Tt133FormBuilder
         _gapAfterTitle = true;
     }
 
-    /// One row merged over all columns.
-    public void WriteText(string text, bool bold = false, bool italic = false, bool centered = false)
+    /// One row merged over all columns, or over the first columns up to lastColumn (1-based).
+    public void WriteText(string text, bool bold = false, bool italic = false, bool centered = false, int? lastColumn = null)
     {
-        var cell = Merged(Row, 1, _columns.Count);
+        var last = lastColumn ?? _columns.Count;
+        var cell = Merged(Row, 1, last);
         cell.Value = text;
         cell.Style.Font.Bold = bold;
         cell.Style.Font.Italic = italic;
         cell.Style.Alignment.Horizontal = centered
             ? XLAlignmentHorizontalValues.Center
             : XLAlignmentHorizontalValues.Left;
-        WrapMerged(cell, text, 1, _columns.Count, bold);
+        WrapMerged(cell, text, 1, last, bold);
         Row++;
         _gapAfterTitle = false;
     }

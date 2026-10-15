@@ -235,6 +235,14 @@ const funds: Fund[] = [
   fund(FUND_BANK, 'NH01', 'Bank', { isDefault: true }),
 ];
 
+let qrDialogProps: Record<string, unknown> = {};
+vi.mock('@/components/payment-qr/payment-qr-dialog', () => ({
+  PaymentQrDialog: (props: unknown) => {
+    qrDialogProps = props as Record<string, unknown>;
+    return null;
+  },
+}));
+
 let printProps: Record<string, unknown> = {};
 vi.mock('@/components/voucher-print/voucher-print-button', () => ({
   VoucherPrintButton: (props: { disabled?: boolean; disabledReason?: string }) => {
@@ -457,6 +465,7 @@ function record(over: Partial<Customer> = {}): Customer {
 describe('StockVoucherFormPage', () => {
   beforeEach(() => {
     printProps = {};
+    qrDialogProps = {};
     localStorage.clear();
     routeParams.id = 'new';
     voucherState.data = undefined;
@@ -933,6 +942,54 @@ describe('StockVoucherFormPage', () => {
 
     expect(screen.getByTestId('voucher-print')).toBeEnabled();
     expect(printProps).toMatchObject({ disabled: false });
+  });
+
+  describe('payment QR button', () => {
+    it('shows on a saved stock-out', () => {
+      routeParams.id = V1;
+      const saved = voucher({ type: 'Out', code: 'PX00007' });
+      voucherState.data = saved;
+      renderPage('Out');
+
+      expect(screen.getByRole('button', { name: 'QR chuyển khoản' })).toBeEnabled();
+      expect(qrDialogProps).toMatchObject({ kind: 'stock', id: saved.id, voucherCode: saved.code, open: false });
+    });
+
+    it('is absent on a stock-in', () => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      renderPage('In');
+
+      expect(screen.queryByRole('button', { name: 'QR chuyển khoản' })).not.toBeInTheDocument();
+    });
+
+    it('is absent on a new voucher', () => {
+      renderPage('Out');
+
+      expect(screen.queryByRole('button', { name: 'QR chuyển khoản' })).not.toBeInTheDocument();
+    });
+
+    it('waits for unsaved changes', () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ type: 'Out', code: 'PX00007' });
+      renderPage('Out');
+
+      fireEvent.change(byId('stock-voucher-note'), { target: { value: 'Sửa chưa lưu' } });
+
+      const button = screen.getByRole('button', { name: 'QR chuyển khoản' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', 'Lưu thay đổi trước khi xem QR');
+    });
+
+    it('is disabled on a cancelled voucher', () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ type: 'Out', code: 'PX00007', status: 'Cancelled', canEdit: false });
+      renderPage('Out');
+
+      const button = screen.getByRole('button', { name: 'QR chuyển khoản' });
+      expect(button).toBeDisabled();
+      expect(button).toHaveAttribute('title', 'Phiếu đã hủy');
+    });
   });
 
   it('new voucher waits for defaults fetched after mount, never cached ones', () => {

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useBanks } from '@/features/banks/hooks';
 import { useCreateFund, useUpdateFund } from '@/features/funds/hooks';
 import type { Fund } from '@/features/funds/types';
 import { FUND_KIND_LABELS } from '@/features/cash-common/labels';
@@ -17,24 +18,53 @@ import { toast } from '@/lib/use-toast';
 // A fund is a cash box or a bank account; 'None' is a payment method value only.
 const FUND_KINDS = ['Cash', 'Bank'] as const;
 
-const editSchema = z.object({
+const baseSchema = z.object({
   code: z.string(),
   name: z.string().trim().min(1, 'Tên quỹ không được để trống').max(255, 'Tối đa 255 ký tự'),
   kind: z.enum(FUND_KINDS),
   bankName: z.string().trim().max(255, 'Tối đa 255 ký tự'),
   accountNumber: z.string().trim().max(50, 'Tối đa 50 ký tự'),
+  bankId: z.string(), // empty = no bank chosen
+  accountHolderName: z.string().trim().max(255, 'Tối đa 255 ký tự'),
   isDefault: z.boolean(),
   isActive: z.boolean(),
 });
 
+type FormValues = z.infer<typeof baseSchema>;
+
+// A bank fund with a chosen bank prints a QR, so its account number must be a valid VietQR account.
+function checkQrAccountNumber(values: FormValues, ctx: z.RefinementCtx) {
+  if (values.kind === 'Bank' && values.bankId !== '' && !/^[0-9A-Za-z]{1,19}$/.test(values.accountNumber)) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['accountNumber'],
+      message: 'Số tài khoản chỉ gồm chữ và số, tối đa 19 ký tự.',
+    });
+  }
+}
+
+const editSchema = baseSchema.superRefine(checkQrAccountNumber);
+
 // The code is entered only on create; it cannot change afterwards.
-const createSchema = editSchema.extend({
-  code: z.string().trim().min(1, 'Mã quỹ không được để trống').max(20, 'Tối đa 20 ký tự'),
-});
+const createSchema = baseSchema
+  .extend({
+    code: z.string().trim().min(1, 'Mã quỹ không được để trống').max(20, 'Tối đa 20 ký tự'),
+  })
+  .superRefine(checkQrAccountNumber);
 
-type FormValues = z.infer<typeof editSchema>;
+const FIELDS = [
+  'code',
+  'name',
+  'kind',
+  'bankName',
+  'accountNumber',
+  'bankId',
+  'accountHolderName',
+  'isDefault',
+  'isActive',
+] as const;
 
-const FIELDS = ['code', 'name', 'kind', 'bankName', 'accountNumber', 'isDefault', 'isActive'] as const;
+const NO_BANK = 'none';
 
 interface Props {
   open: boolean;
@@ -45,6 +75,7 @@ interface Props {
 
 export function FundFormDialog({ open, onOpenChange, initial }: Props) {
   const isEdit = !!initial;
+  const { data: banks } = useBanks();
   const create = useCreateFund();
   const update = useUpdateFund();
 
@@ -69,6 +100,8 @@ export function FundFormDialog({ open, onOpenChange, initial }: Props) {
       kind: values.kind,
       bankName: bank ? values.bankName.trim() || null : null,
       accountNumber: bank ? values.accountNumber.trim() || null : null,
+      bankId: bank && values.bankId ? values.bankId : null,
+      accountHolderName: bank ? values.accountHolderName.trim() || null : null,
       isDefault: values.isDefault,
       isActive: values.isActive,
     };
@@ -133,20 +166,60 @@ export function FundFormDialog({ open, onOpenChange, initial }: Props) {
           </div>
 
           {isBank && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="bankName">Ngân hàng</Label>
-                <Input id="bankName" {...form.register('bankName')} />
-                {errors.bankName && <p className="text-sm text-destructive">{errors.bankName.message}</p>}
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Ngân hàng</Label>
+                  <Input id="bankName" {...form.register('bankName')} />
+                  {errors.bankName && <p className="text-sm text-destructive">{errors.bankName.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="accountNumber">Số tài khoản</Label>
+                  <Input id="accountNumber" {...form.register('accountNumber')} />
+                  {errors.accountNumber && (
+                    <p className="text-sm text-destructive">{errors.accountNumber.message}</p>
+                  )}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="accountNumber">Số tài khoản</Label>
-                <Input id="accountNumber" {...form.register('accountNumber')} />
-                {errors.accountNumber && (
-                  <p className="text-sm text-destructive">{errors.accountNumber.message}</p>
-                )}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="bankId">Ngân hàng (cho QR)</Label>
+                  <Controller
+                    control={form.control}
+                    name="bankId"
+                    render={({ field }) => (
+                      <Select
+                        value={field.value || NO_BANK}
+                        onValueChange={(v) => field.onChange(v === NO_BANK ? '' : v)}
+                      >
+                        <SelectTrigger id="bankId" aria-label="Ngân hàng (cho QR)">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_BANK}>Chưa chọn</SelectItem>
+                          {banks?.map((bank) => (
+                            <SelectItem key={bank.id} value={bank.id}>
+                              {`${bank.shortName ?? bank.code} · ${bank.bin}`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.bankId && <p className="text-sm text-destructive">{errors.bankId.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="accountHolderName">Chủ tài khoản</Label>
+                  <Input id="accountHolderName" {...form.register('accountHolderName')} />
+                  {errors.accountHolderName && (
+                    <p className="text-sm text-destructive">{errors.accountHolderName.message}</p>
+                  )}
+                </div>
               </div>
-            </div>
+              <p className="text-xs text-muted-foreground">
+                Có đủ ngân hàng, số tài khoản và chủ tài khoản thì phiếu thu/xuất in được QR.
+              </p>
+            </>
           )}
 
           <div className="space-y-1">
@@ -186,6 +259,8 @@ function toDefaults(item?: Fund): FormValues {
     kind: item?.kind === 'Bank' ? 'Bank' : 'Cash',
     bankName: item?.bankName ?? '',
     accountNumber: item?.accountNumber ?? '',
+    bankId: item?.bankId ?? '',
+    accountHolderName: item?.accountHolderName ?? '',
     isDefault: item?.isDefault ?? false,
     isActive: item?.isActive ?? true,
   };

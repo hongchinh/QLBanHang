@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.CashVouchers.Services;
+using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.CashDebt.Reports.Models;
 using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
@@ -24,6 +25,7 @@ public class VoucherPrintService : IVoucherPrintService
     private readonly ITransactionRunner _transaction;
     private readonly Tt133ExportSupport _support;
     private readonly IVoucherFormRenderer _renderer;
+    private readonly IVoucherPaymentQrService _paymentQr;
 
     public VoucherPrintService(
         IAppDbContext db,
@@ -32,7 +34,8 @@ public class VoucherPrintService : IVoucherPrintService
         IDateTime clock,
         ITransactionRunner transaction,
         Tt133ExportSupport support,
-        IVoucherFormRenderer renderer)
+        IVoucherFormRenderer renderer,
+        IVoucherPaymentQrService paymentQr)
     {
         _db = db;
         _currentUser = currentUser;
@@ -41,9 +44,11 @@ public class VoucherPrintService : IVoucherPrintService
         _transaction = transaction;
         _support = support;
         _renderer = renderer;
+        _paymentQr = paymentQr;
     }
 
-    public async Task<ExportFile> PrintCashVouchersAsync(IReadOnlyList<Guid> ids, ExportFormat format, CancellationToken ct = default)
+    public async Task<ExportFile> PrintCashVouchersAsync(IReadOnlyList<Guid> ids, ExportFormat format, bool includeQr = false,
+        CancellationToken ct = default)
     {
         // A JSON null binds Ids to null; it counts as empty.
         var distinct = (ids ?? []).Distinct().ToList();
@@ -80,6 +85,11 @@ public class VoucherPrintService : IVoucherPrintService
             await EnsureAccessAsync(distinct, rows.ToDictionary(r => r.Id), nameof(CashVoucher),
                 r => CashVoucherPermissions.View(r.Type), r => r.BranchId, token);
 
+            // After the access check, so a QR is never resolved for a voucher the caller may not print.
+            var qrs = includeQr
+                ? await _paymentQr.ResolveManyAsync(PaymentQrKind.Cash, rows.Select(r => r.Id).ToList(), token)
+                : new Dictionary<Guid, VoucherPaymentQrDto>();
+
             var list = rows
                 .OrderBy(r => r.VoucherAt)
                 .ThenBy(r => r.Code, StringComparer.Ordinal)
@@ -96,6 +106,7 @@ public class VoucherPrintService : IVoucherPrintService
                     AmountInWords = VndAmountInWords.Read(r.Total),
                     AttachedDocsLine = VoucherPrintRules.AttachedDocsLine(r.AttachedDocs),
                     PreparerName = r.OwnerName,
+                    Qr = qrs.GetValueOrDefault(r.Id),
                 })
                 .ToList();
             return (formContext, list);
@@ -106,7 +117,7 @@ public class VoucherPrintService : IVoucherPrintService
     }
 
     public async Task<ExportFile> PrintStockVouchersAsync(IReadOnlyList<Guid> ids, StockPrintPriceMode priceMode,
-        ExportFormat format, CancellationToken ct = default)
+        ExportFormat format, bool includeQr = false, CancellationToken ct = default)
     {
         if (!Enum.IsDefined(priceMode))
             throw new ValidationDomainException(
@@ -170,6 +181,12 @@ public class VoucherPrintService : IVoucherPrintService
             await EnsureAccessAsync(distinct, rows.ToDictionary(r => r.Id), nameof(StockVoucher),
                 r => StockVoucherPermissions.View(r.Type), r => r.BranchId, token);
 
+            // After the access check. A stock-in or a voucher that gets no QR is simply absent. Only the voucher-price
+            // form has the payment block; a cancelled voucher can turn Cost into None but never into Voucher.
+            var qrs = includeQr && priceMode == StockPrintPriceMode.Voucher
+                ? await _paymentQr.ResolveManyAsync(PaymentQrKind.Stock, rows.Select(r => r.Id).ToList(), token)
+                : new Dictionary<Guid, VoucherPaymentQrDto>();
+
             CostSource? cost = null;
             if (priceMode == StockPrintPriceMode.Cost)
             {
@@ -190,7 +207,7 @@ public class VoucherPrintService : IVoucherPrintService
             var list = rows
                 .OrderBy(r => r.VoucherAt)
                 .ThenBy(r => r.Code, StringComparer.Ordinal)
-                .Select(r => ToStockModel(r, priceMode, cost))
+                .Select(r => ToStockModel(r, priceMode, cost, qrs))
                 .ToList();
             return (formContext, list);
         }, ct);
@@ -199,7 +216,8 @@ public class VoucherPrintService : IVoucherPrintService
         return await ToFileAsync(xlsx, models.Select(m => m.Code).ToList(), StockBatchPrefix(models), format, ct);
     }
 
-    private static StockVoucherPrintModel ToStockModel(StockVoucherRow r, StockPrintPriceMode priceMode, CostSource? cost)
+    private static StockVoucherPrintModel ToStockModel(StockVoucherRow r, StockPrintPriceMode priceMode, CostSource? cost,
+        IReadOnlyDictionary<Guid, VoucherPaymentQrDto> qrs)
     {
         var cancelled = r.Status == StockVoucherStatus.Cancelled;
         // A cancelled voucher has no ledger rows left: at cost it prints without money.
@@ -221,6 +239,7 @@ public class VoucherPrintService : IVoucherPrintService
         {
             case StockPrintPriceMode.Voucher:
                 FillAtVoucherPrices(model, r);
+                model.Qr = qrs.GetValueOrDefault(r.Id);
                 break;
             case StockPrintPriceMode.Cost:
                 FillAtCost(model, r, printed, cost!);

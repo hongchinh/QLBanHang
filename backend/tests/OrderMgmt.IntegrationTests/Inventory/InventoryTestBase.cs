@@ -360,7 +360,8 @@ public abstract class InventoryTestBase : QuotationTestBase
 
     /// Inserts a bank fund straight into the DB (default: the main branch). Like FundService, the first bank fund of
     /// the branch becomes its default, so a stock voucher paid by CK finds it (P9, P18).
-    protected Task<Guid> CreateBankFundAsync(string code = "NH01", Guid? branchId = null, decimal opening = 0) =>
+    protected Task<Guid> CreateBankFundAsync(string code = "NH01", Guid? branchId = null, decimal opening = 0,
+        Guid? bankId = null, string? accountNumber = null, string? accountHolderName = null) =>
         InDbAsync(async db =>
         {
             var branch = branchId ?? MainBranchId;
@@ -373,11 +374,22 @@ public abstract class InventoryTestBase : QuotationTestBase
                 IsDefault = !await db.Funds.AnyAsync(f => f.BranchId == branch && f.Kind == FundKind.Bank),
                 OpeningAmount = opening,
                 IsActive = true,
+                BankId = bankId,
+                AccountNumber = accountNumber,
+                AccountHolderName = accountHolderName,
             };
             db.Funds.Add(fund);
             await db.SaveChangesAsync();
             return fund.Id;
         });
+
+    /// A bank fund ready for the transfer QR: the first active bank, an account number and a holder.
+    protected async Task<Guid> CreateQrBankFundAsync(string code, Guid? branchId = null)
+    {
+        var bankId = await InDbAsync(db => db.Banks.Where(b => b.IsActive).OrderBy(b => b.Code).Select(b => b.Id).FirstAsync());
+        return await CreateBankFundAsync(code, branchId, bankId: bankId,
+            accountNumber: "0123456789", accountHolderName: "CONG TY ABC");
+    }
 
     protected static async Task<T> ReadDataAsync<T>(HttpResponseMessage response)
     {

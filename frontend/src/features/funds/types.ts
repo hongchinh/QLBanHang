@@ -8,6 +8,9 @@ export interface Fund {
   kind: FundKind;
   bankName?: string | null;
   accountNumber?: string | null;
+  bankId?: string | null;
+  bankShortName?: string | null;
+  accountHolderName?: string | null;
   isDefault: boolean;
   // Null for users without cash.opening_balance, cash.catalogs.manage or reports.cash.
   openingAmount: number | null;
@@ -26,6 +29,8 @@ export interface CreateFundRequest {
   kind: FundKind;
   bankName?: string | null;
   accountNumber?: string | null;
+  bankId?: string | null;
+  accountHolderName?: string | null;
   isDefault: boolean;
   isActive: boolean;
 }
@@ -36,6 +41,8 @@ export interface UpdateFundRequest {
   kind: FundKind;
   bankName?: string | null;
   accountNumber?: string | null;
+  bankId?: string | null;
+  accountHolderName?: string | null;
   isDefault: boolean;
   isActive: boolean;
 }

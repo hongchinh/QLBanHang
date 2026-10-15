@@ -49,6 +49,8 @@ vi.mock('@/features/funds/hooks', () => ({
   useSetFundOpeningBalance: () => ({ mutateAsync: openingMock, isPending: false }),
 }));
 
+vi.mock('@/features/banks/hooks', () => ({ useBanks: () => ({ data: [] }) }));
+
 vi.mock('@/lib/use-toast', () => ({ toast: vi.fn() }));
 
 let granted = new Set<string>();
@@ -129,6 +131,8 @@ describe('FundListPage', () => {
         kind: 'Bank',
         bankName: 'ACB',
         accountNumber: '9988',
+        bankId: null,
+        accountHolderName: null,
         isDefault: false,
         isActive: true,
       }),

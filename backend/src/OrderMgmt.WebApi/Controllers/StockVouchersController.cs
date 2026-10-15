@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.Catalog.Customers.Models;
+using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
@@ -25,16 +26,18 @@ public class StockVouchersController : ApiControllerBase
     private readonly IValidator<StockVoucherListRequest> _listValidator;
     private readonly IValidator<StockAtRequest> _stockAtValidator;
     private readonly IVoucherPrintService _print;
+    private readonly IVoucherPaymentQrService _paymentQr;
 
     public StockVouchersController(IStockVoucherService service, IValidator<UpsertStockVoucherRequest> upsertValidator,
         IValidator<StockVoucherListRequest> listValidator, IValidator<StockAtRequest> stockAtValidator,
-        IVoucherPrintService print)
+        IVoucherPrintService print, IVoucherPaymentQrService paymentQr)
     {
         _service = service;
         _upsertValidator = upsertValidator;
         _listValidator = listValidator;
         _stockAtValidator = stockAtValidator;
         _print = print;
+        _paymentQr = paymentQr;
     }
 
     [HttpGet]
@@ -80,24 +83,32 @@ public class StockVouchersController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Get(Guid id, CancellationToken ct)
         => Success(await _service.GetAsync(id, ct));
 
-    /// 01-VT / 02-VT of one voucher as Excel or PDF, at the voucher's prices, at cost or without money.
+    /// 01-VT / 02-VT of one voucher as Excel or PDF, at the voucher's prices, at cost or without money; `includeQr`
+    /// adds the payment block with the transfer QR to a stock-out printed at the voucher's prices.
     [HttpGet("{id:guid}/print")]
     public async Task<IActionResult> Print(Guid id, [FromQuery] ExportFormat format,
-        [FromQuery] StockPrintPriceMode priceMode = StockPrintPriceMode.Voucher, CancellationToken ct = default)
+        [FromQuery] StockPrintPriceMode priceMode = StockPrintPriceMode.Voucher, [FromQuery] bool includeQr = false,
+        CancellationToken ct = default)
     {
-        var file = await _print.PrintStockVouchersAsync(new[] { id }, priceMode, format, ct);
+        var file = await _print.PrintStockVouchersAsync(new[] { id }, priceMode, format, includeQr, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 
-    /// Several vouchers, one sheet each. A POST because a list of ids does not fit a URL; it changes nothing.
+    /// Several vouchers, one sheet each (`includeQr` in the body adds the QR to each stock-out that gets one). A POST
+    /// because a list of ids does not fit a URL; it changes nothing.
     [HttpPost("print")]
     [SkipDashboardSignal]
     public async Task<IActionResult> PrintMany(
         [FromBody] StockVoucherPrintRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
     {
-        var file = await _print.PrintStockVouchersAsync(request.Ids ?? [], request.PriceMode, format, ct);
+        var file = await _print.PrintStockVouchersAsync(request.Ids ?? [], request.PriceMode, format, request.IncludeQr, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
+
+    /// Transfer QR of a stock-out: the data the screen draws and the print uses (422 PAYMENT_QR_UNAVAILABLE says why not).
+    [HttpGet("{id:guid}/payment-qr")]
+    public async Task<ActionResult<ApiResponse<VoucherPaymentQrDto>>> PaymentQr(Guid id, CancellationToken ct)
+        => Success(await _paymentQr.GetForStockVoucherAsync(id, ct));
 
     [HttpGet("{id:guid}/activities")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<StockVoucherActivityDto>>>> ListActivities(

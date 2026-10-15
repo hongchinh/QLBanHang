@@ -2,11 +2,11 @@ import {
   AlarmClock, AlertTriangle, ArrowDown, ArrowDownToLine, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowRightLeft,
   ArrowUp, ArrowUpFromLine, BadgeCheck, BadgeDollarSign, Ban, Banknote, BarChart3, Bell, BookOpen, BookText, Boxes,
   Building2, Calculator, CalendarDays, CarFront, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle,
-  CircleHelp, CirclePlus, ClipboardList, Clock, Combine, Container, Copy, CreditCard, Eraser, ExternalLink, FileCheck, FileSpreadsheet,
+  CircleHelp, CirclePlus, ClipboardList, Clock, Combine, Container, Copy, CreditCard, Download, Eraser, ExternalLink, FileCheck, FileSpreadsheet,
   FileText, Files, Gauge, HandCoins, Hash, History, Hourglass, Keyboard, Landmark, LayoutDashboard, LayoutList,
   Library, Lightbulb, Link2, Link2Off, ListChecks, ListOrdered, Loader2, Lock, Menu, MoreHorizontal, MoreVertical, Package,
   PanelLeftClose, PanelLeftOpen, Pencil, PiggyBank, Play, Plus, Presentation, Printer, QrCode, ReceiptText, RotateCcw,
-  Save, Scale, ScrollText, Search, SearchX, Send, Settings, Settings2, ShieldCheck, ShoppingCart, Sigma,
+  Save, Scale, ScrollText, Search, SearchX, Send, Settings, Settings2, Share2, ShieldCheck, ShoppingCart, Sigma,
   SlidersHorizontal, Sparkles, Star, Tag, Target, Trash2, TrendingDown, TrendingUp, Truck, Undo2, UserCog,
   UserPlus, UserRound, Users, Users2, Wallet, Warehouse, X, type LucideIcon,
 } from 'lucide-react';
@@ -60,6 +60,9 @@ export const ICONS = {
   time: { icon: Clock },
   calendar: { icon: CalendarDays },
   paymentQr: { icon: QrCode },
+  copy: { icon: Copy },
+  download: { icon: Download },
+  share: { icon: Share2 },
 
   // Actions (tone = the per-action colour of the conventions).
   search: { icon: Search, tone: 'muted' },

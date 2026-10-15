@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CircleHelp, ExternalLink, FileText, Lightbulb, Loader2, Play, Plus, Trash2, Undo2 } from 'lucide-react';
+import { CircleHelp, Copy, Download, ExternalLink, FileText, Lightbulb, Loader2, Play, Plus, Share2, Trash2, Undo2 } from 'lucide-react';
 import { ICONS, ICON_TONES, iconDef, type IconName } from './icon-registry';
 
 describe('icon registry', () => {
@@ -15,6 +15,9 @@ describe('icon registry', () => {
     ['discardChanges', Undo2, 'muted'],
     ['exportPdf', FileText, 'print'],
     ['quotation', FileText, undefined],
+    ['copy', Copy, undefined],
+    ['download', Download, undefined],
+    ['share', Share2, undefined],
     ['help', CircleHelp, undefined],
     ['helpHint', Lightbulb, 'warn'],
     ['video', Play, undefined],

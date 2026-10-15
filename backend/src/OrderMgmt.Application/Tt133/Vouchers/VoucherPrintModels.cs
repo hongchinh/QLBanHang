@@ -1,3 +1,4 @@
+using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Tt133.Vouchers;
@@ -8,6 +9,7 @@ public class CashVoucherPrintRequest
 {
     /// Nullable on purpose: a JSON null must reach the service as "no targets" (422), not fail model binding with 400.
     public List<Guid>? Ids { get; set; } = new();
+    public bool IncludeQr { get; set; }
 }
 
 public class CashVoucherPrintModel
@@ -23,6 +25,7 @@ public class CashVoucherPrintModel
     public string AmountInWords { get; set; } = default!;
     public string AttachedDocsLine { get; set; } = default!;
     public string? PreparerName { get; set; }
+    public VoucherPaymentQrDto? Qr { get; set; }
 }
 
 public class StockVoucherPrintRequest
@@ -30,6 +33,7 @@ public class StockVoucherPrintRequest
     /// Nullable on purpose: a JSON null must reach the service as "no targets" (422), not fail model binding with 400.
     public List<Guid>? Ids { get; set; } = new();
     public StockPrintPriceMode PriceMode { get; set; } = StockPrintPriceMode.Voucher;
+    public bool IncludeQr { get; set; }
 }
 
 public class StockVoucherPrintModel
@@ -51,6 +55,7 @@ public class StockVoucherPrintModel
     public string? VatIncludedLine { get; set; }
     public string? AmountInWords { get; set; }
     public string? PreparerName { get; set; }
+    public VoucherPaymentQrDto? Qr { get; set; }
 }
 
 public class StockVoucherPrintLine

@@ -68,6 +68,7 @@ QLBanHang/
 | Cash settings and catalogs | `Application/CashDebt/{Settings,CashReasons,Funds,CreditLimits}`, `CashSettingsController.cs`, `CashReasonsController.cs`, `FundsController.cs`, `CreditLimitsController.cs` |
 | Receipts/payments and fund transfers | `Application/CashDebt/{CashVouchers,FundTransfers}`, `CashVouchersController.cs`, `FundTransfersController.cs` |
 | Automatic receipt/payment of stock vouchers | `Application/CashDebt/AutoVouchers` (`IAutoCashVoucherService`; `AutoRecomputeHook` recomputes the `Auto` settlements before the commit of every request that removed settlements) |
+| Payment QR (VietQR transfer QR on receipts and stock-outs) | `Application/CashDebt/PaymentQr` (`VoucherPaymentQrRules` with `PaymentQrKind`, `PaymentQrBlock` and `QrFundInfo`; `VoucherPaymentQrDto`; `IVoucherPaymentQrService` / `VoucherPaymentQrService`, the one resolver for the screen routes and the print), `Infrastructure/Qr/QrPngRenderer.cs` (QRCoder PNG, error correction M), the picture and the payment block in `Infrastructure/Excel/Tt133/Vouchers/VoucherFormBuilder.cs`, the `payment-qr` routes of `CashVouchersController.cs` and `StockVouchersController.cs`, `Fund.BankId` / `AccountHolderName` (migration `AddFundBankAccount`); the payload comes from `Application/Payments/Services/VietQrPayloadBuilder`; tests in `tests/OrderMgmt.IntegrationTests/CashDebt` (`VoucherPaymentQrTests`, `Unit/VoucherPaymentQrRulesTests`) and `Tt133/Unit/Vouchers` |
 | Opening debts, matching and offsets | `Application/CashDebt/{OpeningDebts,Debt,DebtOffsets}`, `OpeningDebtsController.cs`, `DebtController.cs`, `DebtOffsetsController.cs` |
 | Cross-feature application helpers | `Application/Common/LikePattern.cs` (ILike escaping), `Application/Common/References` (`IReferenceUsage`: every "is used" check of partners, payment methods, branches and funds), `Application/Common/Interfaces/IBeforeCommitHook.cs` (run by `EfTransactionRunner` before the outermost commit), `Application/Common/Interfaces/ISpreadsheetPdfConverter.cs` (xlsx → PDF, implemented by `Infrastructure/Excel/LibreOfficeSpreadsheetPdfConverter.cs`; shared by the quotation and TT133 exports), `Application/Common/VndAmountInWords.cs` (a VND amount in Vietnamese words), `Application/Common/ReportScope.cs` (`ReportScope` Branch / Company and `ReportScopeGuard`) |
 | Cash & debt reports | `Application/CashDebt/Reports`, `CashDebtReportsController.cs` |
@@ -106,16 +107,16 @@ QLBanHang/
 | `PaymentMethodsController` | `/api/payment-methods` CRUD |
 | `SuppliersController` | `/api/suppliers` CRUD and `/search` (partners with the supplier role) |
 | `InventorySettingsController` | `/api/inventory/settings`, `/api/inventory/numbering`, `/api/inventory/numbering/{docType}` (stock types need `inventory.settings`, the cash types `Receipt`/`Payment`/`FundTransfer`/`DebtOffset` need `cash.settings`; checked in the service) |
-| `StockVouchersController` | `/api/stock-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/owners`, `/defaults`, `/stock-at`, `/partners`, GET `/{id}/print` and POST `/print` (Excel/PDF of 01-VT/02-VT, `?format=xlsx\|pdf&priceMode=Voucher\|Cost\|None`) |
+| `StockVouchersController` | `/api/stock-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/owners`, `/defaults`, `/stock-at`, `/partners`, GET `/{id}/print` and POST `/print` (Excel/PDF of 01-VT/02-VT, `?format=xlsx\|pdf&priceMode=Voucher\|Cost\|None&includeQr=false\|true`; `includeQr` is a field of the POST body), GET `/{id}/payment-qr` (transfer QR data of a stock-out; 422 `PAYMENT_QR_UNAVAILABLE`) |
 | `OpeningStocksController` | `/api/inventory/opening-stock` (GET grid, PUT save) |
 | `InventoryCostController` | `/api/inventory/recalc-cost` |
 | `InventoryReportsController` | `/api/reports/stock-on-hand`, `/api/reports/stock-card`, `/api/reports/stock-summary` |
 | `CashSettingsController` | `/api/cash/settings` (credit-limit and negative-fund policies) |
 | `CashReasonsController` | `/api/cash-reasons` CRUD (`includeAuto` shows the automatic reasons) |
-| `FundsController` | `/api/funds` CRUD, `/{id}/opening-balance`, scoped to the working branch |
+| `FundsController` | `/api/funds` CRUD, `/{id}/opening-balance`, scoped to the working branch; a bank fund also takes `bankId` (an active `Banks` row) and `accountHolderName` for the transfer QR, and `FundDto` returns `bankShortName` |
 | `CreditLimitsController` | `/api/credit-limits` list, `PUT`/`DELETE /{customerId}` |
 | `OpeningDebtsController` | `/api/opening-debts` list/CRUD |
-| `CashVouchersController` | `/api/cash-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults`, `/partners`, GET `/{id}/print` and POST `/print` (Excel/PDF of 01-TT/02-TT, `?format=xlsx\|pdf`) |
+| `CashVouchersController` | `/api/cash-vouchers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults`, `/partners`, GET `/{id}/print` and POST `/print` (Excel/PDF of 01-TT/02-TT, `?format=xlsx\|pdf&includeQr=false\|true`; `includeQr` is a field of the POST body), GET `/{id}/payment-qr` (transfer QR data of a receipt; 422 `PAYMENT_QR_UNAVAILABLE`) |
 | `FundTransfersController` | `/api/fund-transfers` list/CRUD, `/{id}/cancel`, `/{id}/restore`, `/{id}/activities`, `/defaults` |
 | `DebtController` | `/api/debt/partner-summary`, `/open-items`, `/partners`, `/settlements` (GET, POST), `DELETE /settlements/{id}`, `DELETE /settlement-batches/{batchId}` |
 | `DebtOffsetsController` | `/api/debt-offsets` list/create/view, `/{id}/cancel`, `DELETE /{id}`, `/{id}/activities`, `/defaults` |
@@ -144,13 +145,15 @@ frontend/src/
 │   │                            # partner-code-name-field.tsx (label + code + name; owns the dialogs; vouchers and quotations),
 │   │                            # partner-quick-add-dialog.tsx, partner-catalog-dialog.tsx + partner-catalog-list.tsx,
 │   │                            # stop-form-events.tsx, use-unpicked-partner-guard.ts, search-summary.ts
+│   ├── payment-qr/              # voucher transfer QR: PaymentQrButton, PaymentQrDialog (dialog from 640 px, bottom sheet below),
+│   │                            # qr-image.ts (the PNG to download), qr-actions.ts (copyText, shareOrDownload), use-min-width.ts
 │   ├── period-preset-select/    # PeriodPresetSelect: month / quarter / year presets of a report date range
 │   ├── report-scope-select/     # ReportScopeSelect and useReportScope: Branch / Company scope of a report, kept in the URL
 │   ├── search-combobox/         # generic search combobox behind DebtPartnerPicker and the ledger PartnerPicker
 │   ├── tt133-export/            # Tt133ExportButton ("Xuất theo mẫu TT133"), ExportTargetsDialog (one / several / all with activity),
 │   │                            # company-profile-hint.tsx ("Chưa có thông tin đơn vị", also used by the voucher print button)
 │   ├── ui/                      # shadcn-style primitives (includes selection-checkbox.tsx: select-all with an indeterminate state)
-│   └── voucher-print/           # VoucherPrintButton (menu "In (PDF)" / "Excel"), StockPriceModeDialog (Giá trên phiếu / Giá vốn / Không in tiền)
+│   └── voucher-print/           # VoucherPrintButton (menu "In (PDF)" / "Excel", plus "Kèm QR chuyển khoản" on receipts), StockPriceModeDialog (Giá trên phiếu / Giá vốn / Không in tiền, plus "Kèm QR chuyển khoản" for stock-outs)
 ├── features/
 │   ├── admin-roles/
 │   ├── admin-user-settings/
@@ -204,7 +207,9 @@ frontend/src/
 │   ├── stock-vouchers/          # voucher module, schema, payload, draft store
 │   ├── suppliers/
 │   ├── tt133-export/            # downloadTt133, useTt133Download, Tt133ExportForm, tt133FileBase
-│   ├── voucher-print/           # types, api, useVoucherPrint, price-mode-storage (last price mode per user)
+│   ├── voucher-payment-qr/      # api, types, keys (under cashKeys.all), useVoucherPaymentQr (staleTime 0, gcTime 0)
+│   ├── voucher-print/           # types, api, useVoucherPrint, price-mode-storage (last price mode per user),
+│   │                            # qr-pref-storage (the "Kèm QR chuyển khoản" switch per user)
 │   └── warehouses/              # warehouse queries, selectableWarehouses
 ├── pages/
 │   ├── admin/

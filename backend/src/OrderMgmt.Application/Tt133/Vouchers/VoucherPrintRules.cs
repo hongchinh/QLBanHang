@@ -1,4 +1,5 @@
 using System.Globalization;
+using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Enums;
 
@@ -29,6 +30,18 @@ public static class VoucherPrintRules
 
     public static string Money(decimal amount)
         => Math.Round(amount, 0, MidpointRounding.AwayFromZero).ToString("#,##0", CultureInfo.GetCultureInfo("vi-VN"));
+
+    public const string QrScanCaption = "Quét để chuyển khoản";
+
+    public static string QrAmountLine(VoucherPaymentQrDto qr) => $"Số tiền: {Money(qr.Amount)} đồng";
+
+    /// <summary>Total, cash part and transfer part; null when nothing was paid in cash.</summary>
+    public static string? QrBreakdownLine(VoucherPaymentQrDto qr)
+        => qr.CashPaid == 0
+            ? null
+            : $"Tổng {Money(qr.Total)} · Đã trả tiền mặt {Money(qr.CashPaid)} · Cần chuyển khoản {Money(qr.Amount)}";
+
+    public static string QrBankCaption(VoucherPaymentQrDto qr) => $"{qr.BankShortName} · {qr.AccountNumber}";
 
     public static string BatchFileBase(string prefix, DateTimeOffset utcNow)
         => $"{prefix}_{utcNow.ToOffset(VnTime.Offset).ToString("yyyyMMdd-HHmm", CultureInfo.InvariantCulture)}";

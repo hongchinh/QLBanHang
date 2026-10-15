@@ -65,6 +65,11 @@ The scope is being expanded (approved 2026-10-06) to replace the stock voucher w
   - Excel and PDF of four vouchers in the layout of Circular 133/2016/TT-BTC (Phụ lục 3): 01-TT Phiếu thu and 02-TT Phiếu chi (A5 landscape), 01-VT Phiếu nhập kho and 02-VT Phiếu xuất kho (A4 portrait), from the voucher page and from the list page.
   - On a list page, a print button per row and a checkbox column: the selected vouchers print together, one sheet / page each (at most 300 per file).
   - A stock voucher prints at the voucher's prices, at cost (Giá vốn) or without money; the choice is made in a dialog and remembered per user.
+- **Transfer QR on receipts and stock-out vouchers — QR chuyển khoản** (implemented; goes live after the accountant answers the open questions of the [go-live checklist](../plans/archived/261015-0919-voucher-payment-qr/GO-LIVE-CHECKLIST.md)). Design: [voucher payment QR brainstorm](../brainstorms/261015-0656-voucher-payment-qr/SUMMARY.md); plan: [voucher payment QR plan](../plans/archived/261015-0919-voucher-payment-qr/SUMMARY.md); rules: [QR chuyển khoản trên phiếu](#qr-chuyển-khoản-trên-phiếu). It builds on the VietQR payload above and on the TT133 voucher prints:
+  - A VietQR code with the amount and the transfer content already filled in is printed on 01-TT Phiếu thu (beside the lines) and 02-VT Phiếu xuất kho (in a "Thông tin chuyển khoản" block), and shown on the saved voucher page by the "QR chuyển khoản" button (a dialog on a computer, a bottom sheet on a phone) with the bank, account number, holder and content, copy buttons and "Tải ảnh QR" (the share sheet on touch devices where the browser can share image files, otherwise a file download; a computer always downloads the PNG).
+  - Bank funds (Quỹ) gain a bank picked from the bank list and an account holder name; they are the receiving accounts.
+  - Printing: "Kèm QR chuyển khoản" in the receipt print menu and in the stock-out price dialog, for one voucher or a selection.
+  - Limit: the app only creates the QR. It does not know whether the customer paid (see Non-Goals).
 - **Executive dashboard — Bảng điều hành** (implemented; its figures fill in once inventory, cash and debt go live after Round 3; until then the page shows zeros and empty lists). Design: [executive dashboard brainstorm](../brainstorms/261013-2247-executive-dashboard/SUMMARY.md). The first of the role dashboards: it also builds the shared base (tiles, live refresh) that the later ones reuse.
   - One page, `/dashboard/executive` (Báo cáo → Tổng hợp → Điều hành), for the whole company or one branch, over a chosen period (Hôm nay, Tuần này, Tháng này, Năm nay or a custom range), compared with the previous period of the same length.
   - Tổng quan: seven KPI tiles (for the period: Doanh thu xuất bán, Lãi gộp, Thu − chi ròng; now: Tồn quỹ, Phải thu, Phải trả, Giá trị tồn kho), the revenue–cost–gross profit chart, cash flow with fund balances, the receivable term structure, the branch comparison, top customers, "Cần chú ý" (overdue customers, customers over their credit limit, negative stock, payables due within 7 days, negative funds) and "Vừa phát sinh" (receipts, payments and stock vouchers created today).
@@ -151,6 +156,16 @@ Approved but not yet implemented. Go-live happens after Round 3. Design: [stock 
 - A cancelled voucher still prints, marked "ĐÃ HỦY" under the title. Printing needs the view permission of the voucher type and a voucher of the working branch. A batch of more than 300 vouchers is refused, and so is a batch that holds a voucher the user may not print (the whole request fails, nothing is skipped).
 - Go-live gate: the accountant compares a printed sample of each voucher form and price mode with the original Phụ lục 3 and answers the open questions ([go-live checklist](../plans/archived/261014-1632-tt133-voucher-print-forms/GO-LIVE-CHECKLIST.md)).
 
+### QR chuyển khoản trên phiếu
+
+- Which vouchers get a QR: a receipt (Phiếu thu, not a Phiếu chi) and a stock-out (Phiếu xuất kho) whose reason is a sale (increases the receivable), unless it is cancelled or nothing is left to transfer. Stock-ins and payments never do. A voucher that gets none still prints; the screen button explains why ("Phiếu đã hủy.", "Lý do xuất không phải bán hàng.", …).
+- Amount: a receipt asks for its total. A stock-out asks for its total minus what was already paid into a **cash** fund ("Cần chuyển khoản"); what was paid into a bank fund is still asked for, because a stock-out paid by transfer is saved with the paid amount equal to the total before the customer has transferred (chờ kế toán/BA xác nhận, go-live checklist question 3).
+- Receiving fund: the voucher's own fund when it is a bank fund; when that fund lacks the bank, account number or holder the voucher gets no QR, so the money never goes to a different account. A voucher on a cash fund, or a stock-out without a fund, uses the default bank fund of the branch ("Quỹ nhận" in the dialog); the branch needs one complete default bank fund (chờ kế toán/BA xác nhận whether a receipt on a cash fund should offer a QR at all, checklist question 1).
+- Transfer content: the voucher code (at most 25 characters reach the bank app). The automatic receipt of a stock-out uses the stock-out code, and gets no QR when its fund is not a bank fund (the customer paid cash); with a bank fund and a stock-out paid in full it repeats the stock-out's QR, so staff hand the customer one of the two (checklist, risk 1).
+- Who may see it: whoever may view the voucher type (`receipts.view`, `stock_out.view`) for a voucher of the working branch; no permission of its own. The "Mở màn Quỹ" link in the error needs `cash.catalogs.manage`.
+- "Kèm QR chuyển khoản" is on by default and remembered per user and browser. The QR on paper is fixed at the time of printing: after an edit the old sheet is wrong and the voucher is printed again; the dialog always asks the server and shows the current voucher. The QR prints about 25 mm wide (smaller, down to about 19 mm, on a receipt with very long text, which is shrunk below about 62 % to fit one page); a receipt with a QR prints at a smaller zoom on A5 than one without (see the measurements in the go-live checklist, section 5).
+- Bank funds: a bank fund is complete when it has an active bank from the bank list, an account number (letters and digits, at most 19) and a holder name. The free-text "Ngân hàng" and account number fields stay (they print on the bank book) and are not converted; existing funds are filled in by hand before go-live.
+
 ### Chi nhánh demo
 
 - Only a new branch can be a demo branch: the box is on the create dialog (`branches.manage`). Sample data cannot be loaded into an existing branch, and a demo branch never becomes a normal one.
@@ -170,8 +185,10 @@ Approved but not yet implemented. Go-live happens after Round 3. Design: [stock 
 - No group price lists, tiered price policies or reason-based pricing; voucher prices come from the product catalog.
 - No unit-of-measure conversions, lots/expiry tracking or barcodes.
 - No FTP voucher transfer and no data migration from the legacy database.
-- No payment confirmation, bank webhook, or reconciliation for generated VietQR codes — the app has
-  no way to know whether a transfer actually happened.
+- No payment confirmation, bank webhook, or reconciliation for generated VietQR codes, the transfer
+  QR on receipts and stock-outs included — the app has no way to know whether a transfer actually
+  happened. Matching bank transactions to vouchers (SePay) is a separate project, see the
+  [manager mobile hub brainstorm](../brainstorms/261014-0618-mobile-manager-hub/section-04-bank-feed.md).
 - No direct email/Zalo sending from the app.
 - No full accounting module (no chart of accounts or general ledger): no "TK đối ứng", journals, financial statements or VAT books.
 - No forms of Circular 99/2025/TT-BTC (TT99), no foreign-currency books (S13, S14), no admin-editable print templates and no HTML print pages.
@@ -186,4 +203,5 @@ Approved but not yet implemented. Go-live happens after Round 3. Design: [stock 
 - TT133 report forms brainstorm: [../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md](../brainstorms/261012-2237-tt133-report-forms/SUMMARY.md)
 - Executive dashboard brainstorm: [../brainstorms/261013-2247-executive-dashboard/SUMMARY.md](../brainstorms/261013-2247-executive-dashboard/SUMMARY.md)
 - Branch sample data brainstorm: [../brainstorms/261014-1601-branch-sample-data/SUMMARY.md](../brainstorms/261014-1601-branch-sample-data/SUMMARY.md)
+- Voucher payment QR brainstorm: [../brainstorms/261015-0656-voucher-payment-qr/SUMMARY.md](../brainstorms/261015-0656-voucher-payment-qr/SUMMARY.md)
 - Archived original BD: [../bd/archived/phan-tich-yeu-cau-phan-mem-quan-ly-don-hang.md](../bd/archived/phan-tich-yeu-cau-phan-mem-quan-ly-don-hang.md)

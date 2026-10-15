@@ -115,9 +115,9 @@ Defects found:
 
 - D1: dialog buttons cut off at 1366×768 (fixed, `817b8846`).
 - D2: the stock-out header wraps to 2 rows at 1280 px when the "Chưa có thông tin đơn vị" hint shows (not fixed, low).
-- D3: desktop Chromium, Edge and Safari report `canShare({files})` true, so "Tải ảnh QR" opens the system share dialog instead of downloading (decision pending, follow-up 1).
+- D3: desktop Chromium, Edge and Safari report `canShare({files})` true, so "Tải ảnh QR" opens the system share dialog instead of downloading (decided and implemented, follow-up 1).
 
-Not run: the real desktop share window, a phone or an iPhone install, a second branch.
+Not run: a phone or an iPhone install, a second branch.
 
 ## Deviations from the plan
 
@@ -136,7 +136,7 @@ Not run: the real desktop share window, a phone or an iPhone install, a second b
 
 ## Residual risks, follow-ups, decisions for the user
 
-1. **Desktop "Tải ảnh QR".** Share instead of download on desktop browsers. Recommended: share only on touch devices (`pointer: coarse`) and download otherwise, or two buttons.
+1. **Desktop "Tải ảnh QR".** Decided and implemented: share only on touch devices (`pointer: coarse`), a computer always downloads the PNG (commit `64638097`).
 2. **A5 receipt with a QR prints at 71–73 %** (text about 8 pt instead of 11 pt) against about 81 % without. Accept it, make the QR about 22 mm (about 76 %), or shorten the caption rows.
 3. **A fund whose bank was deactivated later** blocks every edit of that fund until a bank is re-picked (the select shows blank).
 4. **Go-live gate:** the three accountant questions of `GO-LIVE-CHECKLIST.md` and the real-paper scan table (3 bank apps). iPhone installed app: `navigator.share` runs after an `await`, WebKit may refuse, and the fallback download does not work in installed mode.

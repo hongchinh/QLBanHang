@@ -118,11 +118,11 @@ Cột "Trả lời" ghi lựa chọn và ngày. Câu 1 và 3 có thể dẫn t�
 |---|---|---|---|---|
 | 9 | **iPhone** chạy phần mềm ở dạng **app cài đặt** (thêm vào màn hình chính): bấm "Tải ảnh QR" | Hiện bảng chia sẻ. Chọn "Lưu ảnh" thì ảnh vào Ảnh; chọn gửi Zalo thì ảnh gửi được. Ảnh tên `QR_{số phiếu}.png`, có QR, số tiền, nội dung, dòng ngân hàng | | |
 | 10 | **Máy tính**: bấm "Tải ảnh QR" | Tải được file `QR_{số phiếu}.png`; mở ra quét được | | |
-| 11 | Trên máy tính dùng **Chrome, Edge và Safari** (nếu có): bấm "Tải ảnh QR" | Ghi lại những gì thấy. Các trình duyệt này có thể mở **bảng chia sẻ của hệ điều hành** thay vì tải file (vì chúng hỗ trợ chia sẻ file). PO quyết định máy tính có nên **luôn tải file** không | | |
+| 11 | Trên máy tính dùng **Chrome, Edge và Safari** (nếu có): bấm "Tải ảnh QR" | Luôn **tải file** `QR_{số phiếu}.png`, không mở bảng chia sẻ của hệ điều hành (đã quyết định: chỉ điện thoại và máy tính bảng dùng bảng chia sẻ) | | |
 | 12 | Bấm **sao chép** số tài khoản và nội dung, rồi **sao chép thông tin** (qua **HTTPS**, tức địa chỉ thật chứ không phải `http://` nội bộ) | Dán ra được đúng chữ. Nếu trình duyệt không cho sao chép thì có thông báo lỗi, không im lặng | | |
-| 13 | Điện thoại Android, mở dạng app cài đặt hoặc trình duyệt: "Tải ảnh QR" | Lưu được ảnh hoặc hiện bảng chia sẻ | | |
+| 13 | Điện thoại Android, mở dạng app cài đặt hoặc trình duyệt: "Tải ảnh QR" | Hiện bảng chia sẻ; nếu trình duyệt không chia sẻ được file thì tải file về máy | | |
 
-Quyết định cho dòng 11: ☐ giữ nguyên (máy tính có thể hiện bảng chia sẻ) · ☐ máy tính luôn tải file. Người quyết định, ngày: ______
+Quyết định cho dòng 11 (đã có): máy tính luôn tải file; bảng chia sẻ chỉ dành cho thiết bị cảm ứng (con trỏ `pointer: coarse`).
 
 ### Chữ nhỏ trên giấy
 

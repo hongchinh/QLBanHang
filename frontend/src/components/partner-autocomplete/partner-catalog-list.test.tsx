@@ -271,6 +271,18 @@ describe('PartnerCatalogList', () => {
       expect(highlightedIndexes()).toEqual([0]);
     });
 
+    it('after a mouse click on a group tab the search box has the focus and ArrowDown moves the highlight', async () => {
+      const user = userEvent.setup();
+      render(<Harness />);
+
+      await user.click(screen.getByRole('tab', { name: /đại lý/i }));
+
+      expect(searchInput()).toHaveFocus();
+      await user.keyboard('{ArrowDown}');
+      expect(highlightedIndexes()).toEqual([1]);
+      expect(rows()[1]).toHaveAttribute('aria-selected', 'true');
+    });
+
     it('the highlight returns to row 0 when the page changes', async () => {
       const user = userEvent.setup();
       useCustomersMock.mockReturnValue({ data: paged({ totalPages: 2 }), isLoading: false });

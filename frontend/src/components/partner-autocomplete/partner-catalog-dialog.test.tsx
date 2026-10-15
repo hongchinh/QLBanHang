@@ -144,6 +144,20 @@ describe('PartnerCatalogDialog', () => {
     expect(screen.getByPlaceholderText('Tìm mã, tên nhà cung cấp...')).toBeInTheDocument();
   });
 
+  it('after a mouse click on the role tab the search box has the focus, the keys drive the list and Enter picks', async () => {
+    const user = userEvent.setup();
+    const { p } = renderDialog();
+
+    await user.click(screen.getByRole('tab', { name: 'Nhà cung cấp' }));
+
+    await waitFor(() => expect(screen.getByText('NCC-009')).toBeInTheDocument());
+    expect(searchInput()).toHaveFocus();
+    expect(screen.getByRole('tab', { name: 'Nhà cung cấp' })).toHaveAttribute('aria-selected', 'true');
+    await user.keyboard('{Enter}');
+    await waitFor(() => expect(supplierGet).toHaveBeenCalledWith('id-9'));
+    await waitFor(() => expect(p.onSelect).toHaveBeenCalledTimes(1));
+  });
+
   it('the search input shows initialQuery; closing and reopening starts again from it', async () => {
     const user = userEvent.setup();
     const p = props({ initialQuery: 'ABC' });

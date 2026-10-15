@@ -72,6 +72,8 @@ function CatalogBody({
 >) {
   const [query, setQuery] = useState(initialQuery);
   const [role, setRole] = useState<PartnerRole>(roles.includes(preferredRole) ? preferredRole : roles[0]);
+  // The list is remounted per role; a mouse click on a role tab hands the focus back to its search box.
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // One detail load at a time (a double click, or Enter during the load); a result that arrives after this body
   // unmounted (the dialog was closed meanwhile) is dropped.
@@ -100,6 +102,10 @@ function CatalogBody({
     }
   }
 
+  function focusSearch() {
+    searchRef.current?.focus();
+  }
+
   return (
     <div className="flex w-full flex-col min-h-0">
       <div className="flex flex-shrink-0 items-center gap-4 border-b px-4 pr-10 py-3">
@@ -107,8 +113,8 @@ function CatalogBody({
         {roles.length > 1 && (
           <Tabs value={role} onValueChange={(value) => setRole(value as PartnerRole)}>
             <TabsList aria-label="Loại đối tượng" className="h-8">
-              <TabsTrigger value="customer" className="py-1">Khách hàng</TabsTrigger>
-              <TabsTrigger value="supplier" className="py-1">Nhà cung cấp</TabsTrigger>
+              <TabsTrigger value="customer" className="py-1" onMouseUp={focusSearch}>Khách hàng</TabsTrigger>
+              <TabsTrigger value="supplier" className="py-1" onMouseUp={focusSearch}>Nhà cung cấp</TabsTrigger>
             </TabsList>
           </Tabs>
         )}
@@ -120,6 +126,7 @@ function CatalogBody({
           query={query}
           onQueryChange={setQuery}
           onSelect={handleSelectId}
+          searchRef={searchRef}
         />
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -22,15 +22,18 @@ export interface PartnerCatalogListProps {
   query: string;
   onQueryChange: (q: string) => void;
   onSelect: (id: string) => void;
+  /** Lets the dialog's role tabs return the focus to the search box; the list owns one when omitted. */
+  searchRef?: RefObject<HTMLInputElement | null>;
 }
 
 // Controlled by the dialog, which renders it with key={role}: the role never changes within an instance, so the
 // hook below is always the same one.
-export function PartnerCatalogList({ role, query, onQueryChange, onSelect }: PartnerCatalogListProps) {
+export function PartnerCatalogList({ role, query, onQueryChange, onSelect, searchRef: sharedSearchRef }: PartnerCatalogListProps) {
   const [group, setGroup] = useState<CustomerGroup | undefined>(undefined);
   const [page, setPage] = useState(1);
   const [highlighted, setHighlighted] = useState(0);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const ownSearchRef = useRef<HTMLInputElement>(null);
+  const searchRef = sharedSearchRef ?? ownSearchRef;
   const bodyRef = useRef<HTMLTableSectionElement>(null);
 
   const debouncedQuery = useDebouncedValue(query, 250);
@@ -52,7 +55,7 @@ export function PartnerCatalogList({ role, query, onQueryChange, onSelect }: Par
   // Not autoFocus: the dialog keeps recording what had the focus before it opened.
   useEffect(() => {
     searchRef.current?.focus();
-  }, []);
+  }, [searchRef]);
 
   useEffect(() => {
     bodyRef.current?.children[active]?.scrollIntoView?.({ block: 'nearest' });
@@ -73,6 +76,12 @@ export function PartnerCatalogList({ role, query, onQueryChange, onSelect }: Par
   function goToPage(next: number) {
     setPage(next);
     setHighlighted(0);
+  }
+
+  // A mouse click leaves the focus on the tab (the browser focuses it after Radix activated it on mousedown), so
+  // the arrow keys and Enter would stop driving the list. The keyboard keeps the focus on the tab it moved to.
+  function focusSearch() {
+    searchRef.current?.focus();
   }
 
   function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -112,9 +121,9 @@ export function PartnerCatalogList({ role, query, onQueryChange, onSelect }: Par
       <div className="border-b px-3 py-2 overflow-x-auto">
         <Tabs value={group ?? 'all'} onValueChange={handleGroupChange}>
           <TabsList className="h-auto flex-wrap gap-1 bg-transparent p-0">
-            <TabsTrigger value="all" className="h-7 px-2 text-xs">Tất cả</TabsTrigger>
+            <TabsTrigger value="all" className="h-7 px-2 text-xs" onMouseUp={focusSearch}>Tất cả</TabsTrigger>
             {ALL_GROUPS.map((g) => (
-              <TabsTrigger key={g} value={g} className="h-7 px-2 text-xs">
+              <TabsTrigger key={g} value={g} className="h-7 px-2 text-xs" onMouseUp={focusSearch}>
                 {GROUP_LABELS[g]}
               </TabsTrigger>
             ))}

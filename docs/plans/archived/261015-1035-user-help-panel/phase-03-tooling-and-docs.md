@@ -1,6 +1,6 @@
 # Phase 03 — Maintenance tooling and docs
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** M
 
 ## Objective

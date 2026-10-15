@@ -1,6 +1,6 @@
 # Phase 01 — Help data layer, guard tests and the reference doc
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** L
 
 ## Objective

@@ -1,6 +1,6 @@
 # Phase 04 — Content for the other 11 screens
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** M
 
 ## Objective

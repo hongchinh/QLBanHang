@@ -1,6 +1,6 @@
 # Phase 02 — Help UI: panel, button, F1, first-visit hint
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** L
 
 ## Objective

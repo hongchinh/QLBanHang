@@ -1,6 +1,6 @@
 # In-app help panel per screen, round 1 (Khung Hướng dẫn theo màn hình, đợt 1)
 
-> Created: 2026-10-15 10:35 · Based on `qlbanhang/main` at `1a87763` (PR #20, docs only, on top of PR #19 branch sample data) · Source design: [brainstorm SUMMARY](../../brainstorms/261015-1001-user-help-guide/SUMMARY.md) (approved, reviewed against code 2026-10-15), [section-02 review](../../brainstorms/261015-1001-user-help-guide/section-02-review.md), [mockup bản 2](../../brainstorms/261015-1001-user-help-guide/mockup-01-help-panel.html) (option C) · Round 3 (video) is a separate plan. · Reviewed against the code 2026-10-15: [REVIEW.md](REVIEW.md) (3 high, 6 medium, 10 low, all applied).
+> Created: 2026-10-15 10:35 · Based on `qlbanhang/main` at `1a87763` (PR #20, docs only, on top of PR #19 branch sample data) · Source design: [brainstorm SUMMARY](../../../brainstorms/261015-1001-user-help-guide/SUMMARY.md) (approved, reviewed against code 2026-10-15), [section-02 review](../../../brainstorms/261015-1001-user-help-guide/section-02-review.md), [mockup bản 2](../../../brainstorms/261015-1001-user-help-guide/mockup-01-help-panel.html) (option C) · Round 3 (video) is a separate plan. · Reviewed against the code 2026-10-15: [REVIEW.md](REVIEW.md) (3 high, 6 medium, 10 low, all applied).
 
 ## Goal
 
@@ -62,12 +62,12 @@ Every screen gets a **?** button and **F1** that open a help panel for the scree
 
 ## Phases
 
-- [ ] Phase 00 — Worktree, branch, baseline (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Help data layer, guard tests and the reference doc (L) — `phase-01-data-layer.md`
-- [ ] Phase 02 — Help UI: panel, button, F1, first-visit hint (L) — `phase-02-help-ui.md`
-- [ ] Phase 03 — Maintenance tooling and docs (M) — `phase-03-tooling-and-docs.md`
-- [ ] Phase 04 — Content for the other 11 screens (M) — `phase-04-content.md`
-- [ ] Phase 05 — Real-browser check and final verification (M) — `phase-05-browser-check-and-verification.md`
+- [x] Phase 00 — Worktree, branch, baseline (S) — `phase-00-baseline.md`
+- [x] Phase 01 — Help data layer, guard tests and the reference doc (L) — `phase-01-data-layer.md`
+- [x] Phase 02 — Help UI: panel, button, F1, first-visit hint (L) — `phase-02-help-ui.md`
+- [x] Phase 03 — Maintenance tooling and docs (M) — `phase-03-tooling-and-docs.md`
+- [x] Phase 04 — Content for the other 11 screens (M) — `phase-04-content.md`
+- [x] Phase 05 — Real-browser check and final verification (M) — `phase-05-browser-check-and-verification.md`
 
 Order: 00 → 01 → 02 → 03 → 04 → 05. After Phase 01, Phase 03 Tasks 3.1–3.2 (`stale.ts`, the CLI) touch no file of Phase 02 and may run in a second worktree on `feat/user-help-stale`, merged `--no-ff` before Phase 03's remaining tasks. Phase 04 starts by merging `qlbanhang/main` (P12), so it runs alone after Phase 03. Run one phase per request (session limits) unless the user asks for several.
 

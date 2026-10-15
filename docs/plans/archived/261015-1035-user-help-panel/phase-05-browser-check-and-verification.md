@@ -1,6 +1,6 @@
 # Phase 05 — Real-browser check and final verification
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** M
 
 ## Objective

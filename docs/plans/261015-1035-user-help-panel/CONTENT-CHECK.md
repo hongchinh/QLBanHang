@@ -210,8 +210,8 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 
 | label | evidence |
 |---|---|
-| Phải thu | dynamic: DEBT_SIDE_LABELS[s] (frontend/src/features/cash-common/labels.ts:20, outside sources), button rendered at frontend/src/pages/debt/debt-matching-page.tsx:184 |
-| Phải trả | dynamic: DEBT_SIDE_LABELS[s] (frontend/src/features/cash-common/labels.ts:21, outside sources), button rendered at frontend/src/pages/debt/debt-matching-page.tsx:184 |
+| Phải thu | dynamic: DEBT_SIDE_LABELS[s] (frontend/src/features/cash-common/labels.ts:20, in sources), button rendered at frontend/src/pages/debt/debt-matching-page.tsx:204 |
+| Phải trả | dynamic: DEBT_SIDE_LABELS[s] (frontend/src/features/cash-common/labels.ts:21, in sources), button rendered at frontend/src/pages/debt/debt-matching-page.tsx:204 |
 | Đối tượng | frontend/src/pages/debt/debt-matching-page.tsx:210 |
 | Chưa đối trừ | frontend/src/pages/debt/debt-matching-page.tsx:225 |
 | Đã đối trừ | frontend/src/pages/debt/debt-matching-page.tsx:226 |
@@ -230,8 +230,8 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Thêm | frontend/src/pages/debt/opening-debt-page.tsx:195 |
 | Phía | frontend/src/pages/debt/opening-debt-form-dialog.tsx:170 |
 | Loại | frontend/src/pages/debt/opening-debt-form-dialog.tsx:191 |
-| Nợ | dynamic: OPENING_DEBT_KIND_LABELS.Debt (frontend/src/features/cash-common/labels.ts:49, outside sources), option rendered at frontend/src/pages/debt/opening-debt-form-dialog.tsx:204 |
-| Trả trước | dynamic: OPENING_DEBT_KIND_LABELS.Prepayment (frontend/src/features/cash-common/labels.ts:50, outside sources), option rendered at frontend/src/pages/debt/opening-debt-form-dialog.tsx:204 |
+| Nợ | dynamic: OPENING_DEBT_KIND_LABELS.Debt (frontend/src/features/cash-common/labels.ts:49, in sources), option rendered at frontend/src/pages/debt/opening-debt-form-dialog.tsx:204 |
+| Trả trước | dynamic: OPENING_DEBT_KIND_LABELS.Prepayment (frontend/src/features/cash-common/labels.ts:50, in sources), option rendered at frontend/src/pages/debt/opening-debt-form-dialog.tsx:204 |
 | Đối tượng | frontend/src/pages/debt/opening-debt-form-dialog.tsx:211 |
 | Nhân viên | frontend/src/pages/debt/opening-debt-form-dialog.tsx:228 |
 | Số CT | frontend/src/pages/debt/opening-debt-form-dialog.tsx:250 |
@@ -252,9 +252,10 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Tuần này | frontend/src/features/executive-dashboard/presets.ts:6 |
 | Tháng này | frontend/src/features/executive-dashboard/presets.ts:7 |
 | Năm nay | frontend/src/features/executive-dashboard/presets.ts:8 |
-| Tuỳ chỉnh | frontend/src/features/dashboard/components/range-picker.tsx:93 (shared range picker, outside sources) |
-| Từ ngày | frontend/src/features/dashboard/components/range-picker.tsx:100 (shared range picker, outside sources) |
-| Đến ngày | frontend/src/features/dashboard/components/range-picker.tsx:104 (shared range picker, outside sources) |
+| Tuỳ chỉnh | frontend/src/features/dashboard/components/range-picker.tsx:93 (shared range picker, listed in sources) |
+| Từ ngày | frontend/src/features/dashboard/components/range-picker.tsx:100 (shared range picker, listed in sources) |
+| Đến ngày | frontend/src/features/dashboard/components/range-picker.tsx:104 (shared range picker, listed in sources) |
+| Áp dụng | frontend/src/features/dashboard/components/range-picker.tsx:117 (shared range picker, listed in sources) |
 | Tổng quan | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:28 |
 | Kinh doanh | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:29 |
 | Tiền | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:30 |
@@ -265,8 +266,8 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Cần chú ý | frontend/src/pages/executive-dashboard/tabs/overview-tab.tsx:175 |
 | Vừa phát sinh | frontend/src/pages/executive-dashboard/tabs/overview-tab.tsx:179 |
 | Doanh thu xuất bán | frontend/src/pages/executive-dashboard/components/kpi-row.tsx:75 |
-| Trực tiếp | frontend/src/features/dashboard/components/live-status.tsx:12 (shared status badge, outside sources) |
-| Mất kết nối | frontend/src/features/dashboard/components/live-status.tsx:14 (shared status badge, outside sources) |
+| Trực tiếp | frontend/src/features/dashboard/components/live-status.tsx:12 (shared status badge, listed in sources) |
+| Mất kết nối | frontend/src/features/dashboard/components/live-status.tsx:14 (shared status badge, listed in sources) |
 | Thử lại | frontend/src/pages/executive-dashboard/executive-dashboard-page.tsx:91 |
 
 ## stock-out.form

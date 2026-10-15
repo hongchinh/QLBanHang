@@ -49,4 +49,13 @@ describe('CashSettingsPage', () => {
     );
     expect(toastMock).toHaveBeenCalledWith(expect.objectContaining({ variant: 'success' }));
   });
+
+  it('links back to the settings hub', () => {
+    render(
+      <MemoryRouter>
+        <CashSettingsPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Quay lại Cấu hình' })).toHaveAttribute('href', '/settings');
+  });
 });

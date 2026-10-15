@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatApiErrorDetails, getErrorMessage, isRequestTimeout } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
+import { BackLink } from '@/components/layout/back-link';
 
 const ALL_WAREHOUSES = 'all';
 const PERIOD_COUNT = 24;
@@ -76,11 +77,14 @@ export function RecalcCostPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Tính lại giá vốn</h1>
-        <p className="text-sm text-muted-foreground">
-          Tính lại giá vốn bình quân từ kỳ đã chọn đến nay cho chi nhánh làm việc.
-        </p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/settings" label="Cấu hình" />
+        <div>
+          <h1 className="text-2xl font-bold">Tính lại giá vốn</h1>
+          <p className="text-sm text-muted-foreground">
+            Tính lại giá vốn bình quân từ kỳ đã chọn đến nay cho chi nhánh làm việc.
+          </p>
+        </div>
       </div>
 
       {settings.isError && (

@@ -9,6 +9,8 @@ import type {
   StockVoucherFormParsed,
   StockVoucherFormValues,
 } from '@/features/stock-vouchers/schema';
+import type * as DialogModule from '@/components/ui/dialog';
+import type { ProductQuickAddDialogProps } from '@/features/products/components/product-quick-add-dialog';
 import type { ProductListItem, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
@@ -16,6 +18,36 @@ import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-sto
 
 const useProductSearchMock = vi.fn();
 const useProductsMock = vi.fn();
+
+// No `user`: the Enter preferences stay under the key of user ''.
+let permissions: string[] = ['products.create'];
+vi.mock('@/stores/auth-store', () => ({
+  useAuthStore: (selector: (s: { hasPermission: (p: string) => boolean; isInRole: () => boolean }) => unknown) =>
+    selector({ hasPermission: (p) => permissions.includes(p), isInRole: () => false }),
+}));
+
+// Stands in for the real form: a save hands back a product, then closes, as the real dialog does.
+vi.mock('@/features/products/components/product-quick-add-dialog', async () => {
+  const ui = await vi.importActual<typeof DialogModule>('@/components/ui/dialog');
+  return {
+    ProductQuickAddDialog: ({ open, onOpenChange, onCreated, onCloseAutoFocus }: ProductQuickAddDialogProps) => (
+      <ui.Dialog open={open} onOpenChange={onOpenChange}>
+        <ui.DialogContent aria-describedby={undefined} onCloseAutoFocus={onCloseAutoFocus}>
+          <ui.DialogTitle>Thêm nhanh hàng hóa</ui.DialogTitle>
+          <button
+            type="button"
+            onClick={() => {
+              onCreated(quickAdded);
+              onOpenChange(false);
+            }}
+          >
+            fake lưu
+          </button>
+        </ui.DialogContent>
+      </ui.Dialog>
+    ),
+  };
+});
 
 vi.mock('@/features/products/hooks', () => ({
   useProductSearch: (...args: unknown[]) => useProductSearchMock(...args),
@@ -50,6 +82,14 @@ const sheet: ProductSuggestion = {
   purchaseDiscountRate: 3,
   salesDiscountRate: 5,
   priceIncludesVat: true,
+};
+
+const quickAdded: ProductSuggestion = {
+  ...sheet,
+  id: 'new-id',
+  code: 'TL-50',
+  name: 'Tôn lạnh 0.50',
+  pricingMode: 'PerUnit',
 };
 
 const listItem: ProductListItem = {
@@ -175,8 +215,15 @@ async function eventRendered() {
 describe('StockLineGrid', () => {
   beforeEach(() => {
     localStorage.clear();
+    permissions = ['products.create'];
     useProductSearchMock.mockReset();
-    useProductSearchMock.mockReturnValue({ data: [sheet], isLoading: false, isError: false });
+    useProductSearchMock.mockImplementation((text: string) => ({
+      data: [sheet],
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      settledQuery: text,
+    }));
     useProductsMock.mockReset();
     useProductsMock.mockReturnValue({ data: { items: [listItem], totalPages: 1 }, isLoading: false });
   });
@@ -608,6 +655,15 @@ describe('StockLineGrid', () => {
     enter('stock-line-product-code-0');
     expect(focused()).toBe('stock-line-product-code-0');
     expect(document.getElementById('stock-line-product-code-1')).toBeNull();
+  });
+
+  it('an Enter that commits an IME composition does not move the focus', () => {
+    renderGrid({ lines: [line({ pricingMode: 'PerSquareMeter' })] });
+    byId('stock-line-product-code-0').focus();
+    fireEvent.keyDown(byId('stock-line-product-code-0'), { key: 'Enter', isComposing: true, keyCode: 229 });
+    expect(focused()).toBe('stock-line-product-code-0');
+    enter('stock-line-product-code-0');
+    expect(focused()).not.toBe('stock-line-product-code-0');
   });
 
   it('ArrowDown keeps the column, or falls back to Mã when the row below cannot use it', () => {
@@ -1255,5 +1311,42 @@ describe('StockLineGrid', () => {
     expect(popover).toHaveTextContent('Ctrl+Del');
     expect(popover).toHaveTextContent('Alt+1…4');
     expect(popover).toHaveTextContent('Dòng trên/dưới');
+  });
+
+  describe('product quick add', () => {
+    function typeNewCode() {
+      useProductSearchMock.mockImplementation((text: string) => ({
+        data: [],
+        isLoading: false,
+        isError: false,
+        isFetching: false,
+        settledQuery: text,
+      }));
+      renderGrid({ type: 'In' });
+      const input = byId('stock-line-product-code-0');
+      act(() => input.focus());
+      fireEvent.change(input, { target: { value: 'TL-50' } });
+      return input;
+    }
+
+    it('adds a product from the code cell and lands on the quantity cell like a pick', async () => {
+      const input = typeNewCode();
+      await screen.findByRole('option', { name: /Thêm mới hàng hóa "TL-50"/ });
+
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+      fireEvent.click(screen.getByRole('button', { name: 'fake lưu' }));
+
+      await waitFor(() => expect(screen.getByText(quickAdded.name)).toBeInTheDocument());
+      await waitFor(() => expect(byId('stock-line-quantity-0')).toHaveFocus());
+    });
+
+    it('shows no add row without products.create', async () => {
+      permissions = [];
+      typeNewCode();
+
+      await screen.findByRole('listbox');
+      expect(screen.queryByText(/Thêm mới hàng hóa/)).toBeNull();
+    });
   });
 });

@@ -118,4 +118,13 @@ describe('RecalcCostPage', () => {
     );
     expect(toast).not.toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' }));
   });
+
+  it('links back to the settings hub', () => {
+    render(
+      <MemoryRouter>
+        <RecalcCostPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Quay lại Cấu hình' })).toHaveAttribute('href', '/settings');
+  });
 });

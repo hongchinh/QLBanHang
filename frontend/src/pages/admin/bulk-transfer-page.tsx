@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { BackLink, useBackTarget } from '@/components/layout/back-link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { useAdminUsers } from '@/features/admin-users/hooks';
 
 export function BulkTransferPage() {
   const { userId } = useParams<{ userId: string }>();
+  const back = useBackTarget() ?? '/admin/users';
   const [toUserId, setToUserId] = useState('');
   const [includeCancelled, setIncludeCancelled] = useState(false);
   const [reason, setReason] = useState('');
@@ -40,11 +42,17 @@ export function BulkTransferPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Chuyển toàn bộ báo giá</h1>
-        <p className="text-sm text-muted-foreground">
-          Từ user <code>{userId}</code> sang user khác. Dùng khi user nghỉ việc.
-        </p>
+      <div className="flex items-start gap-2">
+        <BackLink
+          to={back}
+          label={back.startsWith('/admin/user-settings/') ? 'Cấu hình báo giá của user' : 'Quản lý người dùng'}
+        />
+        <div>
+          <h1 className="text-2xl font-bold">Chuyển toàn bộ báo giá</h1>
+          <p className="text-sm text-muted-foreground">
+            Từ user <code>{userId}</code> sang user khác. Dùng khi user nghỉ việc.
+          </p>
+        </div>
       </div>
 
       <Card>

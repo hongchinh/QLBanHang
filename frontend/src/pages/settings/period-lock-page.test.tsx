@@ -45,4 +45,13 @@ describe('PeriodLockPage', () => {
     await user.click(within(row1).getByRole('button', { name: 'Bỏ khóa' }));
     await waitFor(() => expect(setLockMock).toHaveBeenCalledWith({ id: 'b1', lockedUntil: null }));
   });
+
+  it('links back to the settings hub', () => {
+    render(
+      <MemoryRouter>
+        <PeriodLockPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Quay lại Cấu hình' })).toHaveAttribute('href', '/settings');
+  });
 });

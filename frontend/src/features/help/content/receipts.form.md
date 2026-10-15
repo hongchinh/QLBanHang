@@ -2,7 +2,7 @@
 key: receipts.form
 title: Phiếu thu
 routes: [/receipts/new, /receipts/:id]
-sources: [frontend/src/pages/cash-vouchers/**, frontend/src/features/cash-vouchers/**, frontend/src/features/cash-common/**, backend/src/OrderMgmt.Application/CashDebt/CashVouchers/**, frontend/src/lib/confirm-required.ts, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/partner-autocomplete/**, backend/src/OrderMgmt.Application/CashDebt/Guards/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/payment-qr/**, frontend/src/features/voucher-payment-qr/**, frontend/src/features/voucher-print/**, backend/src/OrderMgmt.Application/CashDebt/PaymentQr/**, backend/src/OrderMgmt.Application/Tt133/Vouchers/**, backend/src/OrderMgmt.Infrastructure/Excel/Tt133/Vouchers/**]
+sources: [frontend/src/pages/cash-vouchers/**, frontend/src/features/cash-vouchers/**, frontend/src/features/cash-common/**, backend/src/OrderMgmt.Application/CashDebt/CashVouchers/**, frontend/src/lib/confirm-required.ts, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/partner-autocomplete/**, backend/src/OrderMgmt.Application/CashDebt/Guards/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/payment-qr/**, frontend/src/features/voucher-payment-qr/**, frontend/src/features/voucher-print/**, backend/src/OrderMgmt.Application/CashDebt/PaymentQr/**, backend/src/OrderMgmt.Application/Tt133/Vouchers/**, backend/src/OrderMgmt.Infrastructure/Excel/Tt133/Vouchers/**, frontend/src/lib/use-dialog-opening.ts]
 related: [payments.form]
 updated: 2026-10-15
 ---

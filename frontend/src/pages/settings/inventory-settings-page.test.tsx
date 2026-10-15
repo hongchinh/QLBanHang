@@ -71,4 +71,13 @@ describe('InventorySettingsPage', () => {
       expect(toast).toHaveBeenCalledWith(expect.objectContaining({ title: 'Giá vốn có thể vẫn đang được tính lại' })),
     );
   });
+
+  it('links back to the settings hub', () => {
+    render(
+      <MemoryRouter>
+        <InventorySettingsPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole('link', { name: 'Quay lại Cấu hình' })).toHaveAttribute('href', '/settings');
+  });
 });

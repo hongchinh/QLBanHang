@@ -6,6 +6,7 @@ import type { DebtAgingRow } from '@/features/cash-reports/types';
 import type { DebtPartnerSearchItem } from '@/features/debt/types';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide } from '@/features/cash-common/types';
+import { useFromHere } from '@/components/layout/back-link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -23,6 +24,7 @@ const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 // Filters live in the URL; the bucket boundaries are typed here and validated before they reach the API.
 export function DebtAgingPage() {
   const navigate = useNavigate();
+  const fromHere = useFromHere();
   const [searchParams, setSearchParams] = useSearchParams();
   const side = parseDebtSide(searchParams.get('side'));
   const at = searchParams.get('at') || todayYmd();
@@ -71,7 +73,7 @@ export function DebtAgingPage() {
   const openDocuments = (row: DebtAgingRow) => {
     if (!row.partnerId) return;
     const params = new URLSearchParams({ side, at, partnerId: row.partnerId });
-    navigate(`/reports/debt-documents?${params.toString()}`);
+    navigate(`/reports/debt-documents?${params.toString()}`, { state: fromHere });
   };
 
   const amountCells = (row: DebtAgingRow) => (

@@ -16,6 +16,7 @@ import { formatApiErrorDetails, getApiError, getErrorMessage } from '@/lib/api-c
 import type { Permission } from '@/lib/permissions';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
+import { BackLink } from '@/components/layout/back-link';
 
 const DOC_TYPE_LABELS: Record<DocumentType, string> = {
   StockIn: 'Phiếu nhập kho',
@@ -46,9 +47,12 @@ export function NumberingSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Đánh số chứng từ</h1>
-        <p className="text-sm text-muted-foreground">Mẫu số chứng từ của chi nhánh làm việc</p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/settings" label="Cấu hình" />
+        <div>
+          <h1 className="text-2xl font-bold">Đánh số chứng từ</h1>
+          <p className="text-sm text-muted-foreground">Mẫu số chứng từ của chi nhánh làm việc</p>
+        </div>
       </div>
 
       {isError && (

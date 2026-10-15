@@ -3,6 +3,7 @@ import { useDebtBalance } from '@/features/cash-reports/hooks';
 import type { DebtBalanceRow } from '@/features/cash-reports/types';
 import { DEBT_SIDE_LABELS } from '@/features/cash-common/labels';
 import type { DebtSide } from '@/features/cash-common/types';
+import { useFromHere } from '@/components/layout/back-link';
 import { PeriodPresetSelect } from '@/components/period-preset-select/period-preset-select';
 import { ReportScopeSelect } from '@/components/report-scope-select/report-scope-select';
 import { useReportScope } from '@/components/report-scope-select/use-report-scope';
@@ -36,6 +37,7 @@ function AmountCells({ row }: { row: DebtBalanceRow }) {
 // Số dư công nợ. Route permission: reports.debt. Filters live in the URL; a row opens the partner's ledger.
 export function DebtBalancePage() {
   const navigate = useNavigate();
+  const fromHere = useFromHere();
   const [, setSearchParams] = useSearchParams();
   const [sideParam, setSide] = useSearchParamString('side');
   const [from, setFrom] = useSearchParamString('from', firstDayOfMonthYmd());
@@ -66,7 +68,7 @@ export function DebtBalancePage() {
     if (!row.partnerId) return;
     const params = new URLSearchParams({ side, partnerId: row.partnerId, from, to });
     if (scope === 'Company') params.set('scope', scope);
-    navigate(`/reports/debt-ledger?${params.toString()}`);
+    navigate(`/reports/debt-ledger?${params.toString()}`, { state: fromHere });
   };
 
   return (

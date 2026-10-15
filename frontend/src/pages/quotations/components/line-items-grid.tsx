@@ -190,7 +190,8 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
       return;
     }
 
-    if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey) return;
+    // `isComposing`: the Enter that commits a Telex/VNI composition must not jump to the next field.
+    if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
     const target = e.target as HTMLElement;
     const current = parseLineCellId(target.id);
     if (!current) return;
@@ -291,6 +292,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                       variant="cell"
                       inputId={getLineCellId('product-code', idx)}
                       nextFocusId={getLineCellId('name', idx)}
+                      allowQuickAdd
                       value={(line.productCode ?? '') as string}
                       onChange={(v) => setLineField(idx, 'productCode', v)}
                       onSelect={(s) => {

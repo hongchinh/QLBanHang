@@ -9,6 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { useFromHere } from '@/components/layout/back-link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ export function SalesPerformancePage() {
   const [sortKey, setSortKey] = useState<SortKey>('revenue');
   const [sortDesc, setSortDesc] = useState(true);
   const navigate = useNavigate();
+  const fromHere = useFromHere();
 
   const leaderboard = useRevenueReportLeaderboard({ from, to, limit: 50 });
 
@@ -106,7 +108,9 @@ export function SalesPerformancePage() {
                   <TableRow
                     key={it.userId}
                     className="cursor-pointer"
-                    onClick={() => navigate(`/reports/revenue?saleUserId=${it.userId}&from=${from}&to=${to}`)}
+                    onClick={() =>
+                      navigate(`/reports/revenue?saleUserId=${it.userId}&from=${from}&to=${to}`, { state: fromHere })
+                    }
                   >
                     <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
                     <TableCell className="font-medium">{it.fullName}</TableCell>

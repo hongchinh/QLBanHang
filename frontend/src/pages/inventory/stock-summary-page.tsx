@@ -6,6 +6,7 @@ import { useProductGroups } from '@/features/products/hooks';
 import { tt133FileBase, type Tt133ExportForm } from '@/features/tt133-export/types';
 import { useWarehouses } from '@/features/warehouses/hooks';
 import { selectableWarehouses } from '@/features/warehouses/utils';
+import { useFromHere } from '@/components/layout/back-link';
 import { PeriodPresetSelect } from '@/components/period-preset-select/period-preset-select';
 import { ReportScopeSelect } from '@/components/report-scope-select/report-scope-select';
 import { useReportScope } from '@/components/report-scope-select/use-report-scope';
@@ -40,6 +41,7 @@ function quantityValuePairs(row: StockSummaryRow) {
 // inventory.view_cost (canViewCost) and not for a warehouse filter under Branch costing (valuesAtScopeOnly).
 export function StockSummaryPage() {
   const navigate = useNavigate();
+  const fromHere = useFromHere();
   const [, setSearchParams] = useSearchParams();
   const { data: warehouses = [] } = useWarehouses();
   const { data: groups = [] } = useProductGroups();
@@ -82,7 +84,7 @@ export function StockSummaryPage() {
   const openCard = (row: StockSummaryRow) => {
     const query = new URLSearchParams({ productId: row.productId });
     if (warehouseId !== ALL) query.set('warehouseId', warehouseId);
-    navigate(`/inventory/stock-card?${query.toString()}`);
+    navigate(`/inventory/stock-card?${query.toString()}`, { state: fromHere });
   };
 
   const totals = [report?.totalOpeningValue, report?.totalInValue, report?.totalOutValue, report?.totalClosingValue];

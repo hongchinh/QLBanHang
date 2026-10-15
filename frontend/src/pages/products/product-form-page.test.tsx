@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ProductFormPage } from './product-form-page';
+import { toast } from '@/lib/use-toast';
 import type { Product } from '@/features/products/types';
 import type * as RouterModule from 'react-router-dom';
 
@@ -11,12 +12,13 @@ const GROUP_ID = '11111111-1111-1111-1111-111111111111';
 const UNIT_ID = '22222222-2222-2222-2222-222222222222';
 
 const createMock = vi.fn();
+const navigateMock = vi.fn();
 let routeId = 'new';
 let product: Product | undefined;
 
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof RouterModule>();
-  return { ...actual, useParams: () => ({ id: routeId }), useNavigate: () => vi.fn() };
+  return { ...actual, useParams: () => ({ id: routeId }), useNavigate: () => navigateMock };
 });
 
 vi.mock('@/features/products/hooks', () => ({
@@ -59,6 +61,8 @@ const LOCKED_PRODUCT: Product = {
 describe('ProductFormPage inventory fields', () => {
   beforeEach(() => {
     createMock.mockReset().mockResolvedValue({});
+    navigateMock.mockReset();
+    vi.mocked(toast).mockReset();
     routeId = 'new';
     product = undefined;
   });
@@ -90,6 +94,26 @@ describe('ProductFormPage inventory fields', () => {
         }),
       ),
     );
+  });
+
+  it('two submits while create is pending give one create, one toast, one navigate', async () => {
+    let resolveCreate!: (p: object) => void;
+    createMock.mockReset().mockReturnValue(new Promise((r) => (resolveCreate = r)));
+    const user = userEvent.setup();
+    renderPage();
+    await user.type(screen.getByLabelText('Tên hàng hóa *'), 'Tôn lạnh');
+    await user.click(screen.getByRole('combobox', { name: 'Nhóm hàng hóa *' }));
+    await user.click(screen.getByRole('option', { name: 'Tôn' }));
+    await user.type(screen.getByLabelText('Đơn vị tính *'), 'Tấm');
+    const form = screen.getByLabelText('Tên hàng hóa *').closest('form') as HTMLFormElement;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    await waitFor(() => expect(createMock).toHaveBeenCalled());
+    resolveCreate({ id: 'p1', code: 'SP01' });
+    await waitFor(() => expect(navigateMock).toHaveBeenCalled());
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(navigateMock).toHaveBeenCalledTimes(1);
   });
 
   it('locked fields are disabled when the product has inventory activity', () => {

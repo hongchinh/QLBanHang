@@ -1,6 +1,6 @@
 # Phase 05 — User help and docs
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** S
 
 ## Objective

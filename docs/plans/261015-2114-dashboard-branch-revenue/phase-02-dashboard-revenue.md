@@ -163,7 +163,7 @@ Expected in branch: total 750; S alone 300. Requests use `branch.Client`, an adm
 1. Close the remaining gaps. The three quotation revenue tests of `DashboardEndpointsTests` already moved to the report in Task 2.0.
    - Add `limit=1` to `DashboardRevenueTests.Top_customers_by_voucher_revenue`.
    - Add `DashboardRevenueTests.Cancelled_voucher_is_left_out`: cancel the 10-04 XBH through `POST /api/stock-vouchers/{id}/cancel`, expect range revenue 150.
-   - `DashboardScopingTests.Leaderboard_AsAdmin_OrdersByRevenueDesc`: delete it, now covered by Task 2.4. The leaderboard has no report counterpart (`/reports/sales-performance` does not call it).
+   - `DashboardScopingTests.Leaderboard_AsAdmin_OrdersByRevenueDesc`: delete it, now covered by Task 2.4. `/reports/sales-performance` also called the leaderboard: D10 was extended to a fourth endpoint, `GET /api/reports/revenue/sales-leaderboard` (quotation rule, `quotations.view_all`), and that report uses it.
    - Keep the funnel, recent-activity and `TotalCount` tests unchanged. They still test quotations.
 2. Run `--filter "FullyQualifiedName~OrderMgmt.IntegrationTests.Dashboard"`. Expected: PASS, including `Cancelled_voucher_is_left_out`. Before the deletions this run fails to compile on the renamed fields, which is the RED evidence.
 3. Commit: `git commit -m "test(dashboard): replace quotation revenue tests with stock-out tests"`

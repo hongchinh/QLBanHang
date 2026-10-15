@@ -22,11 +22,12 @@ On Tổng quan của tôi (`/`) and Tổng quan hệ thống (`/admin/dashboard`
 - Out of scope:
   - "Toàn công ty" on these screens.
   - Changing the figures of the Doanh thu reports and the legacy `/dashboard/quotation-stats`, which stay on quotations.
-  - New permissions. The only new endpoints are the three report endpoints of D10.
+  - New permissions. The only new endpoints are the four report endpoints of D10.
 
 ## Decisions added at plan review (2026-10-15)
 
 - D10. `/reports/revenue` calls `/api/dashboard/summary`, `/revenue-series` and `/top-customers` today (`revenue-page.tsx`), so moving those endpoints to stock-outs would change the report. The user chose a separate report service over a `source` query parameter. The report keeps the quotation rule, the "Ngày ghi nhận doanh thu" setting and the old field names (`confirmedCount`, `quotationCount`).
+- D10 extension (after review). `/reports/sales-performance` also read the leaderboard, so D10 has a fourth endpoint, `GET /api/reports/revenue/sales-leaderboard` (permission `quotations.view_all`, quotation rule, restored as a quotation report).
 
 ## Assumptions
 
@@ -52,11 +53,11 @@ On Tổng quan của tôi (`/`) and Tổng quan hệ thống (`/admin/dashboard`
 
 ## Phases
 
-- [ ] Phase 01 — Shared sales revenue source (M) — `phase-01-shared-revenue-source.md`
-- [ ] Phase 02 — Quotation revenue report service, then overview dashboard revenue from stock-outs (L) — `phase-02-dashboard-revenue.md`
-- [ ] Phase 03 — Real-time signals: hub groups and QuotationsChanged (M) — `phase-03-realtime-backend.md`
-- [ ] Phase 04 — Frontend: labels, types and live refresh (M) — `phase-04-frontend.md`
-- [ ] Phase 05 — User help and docs (S) — `phase-05-help-docs.md`
+- [x] Phase 01 — Shared sales revenue source (M) — `phase-01-shared-revenue-source.md`
+- [x] Phase 02 — Quotation revenue report service, then overview dashboard revenue from stock-outs (L) — `phase-02-dashboard-revenue.md`
+- [x] Phase 03 — Real-time signals: hub groups and QuotationsChanged (M) — `phase-03-realtime-backend.md`
+- [x] Phase 04 — Frontend: labels, types and live refresh (M) — `phase-04-frontend.md`
+- [x] Phase 05 — User help and docs (S) — `phase-05-help-docs.md`
 
 Order: 01 → 02 → 03 → 04 → 05. Phase 04 depends on the DTO changes of 02 and the event of 03.
 

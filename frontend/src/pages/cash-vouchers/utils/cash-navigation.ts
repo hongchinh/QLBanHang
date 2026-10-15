@@ -27,7 +27,7 @@ export function cashLineCellId(field: CashLineField, index: number): string {
   return `cash-line-${field}-${index}`;
 }
 
-const FIELD_ORDER:readonly CashLineField[] = ['description', 'amount', 'note'];
+const FIELD_ORDER: readonly CashLineField[] = ['description', 'amount', 'note'];
 
 /** Where Enter (or Shift+Enter) goes from a cell of the line grid. */
 export function cashLineEnterTarget(

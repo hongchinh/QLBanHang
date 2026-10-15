@@ -52,8 +52,9 @@ export function useCashAutoText(form: UseFormReturn<CashVoucherFormValues, unkno
       },
       /** The reason or the partner changed by the user: one call, one write. */
       onInputsChanged({ reasonName, partnerName }: { reasonName: string; partnerName: string }) {
-        settled.current = true;
         const auto = buildAutoDescription(reasonName, partnerName);
+        // No reason name yet (the reasons list has not loaded): the default reason may still fill in once (§3.2).
+        if (auto) settled.current = true;
         const current = form.getValues('description') ?? '';
         const next = followAuto(current, prevAuto.current, auto);
         prevAuto.current = auto;

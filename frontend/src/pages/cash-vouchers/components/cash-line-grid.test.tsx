@@ -96,13 +96,17 @@ const cell = (name: string) => screen.getByRole('textbox', { name });
 const enter = (el: HTMLElement, init: KeyboardEventInit = {}) => fireEvent.keyDown(el, { key: 'Enter', ...init });
 
 describe('CashLineGrid Enter (section-01 §2.2)', () => {
-  it('Enter walks description -> amount -> note -> description of the next row', () => {
+  it('Enter walks description -> amount -> note -> description of the next row', async () => {
     renderEnterGrid();
 
     const description = cell('Diễn giải dòng 1') as HTMLInputElement;
     description.focus();
     expect(enter(description)).toBe(false);
-    expect(cell('Số tiền dòng 1')).toHaveFocus();
+    const amount = cell('Số tiền dòng 1') as HTMLInputElement;
+    expect(amount).toHaveFocus();
+    // MoneyCell swaps the formatted text for the raw one on focus and selects it on the next frame.
+    await waitFor(() => expect([amount.selectionStart, amount.selectionEnd]).toEqual([0, amount.value.length]));
+    expect(amount.value.length).toBeGreaterThan(0);
 
     enter(cell('Số tiền dòng 1'));
     expect(cell('Ghi chú dòng 1')).toHaveFocus();
@@ -128,7 +132,10 @@ describe('CashLineGrid Enter (section-01 §2.2)', () => {
     cell('Ghi chú dòng 2').focus();
     expect(enter(cell('Ghi chú dòng 2'))).toBe(false);
 
-    await waitFor(() => expect(cell('Diễn giải dòng 3')).toHaveFocus());
+    const appended = cell('Diễn giải dòng 3') as HTMLInputElement;
+    await waitFor(() => expect(appended).toHaveFocus());
+    expect(appended.value).toBe('Thu tiền khách hàng');
+    expect([appended.selectionStart, appended.selectionEnd]).toEqual([0, appended.value.length]);
     expect(values().lines).toHaveLength(3);
     expect(values().lines[2]).toMatchObject({ description: 'Thu tiền khách hàng', amount: 0 });
   });

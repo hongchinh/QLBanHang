@@ -57,6 +57,19 @@ describe('useCashAutoText', () => {
     expect(desc()).toBe('Thu khác');
   });
 
+  it('initNew still fills the default reason after a partner was picked before the reasons loaded (§3.2)', () => {
+    const { result, desc, line0 } = setup();
+    act(() => {
+      result.current.form.setValue('partnerName', 'Công ty A', { shouldDirty: true });
+      result.current.autoText.onInputsChanged({ reasonName: '', partnerName: 'Công ty A' });
+    });
+    expect(desc()).toBe('');
+
+    act(() => result.current.autoText.initNew('Thu tiền khách hàng'));
+
+    expect([desc(), line0()]).toEqual(['Thu tiền khách hàng - Công ty A', 'Thu tiền khách hàng - Công ty A']);
+  });
+
   it('initNew keeps a description the user already typed', () => {
     const { result, desc } = setup();
     act(() => result.current.form.setValue('description', 'x'));
@@ -157,6 +170,9 @@ describe('useCashAutoText', () => {
       act(() =>
         result.current.autoText.baseline({ reasonName: 'Thu tiền khách hàng', partnerName: 'Công ty A', description: 'Tự nhập' }),
       );
+      expect([desc(), line0()]).toEqual(['Tự nhập', 'Tự nhập']);
+      expect(result.current.isDirty).toBe(false);
+
       act(() => result.current.autoText.onInputsChanged({ reasonName: 'Thu khác', partnerName: 'Công ty A' }));
 
       expect([desc(), line0()]).toEqual(['Tự nhập', 'Tự nhập']);

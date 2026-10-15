@@ -88,6 +88,7 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Mã hàng | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:68 |
 | SL | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:76 |
 | Đơn giá | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:78 |
+| %CK | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:80 (optional column; value filled from purchaseDiscountRate for In, :419) |
 | Số tấm | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:72 |
 | Dài | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:73 |
 | Rộng | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:74 |

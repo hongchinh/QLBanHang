@@ -2,7 +2,7 @@
 key: inventory-opening-stock
 title: Tồn đầu kỳ
 routes: [/inventory/opening-stock]
-sources: [frontend/src/pages/inventory/opening-stock-page.tsx, frontend/src/features/opening-stock/**, backend/src/OrderMgmt.Application/Inventory/OpeningStocks/**]
+sources: [frontend/src/pages/inventory/opening-stock-page.tsx, frontend/src/features/opening-stock/**, backend/src/OrderMgmt.Application/Inventory/OpeningStocks/**, frontend/src/pages/stock-vouchers/components/negative-stock-dialog.tsx]
 related: [stock-in.form, stock-out.form]
 updated: 2026-10-15
 ---
@@ -18,8 +18,9 @@ Khai báo hàng đang có trong từng kho tại ngày đầu kỳ: số lượn
 
 ## Lưu ý
 - **Lưu** thay toàn bộ danh sách tồn đầu kỳ của kho: hàng đã xóa khỏi danh sách sẽ mất tồn đầu kỳ.
-- Ngày đầu kỳ đặt theo chi nhánh. Chưa có thì trang báo Chi nhánh chưa có ngày đầu kỳ và chưa lưu được, cần đặt ở Cấu hình, mục Chi nhánh.
+- Đổi **Kho** khi chưa bấm **Lưu** thì các thay đổi chưa lưu bị bỏ, không hỏi lại.
+- Ngày đầu kỳ đặt theo chi nhánh. Chưa có thì trang báo Chi nhánh chưa có ngày đầu kỳ và chưa lưu được, cần người có quyền đặt ở Cấu hình hệ thống, mục Chi nhánh.
 - Mỗi hàng một dòng, chỉ chọn hàng có theo dõi tồn kho; nếu không, trang báo Hàng đã có trong danh sách hoặc Hàng không theo dõi tồn kho.
 - Mỗi dòng phải có **Số lượng** lớn hơn 0 và **Giá trị** không âm.
 - Ngày đầu kỳ nằm trong kỳ đã khóa sổ thì không sửa được, hệ thống báo Ngày tồn đầu kỳ đã khóa sổ.
-- Nếu giảm tồn đầu kỳ làm tồn kho âm, hệ thống cảnh báo để bạn xác nhận hoặc chặn, tùy cấu hình.
+- Giảm tồn đầu kỳ làm tồn kho âm: tùy cấu hình, hệ thống cho qua, hiện Cảnh báo âm kho để bạn xác nhận, hoặc chặn (Không đủ tồn kho).

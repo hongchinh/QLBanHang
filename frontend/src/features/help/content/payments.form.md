@@ -2,7 +2,7 @@
 key: payments.form
 title: Phiếu chi
 routes: [/payments/new, /payments/:id]
-sources: [frontend/src/pages/cash-vouchers/**, frontend/src/features/cash-vouchers/**, frontend/src/features/cash-common/**, backend/src/OrderMgmt.Application/CashDebt/CashVouchers/**, frontend/src/lib/confirm-required.ts, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/partner-autocomplete/**, backend/src/OrderMgmt.Application/CashDebt/Guards/**, frontend/src/pages/customers/customer-form-fields.tsx]
+sources: [frontend/src/pages/cash-vouchers/**, frontend/src/features/cash-vouchers/**, frontend/src/features/cash-common/**, backend/src/OrderMgmt.Application/CashDebt/CashVouchers/**, frontend/src/lib/confirm-required.ts, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/partner-autocomplete/**, backend/src/OrderMgmt.Application/CashDebt/Guards/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/lib/enter-focus.ts]
 related: [receipts.form]
 updated: 2026-10-15
 ---

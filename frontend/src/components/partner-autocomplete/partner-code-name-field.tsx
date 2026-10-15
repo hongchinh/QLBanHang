@@ -1,7 +1,9 @@
-import type { ComponentProps } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { focusById } from '@/lib/enter-focus';
+import { usePartnerPermissions } from '@/features/customers/use-partner-permissions';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 import type { PartnerType, StockDirection } from '@/features/stock-reasons/types';
 import {
@@ -10,6 +12,9 @@ import {
   type PartnerSearchHook,
   type PartnerSearchSource,
 } from './partner-autocomplete';
+import { PartnerCatalogDialog } from './partner-catalog-dialog';
+import { PartnerQuickAddDialog } from './partner-quick-add-dialog';
+import { StopFormEvents } from './stop-form-events';
 
 export interface PartnerCodeNameFieldProps {
   // 'Đối tượng' | 'Khách hàng'
@@ -17,7 +22,7 @@ export interface PartnerCodeNameFieldProps {
   required?: boolean;
   // 'customer' = quotation: customers only.
   scope: 'partner' | 'customer';
-  // From the reason; default 'customer'. Used by the quick add dialog (Phase 03).
+  // From the reason; default 'customer'. Picks the quick add's checked role and the catalog's start tab.
   preferredRole?: 'customer' | 'supplier';
   codeInputId: string;
   nameInputId: string;
@@ -44,6 +49,7 @@ export function PartnerCodeNameField({
   label,
   required,
   scope,
+  preferredRole = 'customer',
   codeInputId,
   nameInputId,
   nameInputProps,
@@ -62,6 +68,37 @@ export function PartnerCodeNameField({
   const source: PartnerSearchSource = useSearch ? { useSearch, type } : { type: type ?? 'In' };
   const errorId = `${codeInputId}-error`;
   const effectiveNamePlaceholder = namePlaceholder ?? (isCustomer ? 'Tên khách hàng' : 'Tên đối tượng');
+
+  const { canCreateCustomer, canCreateSupplier, canViewCustomer, canViewSupplier } = usePartnerPermissions();
+  const canAdd = !disabled && (isCustomer ? canCreateCustomer : canCreateCustomer || canCreateSupplier);
+  const canOpenCatalog = !disabled && (isCustomer ? canViewCustomer : canViewCustomer || canViewSupplier);
+  const [quickAdd, setQuickAdd] = useState({ open: false, seed: '' });
+  const [catalog, setCatalog] = useState({ open: false, seed: '' });
+  // A pick from a dialog keeps the focus on the name input; a cancel returns it to the code input.
+  const skipRestoreFocus = useRef(false);
+  const pickTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(pickTimer.current), []);
+  // The quick add can finish after the user cancelled it while saving: that late result is not picked.
+  const quickAddOpenRef = useRef(false);
+  useEffect(() => {
+    quickAddOpenRef.current = quickAdd.open;
+  }, [quickAdd.open]);
+
+  function pick(item: PartnerSearchItem) {
+    skipRestoreFocus.current = true;
+    onSelect(item);
+    clearTimeout(pickTimer.current);
+    pickTimer.current = setTimeout(() => focusById(nameInputId, 'end'), 0);
+  }
+
+  function handleCloseAutoFocus(e: Event) {
+    e.preventDefault();
+    if (skipRestoreFocus.current) {
+      skipRestoreFocus.current = false;
+      return;
+    }
+    focusById(codeInputId);
+  }
 
   return (
     <>
@@ -84,6 +121,22 @@ export function PartnerCodeNameField({
           onSelect={onSelect}
           disabled={disabled}
           onUnpickedChange={onUnpickedChange}
+          onAddNew={
+            canAdd
+              ? (seed) => {
+                  skipRestoreFocus.current = false;
+                  setQuickAdd({ open: true, seed });
+                }
+              : undefined
+          }
+          onOpenCatalog={
+            canOpenCatalog
+              ? (seed) => {
+                  skipRestoreFocus.current = false;
+                  setCatalog({ open: true, seed });
+                }
+              : undefined
+          }
         />
         <Input
           id={nameInputId}
@@ -98,6 +151,31 @@ export function PartnerCodeNameField({
           {error}
         </p>
       )}
+      {/* After the row: the CSS needs the name input to stay the last child of .partner-code-name. */}
+      <StopFormEvents>
+        <PartnerQuickAddDialog
+          open={quickAdd.open}
+          onOpenChange={(open) => setQuickAdd((q) => ({ ...q, open }))}
+          initialName={quickAdd.seed}
+          scope={scope}
+          preferredRole={preferredRole}
+          onCreated={(created) => {
+            if (quickAddOpenRef.current) pick(created);
+          }}
+          onCloseAutoFocus={handleCloseAutoFocus}
+        />
+      </StopFormEvents>
+      <StopFormEvents>
+        <PartnerCatalogDialog
+          open={catalog.open}
+          onOpenChange={(open) => setCatalog((c) => ({ ...c, open }))}
+          initialQuery={catalog.seed}
+          scope={scope}
+          preferredRole={preferredRole}
+          onSelect={pick}
+          onCloseAutoFocus={handleCloseAutoFocus}
+        />
+      </StopFormEvents>
     </>
   );
 }

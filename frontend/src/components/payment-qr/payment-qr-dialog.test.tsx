@@ -22,10 +22,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock('qrcode.react', () => ({
   QRCodeCanvas: forwardRef<
     HTMLCanvasElement,
-    { value: string; size: number; level: string; marginSize: number; boostLevel?: boolean }
-  >(({ value, size, level, marginSize, boostLevel }, ref) => (
+    { value: string; size: number; level: string; marginSize: number; boostLevel?: boolean; role?: string; 'aria-label'?: string }
+  >(({ value, size, level, marginSize, boostLevel, role, 'aria-label': ariaLabel }, ref) => (
     <canvas
       ref={ref}
+      role={role}
+      aria-label={ariaLabel}
       data-testid="qr"
       data-value={value}
       data-level={level}
@@ -113,6 +115,11 @@ describe('PaymentQrDialog', () => {
     expect(row('Chủ tài khoản')).toHaveTextContent('CONG TY ABC');
     expect(row('Nội dung')).toHaveTextContent('PX000318');
     expect(row('Quỹ nhận')).toHaveTextContent('Tài khoản Vietcombank (NH01)');
+  });
+
+  it('gives the qr canvas an accessible name', () => {
+    renderDialog();
+    expect(screen.getByRole('img', { name: 'Mã QR chuyển khoản' })).toBe(screen.getByTestId('qr'));
   });
 
   it('shows the breakdown only with cash paid', () => {

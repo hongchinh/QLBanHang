@@ -84,7 +84,17 @@ function PaymentQrDetails({ qr, voucherCode }: { qr: VoucherPaymentQr; voucherCo
       <ScrollBody className="space-y-3">
         <div className="flex justify-center">
           <div className="rounded-lg border bg-white p-1">
-            <QRCodeCanvas ref={qrRef} value={qr.payload} size={QR_SIZE} level="M" boostLevel={false} marginSize={4} bgColor="#ffffff" />
+            <QRCodeCanvas
+              ref={qrRef}
+              value={qr.payload}
+              size={QR_SIZE}
+              level="M"
+              boostLevel={false}
+              marginSize={4}
+              bgColor="#ffffff"
+              role="img"
+              aria-label="Mã QR chuyển khoản"
+            />
           </div>
         </div>
         <div className="text-center">

@@ -74,18 +74,17 @@ export function useStockAt(body: StockAtRequest) {
 export function usePartnerSearch(
   type: StockDirection,
   keyword: string,
-  reasonId?: string,
   activeOnly?: boolean,
 ) {
   const trimmed = keyword.trim();
-  const queryKey = stockVoucherKeys.partners(type, trimmed, reasonId, activeOnly);
+  const queryKey = stockVoucherKeys.partners(type, trimmed, activeOnly);
   return useQuery({
     queryKey,
-    queryFn: () => stockVouchersApi.partners(type, trimmed, reasonId, activeOnly),
+    queryFn: () => stockVouchersApi.partners(type, trimmed, activeOnly),
     enabled: trimmed.length > 0,
     staleTime: 30_000,
-    // Keep the previous results only while the role filter is the same: results of another reason
-    // may hold partners of the wrong role and must not be selectable while the new search loads.
+    // Keep the previous results only while the filter is the same: results of another direction or
+    // of the other activeOnly setting must not be selectable while the new search loads.
     placeholderData: (previous: PartnerSearchItem[] | undefined, previousQuery) =>
       previousQuery && sameRoleFilter(previousQuery.queryKey, queryKey) ? previous : undefined,
   });
@@ -93,15 +92,11 @@ export function usePartnerSearch(
 
 type PartnerSearchKey = ReturnType<typeof stockVoucherKeys.partners>;
 
-// The last key part is { type, keyword, reasonId, activeOnly }; only the keyword may differ.
+// The last key part is { type, keyword, activeOnly }; only the keyword may differ.
 function sameRoleFilter(previous: readonly unknown[], next: PartnerSearchKey): boolean {
   const before = previous[previous.length - 1] as PartnerSearchKey[3] | undefined;
   const after = next[3];
-  return (
-    before?.type === after.type &&
-    before?.reasonId === after.reasonId &&
-    before?.activeOnly === after.activeOnly
-  );
+  return before?.type === after.type && before?.activeOnly === after.activeOnly;
 }
 
 // Every voucher change moves stock, costs and numbering: refresh the whole inventory root.

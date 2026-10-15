@@ -20,8 +20,8 @@ vi.mock('@/lib/use-toast', () => ({ toast: vi.fn() }));
 
 const partnerSearchMock = vi.fn();
 vi.mock('@/features/cash-vouchers/hooks', () => ({
-  useCashPartnerSearch: (type: string, keyword: string, reasonId?: string, activeOnly?: boolean) => {
-    partnerSearchMock(type, keyword, reasonId, activeOnly);
+  useCashPartnerSearch: (type: string, keyword: string, activeOnly?: boolean) => {
+    partnerSearchMock(type, keyword, activeOnly);
     return { data: [], isFetching: false, isLoading: false, isError: false };
   },
 }));
@@ -138,7 +138,7 @@ describe('CashVoucherHeader layout (section-01 §1.1)', () => {
   it('searches active partners of the voucher type without a reason', () => {
     renderHeader();
 
-    expect(partnerSearchMock).toHaveBeenLastCalledWith('Receipt', expect.any(String), undefined, true);
+    expect(partnerSearchMock).toHaveBeenLastCalledWith('Receipt', expect.any(String), true);
   });
 });
 

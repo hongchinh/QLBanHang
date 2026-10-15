@@ -10,8 +10,6 @@ vi.mock('@/features/stock-vouchers/hooks', () => ({
   usePartnerSearch: (...args: unknown[]) => usePartnerSearchMock(...args),
 }));
 
-const REASON = '22222222-2222-2222-2222-222222222222';
-
 const partners: PartnerSearchItem[] = [
   {
     id: '11111111-1111-1111-1111-111111111111',
@@ -38,7 +36,6 @@ type Props = React.ComponentProps<typeof PartnerAutocomplete>;
 function renderAutocomplete(overrides: Partial<Props> = {}) {
   const props = {
     type: 'In',
-    reasonId: REASON,
     partnerType: 'Supplier',
     value: null,
     onSelect: vi.fn(),
@@ -55,13 +52,6 @@ describe('PartnerAutocomplete', () => {
     usePartnerSearchMock.mockReturnValue({ data: partners, isLoading: false, isError: false });
   });
 
-  it('is disabled until a reason is chosen', () => {
-    renderAutocomplete({ reasonId: undefined, partnerType: undefined });
-    const input = screen.getByRole('combobox');
-    expect(input).toBeDisabled();
-    expect(input).toHaveAttribute('placeholder', 'Chọn lý do trước');
-  });
-
   it('is disabled for partner type None', () => {
     renderAutocomplete({ partnerType: 'None' });
     const input = screen.getByRole('combobox');
@@ -69,20 +59,12 @@ describe('PartnerAutocomplete', () => {
     expect(input).toHaveAttribute('placeholder', 'Không cần đối tượng');
   });
 
-  it('filter mode (requireReason=false) is enabled without a reason', async () => {
-    renderAutocomplete({ requireReason: false, reasonId: undefined, partnerType: undefined, type: 'Out' });
-    const input = screen.getByRole('combobox');
-    expect(input).toBeEnabled();
-    fireEvent.change(input, { target: { value: 'cong' } });
-    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('Out', 'cong', undefined, undefined));
-  });
-
   it('lists results and selects with Enter', async () => {
     const props = renderAutocomplete();
     const input = screen.getByRole('combobox');
     fireEvent.change(input, { target: { value: 'cong' } });
     await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(2));
-    expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', REASON, undefined);
+    expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', undefined);
 
     fireEvent.keyDown(input, { key: 'ArrowDown' });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -97,7 +79,7 @@ describe('PartnerAutocomplete', () => {
     fireEvent.change(input, { target: { value: 'abc' } });
 
     await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(1));
-    expect(useSearch.mock.lastCall?.slice(0, 2)).toEqual(['abc', REASON]);
+    expect(useSearch.mock.lastCall?.slice(0, 2)).toEqual(['abc', undefined]);
     expect(usePartnerSearchMock).not.toHaveBeenCalled();
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(props.onSelect).toHaveBeenCalledWith(partners[1]);
@@ -136,26 +118,26 @@ describe('PartnerAutocomplete list and modes', () => {
   });
 
   it('header says both roles and active only for a form field', async () => {
-    renderAutocomplete({ activeOnly: true, requireReason: false });
+    renderAutocomplete({ activeOnly: true });
     await typeAndOpen();
     expect(await screen.findByText('Tìm thấy 2 đối tượng (KH + NCC) đang dùng')).toBeInTheDocument();
   });
 
   it('header has no "đang dùng" without activeOnly', async () => {
-    renderAutocomplete({ requireReason: false });
+    renderAutocomplete();
     await typeAndOpen();
     expect(await screen.findByText('Tìm thấy 2 đối tượng')).toBeInTheDocument();
   });
 
   it('header names customers for noun="khách hàng"', async () => {
-    renderAutocomplete({ activeOnly: true, noun: 'khách hàng', requireReason: false });
+    renderAutocomplete({ activeOnly: true, noun: 'khách hàng' });
     await typeAndOpen();
     expect(await screen.findByText('Tìm thấy 2 khách hàng đang dùng')).toBeInTheDocument();
   });
 
   it('header says so when 20 results come back', async () => {
     usePartnerSearchMock.mockReturnValue({ data: manyPartners(20), isLoading: false, isError: false });
-    renderAutocomplete({ activeOnly: true, requireReason: false });
+    renderAutocomplete({ activeOnly: true });
     await typeAndOpen();
     expect(await screen.findByText('Hiển thị 20 kết quả đầu — gõ thêm để thu hẹp')).toBeInTheDocument();
   });
@@ -166,7 +148,7 @@ describe('PartnerAutocomplete list and modes', () => {
       isLoading: false,
       isError: false,
     });
-    renderAutocomplete({ requireReason: false });
+    renderAutocomplete();
     await typeAndOpen();
     expect(screen.getByRole('columnheader', { name: 'SĐT' })).toBeInTheDocument();
     expect(screen.getByText('0901234567')).toBeInTheDocument();
@@ -175,67 +157,67 @@ describe('PartnerAutocomplete list and modes', () => {
   it('empty result text names the noun and the typed text', async () => {
     usePartnerSearchMock.mockReturnValue({ data: [], isLoading: false, isError: false });
     const { unmount } = render(
-      <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} />,
+      <PartnerAutocomplete type="In" value={null} onSelect={vi.fn()} />,
     );
     await typeAndOpen('zzz');
     expect(await screen.findByText('Không tìm thấy đối tượng "zzz"')).toBeInTheDocument();
     unmount();
 
-    render(<PartnerAutocomplete type="In" noun="khách hàng" requireReason={false} value={null} onSelect={vi.fn()} />);
+    render(<PartnerAutocomplete type="In" noun="khách hàng" value={null} onSelect={vi.fn()} />);
     await typeAndOpen('zzz');
     expect(await screen.findByText('Không tìm thấy khách hàng "zzz"')).toBeInTheDocument();
   });
 
   it('shows the error text', async () => {
     usePartnerSearchMock.mockReturnValue({ data: undefined, isLoading: false, isError: true });
-    renderAutocomplete({ requireReason: false });
+    renderAutocomplete();
     await typeAndOpen();
     expect(await screen.findByText('Không thể tải danh sách. Vui lòng thử lại.')).toBeInTheDocument();
   });
 
   it('shows the loading text', async () => {
     usePartnerSearchMock.mockReturnValue({ data: undefined, isLoading: true, isFetching: true, isError: false });
-    renderAutocomplete({ requireReason: false });
+    renderAutocomplete();
     await typeAndOpen();
     expect(await screen.findByText('Đang tìm kiếm...')).toBeInTheDocument();
   });
 
-  it('passes (type, keyword, reasonId, activeOnly) to the default stock search', async () => {
+  it('passes (type, keyword, activeOnly) to the default stock search', async () => {
     renderAutocomplete({ activeOnly: true });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'cong' } });
-    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', REASON, true));
+    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', true));
   });
 
-  it('passes (keyword, reasonId, activeOnly) to a given search hook', async () => {
+  it('passes (keyword, activeOnly) to a given search hook', async () => {
     const useSearch = vi.fn((keyword: string) => ({ data: keyword ? [partners[1]] : [], isFetching: false }));
     renderAutocomplete({ type: undefined, partnerType: 'Customer', useSearch, activeOnly: true });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'abc' } });
     await waitFor(() => expect(screen.getAllByRole('option')).toHaveLength(1));
-    expect(useSearch.mock.lastCall?.slice(0, 3)).toEqual(['abc', REASON, true]);
+    expect(useSearch.mock.lastCall?.slice(0, 2)).toEqual(['abc', true]);
   });
 
   it('key hints: F4 only with onAddNew', async () => {
     const { unmount } = render(
-      <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} />,
+      <PartnerAutocomplete type="In" value={null} onSelect={vi.fn()} />,
     );
     await typeAndOpen();
     expect(screen.getByText('↑↓ duyệt · Enter chọn · Esc đóng')).toBeInTheDocument();
     unmount();
 
-    render(<PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} onAddNew={vi.fn()} />);
+    render(<PartnerAutocomplete type="In" value={null} onSelect={vi.fn()} onAddNew={vi.fn()} />);
     await typeAndOpen();
     expect(screen.getByText('↑↓ duyệt · Enter chọn · F4 thêm mới · Esc đóng')).toBeInTheDocument();
   });
 
-  it('partnerType None locks the input even with requireReason=false', () => {
-    renderAutocomplete({ partnerType: 'None', requireReason: false });
+  it('partnerType None locks the input', () => {
+    renderAutocomplete({ partnerType: 'None' });
     const input = screen.getByRole('combobox');
     expect(input).toBeDisabled();
     expect(input).toHaveAttribute('placeholder', 'Không cần đối tượng');
   });
 
-  it('a Customer partner type with requireReason=false stays enabled', () => {
-    renderAutocomplete({ partnerType: 'Customer', requireReason: false });
+  it('a Customer partner type stays enabled', () => {
+    renderAutocomplete({ partnerType: 'Customer' });
     expect(screen.getByRole('combobox')).toBeEnabled();
   });
 
@@ -245,7 +227,6 @@ describe('PartnerAutocomplete list and modes', () => {
       return (
         <PartnerAutocomplete
           type="In"
-          requireReason={false}
           value={value}
           onSelect={(p) => setValue(p ? { id: p.id, code: p.code, name: p.name } : null)}
         />
@@ -259,7 +240,7 @@ describe('PartnerAutocomplete list and modes', () => {
   });
 
   it('filter mode: no + button, no add row, no catalog row', async () => {
-    renderAutocomplete({ requireReason: false });
+    renderAutocomplete();
     await typeAndOpen();
     expect(screen.queryByRole('button', { name: /Thêm nhanh/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
@@ -279,12 +260,12 @@ describe('PartnerAutocomplete footer rows', () => {
   });
 
   function renderFooter(overrides: Partial<Props> = {}) {
-    return renderAutocomplete({ requireReason: false, onAddNew, onOpenCatalog, ...overrides });
+    return renderAutocomplete({ onAddNew, onOpenCatalog, ...overrides });
   }
 
   function renderFooterRaw() {
     return render(
-      <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} onAddNew={onAddNew} onOpenCatalog={onOpenCatalog} />,
+      <PartnerAutocomplete type="In" value={null} onSelect={vi.fn()} onAddNew={onAddNew} onOpenCatalog={onOpenCatalog} />,
     );
   }
 
@@ -398,7 +379,7 @@ describe('PartnerAutocomplete footer rows', () => {
   });
 
   it('without the props neither footer row renders', async () => {
-    renderAutocomplete({ requireReason: false });
+    renderAutocomplete();
     await typeAndOpen('zzz');
     expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
     expect(screen.queryByText('Xem danh mục đầy đủ')).not.toBeInTheDocument();
@@ -413,7 +394,6 @@ describe('PartnerAutocomplete keyboard', () => {
   function renderField(overrides: Partial<Props> = {}) {
     const props = {
       type: 'In',
-      requireReason: false,
       value: null,
       onSelect: vi.fn(),
       onUnpickedChange: vi.fn(),
@@ -650,7 +630,7 @@ describe('PartnerAutocomplete keyboard', () => {
   ])('focuses the name input after a pick by %s', async (_name, pick) => {
     render(
       <>
-        <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} nameInputId="name" />
+        <PartnerAutocomplete type="In" value={null} onSelect={vi.fn()} nameInputId="name" />
         <input id="name" />
       </>,
     );
@@ -662,7 +642,7 @@ describe('PartnerAutocomplete keyboard', () => {
   it('leaves the focus alone after a pick without nameInputId', async () => {
     render(
       <>
-        <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} />
+        <PartnerAutocomplete type="In" value={null} onSelect={vi.fn()} />
         <input id="name" />
       </>,
     );
@@ -702,7 +682,6 @@ describe('PartnerAutocomplete hidden list and waiting Enter edge cases', () => {
   function renderField(overrides: Partial<Props> = {}) {
     const props = {
       type: 'In',
-      requireReason: false,
       value: null,
       onSelect: vi.fn(),
       inputId: 'partner',
@@ -763,7 +742,7 @@ describe('PartnerAutocomplete hidden list and waiting Enter edge cases', () => {
     const onSelect = vi.fn();
     render(
       <>
-        <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={onSelect} nameInputId="name" />
+        <PartnerAutocomplete type="In" value={null} onSelect={onSelect} nameInputId="name" />
         <input id="name" />
         <input id="elsewhere" />
       </>,
@@ -838,7 +817,7 @@ describe('PartnerAutocomplete hidden list and waiting Enter edge cases', () => {
     outside.id = 'name';
     document.body.appendChild(outside);
     const view = render(
-      <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} nameInputId="name" />,
+      <PartnerAutocomplete type="In" value={null} onSelect={vi.fn()} nameInputId="name" />,
     );
     const input = await typeAndOpen('abc');
     fireEvent.keyDown(input, { key: 'Enter' });

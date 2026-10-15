@@ -13,21 +13,19 @@ import { partnerSearchSummary, type PartnerNoun } from './search-summary';
 
 export type { PartnerNoun } from './search-summary';
 
-// A partner search hook: `useSearch(keyword, reasonId, activeOnly)`, e.g. the cash voucher partner search.
+// A partner search hook: `useSearch(keyword, activeOnly)`, e.g. the cash voucher partner search.
 export type PartnerSearchHook = (
   keyword: string,
-  reasonId?: string,
   activeOnly?: boolean,
 ) => { data?: PartnerSearchItem[]; isFetching: boolean; isLoading?: boolean; isError?: boolean };
 
 // Default: GET /stock-vouchers/partners of the voucher direction.
 function useStockPartnerSearch(
   keyword: string,
-  reasonId: string | undefined,
   activeOnly: boolean | undefined,
   type: StockDirection | undefined,
 ) {
-  return usePartnerSearch(type ?? 'In', keyword, reasonId, activeOnly);
+  return usePartnerSearch(type ?? 'In', keyword, activeOnly);
 }
 
 // `type` picks the default stock voucher search; a caller with its own `useSearch` needs no type.
@@ -36,11 +34,8 @@ export type PartnerSearchSource =
   | { type?: StockDirection; useSearch: PartnerSearchHook };
 
 export type PartnerAutocompleteProps = PartnerSearchSource & {
-  reasonId?: string;
+  // 'None' (the reason needs no partner) locks the field.
   partnerType?: PartnerType;
-  // Form mode (default): needs a reason and searches the reason's partner role.
-  // Filter mode (false): always enabled and searches every role.
-  requireReason?: boolean;
   value: { id: string; code: string; name: string } | null;
   onSelect: (partner: PartnerSearchItem | null) => void;
   disabled?: boolean;
@@ -70,9 +65,7 @@ type ListRow = { kind: 'result'; item: PartnerSearchItem } | { kind: 'addNew' } 
 // Combobox over a partner search; the default search is GET /stock-vouchers/partners (D3).
 export function PartnerAutocomplete({
   type,
-  reasonId,
   partnerType,
-  requireReason = true,
   value,
   onSelect,
   disabled,
@@ -98,11 +91,10 @@ export function PartnerAutocomplete({
   // Exactly one search hook call per render, so the hook order stays stable.
   const usePartnerResults: (
     keyword: string,
-    reasonId: string | undefined,
     activeOnly: boolean | undefined,
     type: StockDirection | undefined,
   ) => ReturnType<PartnerSearchHook> = useSearch ?? useStockPartnerSearch;
-  const search = usePartnerResults(debouncedKeyword, requireReason ? reasonId : undefined, activeOnly, type);
+  const search = usePartnerResults(debouncedKeyword, activeOnly, type);
   const { data } = search;
   const isLoading = search.isLoading ?? (search.isFetching && !data);
   const isError = search.isError ?? false;
@@ -128,15 +120,8 @@ export function PartnerAutocomplete({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
-  let effectivePlaceholder = placeholder;
-  let blocked = false;
-  if (requireReason && !reasonId) {
-    blocked = true;
-    effectivePlaceholder = 'Chọn lý do trước';
-  } else if (partnerType === 'None') {
-    blocked = true;
-    effectivePlaceholder = 'Không cần đối tượng';
-  }
+  const blocked = partnerType === 'None';
+  const effectivePlaceholder = blocked ? 'Không cần đối tượng' : placeholder;
   const isDisabled = disabled || blocked;
 
   const showDropdown = isOpen && !isDisabled && debouncedKeyword.trim().length > 0;

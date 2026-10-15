@@ -75,8 +75,8 @@ vi.mock('@/features/cash-vouchers/hooks', () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  useCashPartnerSearch: (type: string, keyword: string, reasonId?: string, activeOnly?: boolean) => {
-    partnerSearchMock(type, keyword, reasonId, activeOnly);
+  useCashPartnerSearch: (type: string, keyword: string, activeOnly?: boolean) => {
+    partnerSearchMock(type, keyword, activeOnly);
     return { data: keyword ? partnerResults.data : [], isFetching: false, isLoading: false, isError: false };
   },
   useCreateCashVoucher: () => mutation(createMock),
@@ -431,7 +431,7 @@ describe('CashVoucherFormPage', () => {
     );
     await waitFor(() => expect(allocationInput('PX00002')).toHaveValue('1.500'));
     expect(allocationInput('PX00001')).toHaveValue('1.000');
-    expect(partnerSearchMock).toHaveBeenLastCalledWith('Receipt', expect.any(String), undefined, true);
+    expect(partnerSearchMock).toHaveBeenLastCalledWith('Receipt', expect.any(String), true);
 
     fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
 

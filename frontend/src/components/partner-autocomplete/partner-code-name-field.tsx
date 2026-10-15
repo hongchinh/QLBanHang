@@ -129,7 +129,6 @@ export function PartnerCodeNameField({
         <PartnerAutocomplete
           {...source}
           compact
-          requireReason={false}
           activeOnly
           noun={noun}
           inputId={codeInputId}

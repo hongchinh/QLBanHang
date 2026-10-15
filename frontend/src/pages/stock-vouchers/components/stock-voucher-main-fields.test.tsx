@@ -145,7 +145,7 @@ describe('StockVoucherMainFields', () => {
 
       fireEvent.change(byId('stock-partner'), { target: { value: 'cong' } });
 
-      await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith(type, 'cong', undefined, true));
+      await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith(type, 'cong', true));
     });
 
     it('does not pass the reason to the search', async () => {
@@ -153,8 +153,8 @@ describe('StockVoucherMainFields', () => {
 
       fireEvent.change(byId('stock-partner'), { target: { value: 'cong' } });
 
-      await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', undefined, true));
-      for (const call of usePartnerSearchMock.mock.calls) expect(call[2]).toBeUndefined();
+      await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', true));
+      for (const call of usePartnerSearchMock.mock.calls) expect(call).toHaveLength(3);
     });
 
     it('picking a partner calls onSelectPartner and puts the focus on the partner name', async () => {

@@ -157,7 +157,7 @@ describe('PartnerCodeNameField', () => {
     const code = screen.getByRole('combobox');
     fireEvent.change(code, { target: { value: 'KH01' } });
     await waitFor(() => expect(screen.getByRole('listbox')).toBeInTheDocument());
-    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenCalledWith('In', 'KH01', undefined, true));
+    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenCalledWith('In', 'KH01', true));
     fireEvent.keyDown(code, { key: 'Enter' });
     expect(onSelect).toHaveBeenCalledWith(partners[1]);
     await waitFor(() => expect(document.getElementById('partner-name')).toHaveFocus());
@@ -178,20 +178,20 @@ describe('PartnerCodeNameField', () => {
     renderField();
     expect(screen.getByRole('combobox')).toBeEnabled();
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'cong' } });
-    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', undefined, true));
+    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', true));
   });
 
   it('searches the given stock direction, or uses its own search hook', async () => {
     const { unmount } = renderField({ type: 'Out' });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'cong' } });
-    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('Out', 'cong', undefined, true));
+    await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('Out', 'cong', true));
     unmount();
 
     usePartnerSearchMock.mockClear();
     const useSearch = vi.fn().mockReturnValue({ data: partners, isFetching: false, isLoading: false, isError: false });
     renderField({ useSearch });
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'cong' } });
-    await waitFor(() => expect(useSearch).toHaveBeenCalledWith('cong', undefined, true, undefined));
+    await waitFor(() => expect(useSearch).toHaveBeenCalledWith('cong', true, undefined));
     expect(usePartnerSearchMock).not.toHaveBeenCalled();
   });
 

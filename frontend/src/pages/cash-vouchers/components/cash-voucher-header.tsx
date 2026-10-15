@@ -25,11 +25,11 @@ const SELECT_CLASS =
   'h-7 w-full rounded-md border border-input bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-50';
 
 // GET /cash-vouchers/partners of the voucher type; one stable hook per type.
-function useReceiptPartnerSearch(keyword: string, reasonId?: string, activeOnly?: boolean) {
-  return useCashPartnerSearch('Receipt', keyword, reasonId, activeOnly);
+function useReceiptPartnerSearch(keyword: string, activeOnly?: boolean) {
+  return useCashPartnerSearch('Receipt', keyword, activeOnly);
 }
-function usePaymentPartnerSearch(keyword: string, reasonId?: string, activeOnly?: boolean) {
-  return useCashPartnerSearch('Payment', keyword, reasonId, activeOnly);
+function usePaymentPartnerSearch(keyword: string, activeOnly?: boolean) {
+  return useCashPartnerSearch('Payment', keyword, activeOnly);
 }
 const PARTNER_SEARCH: Record<CashVoucherType, PartnerSearchHook> = {
   Receipt: useReceiptPartnerSearch,

@@ -130,8 +130,8 @@ vi.mock('@/features/stock-vouchers/hooks', () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  usePartnerSearch: (type: string, keyword: string, reasonId?: string, activeOnly?: boolean) => {
-    partnerSearchMock(type, keyword, reasonId, activeOnly);
+  usePartnerSearch: (type: string, keyword: string, activeOnly?: boolean) => {
+    partnerSearchMock(type, keyword, activeOnly);
     return { data: keyword ? partnerResults.data : [], isLoading: false, isError: false };
   },
   useCreateStockVoucher: () => mutation(createMock),
@@ -993,13 +993,13 @@ describe('StockVoucherFormPage', () => {
     it('the partner search does not depend on the reason', async () => {
       renderPage('In');
       fireEvent.change(byId('stock-partner'), { target: { value: 'NCC' } });
-      await waitFor(() => expect(partnerSearchMock).toHaveBeenLastCalledWith('In', 'NCC', undefined, true));
+      await waitFor(() => expect(partnerSearchMock).toHaveBeenLastCalledWith('In', 'NCC', true));
 
       fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
       fireEvent.change(byId('stock-partner'), { target: { value: 'NCCX' } });
 
-      await waitFor(() => expect(partnerSearchMock).toHaveBeenLastCalledWith('In', 'NCCX', undefined, true));
-      for (const call of partnerSearchMock.mock.calls) expect(call[2]).toBeUndefined();
+      await waitFor(() => expect(partnerSearchMock).toHaveBeenLastCalledWith('In', 'NCCX', true));
+      for (const call of partnerSearchMock.mock.calls) expect(call).toHaveLength(3);
     });
   });
 

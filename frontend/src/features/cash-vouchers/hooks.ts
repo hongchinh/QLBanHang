@@ -51,18 +51,17 @@ export function useCashVoucherDefaults(
 export function useCashPartnerSearch(
   type: CashVoucherType,
   keyword: string,
-  reasonId?: string,
   activeOnly?: boolean,
 ) {
   const trimmed = keyword.trim();
-  const queryKey = cashVoucherKeys.partners(type, trimmed, reasonId, activeOnly);
+  const queryKey = cashVoucherKeys.partners(type, trimmed, activeOnly);
   return useQuery({
     queryKey,
-    queryFn: () => cashVouchersApi.partners(type, trimmed, reasonId, activeOnly),
+    queryFn: () => cashVouchersApi.partners(type, trimmed, activeOnly),
     enabled: trimmed.length > 0,
     staleTime: 30_000,
-    // Keep the previous results only while the role filter is the same: results of another reason
-    // may hold partners of the wrong role and must not be selectable while the new search loads.
+    // Keep the previous results only while the filter is the same: results of another voucher type or
+    // of the other activeOnly setting must not be selectable while the new search loads.
     placeholderData: (previous: CashPartnerSearchItem[] | undefined, previousQuery) =>
       previousQuery && sameRoleFilter(previousQuery.queryKey, queryKey) ? previous : undefined,
   });
@@ -70,15 +69,11 @@ export function useCashPartnerSearch(
 
 type CashPartnerSearchKey = ReturnType<typeof cashVoucherKeys.partners>;
 
-// The last key part is { type, keyword, reasonId, activeOnly }; only the keyword may differ.
+// The last key part is { type, keyword, activeOnly }; only the keyword may differ.
 function sameRoleFilter(previous: readonly unknown[], next: CashPartnerSearchKey): boolean {
   const before = previous[previous.length - 1] as CashPartnerSearchKey[3] | undefined;
   const after = next[3];
-  return (
-    before?.type === after.type &&
-    before?.reasonId === after.reasonId &&
-    before?.activeOnly === after.activeOnly
-  );
+  return before?.type === after.type && before?.activeOnly === after.activeOnly;
 }
 
 // A cash voucher moves fund balances and debt settlements, and stock voucher lists show

@@ -18,10 +18,10 @@ export const stockVoucherKeys = {
     [...stockVoucherKeys.all, 'defaults', type, voucherAt ?? null] as const,
   stockAt: (body: StockAtRequest) => [...stockVoucherKeys.all, 'stock-at', body] as const,
   partnersAll: () => [...stockVoucherKeys.all, 'partners'] as const,
-  partners: (type: StockDirection, keyword: string, reasonId?: string, activeOnly?: boolean) =>
+  partners: (type: StockDirection, keyword: string, activeOnly?: boolean) =>
     [
       ...stockVoucherKeys.all,
       'partners',
-      { type, keyword, reasonId: reasonId ?? null, activeOnly: activeOnly ?? null },
+      { type, keyword, activeOnly: activeOnly ?? null },
     ] as const,
 };

@@ -110,14 +110,14 @@ describe('useCashPartnerSearch', () => {
   it('passes activeOnly to the api', async () => {
     vi.mocked(cashVouchersApi.partners).mockResolvedValue([]);
     const { wrapper } = setup();
-    renderHook(() => useCashPartnerSearch('Receipt', 'abc', undefined, true), { wrapper });
+    renderHook(() => useCashPartnerSearch('Receipt', 'abc', true), { wrapper });
     await waitFor(() =>
-      expect(cashVouchersApi.partners).toHaveBeenCalledWith('Receipt', 'abc', undefined, true),
+      expect(cashVouchersApi.partners).toHaveBeenCalledWith('Receipt', 'abc', true),
     );
   });
 
   it('activeOnly is part of the query key', () => {
-    expect(cashVoucherKeys.partners('Receipt', 'abc', undefined, true)).not.toEqual(
+    expect(cashVoucherKeys.partners('Receipt', 'abc', true)).not.toEqual(
       cashVoucherKeys.partners('Receipt', 'abc'),
     );
   });
@@ -129,7 +129,7 @@ describe('useCashPartnerSearch', () => {
     const { wrapper } = setup();
     const { result, rerender } = renderHook(
       ({ keyword, activeOnly }: { keyword: string; activeOnly?: boolean }) =>
-        useCashPartnerSearch('Receipt', keyword, undefined, activeOnly),
+        useCashPartnerSearch('Receipt', keyword, activeOnly),
       { wrapper, initialProps: { keyword: 'a' } as { keyword: string; activeOnly?: boolean } },
     );
     await waitFor(() => expect(result.current.data).toEqual([cashPartner('KH01')]));

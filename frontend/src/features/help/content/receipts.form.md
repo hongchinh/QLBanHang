@@ -2,7 +2,7 @@
 key: receipts.form
 title: Phiếu thu
 routes: [/receipts/new, /receipts/:id]
-sources: [frontend/src/pages/cash-vouchers/**, frontend/src/features/cash-vouchers/**, frontend/src/features/cash-common/**, backend/src/OrderMgmt.Application/CashDebt/CashVouchers/**, frontend/src/lib/confirm-required.ts, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/partner-autocomplete/**, backend/src/OrderMgmt.Application/CashDebt/Guards/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/payment-qr/**, frontend/src/features/voucher-payment-qr/**, frontend/src/features/voucher-print/**, backend/src/OrderMgmt.Application/CashDebt/PaymentQr/**]
+sources: [frontend/src/pages/cash-vouchers/**, frontend/src/features/cash-vouchers/**, frontend/src/features/cash-common/**, backend/src/OrderMgmt.Application/CashDebt/CashVouchers/**, frontend/src/lib/confirm-required.ts, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/partner-autocomplete/**, backend/src/OrderMgmt.Application/CashDebt/Guards/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/payment-qr/**, frontend/src/features/voucher-payment-qr/**, frontend/src/features/voucher-print/**, backend/src/OrderMgmt.Application/CashDebt/PaymentQr/**, backend/src/OrderMgmt.Application/Tt133/Vouchers/**, backend/src/OrderMgmt.Infrastructure/Excel/Tt133/Vouchers/**]
 related: [payments.form]
 updated: 2026-10-15
 ---
@@ -31,12 +31,11 @@ Ghi nhận tiền thu vào một quỹ: thu tiền khách hàng, nhận hoàn ti
 - Phiếu thu tự động từ phiếu xuất có nhãn **Tự động** và chỉ xem. Bấm **Mở phiếu kho** để sửa, hoặc **Đóng** để thoát.
 - **Hủy phiếu**, **Khôi phục** và **Xóa** chỉ hiện khi bạn có quyền tương ứng và phiếu là của bạn (hoặc bạn có quyền sửa phiếu của mọi người).
 - Hủy, xóa hoặc sửa phiếu đã được đối trừ với chứng từ khác thì có thể hiện hộp thoại **Bỏ đối trừ chứng từ** để bạn xác nhận. Phiếu đã hủy không sửa được, khôi phục thì đối trừ cũ không quay lại.
-
-- **QR chuyển khoản** mở hộp thoại (trên điện thoại là tấm trượt từ dưới lên) có mã VietQR, số tiền, ngân hàng, số tài khoản, chủ tài khoản và nội dung chuyển khoản. Bấm biểu tượng sao chép cạnh số tài khoản hoặc nội dung để chép, **Sao chép thông tin** để chép cả bộ, **Tải ảnh QR** để lưu ảnh.
+- **QR chuyển khoản** mở hộp thoại (trên điện thoại là tấm trượt từ dưới lên) có mã VietQR, số tiền, ngân hàng, số tài khoản, chủ tài khoản, nội dung chuyển khoản và quỹ nhận. Bấm biểu tượng sao chép cạnh số tài khoản hoặc nội dung để chép, **Sao chép thông tin** để chép cả bộ, **Tải ảnh QR** để lưu ảnh (trên điện thoại mở bảng chia sẻ).
 - Nút **QR chuyển khoản** bị khóa khi phiếu có thay đổi chưa lưu (Lưu thay đổi trước khi xem QR) hoặc phiếu đã hủy. Phiếu chi không có nút này.
-- Tiền chuyển về quỹ ngân hàng của chính phiếu; phiếu ở quỹ tiền mặt thì dùng quỹ ngân hàng mặc định của chi nhánh. Quỹ thiếu ngân hàng, số tài khoản hoặc chủ tài khoản thì hộp thoại báo thiếu gì, và quản trị viên bấm **Mở màn Quỹ** để bổ sung.
-- Menu **In** có tùy chọn **Kèm QR chuyển khoản** (mặc định bật, nhớ theo từng người dùng): mã QR in cạnh các dòng của phiếu thu.
-- Phiếu thu tự động từ phiếu xuất đã trả tiền mặt không có QR.
+- Tiền chuyển về quỹ ngân hàng của chính phiếu; phiếu ở quỹ tiền mặt thì dùng quỹ ngân hàng mặc định của chi nhánh. Quỹ chưa đủ thông tin thì hộp thoại báo Quỹ … chưa khai ngân hàng, số tài khoản hoặc chủ tài khoản (hoặc Chi nhánh chưa có quỹ ngân hàng mặc định đủ thông tin QR); người có quyền quản lý quỹ thấy **Mở màn Quỹ** để bổ sung.
+- Menu **In** có tùy chọn **Kèm QR chuyển khoản** (mặc định bật, nhớ theo từng người dùng trên máy này): mã QR in cạnh phần người nộp, lý do và số tiền; phiếu không có QR thì in như thường.
+- Phiếu thu tự động từ phiếu xuất đã trả tiền mặt không có QR (hộp thoại báo Phiếu thu tự động thu tiền mặt, không có QR chuyển khoản.).
 
 ## Phím tắt
 - `Ctrl S` Lưu

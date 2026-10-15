@@ -7,7 +7,7 @@ related: [customers.list]
 updated: 2026-10-16
 ---
 ## Dùng để
-Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng tiền rồi lưu, gửi, xác nhận hoặc in. Doanh thu của sale được ghi nhận khi báo giá được xác nhận.
+Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng tiền rồi lưu, gửi, xác nhận hoặc in. Trong báo cáo Doanh thu, doanh thu của sale được ghi nhận khi báo giá được xác nhận.
 
 ## Các bước
 1. {#customer} Gõ mã, tên, MST, địa chỉ hoặc SĐT ở **Khách hàng**, Enter để chọn; chưa có khách thì `F4` hoặc nút **+** để thêm nhanh.

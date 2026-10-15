@@ -20,8 +20,8 @@ Xem nhanh doanh thu bán hàng của chi nhánh đang làm việc và tình hìn
 ## Lưu ý
 - Doanh thu là phiếu xuất bán trừ hàng bán trả lại, trước VAT, không gồm cước, tính theo ngày chứng từ của chi nhánh đang chọn ở đầu trang. Đổi chi nhánh thì số liệu đổi theo.
 - Không có quyền xem báo giá của mọi người thì bạn chỉ thấy phiếu mình phụ trách, và dòng dưới tiêu đề ghi "phiếu của tôi".
-- **Tổng báo giá**, **Đã huỷ**, **Phễu trạng thái** và **Hoạt động gần đây** vẫn tính theo báo giá của cả công ty, không theo chi nhánh.
-- Muốn xem doanh thu toàn công ty thì mở màn hình **Điều hành**.
+- **Tổng báo giá**, **Đã huỷ**, **Phễu trạng thái** và **Hoạt động gần đây** không theo chi nhánh: chúng tính theo báo giá của bạn, hoặc của mọi người nếu bạn có quyền xem báo giá của mọi người.
+- Nếu bạn có quyền, mở màn hình **Điều hành** để xem doanh thu toàn công ty.
 - Báo cáo Doanh thu vẫn tính theo báo giá đã chốt, nên số có thể khác màn hình này.
-- **Trực tiếp** ở đầu trang nghĩa là số liệu cập nhật ngay khi có chứng từ hoặc báo giá mới; khi **Mất kết nối**, số liệu chỉ được làm mới định kỳ, giờ bên cạnh là lần cập nhật cuối.
+- **Trực tiếp** ở đầu trang nghĩa là số liệu cập nhật ngay khi có chứng từ hoặc báo giá mới; khi **Mất kết nối**, số liệu chỉ được làm mới mỗi phút, giờ bên cạnh là lần cập nhật cuối.
 

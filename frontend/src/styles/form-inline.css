@@ -10,10 +10,6 @@
   --qldh-form-grid-columns: 90px minmax(180px, 1fr) 90px minmax(180px, 1fr);
 }
 
-.form-inline-grid.form-cols-customer {
-  --qldh-form-grid-columns: 90px minmax(180px, 1fr) 90px minmax(220px, 2fr);
-}
-
 /* Cash voucher: a narrow attached-documents field and a wide note. */
 .form-inline-grid.form-cols-attached-note {
   --qldh-form-grid-columns: 90px minmax(140px, 1fr) 90px minmax(260px, 3fr);
@@ -83,14 +79,12 @@
 }
 
 @media (max-width: 1023px) {
-  .form-inline-grid.customer-row,
   .form-inline-grid.info-row-2,
   .form-inline-grid.info-row-3,
   .form-inline-grid.form-cols-2,
   .form-inline-grid.form-cols-3,
   .form-inline-grid.form-cols-stock-main-1,
   .form-inline-grid.form-cols-stock-partner,
-  .form-inline-grid.form-cols-customer,
   .form-inline-grid.form-cols-attached-note {
     grid-template-columns: 90px 1fr;
   }

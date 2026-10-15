@@ -443,6 +443,13 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     clearAllocationErrors();
   }
 
+  // A server error describes the value that was sent: it goes with that value (client errors are left to the resolver).
+  function clearServerErrors(...fields: Array<'partnerId' | 'reasonId'>) {
+    for (const field of fields) {
+      if (form.getFieldState(field).error?.type === 'server') form.clearErrors(field);
+    }
+  }
+
   function clearPartnerFields() {
     form.setValue('partnerId', '', { shouldDirty: true });
     form.setValue('partnerName', '', { shouldDirty: true });
@@ -453,6 +460,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
 
   function clearPartner() {
     clearPartnerFields();
+    clearServerErrors('partnerId');
     switchNotice.clear();
     autoText.onInputsChanged({ reasonName: nameOfReason(form.getValues('reasonId')), partnerName: '' });
   }
@@ -467,6 +475,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     form.setValue('partnerId', p.id, { shouldDirty: true });
     form.setValue('partnerName', p.name, { shouldDirty: true });
     form.setValue('partnerAddress', p.companyAddress ?? '', { shouldDirty: true });
+    clearServerErrors('partnerId');
     setSelectedPartner({ id: p.id, code: p.code, name: p.name, isCustomer: p.isCustomer, isSupplier: p.isSupplier });
     resetAllocations();
     switchNotice.clear();
@@ -474,6 +483,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     const match = matchReasonForPartner(p, nextReasonId, reasonOptions);
     if (match.kind === 'switch') {
       nextReasonId = match.reasonId;
+      clearServerErrors('reasonId');
       form.setValue('reasonId', nextReasonId, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
       switchNotice.show(reasonSwitchMessage(p.code, p));
     }
@@ -485,6 +495,8 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     const next = reasonOptions.find((r) => r.id === nextId);
     const effectChanged = debtEffectOf(nextId) !== debtEffect;
     form.setValue('reasonId', nextId, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
+    // The partner error of a save depends on the reason as well.
+    clearServerErrors('reasonId', 'partnerId');
     switchNotice.clear();
     if (next?.partnerType === 'None') clearPartnerFields();
     else if (effectChanged) resetAllocations();

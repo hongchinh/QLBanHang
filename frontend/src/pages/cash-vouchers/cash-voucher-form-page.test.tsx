@@ -1188,6 +1188,34 @@ describe('CashVoucherFormPage', () => {
       expect(byId('cash-reason').parentElement).not.toContainElement(message);
     });
 
+    it('10. picking another partner removes the server partnerId error', async () => {
+      const MESSAGE = 'Đối tượng không hợp với lý do';
+      createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', { partnerId: [MESSAGE] }));
+      renderPage('Receipt');
+      await pickCustomer();
+      fillLine('2500');
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+      expect(await screen.findByText(MESSAGE)).toBeInTheDocument();
+
+      await pickPartner(supplier, 'NCC');
+
+      expect(screen.queryByText(MESSAGE)).toBeNull();
+    });
+
+    it('10. a reason change removes the server partnerId error', async () => {
+      const MESSAGE = 'Đối tượng không hợp với lý do';
+      createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', { partnerId: [MESSAGE] }));
+      renderPage('Receipt');
+      await pickCustomer();
+      fillLine('2500');
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+      expect(await screen.findByText(MESSAGE)).toBeInTheDocument();
+
+      fireEvent.change(byId('cash-reason'), { target: { value: R_THNCC } });
+
+      expect(screen.queryByText(MESSAGE)).toBeNull();
+    });
+
     it('11. a read-only voucher is not auto filled', () => {
       routeParams.id = V1;
       for (const data of readOnlyVouchers()) {

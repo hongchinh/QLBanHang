@@ -30,6 +30,7 @@ export function FirstVisitHint({ hint, desktopAnchorRef, mobileAnchorRef }: Firs
       <PopoverAnchor virtualRef={desktop ? desktopAnchorRef : mobileAnchorRef} />
       <PopoverContent
         data-help-hint=""
+        role="status"
         aria-labelledby={titleId}
         side="bottom"
         align="end"

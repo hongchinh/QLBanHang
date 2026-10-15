@@ -54,6 +54,8 @@ git grep -nF "<label>" -- ':(top,glob)<glob>' ...   # every bold label is found,
 npm run help:stale                                    # run again after committing
 ```
 
+`npm run help:stale` needs Node 22.18 or newer (it runs the TypeScript script by type stripping).
+
 ## Videos
 
 When `frontend/src/features/help/videos.json` has the key and a step was added, removed or reworded, list those step ids as "cần quay lại" in the final report (the round 3 video tooling re-records them). Never edit `videos.json` by hand.

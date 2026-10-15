@@ -7,6 +7,7 @@ import { FirstVisitHint } from './first-visit-hint';
 import { fixtureDocs } from './test-fixtures';
 import { buildHelpIndex } from '@/features/help/registry';
 import { useHelpIndex } from '@/features/help/load-help';
+import { DIALOG_SELECTOR } from '@/lib/focus';
 import { useFirstVisitHint } from '@/features/help/use-first-visit-hint';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUiStore } from '@/stores/ui-store';
@@ -126,6 +127,13 @@ describe('FirstVisitHint', () => {
     expect(useUiStore.getState().helpHintSeen.u1).toEqual(['stock-out.form']);
     act(() => useUiStore.getState().closeHelp());
     expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
+  });
+
+  it('is not a dialog for the page shortcuts and leaves the focus alone', () => {
+    renderHint();
+    expect(screen.getByText(TITLE)).toBeInTheDocument();
+    expect(document.querySelector(DIALOG_SELECTOR)).toBeNull();
+    expect(screen.getByLabelText('ô trang')).toHaveFocus();
   });
 
   it('shows nothing on a screen without help', () => {

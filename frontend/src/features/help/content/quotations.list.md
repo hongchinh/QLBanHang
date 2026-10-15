@@ -4,7 +4,7 @@ title: Danh sách báo giá
 routes: [/quotations]
 sources: [frontend/src/pages/quotations/quotation-list-page.tsx, frontend/src/pages/quotations/components/**, frontend/src/features/quotations/**, frontend/src/stores/ui-store.ts, backend/src/OrderMgmt.Application/Sales/Quotations/**]
 related: [quotations.form, customers.list]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 ## Dùng để
 Tìm và lọc báo giá, rồi gửi, xác nhận, hủy, nhân bản hoặc in ngay trên từng dòng. Không có quyền xem báo giá của mọi người thì bạn chỉ thấy báo giá của mình.

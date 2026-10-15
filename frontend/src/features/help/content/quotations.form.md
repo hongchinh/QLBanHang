@@ -4,7 +4,7 @@ title: Báo giá
 routes: [/quotations/new, /quotations/:id]
 sources: [frontend/src/pages/quotations/quotation-form-page.tsx, frontend/src/components/partner-autocomplete/**, frontend/src/features/customers/use-quotation-customer-search.ts, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/pages/quotations/components/**, frontend/src/pages/quotations/utils/**, frontend/src/features/quotations/**, backend/src/OrderMgmt.Application/Sales/Quotations/**]
 related: [customers.list]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 ## Dùng để
 Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng tiền rồi lưu, gửi, xác nhận hoặc in. Doanh thu của sale được ghi nhận khi báo giá được xác nhận.

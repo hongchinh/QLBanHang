@@ -46,6 +46,7 @@ import { defaultFund, selectableFunds } from '@/features/funds/utils';
 import { useInventorySettings } from '@/features/inventory-settings/hooks';
 import { ActivityHistory } from '@/components/activity-history/activity-history';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
+import { PaymentQrButton } from '@/components/payment-qr/payment-qr-button';
 import { VoucherPrintButton } from '@/components/voucher-print/voucher-print-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -727,6 +728,17 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                 vouchers={[{ id: voucher.id, code: voucher.code }]}
                 disabled={isDirty || busy}
                 disabledReason={isDirty ? 'Lưu thay đổi trước khi in' : undefined}
+              />
+            )}
+            {isEdit && voucher && voucher.type === 'Out' && (
+              <PaymentQrButton
+                kind="stock"
+                id={voucher.id}
+                code={voucher.code}
+                disabled={isDirty || busy || status === 'Cancelled'}
+                disabledReason={
+                  status === 'Cancelled' ? 'Phiếu đã hủy' : isDirty ? 'Lưu thay đổi trước khi xem QR' : undefined
+                }
               />
             )}
             {!isEdit && (

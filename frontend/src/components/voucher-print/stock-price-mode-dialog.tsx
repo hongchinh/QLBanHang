@@ -8,20 +8,33 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { readPriceMode, writePriceMode } from '@/features/voucher-print/price-mode-storage';
+import { readQrPref, writeQrPref } from '@/features/voucher-print/qr-pref-storage';
 import type { StockPrintPriceMode } from '@/features/voucher-print/types';
 import { useAuthStore } from '@/stores/auth-store';
+
+const QR_DISABLED_REASON = 'Chỉ dùng với Giá trên phiếu';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (mode: StockPrintPriceMode) => void;
+  onConfirm: (mode: StockPrintPriceMode, includeQr: boolean) => void;
+  showQr?: boolean; // stock-out: offer the transfer QR (only with the voucher price)
   onCloseAutoFocus?: (event: Event) => void; // the opener is a menu item that is gone by now: say where the focus goes
 }
 
-function Body({ onConfirm, onClose }: { onConfirm: (mode: StockPrintPriceMode) => void; onClose: () => void }) {
+function Body({
+  onConfirm,
+  onClose,
+  showQr,
+}: {
+  onConfirm: (mode: StockPrintPriceMode, includeQr: boolean) => void;
+  onClose: () => void;
+  showQr?: boolean;
+}) {
   const userId = useAuthStore((s) => s.user?.id);
   const canViewCost = useAuthStore((s) => s.hasPermission('inventory.view_cost'));
   const [mode, setMode] = useState<StockPrintPriceMode>(() => readPriceMode(userId, canViewCost));
+  const [includeQr, setIncludeQr] = useState(() => readQrPref(userId));
 
   const options: { value: StockPrintPriceMode; label: string }[] = [
     { value: 'Voucher', label: 'Giá trên phiếu' },
@@ -29,9 +42,12 @@ function Body({ onConfirm, onClose }: { onConfirm: (mode: StockPrintPriceMode) =
     { value: 'None', label: 'Không in tiền' },
   ];
 
+  const qrDisabled = mode !== 'Voucher';
+
   const confirm = () => {
     writePriceMode(userId, mode);
-    onConfirm(mode);
+    if (showQr) writeQrPref(userId, includeQr);
+    onConfirm(mode, !!showQr && mode === 'Voucher' && includeQr);
     onClose();
   };
 
@@ -50,6 +66,22 @@ function Body({ onConfirm, onClose }: { onConfirm: (mode: StockPrintPriceMode) =
           </label>
         ))}
       </div>
+      {showQr && (
+        <div className="flex items-center gap-2 text-sm" title={qrDisabled ? QR_DISABLED_REASON : undefined}>
+          <input
+            type="checkbox"
+            id="stock-print-qr"
+            className="h-4 w-4"
+            checked={includeQr}
+            disabled={qrDisabled}
+            title={qrDisabled ? QR_DISABLED_REASON : undefined}
+            onChange={(e) => setIncludeQr(e.target.checked)}
+          />
+          <label htmlFor="stock-print-qr" className={qrDisabled ? 'text-muted-foreground' : undefined}>
+            Kèm QR chuyển khoản
+          </label>
+        </div>
+      )}
       <DialogFooter>
         <Button variant="outline" onClick={onClose}>
           Hủy
@@ -61,7 +93,7 @@ function Body({ onConfirm, onClose }: { onConfirm: (mode: StockPrintPriceMode) =
 }
 
 // Which price a stock voucher prints with. The body mounts only while open, so each opening re-reads the remembered mode.
-export function StockPriceModeDialog({ open, onOpenChange, onConfirm, onCloseAutoFocus }: Props) {
+export function StockPriceModeDialog({ open, onOpenChange, onConfirm, showQr, onCloseAutoFocus }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -72,7 +104,7 @@ export function StockPriceModeDialog({ open, onOpenChange, onConfirm, onCloseAut
         <DialogHeader>
           <DialogTitle>Chọn giá in</DialogTitle>
         </DialogHeader>
-        <Body onConfirm={onConfirm} onClose={() => onOpenChange(false)} />
+        <Body onConfirm={onConfirm} onClose={() => onOpenChange(false)} showQr={showQr} />
       </DialogContent>
     </Dialog>
   );

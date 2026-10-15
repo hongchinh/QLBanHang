@@ -37,6 +37,9 @@ describe('isCacheableApiPath', () => {
     '/api/suppliers/search',
     '/api/stock-reasons',
     '/api/payment-methods',
+    // payment QR of a voucher: branch-scoped, built from the live fund
+    '/api/cash-vouchers/3f2c/payment-qr',
+    '/api/stock-vouchers/3f2c/payment-qr',
   ])('never caches scoped %s', (path) => {
     expect(isCacheableApiPath(path)).toBe(false);
   });

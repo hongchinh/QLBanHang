@@ -16,7 +16,7 @@ One of:
 - A help key (for example `stock-out.form`): work on `frontend/src/features/help/content/<key>.md`.
 - A route (for example `/stock-out/new`): find the file whose `routes` lists it, or create one when the route is in `HELP_PENDING`.
 - A diff: list the changed paths with `git diff <base>..HEAD --name-only`, then
-  - match every changed path against the `sources` globs of every help file (`git grep -n "^sources:" -- frontend/src/features/help/content`); each file with a match needs a review;
+  - match every changed path against the `sources` globs of every help file (`git grep -n "^sources:" -- frontend/src/features/help/content`); each file with a match needs a review (to test one glob: `git diff --name-only <base>..HEAD -- ':(top,glob)<glob>'`);
   - check the routes added or removed in `frontend/src/app-routes.tsx` (`git diff <base>..HEAD -- frontend/src/app-routes.tsx`).
 
 ## Read First
@@ -29,8 +29,8 @@ One of:
 
 ## Write
 
-- File name = key. Frontmatter: `key`, `title`, `routes`, `sources`, `related`, `updated`.
-- Every `sources` glob must match tracked files: `git ls-files -- ':(glob)<glob>'` prints something. Otherwise `npm run help:stale` reports `sources-no-match`.
+- File name = key: the route without `/` and without `:param` segments, joined with `-`; `/` is `home`; a list/form pair gets `.list` / `.form`. Frontmatter: `key`, `title`, `routes`, `sources`, `related`, `updated`.
+- Every `sources` glob must match tracked files: `git ls-files -- ':(top,glob)<glob>'` prints something (the `top` magic makes it work from any folder). Otherwise `npm run help:stale` reports `sources-no-match`.
 - Section "Dùng để": at most 2 sentences.
 - Section "Các bước": 3-7 steps `N. {#id} text`. Each starts with a verb and fits on one line. Keep `{#id}` stable while the meaning stays; use a new id only for a new step.
 - Bold labels exactly as on screen (`**Lưu tạm**`). Inline Markdown is only `**label**` and `` `key` ``; no links.
@@ -45,11 +45,13 @@ Remove the file's routes from `frontend/src/features/help/help-pending.ts` (the 
 
 ## Check
 
+`sources` globs are repo-relative and git resolves pathspecs from the current directory, so prefix every glob with `:(top,glob)` (works from `frontend/` too):
+
 ```bash
 cd frontend
 npm run test -- --testTimeout=30000 --maxWorkers=3 src/features/help
-git grep -nF "<label>" -- <sources>      # every bold label is found, or explain the dynamic label in the commit body
-npm run help:stale                        # run again after committing
+git grep -nF "<label>" -- ':(top,glob)<glob>' ...   # every bold label is found, or explain the dynamic label in the commit body
+npm run help:stale                                    # run again after committing
 ```
 
 ## Videos

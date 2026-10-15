@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAuthStore } from '@/stores/auth-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { KpiCard } from '@/features/dashboard/components/kpi-card';
 import { RangePicker } from '@/features/dashboard/components/range-picker';
@@ -16,10 +17,17 @@ import {
 import { useDashboardParams } from '@/features/dashboard/use-dashboard-params';
 import type { Granularity } from '@/features/dashboard/types';
 import { formatNumber } from '@/features/dashboard/format';
+import { LiveStatus } from '@/features/dashboard/components/live-status';
+import { useOverviewLive } from '@/features/dashboard/use-overview-live';
+import { revenueSubtitle } from '@/features/dashboard/revenue-subtitle';
+import { useBranchContext } from '@/features/branches/use-branch-context';
 
 export function DashboardPage() {
   const { from, to, setRange, setPreset } = useDashboardParams();
   const [granularity, setGranularity] = useState<Granularity>('day');
+  const { workingBranch } = useBranchContext();
+  const live = useOverviewLive(workingBranch?.id);
+  const ownOnly = !useAuthStore((s) => s.hasPermission('quotations.view_all'));
 
   const summary = useDashboardSummary({ from, to });
   const revenue = useRevenueSeries({ from, to, granularity });
@@ -33,10 +41,18 @@ export function DashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Tổng quan của tôi</h1>
           <p className="text-sm text-muted-foreground">
-            {summary.data ? `Từ ${summary.data.from} đến ${summary.data.to}` : 'Báo giá trong khoảng đang xem.'}
+            {revenueSubtitle({
+              branchName: workingBranch?.name ?? null,
+              ownOnly: ownOnly,
+              from: summary.data?.from,
+              to: summary.data?.to,
+            })}
           </p>
         </div>
-        <RangePicker from={from} to={to} onChange={setRange} onPreset={setPreset} />
+        <div className="flex flex-wrap items-center gap-3">
+          <LiveStatus status={live.status} updatedAt={live.updatedAt} />
+          <RangePicker from={from} to={to} onChange={setRange} onPreset={setPreset} />
+        </div>
       </header>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

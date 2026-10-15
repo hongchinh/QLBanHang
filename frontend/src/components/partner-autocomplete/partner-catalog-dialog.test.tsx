@@ -229,6 +229,61 @@ describe('PartnerCatalogDialog', () => {
     expect(p.onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('a double click loads the detail once and selects once', async () => {
+    const user = userEvent.setup();
+    let resolveLoad: (value: Customer) => void = () => {};
+    customerGet.mockReturnValue(new Promise<Customer>((resolve) => { resolveLoad = resolve; }));
+    const { p } = renderDialog();
+
+    await user.dblClick(screen.getByText('KH-001').closest('tr')!);
+    expect(customerGet).toHaveBeenCalledTimes(1);
+
+    resolveLoad(record());
+    await waitFor(() => expect(p.onSelect).toHaveBeenCalledTimes(1));
+    expect(customerGet).toHaveBeenCalledTimes(1);
+  });
+
+  it('Enter while a detail load is running does not start a second one', async () => {
+    customerGet.mockReturnValue(new Promise<Customer>(() => {}));
+    renderDialog();
+
+    fireEvent.keyDown(searchInput(), { key: 'Enter' });
+    fireEvent.keyDown(searchInput(), { key: 'Enter' });
+
+    expect(customerGet).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['resolves', false],
+    ['fails', true],
+  ] as const)('a detail load that %s after the dialog closed is ignored', async (_name, fails) => {
+    const user = userEvent.setup();
+    let settle: (value?: Customer) => void = () => {};
+    customerGet.mockReturnValue(
+      new Promise<Customer>((resolve, reject) => {
+        settle = fails ? () => reject(new Error('boom')) : () => resolve(record());
+      }),
+    );
+    const p = props();
+    const ui = (open: boolean) => (
+      <StopFormEvents>
+        <PartnerCatalogDialog {...p} open={open} />
+      </StopFormEvents>
+    );
+    const { rerender } = render(ui(true));
+    await user.click(screen.getByText('KH-001').closest('tr')!);
+    expect(customerGet).toHaveBeenCalledTimes(1);
+
+    rerender(ui(false));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    settle();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(p.onSelect).not.toHaveBeenCalled();
+    expect(p.onOpenChange).not.toHaveBeenCalled();
+    expect(toastMock).not.toHaveBeenCalled();
+  });
+
   it('Enter in the search box picks the first row', async () => {
     const { p } = renderDialog();
 

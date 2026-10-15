@@ -175,7 +175,7 @@ export function CustomerFormFields({
   function handleEnterKeys(e: React.KeyboardEvent<HTMLFormElement>) {
     if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.altKey || e.metaKey) return;
     const submit = () => {
-      if (!submitting) void form.handleSubmit(onSubmit)();
+      if (!submitting && !lockedByOtherRole) void form.handleSubmit(onSubmit)();
     };
     if (e.ctrlKey) {
       if (e.shiftKey) return;

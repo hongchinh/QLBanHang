@@ -36,7 +36,7 @@ export function PartnerCatalogList({ role, query, onQueryChange, onSelect }: Par
   const debouncedQuery = useDebouncedValue(query, 250);
 
   const useList = role === 'customer' ? useCustomers : useSuppliers;
-  const { data, isLoading } = useList({
+  const { data, isLoading, isPlaceholderData } = useList({
     page,
     pageSize: 20,
     search: debouncedQuery || undefined,
@@ -84,6 +84,8 @@ export function PartnerCatalogList({ role, query, onQueryChange, onSelect }: Par
       setHighlighted(Math.max(active - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      // The rows on screen belong to an older query while the typed text is still waiting for its search.
+      if (query !== debouncedQuery || isPlaceholderData) return;
       const item = items[active];
       if (item) onSelect(item.id);
     }

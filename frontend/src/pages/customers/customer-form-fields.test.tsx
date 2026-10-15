@@ -243,6 +243,8 @@ describe('CustomerFormFields quick add mode', () => {
     const { onSubmit } = renderFields({ ...FREE, submitting: true, enterNavigation: true, initialName: 'A' });
     screen.getByLabelText('Mã').focus();
     await user.keyboard('{Control>}{Enter}{/Control}');
+    screen.getByLabelText('Ghi chú').focus();
+    await user.keyboard('{Enter}');
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(onSubmit).not.toHaveBeenCalled();
   });
@@ -327,6 +329,8 @@ describe('CustomerFormFields Enter navigation', () => {
     await user.keyboard('{Enter}');
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'ACME', isCustomer: true, isSupplier: false });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('without the role box Enter in Ghi chú submits', async () => {
@@ -335,6 +339,8 @@ describe('CustomerFormFields Enter navigation', () => {
     screen.getByLabelText('Ghi chú').focus();
     await user.keyboard('{Enter}');
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
   });
 
   it('Shift+Enter in the first field does not submit', async () => {
@@ -353,6 +359,24 @@ describe('CustomerFormFields Enter navigation', () => {
     await user.keyboard('{Control>}{Enter}{/Control}');
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ name: 'ACME' });
+  });
+
+  it('Ctrl+Enter does not submit a partner locked by its other role; with suppliers.update it does', async () => {
+    granted = new Set(['customers.update']);
+    const user = userEvent.setup();
+    const locked = renderFields({ isEdit: true, initial: DUAL_ROLE, enterNavigation: true });
+    expect(screen.getByRole('button', { name: 'Cập nhật' })).toBeDisabled();
+    screen.getByLabelText('Tên khách hàng *').focus();
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(locked.onSubmit).not.toHaveBeenCalled();
+    locked.unmount();
+
+    granted = new Set(['customers.update', 'suppliers.update']);
+    const open = renderFields({ isEdit: true, initial: DUAL_ROLE, enterNavigation: true });
+    screen.getByLabelText('Tên khách hàng *').focus();
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await waitFor(() => expect(open.onSubmit).toHaveBeenCalledTimes(1));
   });
 
   it('ignores Enter while composing', () => {

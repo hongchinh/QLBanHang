@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { PartnerQuickAddDialog, type PartnerQuickAddDialogProps } from './partner-quick-add-dialog';
 import { StopFormEvents } from './stop-form-events';
 import { toPartnerSearchItem } from '@/features/customers/partner-search-item';
+import { ApiCallError } from '@/lib/api-client';
 import type { Customer, UpsertCustomerRequest } from '@/features/customers/types';
 
 let granted = new Set<string>();
@@ -195,6 +196,29 @@ describe('PartnerQuickAddDialog', () => {
     expect(p.onOpenChange).not.toHaveBeenCalled();
     expect(screen.getByLabelText('Mã')).toHaveValue('KH1');
     expect(screen.getByLabelText('Tên *')).toHaveValue('Công ty An Phát');
+  });
+
+  it('failure with server details: the destructive toast lists the detail messages', async () => {
+    const user = userEvent.setup();
+    createCustomerFn.mockRejectedValue(
+      new ApiCallError({
+        code: 'VALIDATION',
+        message: 'Dữ liệu không hợp lệ',
+        details: { code: ['Mã đã tồn tại'], taxCode: ['Mã số thuế không hợp lệ'] },
+      }),
+    );
+    const { p } = renderDialog();
+
+    await user.click(screen.getByRole('button', { name: 'Tạo mới' }));
+
+    await waitFor(() =>
+      expect(toastMock).toHaveBeenCalledWith({
+        variant: 'destructive',
+        title: 'Không thể lưu',
+        description: 'Dữ liệu không hợp lệ; Mã đã tồn tại; Mã số thuế không hợp lệ',
+      }),
+    );
+    expect(p.onCreated).not.toHaveBeenCalled();
   });
 
   it('Hủy closes the dialog', async () => {

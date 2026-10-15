@@ -1,6 +1,6 @@
 # Phase 01 — Backend `activeOnly` and seed grants; pure logic
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15; see EXECUTION-REPORT.md)
 **Complexity:** M
 
 ## Objective

@@ -1,6 +1,6 @@
 # Phase 03 — Quick add and catalog dialogs
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15; see EXECUTION-REPORT.md)
 **Complexity:** L
 
 ## Objective

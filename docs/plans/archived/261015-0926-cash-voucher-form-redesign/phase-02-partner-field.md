@@ -1,6 +1,6 @@
 # Phase 02 — Shared partner field: data layer, `PartnerAutocomplete`, `PartnerCodeNameField`
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15; see EXECUTION-REPORT.md)
 **Complexity:** XL
 
 ## Objective

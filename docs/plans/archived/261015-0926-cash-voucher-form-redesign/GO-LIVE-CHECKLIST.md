@@ -1,6 +1,6 @@
 # Go-Live Checklist — cash voucher form redesign
 
-> Branch `feat/cash-voucher-form-redesign` · Plan [SUMMARY.md](SUMMARY.md) · Behaviour spec [section-01-behaviour-spec.md](../../brainstorms/261015-0644-cash-voucher-form-redesign/section-01-behaviour-spec.md)
+> Branch `feat/cash-voucher-form-redesign` · Plan [SUMMARY.md](SUMMARY.md) · Behaviour spec [section-01-behaviour-spec.md](../../../brainstorms/261015-0644-cash-voucher-form-redesign/section-01-behaviour-spec.md)
 
 Tick each item on the day the change reaches a running database.
 

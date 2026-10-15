@@ -1,6 +1,6 @@
 # Phase 05 — Stock voucher form and quotation form
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15; see EXECUTION-REPORT.md)
 **Complexity:** L
 
 ## Objective

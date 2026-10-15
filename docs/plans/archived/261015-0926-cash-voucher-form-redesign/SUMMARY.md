@@ -1,6 +1,6 @@
 # Cash voucher form redesign and one shared partner field (Thiết kế lại form phiếu thu/chi và ô đối tượng dùng chung)
 
-> Created: 2026-10-15 09:26 · Based on `qlbanhang/main` at `3ae3804` (PR #19 branch sample data merged; PR #18 app icon registry included) · Source design: [brainstorm SUMMARY](../../brainstorms/261015-0644-cash-voucher-form-redesign/SUMMARY.md) (approved, reviewed 2026-10-15), [section-01 behaviour spec](../../brainstorms/261015-0644-cash-voucher-form-redesign/section-01-behaviour-spec.md) (authoritative over the mockups), [section-02 review](../../brainstorms/261015-0644-cash-voucher-form-redesign/section-02-review.md) · Overlaps: [payment QR plan](../261015-0919-voucher-payment-qr/SUMMARY.md) (adds one button to `cash-voucher-form-page.tsx`)
+> Created: 2026-10-15 09:26 · Based on `qlbanhang/main` at `3ae3804` (PR #19 branch sample data merged; PR #18 app icon registry included) · Source design: [brainstorm SUMMARY](../../../brainstorms/261015-0644-cash-voucher-form-redesign/SUMMARY.md) (approved, reviewed 2026-10-15), [section-01 behaviour spec](../../../brainstorms/261015-0644-cash-voucher-form-redesign/section-01-behaviour-spec.md) (authoritative over the mockups), [section-02 review](../../../brainstorms/261015-0644-cash-voucher-form-redesign/section-02-review.md) · Overlaps: [payment QR plan](../../261015-0919-voucher-payment-qr/SUMMARY.md) (adds one button to `cash-voucher-form-page.tsx`)
 >
 > Reviewed against the code: 2026-10-15 (four reviewers, one per phase group). Fixed in the plan: 7 major findings (dialog event wrapper broke the Tab loop and missed the close button; stale typed text after a dialog pick; save blocked by locked typed text; catalog role switch lost the query; stock `partnerId` server error not focused; mismatch message missed "Any" reasons with a debt effect; Mode B browser run could hit the dev database) and about 25 minor ones (Phase 04 task order, unbuildable or vacuous tests, missing fixtures and mocks, git and grep commands, spec wording). Since then `qlbanhang/main` moved to `1a87763` (PR #20, docs only); the QR plan is being executed in `.claude/worktrees/voucher-qr` and will likely merge first.
 
@@ -68,13 +68,13 @@ Make the receipt/payment voucher form keyboard-first like MISA/Fast, and give ca
 
 ## Phases
 
-- [ ] Phase 00 — Worktree, branch, baseline (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Backend `activeOnly` and seed grants; pure logic (M) — `phase-01-backend-and-pure-logic.md`
-- [ ] Phase 02 — Shared partner field: data layer, `PartnerAutocomplete`, `PartnerCodeNameField` (XL) — `phase-02-partner-field.md`
-- [ ] Phase 03 — Quick add and catalog dialogs (L) — `phase-03-dialogs.md`
-- [ ] Phase 04 — Cash voucher form (XL) — `phase-04-cash-voucher-form.md`
-- [ ] Phase 05 — Stock voucher form and quotation form (L) — `phase-05-stock-and-quotation.md`
-- [ ] Phase 06 — Cleanup, docs, real-browser checks, final verification (L) — `phase-06-cleanup-docs-verification.md`
+- [x] Phase 00 — Worktree, branch, baseline (S) — `phase-00-baseline.md`
+- [x] Phase 01 — Backend `activeOnly` and seed grants; pure logic (M) — `phase-01-backend-and-pure-logic.md`
+- [x] Phase 02 — Shared partner field: data layer, `PartnerAutocomplete`, `PartnerCodeNameField` (XL) — `phase-02-partner-field.md`
+- [x] Phase 03 — Quick add and catalog dialogs (L) — `phase-03-dialogs.md`
+- [x] Phase 04 — Cash voucher form (XL) — `phase-04-cash-voucher-form.md`
+- [x] Phase 05 — Stock voucher form and quotation form (L) — `phase-05-stock-and-quotation.md`
+- [x] Phase 06 — Cleanup, docs, real-browser checks, final verification (L) — `phase-06-cleanup-docs-verification.md`
 
 Order: 00 → 01 → 02 → 03 → 04 → 05 → 06. Phase 01's backend half (Tasks 1.1–1.3) and its pure-logic half (Tasks 1.4–1.7) touch disjoint files and may run in two worktrees (the backend half on `feat/cvf-p01-backend`, merged `--no-ff` into the feature branch before the phase verification); Phase 04 and Phase 05 touch disjoint screens and may run in two worktrees after Phase 03. Run one phase per request (session limits) unless the user asks for several.
 

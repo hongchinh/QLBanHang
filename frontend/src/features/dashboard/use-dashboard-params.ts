@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { parseISO } from 'date-fns';
 import { computePreset } from '@/lib/date-range-presets';
 import type { RangePreset } from '@/lib/date-range-presets';
+import { useReplaceSearchParams } from '@/lib/use-search-param-state';
 import { useVnToday } from '@/lib/use-vn-today';
 
 // The presets live in lib/date-range-presets.ts; the type is re-exported for the modules that import it from here.
@@ -23,7 +24,9 @@ export interface UseDashboardParamsOptions {
 }
 
 export function useDashboardParams({ isValid }: UseDashboardParamsOptions = {}): UseDashboardParams {
-  const [sp, setSp] = useSearchParams();
+  const [sp] = useSearchParams();
+  // Replaces the entry and keeps its state, so a drill-down's state.from survives a period or sale change.
+  const setSp = useReplaceSearchParams();
 
   // Without from/to in the URL: this month up to today. It follows the VN date, so a page left open past
   // midnight asks for the new day (or month) instead of the day it was opened.
@@ -41,30 +44,24 @@ export function useDashboardParams({ isValid }: UseDashboardParamsOptions = {}):
 
   const setRange = useCallback(
     (f: string, t: string) => {
-      setSp(
-        (prev) => {
-          const out = new URLSearchParams(prev);
-          out.set('from', f);
-          out.set('to', t);
-          return out;
-        },
-        { replace: true },
-      );
+      setSp((prev) => {
+        const out = new URLSearchParams(prev);
+        out.set('from', f);
+        out.set('to', t);
+        return out;
+      });
     },
     [setSp],
   );
 
   const setSaleUserId = useCallback(
     (id: string | undefined) => {
-      setSp(
-        (prev) => {
-          const out = new URLSearchParams(prev);
-          if (id) out.set('saleUserId', id);
-          else out.delete('saleUserId');
-          return out;
-        },
-        { replace: true },
-      );
+      setSp((prev) => {
+        const out = new URLSearchParams(prev);
+        if (id) out.set('saleUserId', id);
+        else out.delete('saleUserId');
+        return out;
+      });
     },
     [setSp],
   );

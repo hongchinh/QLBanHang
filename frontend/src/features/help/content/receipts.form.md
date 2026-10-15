@@ -2,7 +2,7 @@
 key: receipts.form
 title: Phiếu thu
 routes: [/receipts/new, /receipts/:id]
-sources: [frontend/src/pages/cash-vouchers/**, frontend/src/features/cash-vouchers/**, frontend/src/features/cash-common/**, backend/src/OrderMgmt.Application/CashDebt/CashVouchers/**, frontend/src/lib/confirm-required.ts, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/partner-autocomplete/**, backend/src/OrderMgmt.Application/CashDebt/Guards/**]
+sources: [frontend/src/pages/cash-vouchers/**, frontend/src/features/cash-vouchers/**, frontend/src/features/cash-common/**, backend/src/OrderMgmt.Application/CashDebt/CashVouchers/**, frontend/src/lib/confirm-required.ts, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/partner-autocomplete/**, backend/src/OrderMgmt.Application/CashDebt/Guards/**, frontend/src/components/payment-qr/**, frontend/src/features/voucher-payment-qr/**, frontend/src/features/voucher-print/**, backend/src/OrderMgmt.Application/CashDebt/PaymentQr/**]
 related: [payments.form]
 updated: 2026-10-15
 ---
@@ -16,6 +16,7 @@ Ghi nhận tiền thu vào một quỹ: thu tiền khách hàng, nhận hoàn ti
 4. {#lines} Nhập từng dòng ở bảng: **Diễn giải** và **Số tiền**. `Insert` hoặc **Thêm dòng** để thêm dòng, **Tổng** là số tiền thu.
 5. {#allocation} Nếu có **Phân bổ chứng từ**, kiểm tra cột **Phân bổ** (gợi ý sẵn chứng từ đến hạn sớm nhất), sửa hoặc bấm **Gợi ý**.
 6. {#save} Bấm **Lưu tạm** (ở lại phiếu) hoặc **Lưu và thoát** (**Cập nhật** khi sửa phiếu); muốn in thì lưu xong bấm **In**, chọn PDF hoặc Excel.
+7. {#qr} Khi khách chuyển khoản, bấm **QR chuyển khoản** (cạnh **In**, sau khi đã lưu) để cho khách quét mã.
 
 ## Lưu ý
 - Ô **Đối tượng** phụ thuộc **Lý do**: chưa chọn lý do thì ô khóa, lý do không dùng đối tượng thì báo Không cần đối tượng. Thu tiền khách hàng chỉ nhận khách hàng, Thu hoàn tiền NCC chỉ nhận nhà cung cấp. Lý do có ảnh hưởng công nợ thì bắt buộc chọn đối tượng (báo Lý do này ảnh hưởng công nợ, vui lòng chọn đối tượng). Đổi lý do làm đối tượng không còn hợp thì đối tượng bị bỏ.
@@ -25,6 +26,12 @@ Ghi nhận tiền thu vào một quỹ: thu tiền khách hàng, nhận hoàn ti
 - Phiếu thu tự động từ phiếu xuất có nhãn **Tự động** và chỉ xem. Bấm **Mở phiếu kho** để sửa, hoặc **Đóng** để thoát.
 - **Hủy phiếu**, **Khôi phục** và **Xóa** chỉ hiện khi bạn có quyền tương ứng và phiếu là của bạn (hoặc bạn có quyền sửa phiếu của mọi người).
 - Hủy, xóa hoặc sửa phiếu đã được đối trừ với chứng từ khác thì có thể hiện hộp thoại **Bỏ đối trừ chứng từ** để bạn xác nhận. Phiếu đã hủy không sửa được, khôi phục thì đối trừ cũ không quay lại.
+
+- **QR chuyển khoản** mở hộp thoại (trên điện thoại là tấm trượt từ dưới lên) có mã VietQR, số tiền, ngân hàng, số tài khoản, chủ tài khoản và nội dung chuyển khoản. Bấm biểu tượng sao chép cạnh số tài khoản hoặc nội dung để chép, **Sao chép thông tin** để chép cả bộ, **Tải ảnh QR** để lưu ảnh.
+- Nút **QR chuyển khoản** bị khóa khi phiếu có thay đổi chưa lưu (Lưu thay đổi trước khi xem QR) hoặc phiếu đã hủy. Phiếu chi không có nút này.
+- Tiền chuyển về quỹ ngân hàng của chính phiếu; phiếu ở quỹ tiền mặt thì dùng quỹ ngân hàng mặc định của chi nhánh. Quỹ thiếu ngân hàng, số tài khoản hoặc chủ tài khoản thì hộp thoại báo thiếu gì, và quản trị viên bấm **Mở màn Quỹ** để bổ sung.
+- Menu **In** có tùy chọn **Kèm QR chuyển khoản** (mặc định bật, nhớ theo từng người dùng): mã QR in cạnh các dòng của phiếu thu.
+- Phiếu thu tự động từ phiếu xuất đã trả tiền mặt không có QR.
 
 ## Phím tắt
 - `Ctrl S` Lưu

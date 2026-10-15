@@ -1,5 +1,13 @@
 # Phân tích hành vi người dùng — 4.2. Mã đối tượng
 
+> **Cập nhật 2026-10-15.** Brainstorm [thiết kế lại form phiếu thu/chi và ô đối tượng dùng chung](../brainstorms/261015-0644-cash-voucher-form-redesign/SUMMARY.md) (quyết định D2, D4, D9, D11, D13) thay các mục sau. Phần còn lại vẫn giữ nguyên.
+>
+> - **§1, §3, AC-OBJ-001, AC-OBJ-006**: ô mã tìm **cả khách hàng và nhà cung cấp** đang hoạt động, rồi lý do tự khớp với đối tượng được chọn. Đối tượng bắt buộc hay không theo quy tắc lý do của server. Áp dụng cho phiếu thu/chi và phiếu kho. Báo giá chỉ tìm khách hàng.
+> - **§4, §15.2**: nút + vẫn nằm cạnh ô và Tab tới được. Ngoài ra có thêm **dòng "＋ Thêm mới …" cuối danh sách** và **phím F4**. Khi đã tìm xong mà không có kết quả, Enter mở hộp thêm nhanh.
+> - **§10, §13**: Lý do nộp có dạng **"Tên lý do - Tên đối tượng"**, không còn "Thu tiền của [Tên]". Bỏ chọn đối tượng thì Lý do nộp (nếu còn là chữ tự sinh) về tên lý do.
+> - **§11, §12**: Diễn giải của các dòng **chưa sửa tay** đổi theo Lý do nộp. Dòng người dùng đã nhập không bao giờ bị ghi đè.
+> - Vẫn giữ: focus sang Tên đối tượng sau khi chọn hoặc thêm nhanh (§5, §8, AC-OBJ-021); gõ chữ mà không chọn thì không cho lưu (§14, AC-OBJ-023/024).
+
 ## 1. Quy tắc chính
 
 Trường **Mã đối tượng** là field bắt buộc trong màn hình **Thêm mới Phiếu thu**.

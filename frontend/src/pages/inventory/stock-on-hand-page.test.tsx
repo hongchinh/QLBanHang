@@ -79,8 +79,8 @@ describe('StockOnHandPage', () => {
     expect(screen.getAllByText('1.250.000')).toHaveLength(2); // vi-VN grouping
 
     fireEvent.click(screen.getByText('Tôn lạnh'));
-    expect(screen.getByTestId('location')).toHaveTextContent('/inventory/stock-card?productId=p1&warehouseId=w1');
-    expect(screen.getByTestId('state')).toHaveTextContent(JSON.stringify({ from: '/inventory/stock-on-hand' }));
+    expect(screen.getByTestId('location').textContent).toBe('/inventory/stock-card?productId=p1&warehouseId=w1');
+    expect(screen.getByTestId('state').textContent).toBe(JSON.stringify({ from: '/inventory/stock-on-hand' }));
   });
 
   it('sends the point in time as an ISO instant and the search text', async () => {

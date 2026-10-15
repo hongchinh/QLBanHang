@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
@@ -33,20 +33,16 @@ function renderPage() {
 }
 
 describe('SalesPerformancePage drill-down', () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-  });
-
   it('a row opens the revenue report of that sale and passes its own url as state.from', async () => {
     const user = userEvent.setup();
     renderPage();
 
     await user.click(screen.getByText('An Sale', { selector: 'td' }));
 
-    expect(screen.getByTestId('location')).toHaveTextContent(
+    expect(screen.getByTestId('location').textContent).toBe(
       '/reports/revenue?saleUserId=u1&from=2026-10-01&to=2026-10-31',
     );
-    expect(screen.getByTestId('state')).toHaveTextContent(
+    expect(screen.getByTestId('state').textContent).toBe(
       JSON.stringify({ from: '/reports/sales-performance?from=2026-10-01&to=2026-10-31' }),
     );
   });

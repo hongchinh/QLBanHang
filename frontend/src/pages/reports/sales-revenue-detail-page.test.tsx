@@ -49,11 +49,6 @@ describe('SalesRevenueDetailPage back link', () => {
       'href',
       '/reports/sales-revenue',
     );
-  });
-
-  it('no longer has the history-based Quay lại button', () => {
-    renderPage();
-
     expect(screen.queryByRole('button', { name: /Quay lại/ })).not.toBeInTheDocument();
   });
 });

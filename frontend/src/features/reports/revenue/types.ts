@@ -21,6 +21,15 @@ export interface QuotationRevenueSeries {
   points: QuotationRevenuePoint[];
 }
 
+export interface QuotationSalesLeaderboardItem {
+  userId: string;
+  fullName: string;
+  revenue: number;
+  confirmedCount: number;
+  conversionRate: number | null;
+  deltaPct: number | null;
+}
+
 export interface QuotationTopCustomer {
   customerId: string;
   customerName: string;

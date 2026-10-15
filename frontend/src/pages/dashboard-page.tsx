@@ -43,7 +43,7 @@ export function DashboardPage() {
           <p className="text-sm text-muted-foreground">
             {revenueSubtitle({
               branchName: workingBranch?.name ?? null,
-              ownOnly: ownOnly,
+              ownOnly,
               from: summary.data?.from,
               to: summary.data?.to,
             })}

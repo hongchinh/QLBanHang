@@ -19,6 +19,14 @@ export function useRevenueReportSeries(params: DashboardParams & { granularity: 
   });
 }
 
+export function useRevenueReportLeaderboard(params: { from: string; to: string; limit?: number }) {
+  return useQuery({
+    queryKey: revenueReportKeys.leaderboard(params),
+    queryFn: () => revenueReportApi.getLeaderboard(params),
+    staleTime: 30_000,
+  });
+}
+
 export function useRevenueReportTopCustomers(params: DashboardParams & { limit?: number }) {
   return useQuery({
     queryKey: revenueReportKeys.topCustomers(params),

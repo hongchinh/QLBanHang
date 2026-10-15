@@ -17,7 +17,12 @@ export function useOverviewLive(branchId: string | undefined): { status: Realtim
   );
   const getUpdatedAt = useCallback(() => {
     let latest = 0;
-    for (const query of queryClient.getQueryCache().findAll({ queryKey: dashboardKeys.all })) {
+    // The legacy quotation-stats query is not on these pages.
+    const onOverview = (key: readonly unknown[]) => key[1] !== 'quotation-stats';
+    for (const query of queryClient.getQueryCache().findAll({
+      queryKey: dashboardKeys.all,
+      predicate: (q) => onOverview(q.queryKey),
+    })) {
       latest = Math.max(latest, query.state.dataUpdatedAt);
     }
     return latest > 0 ? latest : null;

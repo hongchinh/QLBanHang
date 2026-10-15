@@ -1,6 +1,6 @@
 import { apiGet } from '@/lib/api-client';
 import type { DashboardParams, Granularity } from '@/features/dashboard/types';
-import type { QuotationRevenueSeries, QuotationRevenueSummary, QuotationTopCustomer } from './types';
+import type { QuotationRevenueSeries, QuotationSalesLeaderboardItem, QuotationRevenueSummary, QuotationTopCustomer } from './types';
 
 export const revenueReportApi = {
   getSummary: (p: { from?: string; to?: string; saleUserId?: string }) =>
@@ -11,4 +11,7 @@ export const revenueReportApi = {
 
   getTopCustomers: (p: DashboardParams & { limit?: number }) =>
     apiGet<QuotationTopCustomer[]>('/reports/revenue/top-customers', p),
+
+  getLeaderboard: (p: { from: string; to: string; limit?: number }) =>
+    apiGet<QuotationSalesLeaderboardItem[]>('/reports/revenue/sales-leaderboard', p),
 };

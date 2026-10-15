@@ -119,7 +119,7 @@ export function ProductFormFields({
       if (e.shiftKey) return;
       e.preventDefault();
       e.stopPropagation();
-      submit();
+      if (!e.repeat) submit(); // a held key must not save again
       return;
     }
     const target = e.target as HTMLElement;
@@ -127,13 +127,18 @@ export function ProductFormFields({
     if (SELECT_IDS.includes(target.id) && target.getAttribute('aria-expanded') === 'true') return; // an open Select is Radix's
     e.preventDefault();
     e.stopPropagation(); // capture phase: the Radix trigger would otherwise open on Enter
+    if (e.repeat) return; // a held Enter neither walks the fields nor submits at the end
     const step = focusNextInOrder(ENTER_ORDER, target.id, e.shiftKey ? -1 : 1);
     if (step === 'end' && !e.shiftKey) submit();
   }
 
   // The dialog scrolls, so its error sits above the first card; the page keeps it at the bottom.
+  const errorRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (hasSubmitError && !showHeader) errorRef.current?.scrollIntoView?.({ block: 'nearest' });
+  }, [hasSubmitError, submitError, showHeader]);
   const errorBox = (
-    <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+    <div ref={errorRef} className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
       {submitError}
     </div>
   );

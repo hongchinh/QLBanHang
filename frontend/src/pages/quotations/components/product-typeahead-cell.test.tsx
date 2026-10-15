@@ -402,6 +402,21 @@ describe('ProductTypeaheadCell', () => {
         expect(quickAddDialog()).toBeNull();
       });
 
+      it('an Enter that commits an IME composition acts on nothing: no dialog, no pick', () => {
+        searchState.data = [];
+        const first = setup();
+        fireEvent.keyDown(first.input, { key: 'Enter', isComposing: true, keyCode: 229 });
+        expect(quickAddDialog()).toBeNull();
+        expect(first.onSelect).not.toHaveBeenCalled();
+      });
+
+      it('an IME Enter with a result highlighted picks nothing', () => {
+        const { input, onSelect } = setup();
+        fireEvent.keyDown(input, { key: 'Enter', isComposing: true, keyCode: 229 });
+        expect(onSelect).not.toHaveBeenCalled();
+        expect(quickAddDialog()).toBeNull();
+      });
+
       it('opens the add row with the mouse', async () => {
         searchState.data = [];
         setup();

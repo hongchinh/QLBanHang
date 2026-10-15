@@ -212,6 +212,8 @@ export function ProductTypeaheadCell({
   }, [enterWaiting, pending, search.data]);
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    // The Enter that commits a Telex/VNI composition must not pick or add on half-composed text.
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'F4') {
       if (!canAdd) return;
       e.preventDefault();

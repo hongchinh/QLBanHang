@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ProductFormFields } from '@/features/products/components/product-form-fields';
@@ -59,6 +59,8 @@ function QuickAddBody({ onOpenChange, seed, onCreated }: Pick<ProductQuickAddDia
   const save = useSaveProduct();
   // Local: a unit get-or-create failure happens before the mutation and never reaches save.error.
   const [error, setError] = useState('');
+  // Set on success: the dialog stays mounted and focused while it closes, so a later key must not start a new save.
+  const savedRef = useRef(false);
 
   const { code, name } = splitTypedProductText(seed);
   const loading = groups.isLoading || units.isLoading;
@@ -70,10 +72,12 @@ function QuickAddBody({ onOpenChange, seed, onCreated }: Pick<ProductQuickAddDia
   }, [ready, code]);
 
   async function handleSubmit(parsed: ProductFormParsed) {
+    if (savedRef.current) return;
     save.reset();
     setError('');
     try {
       const created = await save.create(parsed);
+      savedRef.current = true;
       toast({ variant: 'success', title: 'Đã tạo hàng hóa', description: created.code });
       onCreated(toProductSuggestion(created));
       onOpenChange(false);

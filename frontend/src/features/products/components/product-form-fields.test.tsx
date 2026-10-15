@@ -104,6 +104,33 @@ describe('ProductFormFields', () => {
     expect(error.compareDocumentPosition(firstCard) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('scrolls the error box into view when a save error appears above the first card', () => {
+    const original = Element.prototype.scrollIntoView;
+    const spy = vi.fn();
+    Element.prototype.scrollIntoView = spy;
+    try {
+      const props = {
+        isEdit: false, groups, units, submitting: false, showHeader: false,
+        onSubmit: vi.fn(), onCancel: vi.fn(),
+      };
+      const view = render(
+        <MemoryRouter>
+          <ProductFormFields {...props} submitError="" hasSubmitError={false} />
+        </MemoryRouter>,
+      );
+      expect(spy).not.toHaveBeenCalled();
+      view.rerender(
+        <MemoryRouter>
+          <ProductFormFields {...props} submitError="Mã đã tồn tại" hasSubmitError />
+        </MemoryRouter>,
+      );
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(spy.mock.contexts[0]).toBe(screen.getByText('Mã đã tồn tại'));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it('keeps the submit error at the bottom with the default header', () => {
     setup({ showHeader: true, hasSubmitError: true, submitError: 'Mã đã tồn tại' });
     expect(screen.getByRole('heading', { name: 'Thêm hàng hóa' })).toBeInTheDocument();
@@ -157,6 +184,24 @@ describe('ProductFormFields Enter navigation', () => {
     byId('code').focus();
     await user.keyboard('{Control>}{Enter}{/Control}');
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+  });
+
+  it('a repeating Ctrl+Enter (held key) does not submit', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = setup({ enterNavigation: true });
+    await fillValid(user);
+    fireEvent.keyDown(byId('code'), { key: 'Enter', ctrlKey: true, repeat: true });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('a repeating Enter on the last field does not submit', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = setup({ enterNavigation: true });
+    await fillValid(user);
+    fireEvent.keyDown(byId('note'), { key: 'Enter', repeat: true });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('ignores a second submit (form submit or Ctrl+Enter) while onSubmit is pending, then submits again', async () => {

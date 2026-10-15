@@ -150,6 +150,23 @@ describe('ProductQuickAddDialog', () => {
     expect(toast).toHaveBeenCalledTimes(1);
   });
 
+  it('a Ctrl+Enter after the save succeeded starts no second save while the dialog is still closing', async () => {
+    const user = userEvent.setup();
+    const { onCreated } = renderDialog('Tôn lạnh');
+    await user.click(await screen.findByRole('combobox', { name: 'Nhóm hàng hóa *' }));
+    await user.click(screen.getByRole('option', { name: 'Tôn' }));
+    await user.type(screen.getByLabelText('Đơn vị tính *'), 'Tấm');
+    await user.click(screen.getByLabelText('Tên hàng hóa *'));
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+
+    // The test's onOpenChange does not close the dialog, as the Radix close animation leaves it mounted.
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(createMock).toHaveBeenCalledTimes(1);
+    expect(onCreated).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the dialog open and shows the error when saving fails', async () => {
     createMock.mockRejectedValue(new Error('Mã hàng hóa đã tồn tại'));
     const user = userEvent.setup();

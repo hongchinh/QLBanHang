@@ -244,6 +244,22 @@ describe('PaymentQrDialog', () => {
     expect(screen.queryByText('1.000.000')).not.toBeInTheDocument();
   });
 
+  it.each([
+    ['dialog', true],
+    ['sheet', false],
+  ])('keeps the action buttons outside the scrolling body (%s)', (_name, wide) => {
+    stubMatchMedia(wide);
+    renderDialog();
+    const scroll = screen.getByTestId('payment-qr-scroll');
+    expect(scroll).toContainElement(screen.getByTestId('qr'));
+    expect(scroll).toHaveClass('overflow-y-auto', 'min-h-0');
+    const actions = screen.getByTestId('payment-qr-actions');
+    expect(scroll).not.toContainElement(actions);
+    expect(actions).toHaveClass('shrink-0');
+    expect(actions).toContainElement(screen.getByRole('button', { name: 'Sao chép thông tin' }));
+    expect(actions).toContainElement(screen.getByRole('button', { name: 'Tải ảnh QR' }));
+  });
+
   it('dialog or sheet', () => {
     const { unmount } = renderDialog();
     expect(screen.getByTestId('payment-qr-dialog')).toBeInTheDocument();

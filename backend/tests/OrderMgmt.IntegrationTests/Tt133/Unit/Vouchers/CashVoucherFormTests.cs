@@ -26,6 +26,18 @@ public class CashVoucherFormTests
         PrintDate = new DateOnly(2026, 10, 14),
     };
 
+    /// The company profile of the PDF samples (Task 3.6): the unit and the address take two lines each.
+    private static Tt133FormContext FilledContext() => new()
+    {
+        CompanyName = "Công ty TNHH Thương mại và Dịch vụ Minh Phát",
+        BranchName = "Chi nhánh PQ89cb0b26",
+        Address = "Số 12 ngõ 34 đường Láng Hạ, phường Thành Công, quận Ba Đình, Hà Nội",
+        TaxCode = "0101234567",
+        ChiefAccountantName = "Trần Thị Bình",
+        LegalRepresentativeName = "Nguyễn Văn An",
+        PrintDate = new DateOnly(2026, 10, 14),
+    };
+
     private static CashVoucherPrintModel Receipt(string code = "PT00001") => new()
     {
         Type = CashVoucherType.Receipt,
@@ -76,9 +88,11 @@ public class CashVoucherFormTests
     private static int SignatureDateRow(IXLWorksheet sheet) =>
         sheet.CellsUsed().Last(c => c.GetString() == SignedDate).Address.RowNumber;
 
-    private static XLWorkbook Render(params CashVoucherPrintModel[] models)
+    private static XLWorkbook Render(params CashVoucherPrintModel[] models) => Render(Context(), models);
+
+    private static XLWorkbook Render(Tt133FormContext context, params CashVoucherPrintModel[] models)
     {
-        var bytes = new VoucherFormRenderer().RenderCashVouchers(Context(), models);
+        var bytes = new VoucherFormRenderer().RenderCashVouchers(context, models);
         return new XLWorkbook(new MemoryStream(bytes));
     }
 
@@ -255,24 +269,52 @@ public class CashVoucherFormTests
             (int)LibreOfficePrint.CentredOffset(picture, 9.5, 9.5) + 1);
     }
 
+    // The 01-TT-qr and 01-TT-qr-long PDF samples printed at 73 % and 71 % (a fixed zoom printed them 21.1 and 19.7 mm
+    // wide); the short profile fits at 78 %.
     [Theory]
-    [InlineData(false, false)]
-    [InlineData(true, false)]
-    [InlineData(false, true)]
-    [InlineData(true, true)]
-    public void Qr_prints_25_mm_at_the_zoom_that_fits_the_receipt_to_the_page(bool longReason, bool cancelled)
+    [InlineData(false, false, 0.78)]
+    [InlineData(true, false, 0.73)]
+    [InlineData(true, true, 0.71)]
+    public void Qr_prints_25_mm_at_the_zoom_that_fits_the_receipt_to_the_page(bool filledProfile, bool longReason,
+        double zoom)
     {
         var model = ReceiptWithQr();
-        if (longReason) model.Reason = string.Join(" ", Enumerable.Repeat("Thu tiền hàng theo hợp đồng", 20))[..400];
-        model.IsCancelled = cancelled;
-        using var wb = Render(model);
+        model.Reason = longReason
+            ? string.Join(" ", Enumerable.Repeat("Thu tiền hàng theo hợp đồng mua bán số 12/2026", 10))[..400]
+            : "Thu tiền hàng theo hóa đơn số 0001234";
+        using var wb = Render(filledProfile ? FilledContext() : Context(), model);
         var ws = wb.Worksheet(1);
 
-        // The sheet is fitted to one A5 page by its height, which the QR rows and the reason change; a fixed zoom
-        // printed it 21.1 mm and 19.7 mm wide.
+        // The sheet is fitted to one A5 page by its height, which the profile, the QR rows and the reason change.
+        LibreOfficePrint.A5Zoom(ws, 10).Should().Be(zoom);
         var picture = ws.Pictures.First();
-        LibreOfficePrint.PrintedMillimetres(picture, LibreOfficePrint.A5Zoom(ws, 10)).Should().BeApproximately(25, 0.5);
+        picture.Width.Should().Be(LibreOfficePrint.QrPixels(zoom));
+        LibreOfficePrint.PrintedMillimetres(picture, zoom).Should().BeApproximately(25, 0.25);
         AssertRowsCoverPicture(ws);
+    }
+
+    [Fact]
+    public void Qr_of_a_receipt_shrunk_below_62_percent_stays_inside_its_two_columns()
+    {
+        var model = ReceiptWithQr();
+        model.PersonName = new string('N', 255);
+        model.Address = string.Join(" ", Enumerable.Repeat("số 12 ngõ 34 đường Láng Hạ", 40))[..1000];
+        model.Reason = string.Join(" ", Enumerable.Repeat("Thu tiền hàng theo hợp đồng", 20))[..500];
+        using var wb = Render(FilledContext(), model);
+        var ws = wb.Worksheet(1);
+        LibreOfficePrint.A5Zoom(ws, 10).Should().BeLessThan(0.62); // precondition of the case
+
+        // A 25 mm QR would be wider than columns I-J here and push the print range to column K.
+        var picture = ws.Pictures.Single();
+        var columns = LibreOfficePrint.ColumnsPixels(9.5, 9.5);
+        (picture.GetOffset(XLMarkerPosition.TopLeft).X + picture.Width).Should().BeLessThanOrEqualTo((int)columns);
+        picture.TopLeftCell.Address.ColumnNumber.Should().Be(9);
+        AssertRowsCoverPicture(ws);
+        // Still one page: fitted to one page, nothing used past column J and no break.
+        ws.PageSetup.PagesWide.Should().Be(1);
+        ws.PageSetup.PagesTall.Should().Be(1);
+        ws.LastColumnUsed()!.ColumnNumber().Should().BeLessThanOrEqualTo(10);
+        ws.PageSetup.RowBreaks.Should().BeEmpty();
     }
 
     [Fact]
@@ -325,7 +367,7 @@ public class CashVoucherFormTests
         LastColumnOf(ws, "Họ và tên người nhận tiền: Nguyễn Văn A").Should().Be(10);
     }
 
-    /// The rows from the picture to the one before the first caption hold the picture.
+    /// The rows from the picture to the one before the first caption hold the picture and its 2 px offset from the top.
     private static void AssertRowsCoverPicture(IXLWorksheet ws)
     {
         var picture = ws.Pictures.First();
@@ -333,6 +375,6 @@ public class CashVoucherFormTests
         var captionRow = RowOf(ws, ScanCaption);
         var height = 0d;
         for (var r = first; r < captionRow; r++) height += ws.Row(r).Height;
-        height.Should().BeGreaterThanOrEqualTo(picture.Height * 0.75);
+        height.Should().BeGreaterThanOrEqualTo(picture.Height * 0.75 + 1.5);
     }
 }

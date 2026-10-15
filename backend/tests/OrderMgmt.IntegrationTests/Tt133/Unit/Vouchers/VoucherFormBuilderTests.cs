@@ -483,13 +483,27 @@ public class VoucherFormBuilderTests
         b.Finish();
 
         var picture = ws.Pictures.Single();
-        LibreOfficePrint.PrintedMillimetres(picture, LibreOfficePrint.A5Zoom(ws, 10)).Should().BeApproximately(25, 0.5);
+        var zoom = LibreOfficePrint.A5Zoom(ws, 10);
+        picture.Width.Should().Be(LibreOfficePrint.QrPixels(zoom));
+        LibreOfficePrint.PrintedMillimetres(picture, zoom).Should().BeApproximately(25, 0.25);
         var captionRow = RowOf(ws, VoucherPrintRules.QrScanCaption);
         var above = 0d;
         for (var r = picture.TopLeftCell.Address.RowNumber; r < captionRow; r++) above += ws.Row(r).Height;
         above.Should().BeGreaterThanOrEqualTo(picture.Height * 0.75 + 1.5);
         // No row is added: the lines after the block stay where they were written.
         RowOf(ws, "Sau 1: x").Should().Be(rowsAfterBlock);
+    }
+
+    [Fact]
+    public void Payment_block_on_A5_is_refused()
+    {
+        // Only the A4 zoom is known when the block is written; on A5 the picture would keep a guessed size.
+        var (b, ws) = NewBuilder(Context());
+
+        var act = () => b.WritePaymentBlock(Qr());
+
+        act.Should().Throw<InvalidOperationException>().WithMessage("*A4*");
+        ws.Pictures.Should().BeEmpty();
     }
 
     [Theory]

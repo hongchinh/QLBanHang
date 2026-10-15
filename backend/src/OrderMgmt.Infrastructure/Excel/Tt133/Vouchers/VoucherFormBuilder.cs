@@ -37,6 +37,8 @@ public sealed class VoucherFormBuilder
     // written (measured: 71 % to 76 % on the samples, while the width alone allows 89 %). EndQrBeside reserves the rows
     // for a picture at this zoom, and Finish draws it at the real one.
     private const double A5ReserveScale = 0.75;
+    // A height shortfall below this is rounding noise of the summed row heights, not a reason to grow a row.
+    private const double NegligiblePoints = 0.01;
     private const int QrColumns = 2;
     private const int QrTopOffsetPixels = 2;
     private const double QrCaptionFontSize = 8;
@@ -228,8 +230,11 @@ public sealed class VoucherFormBuilder
     /// transfer details on the left, the QR in the last two columns from the first row, its
     /// caption in the last row, and a thin outside border around the whole block. The rows get explicit heights (the
     /// page-break estimate reads only those): the rows above the caption hold the picture, the caption row keeps its own.
+    /// A4 only: its zoom is known when the block is written, while an A5 sheet is fitted by its finished height.
     public void WritePaymentBlock(VoucherPaymentQrDto qr)
     {
+        if (_paper != VoucherPaper.A4Portrait)
+            throw new InvalidOperationException("The payment block is drawn on the A4 portrait voucher only.");
         var count = _columns.Count;
         if (count < 4)
             throw new InvalidOperationException("A payment block needs at least four columns.");
@@ -336,7 +341,7 @@ public sealed class VoucherFormBuilder
             foreach (var block in _qrBlocks)
             {
                 var missing = needed - HeightOfRows(block.FirstRow, block.CaptionRow - 1);
-                if (missing <= 0.01) continue;
+                if (missing <= NegligiblePoints) continue;
                 Sheet.Row(block.CaptionRow - 1).Height += missing;
                 grown = true;
             }
@@ -396,12 +401,22 @@ public sealed class VoucherFormBuilder
     private static double ColumnPoints(double width) => (width + SavedWidthPadding) * PointsPerWidthUnit;
 
     /// Side of the QR picture in sheet pixels. The sheet is shrunk to the page, so the picture is drawn larger in the
-    /// sheet to come out at QrPrintMillimetres on paper.
-    private static int QrPixels(double scale) =>
-        (int)Math.Round(QrPrintMillimetres * 72 / 25.4 / scale / PointsPerPixel);
+    /// sheet to come out at QrPrintMillimetres on paper; never wider than its columns, though (an A5 receipt shrunk
+    /// below about 62 % prints it smaller instead of past the last column, which would widen the print range).
+    private int QrPixels(double scale) =>
+        Math.Min((int)Math.Round(QrPrintMillimetres * 72 / 25.4 / scale / PointsPerPixel), (int)QrColumnsPixels());
 
     /// Height in points the picture takes from the top of its first row: the picture and its offset from the top.
-    private static double QrSpanPoints(double scale) => (QrPixels(scale) + QrTopOffsetPixels) * PointsPerPixel;
+    private double QrSpanPoints(double scale) => (QrPixels(scale) + QrTopOffsetPixels) * PointsPerPixel;
+
+    /// The last QrColumns columns as LibreOffice prints them, in sheet pixels.
+    private double QrColumnsPixels()
+    {
+        var pixels = 0d;
+        for (var i = _columns.Count - QrColumns + 1; i <= _columns.Count; i++)
+            pixels += ColumnPoints(_columns[i - 1].Width) / PointsPerPixel;
+        return pixels;
+    }
 
     private double HeightOfRows(int firstRow, int lastRow)
     {
@@ -424,9 +439,7 @@ public sealed class VoucherFormBuilder
     private void PlaceQrPicture(IXLPicture picture, int row, int pixels)
     {
         var firstColumn = _columns.Count - QrColumns + 1;
-        var columnsPixels = 0d;
-        for (var i = firstColumn; i <= _columns.Count; i++) columnsPixels += ColumnPoints(_columns[i - 1].Width) / PointsPerPixel;
-        var xOffset = Math.Max(0, (int)Math.Round((columnsPixels - pixels) / 2));
+        var xOffset = Math.Max(0, (int)Math.Round((QrColumnsPixels() - pixels) / 2));
 
         picture.MoveTo(Sheet.Cell(row, firstColumn), xOffset, QrTopOffsetPixels).WithSize(pixels, pixels);
     }

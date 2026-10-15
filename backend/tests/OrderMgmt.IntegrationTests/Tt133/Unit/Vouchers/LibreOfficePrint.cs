@@ -26,7 +26,13 @@ internal static class LibreOfficePrint
 
     public static double PrintedMillimetres(IXLPicture picture, double zoom) => picture.Width * 0.75 * zoom * 25.4 / 72;
 
+    /// The side in sheet pixels that prints 25 mm at the given zoom.
+    public static int QrPixels(double zoom) => (int)Math.Round(25 * 72 / 25.4 / zoom / 0.75);
+
+    /// The given columns as LibreOffice prints them, in sheet pixels.
+    public static double ColumnsPixels(params double[] columnWidths) => columnWidths.Sum(ColumnPoints) / 0.75;
+
     /// The x offset (pixels) that centres the picture over the given columns as LibreOffice draws them.
     public static double CentredOffset(IXLPicture picture, params double[] columnWidths) =>
-        (columnWidths.Sum(ColumnPoints) / 0.75 - picture.Width) / 2;
+        (ColumnsPixels(columnWidths) - picture.Width) / 2;
 }

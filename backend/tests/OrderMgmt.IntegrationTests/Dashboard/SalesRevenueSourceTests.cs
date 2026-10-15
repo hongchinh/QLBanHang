@@ -78,6 +78,34 @@ public class SalesRevenueSourceTests : ExecutiveDashboardTestBase
         quantity.Should().Be(3m);
     }
 
+    [Fact]
+    public async Task Multi_line_voucher_nets_discount_and_inclusive_vat()
+    {
+        var branch = await CreateFreshBranchAsync();
+        var suffix = Guid.NewGuid().ToString("N")[..8];
+        var inclusive = await CreateInventoryProductAsync("SRI-" + suffix, track: false, taxRate: 10, priceIncludesVat: true);
+        var plain = await CreateInventoryProductAsync("SRP-" + suffix, track: false);
+        var request = VoucherRequest(StockDirection.Out, await ReasonIdAsync("XBH"), "2026-10-04 09:00",
+            LineRequest(inclusive, 2, 110), LineRequest(plain, 3, 100));
+        request.WarehouseId = branch.WarehouseId;
+        request.PartnerId = branch.CustomerId;
+        request.Lines[0].VatRate = 10m;
+        request.Lines[1].DiscountRate = 10m;
+        var (status, voucher, error) = await PostVoucherAsync(branch.Client, request);
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+
+        // Line 1: amount 220, VAT 20 is inside the price, so revenue 220 - 20 = 200.
+        // Line 2: amount 300, discount 10% = 30, revenue 270. The voucher: 470.
+        (await RevenueAsync(branch.BranchId, null)).Should().Be(470m);
+        using var scope = _factory.Services.CreateScope();
+        var counted = await scope.ServiceProvider.GetRequiredService<SalesRevenueSource>()
+            .BuildAsync([branch.BranchId], null, From, To, CancellationToken.None);
+        var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
+        var lines = await counted.LineRevenues(db.StockVoucherLines).Where(l => l.VoucherId == voucher!.Id)
+            .OrderBy(l => l.Revenue).ToListAsync();
+        lines.Select(l => l.Revenue).Should().Equal(200m, 270m);
+    }
+
     /// NMH 10 × 100 on 10-02, XBH 4 × 150 on 10-04, NTL 1 × 150 on 10-05 in a fresh branch: 600 − 150 = 450.
     private async Task<(FreshBranch Branch, Guid ProductId)> SeedSalesAndReturnAsync()
     {

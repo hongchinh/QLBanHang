@@ -46,6 +46,7 @@ public sealed record CountedSales(IQueryable<StockVoucher> Vouchers, IReadOnlyLi
 {
     /// Signed revenue of each voucher: a sale counts positive and a return negative. Written as a group over the
     /// lines, not as a sum inside the select, so that a caller can aggregate the result again in the database.
+    /// DefaultIfEmpty keeps a voucher without lines as one row with revenue 0, as the old COALESCE(SUM) did.
     public IQueryable<SalesVoucherRevenue> VoucherRevenues()
     {
         var returnIds = ReturnIds;

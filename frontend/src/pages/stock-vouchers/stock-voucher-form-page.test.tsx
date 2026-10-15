@@ -4,10 +4,15 @@ import { act, createEvent, fireEvent, render, screen, waitFor, within } from '@t
 import type * as ReactHookForm from 'react-hook-form';
 import type * as ReactRouterDom from 'react-router-dom';
 import type * as DebtHooks from '@/features/debt/hooks';
+import type * as CustomerHooks from '@/features/customers/hooks';
+import type * as CustomerApi from '@/features/customers/api';
+import type * as SupplierApi from '@/features/suppliers/api';
+import type * as SupplierHooks from '@/features/suppliers/hooks';
 import { StockVoucherFormPage } from './stock-voucher-form-page';
 import { toDateTimeLocalValue } from '@/lib/vn-datetime';
 import { createEmptyStockLine, toFormDefaults } from '@/features/stock-vouchers/payload';
 import { useBranchStore } from '@/stores/branch-store';
+import type { Customer, CustomerListItem, PagedResult } from '@/features/customers/types';
 import type { Fund } from '@/features/funds/types';
 import type { PaymentMethod } from '@/features/payment-methods/types';
 import type { ProductSuggestion } from '@/features/products/types';
@@ -98,6 +103,9 @@ const useStockAtMock = vi.fn();
 const useStockReasonsMock = vi.fn();
 const defaultsMock = vi.fn();
 const partnerResults: { data: PartnerSearchItem[] } = { data: [] };
+const partnerSearchMock = vi.fn();
+// null: the module's reasons; a test that needs another set puts it here before rendering.
+const reasonsState: { override: StockReason[] | null } = { override: null };
 const paymentMethodsState: { data: PaymentMethod[] } = { data: [] };
 const voucherState: { data: StockVoucher | undefined } = { data: undefined };
 const activitiesState: { data: unknown[] } = { data: [] };
@@ -122,11 +130,10 @@ vi.mock('@/features/stock-vouchers/hooks', () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  usePartnerSearch: (_type: string, keyword: string) => ({
-    data: keyword ? partnerResults.data : [],
-    isLoading: false,
-    isError: false,
-  }),
+  usePartnerSearch: (type: string, keyword: string, reasonId?: string, activeOnly?: boolean) => {
+    partnerSearchMock(type, keyword, reasonId, activeOnly);
+    return { data: keyword ? partnerResults.data : [], isLoading: false, isError: false };
+  },
   useCreateStockVoucher: () => mutation(createMock),
   useUpdateStockVoucher: () => mutation(updateMock),
   useCancelStockVoucher: () => mutation(cancelMock),
@@ -134,12 +141,57 @@ vi.mock('@/features/stock-vouchers/hooks', () => ({
   useDeleteStockVoucher: () => mutation(deleteMock),
 }));
 
+// The quick add and catalog dialogs of the partner field. The page renders without a QueryClientProvider, so the
+// create hooks and the catalog lists are mocks; the other exports of these modules stay real.
+const createCustomerMock = vi.fn();
+const createSupplierMock = vi.fn();
+const customerGetMock = vi.fn();
+const supplierGetMock = vi.fn();
+const createMutation = (fn: ReturnType<typeof vi.fn>) => ({
+  mutateAsync: fn,
+  isPending: false,
+  isError: false,
+  error: null,
+  reset: vi.fn(),
+});
+const customerRow: CustomerListItem = {
+  id: 'cat-1', code: 'KH-001', name: 'Công ty ABC', taxCode: '0100000001', group: 'Company', status: 'Active',
+  isCustomer: true, isSupplier: false,
+};
+const supplierRow: CustomerListItem = {
+  id: 'cat-9', code: 'NCC-009', name: 'Nhà máy Sơn', taxCode: '0100000009', group: 'Company', status: 'Active',
+  isCustomer: false, isSupplier: true,
+};
+const paged = (item: CustomerListItem): PagedResult<CustomerListItem> => ({
+  items: [item], page: 1, pageSize: 20, totalItems: 1, totalPages: 1, hasNextPage: false, hasPreviousPage: false,
+});
+vi.mock('@/features/customers/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof CustomerHooks>()),
+  useCreateCustomer: () => createMutation(createCustomerMock),
+  useCustomers: () => ({ data: paged(customerRow), isLoading: false }),
+}));
+vi.mock('@/features/suppliers/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof SupplierHooks>()),
+  useCreateSupplier: () => createMutation(createSupplierMock),
+  useSuppliers: () => ({ data: paged(supplierRow), isLoading: false }),
+}));
+vi.mock('@/features/customers/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof CustomerApi>();
+  return { ...actual, customersApi: { ...actual.customersApi, get: (...args: unknown[]) => customerGetMock(...args) } };
+});
+vi.mock('@/features/suppliers/api', async (importOriginal) => {
+  const actual = await importOriginal<typeof SupplierApi>();
+  return { ...actual, suppliersApi: { ...actual.suppliersApi, get: (...args: unknown[]) => supplierGetMock(...args) } };
+});
+
 const WH1 = '11111111-1111-4111-8111-111111111111';
 const R_IN = '22222222-2222-4222-8222-222222222222';
 const R_IN2 = '22222222-2222-4222-8222-222222222223';
 const R_OUT = '22222222-2222-4222-8222-222222222224';
 const R_IN_CUSTOMER = '22222222-2222-4222-8222-222222222225';
 const R_OUT_GIFT = '22222222-2222-4222-8222-222222222226';
+const R_OUT_RETURN = '22222222-2222-4222-8222-222222222227';
+const R_OUT_ANY = '22222222-2222-4222-8222-222222222228';
 const PM1 = '33333333-3333-4333-8333-333333333333';
 const PM_BANK = '33333333-3333-4333-8333-333333333334';
 const PM_NONE = '33333333-3333-4333-8333-333333333335';
@@ -164,7 +216,12 @@ const reasons: StockReason[] = [
   { id: R_IN_CUSTOMER, code: 'NTL', name: 'Nhập hàng trả lại', direction: 'In', partnerType: 'Customer', debtEffect: 'ReceivableDecrease', isSystem: true },
   { id: R_OUT, code: 'XBH', name: 'Xuất bán hàng', direction: 'Out', partnerType: 'Customer', debtEffect: 'ReceivableIncrease', isSystem: true },
   { id: R_OUT_GIFT, code: 'XBT', name: 'Xuất biếu tặng', direction: 'Out', partnerType: 'Customer', debtEffect: 'None', isSystem: false },
+  { id: R_OUT_RETURN, code: 'XTN', name: 'Xuất trả hàng NCC', direction: 'Out', partnerType: 'Supplier', debtEffect: 'PayableDecrease', isSystem: true },
 ];
+// A reason for any partner and without a debt effect.
+const outAnyReason: StockReason = {
+  id: R_OUT_ANY, code: 'XK', name: 'Xuất khác', direction: 'Out', partnerType: 'Any', debtEffect: 'None', isSystem: false,
+};
 
 function fund(id: string, code: string, kind: Fund['kind'], extra: Partial<Fund> = {}): Fund {
   return { id, branchId: 'b1', code, name: code, kind, isDefault: false, openingAmount: 0, isActive: true, ...extra };
@@ -189,7 +246,7 @@ vi.mock('@/features/warehouses/hooks', () => ({ useWarehouses: () => ({ data: wa
 vi.mock('@/features/stock-reasons/hooks', () => ({
   useStockReasons: (params: unknown) => {
     useStockReasonsMock(params);
-    return { data: reasons };
+    return { data: reasonsState.override ?? reasons };
   },
 }));
 vi.mock('@/features/payment-methods/hooks', () => ({
@@ -359,6 +416,43 @@ function dialog() {
   return within(screen.getByRole('dialog'));
 }
 
+// Types the code, picks the partner from the open list.
+async function pickPartner(item: PartnerSearchItem) {
+  partnerResults.data = [item];
+  fireEvent.change(byId('stock-partner'), { target: { value: item.code } });
+  fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText(item.code));
+  await waitFor(() => expect(byId('stock-partner').value).toBe(item.code));
+}
+
+// Renders a new stock-in with one filled line, saves it and lets the server answer 400 with these details.
+async function saveWithServerErrors(details: Record<string, string[]>) {
+  createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', details));
+  renderPage('In');
+  await fillPerUnitLine(3);
+  await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
+  fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+}
+
+// What the quick add dialog's inner form gives its fields (it uses global ids): the page must not use them.
+const QUICK_ADD_IDS = [
+  'code', 'name', 'taxCode', 'phoneNumber', 'email', 'group', 'creditDays', 'contactPerson', 'companyAddress',
+  'defaultShippingAddress', 'note', 'role-customer', 'role-supplier',
+];
+
+function record(over: Partial<Customer> = {}): Customer {
+  return {
+    id: 'new-1',
+    code: 'NCC9',
+    name: 'Công ty mới',
+    group: 'Company',
+    status: 'Active',
+    createdAt: '2026-10-01T00:00:00Z',
+    isCustomer: false,
+    isSupplier: true,
+    ...over,
+  };
+}
+
 describe('StockVoucherFormPage', () => {
   beforeEach(() => {
     printProps = {};
@@ -379,6 +473,12 @@ describe('StockVoucherFormPage', () => {
     defaultsMock.mockReset();
     defaultsMock.mockImplementation((type: 'In' | 'Out', voucherAt?: string) => defaultsResult(type, voucherAt));
     partnerResults.data = [];
+    partnerSearchMock.mockReset();
+    reasonsState.override = null;
+    createCustomerMock.mockReset();
+    createSupplierMock.mockReset();
+    customerGetMock.mockReset();
+    supplierGetMock.mockReset();
     paymentMethodsState.data = PAYMENT_METHODS;
     permissionState.granted = null;
     partnerSummaryMock.mockReset();
@@ -883,18 +983,306 @@ describe('StockVoucherFormPage', () => {
     expect(screen.queryByRole('heading', { name: /Phiếu nhập kho/ })).not.toBeInTheDocument();
   });
 
-  it('switching to a reason of another partner role clears a partner without that role', async () => {
-    partnerResults.data = [supplier];
-    renderPage('In');
+  describe('shared partner field', () => {
+    it('renders no element with an id the quick add dialog uses', () => {
+      renderPage('In');
 
-    fireEvent.change(byId('stock-partner'), { target: { value: 'NCC' } });
-    fireEvent.mouseDown(within(await screen.findByRole('listbox')).getByText('NCC01'));
-    await waitFor(() => expect(byId('stock-partner-name').value).toBe(supplier.name));
+      for (const id of QUICK_ADD_IDS) expect(document.getElementById(id), `#${id}`).toBeNull();
+    });
 
-    fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
+    it('the partner search does not depend on the reason', async () => {
+      renderPage('In');
+      fireEvent.change(byId('stock-partner'), { target: { value: 'NCC' } });
+      await waitFor(() => expect(partnerSearchMock).toHaveBeenLastCalledWith('In', 'NCC', undefined, true));
 
-    await waitFor(() => expect(byId('stock-partner-name').value).toBe(''));
-    expect(byId('stock-partner').value).toBe('');
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
+      fireEvent.change(byId('stock-partner'), { target: { value: 'NCCX' } });
+
+      await waitFor(() => expect(partnerSearchMock).toHaveBeenLastCalledWith('In', 'NCCX', undefined, true));
+      for (const call of partnerSearchMock.mock.calls) expect(call[2]).toBeUndefined();
+    });
+  });
+
+  describe('reason match when a partner is picked', () => {
+    it('a supplier-only partner switches a customer reason to the first supplier reason, says so and flashes the select', async () => {
+      renderPage('Out');
+      expect(byId('stock-reason').value).toBe(R_OUT);
+
+      await pickPartner(supplier);
+
+      await waitFor(() => expect(byId('stock-reason').value).toBe(R_OUT_RETURN));
+      const notice = screen.getByText('Đã đổi lý do cho hợp với NCC01 (nhà cung cấp).');
+      expect(notice).toHaveAttribute('role', 'status');
+      expect(byId('stock-reason')).toHaveClass('ring-amber-400');
+    });
+
+    it('falls back to a reason for any partner when no reason fits the role', async () => {
+      reasonsState.override = [...reasons.filter((r) => r.id !== R_OUT_RETURN), outAnyReason];
+      renderPage('Out');
+
+      await pickPartner(supplier);
+
+      await waitFor(() => expect(byId('stock-reason').value).toBe(R_OUT_ANY));
+      expect(screen.getByText('Đã đổi lý do cho hợp với NCC01 (nhà cung cấp).')).toBeInTheDocument();
+    });
+
+    it('a customer keeps the customer reason and shows no notice', async () => {
+      renderPage('Out');
+
+      await pickPartner(customer);
+
+      expect(byId('stock-reason').value).toBe(R_OUT);
+      expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+      expect(byId('stock-reason')).not.toHaveClass('ring-amber-400');
+    });
+
+    it('matches an empty reason too', async () => {
+      renderPage('Out');
+      fireEvent.change(byId('stock-reason'), { target: { value: '' } });
+
+      await pickPartner(customer);
+
+      await waitFor(() => expect(byId('stock-reason').value).toBe(R_OUT));
+      expect(screen.getByText('Đã đổi lý do cho hợp với KH01 (khách hàng).')).toHaveAttribute('role', 'status');
+    });
+
+    it('changing the reason by hand removes the notice', async () => {
+      renderPage('Out');
+      await pickPartner(supplier);
+      await screen.findByText('Đã đổi lý do cho hợp với NCC01 (nhà cung cấp).');
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_OUT_RETURN } });
+
+      expect(screen.queryByText(/Đã đổi lý do/)).toBeNull();
+    });
+  });
+
+  describe('a reason change keeps the partner', () => {
+    const MISMATCH = 'Lý do "Nhập hàng trả lại" cần khách hàng — NCC01 không phải khách hàng';
+
+    it('keeps a partner without the new reason\'s role and warns in red; changing back removes the line', async () => {
+      renderPage('In');
+      await pickPartner(supplier);
+      expect(screen.queryByText(MISMATCH)).toBeNull();
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
+
+      expect(byId('stock-partner').value).toBe('NCC01');
+      expect(byId('stock-partner-name').value).toBe(supplier.name);
+      expect(screen.getByText(MISMATCH)).toHaveClass('text-destructive');
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN } });
+
+      expect(screen.queryByText(MISMATCH)).toBeNull();
+      expect(byId('stock-partner').value).toBe('NCC01');
+    });
+
+    it('clears the partner when the new reason needs none', async () => {
+      renderPage('In');
+      await pickPartner({ ...supplier, companyAddress: '12 Lê Lợi' });
+      await waitFor(() => expect(byId('stock-partner-address').value).toBe('12 Lê Lợi'));
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN2 } });
+
+      await waitFor(() => expect(byId('stock-partner').value).toBe(''));
+      expect(byId('stock-partner-name').value).toBe('');
+      expect(byId('stock-partner-address').value).toBe('');
+      expect(screen.queryByText(MISMATCH)).toBeNull();
+    });
+
+    it('a partner restored from the draft (roles known) behaves the same', async () => {
+      localStorage.setItem(
+        'stock_voucher_draft_In_user-test_b1',
+        JSON.stringify({
+          savedAt: DEFAULT_AT,
+          values: {
+            ...toFormDefaults(undefined, defaultsFor('In')),
+            reasonId: R_IN_CUSTOMER,
+            partnerId: supplier.id,
+            partnerName: supplier.name,
+          },
+          selectedPartner: { id: supplier.id, code: supplier.code, name: supplier.name, isCustomer: false, isSupplier: true },
+        }),
+      );
+      renderPage('In');
+
+      expect(byId('stock-partner').value).toBe('NCC01');
+      expect(screen.getByText(MISMATCH)).toBeInTheDocument();
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN } });
+
+      expect(screen.queryByText(MISMATCH)).toBeNull();
+    });
+
+    it('a saved voucher\'s partner (roles unknown) gets no red line', () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ partnerId: supplier.id, partnerCode: supplier.code, partnerName: supplier.name });
+      renderPage('In');
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
+
+      expect(byId('stock-reason').value).toBe(R_IN_CUSTOMER);
+      expect(byId('stock-partner').value).toBe('NCC01');
+      expect(screen.queryByText(/cần khách hàng/)).toBeNull();
+    });
+  });
+
+  describe('server partner error', () => {
+    it('focuses the partner field for a partnerId server error, even with a tab error', async () => {
+      await saveWithServerErrors({ partnerId: ['Đối tượng không hợp lệ'], fundId: ['Quỹ không hợp lệ'] });
+      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
+      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+    });
+
+    it('shows under the partner row and focuses the partner code; changing the reason clears it', async () => {
+      await saveWithServerErrors({ partnerId: ['Đối tượng không hợp lệ'] });
+
+      const message = await screen.findByText('Đối tượng không hợp lệ');
+      expect(message).toHaveClass('text-destructive');
+      expect(byId('stock-partner')).toHaveAttribute('aria-describedby', message.id);
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
+
+      await waitFor(() => expect(screen.queryByText('Đối tượng không hợp lệ')).toBeNull());
+    });
+
+    it('with a line error: both messages show, the lines tab is active with its dot, the focus is on the partner', async () => {
+      createMock.mockRejectedValueOnce(
+        apiError(400, 'VALIDATION', { partnerId: ['Đối tượng không hợp lệ'], 'lines[0].quantity': ['Số lượng không hợp lệ'] }),
+      );
+      renderPage('In');
+      await fillPerUnitLine(3);
+      fireEvent.keyDown(byId('stock-voucher-at'), { key: '3', altKey: true });
+      await waitFor(() => expect(tab(/Thanh toán/)).toHaveAttribute('data-state', 'active'));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      expect(await screen.findByText('Đối tượng không hợp lệ')).toBeInTheDocument();
+      await waitFor(() => expect(tab(/Hàng hóa/)).toHaveAttribute('data-state', 'active'));
+      expect(screen.getByText('Số lượng không hợp lệ')).toBeInTheDocument();
+      expect(screen.getByTestId('tab-error-lines')).toBeInTheDocument();
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
+    });
+  });
+
+  describe('save guard for typed text', () => {
+    const UNPICKED = 'Vui lòng chọn đối tượng từ danh sách';
+
+    it('blocks the save, says so and focuses the code input; clearing the text lets the save through', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderPage('In');
+      await fillPerUnitLine(3);
+      fireEvent.change(byId('stock-partner'), { target: { value: 'zzz' } });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      expect(await screen.findByText(UNPICKED)).toBeInTheDocument();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(createMock).not.toHaveBeenCalled();
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
+
+      fireEvent.change(byId('stock-partner'), { target: { value: '' } });
+      expect(screen.queryByText(UNPICKED)).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+    });
+
+    it('a reason without a partner locks the field and drops its text, so the save goes through', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderPage('In');
+      await fillPerUnitLine(3);
+      fireEvent.change(byId('stock-partner'), { target: { value: 'zzz' } });
+
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN2 } });
+
+      await waitFor(() => expect(byId('stock-partner')).toBeDisabled());
+      expect(byId('stock-partner').value).toBe('');
+      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
+      await waitFor(() => expect(createMock).toHaveBeenCalledTimes(1));
+      expect(screen.queryByText(UNPICKED)).toBeNull();
+    });
+  });
+
+  describe('quick add and catalog from the stock form', () => {
+    it('F4 creates a partner through the create mock, selects it, runs the reason match and never saves the voucher', async () => {
+      createSupplierMock.mockResolvedValue(record());
+      createMock.mockResolvedValue(voucher());
+      renderPage('In');
+      await fillPerUnitLine(3);
+      // A customer reason: the quick add starts as a customer and the new supplier does not fit the reason.
+      fireEvent.change(byId('stock-reason'), { target: { value: R_IN_CUSTOMER } });
+      fireEvent.change(byId('stock-partner'), { target: { value: 'Công ty mới' } });
+
+      fireEvent.keyDown(byId('stock-partner'), { key: 'F4' });
+
+      expect(await screen.findByText('Thêm nhanh đối tượng')).toBeInTheDocument();
+      await waitFor(() => expect(byId('name')).toHaveFocus());
+      expect(byId('name').value).toBe('Công ty mới');
+      fireEvent.click(byId('role-supplier'));
+      fireEvent.click(byId('role-customer'));
+      fireEvent.keyDown(byId('name'), { key: 'Enter', ctrlKey: true });
+
+      await waitFor(() => expect(createSupplierMock).toHaveBeenCalledTimes(1));
+      expect(createCustomerMock).not.toHaveBeenCalled();
+      await waitFor(() => expect(byId('stock-partner').value).toBe('NCC9'));
+      expect(byId('stock-partner-name').value).toBe('Công ty mới');
+      expect(byId('stock-reason').value).toBe(R_IN);
+      expect(screen.getByText('Đã đổi lý do cho hợp với NCC9 (nhà cung cấp).')).toBeInTheDocument();
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await waitFor(() => expect(byId('stock-partner-name')).toHaveFocus());
+      expect(createMock).not.toHaveBeenCalled();
+    });
+
+    it('Ctrl+S and Enter inside the open quick add dialog do not save the voucher', async () => {
+      createMock.mockResolvedValue(voucher());
+      renderPage('In');
+      await fillPerUnitLine(3);
+      fireEvent.change(byId('stock-partner'), { target: { value: 'abc' } });
+      fireEvent.keyDown(byId('stock-partner'), { key: 'F4' });
+      await screen.findByText('Thêm nhanh đối tượng');
+      await waitFor(() => expect(byId('name')).toHaveFocus());
+
+      fireEvent.keyDown(byId('name'), { key: 's', ctrlKey: true });
+      fireEvent.keyDown(byId('name'), { key: 'Enter' });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(createMock).not.toHaveBeenCalled();
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    });
+
+    it('a catalog pick returns creditDays, which drive the due date', async () => {
+      supplierGetMock.mockResolvedValue(
+        record({ id: 'cat-9', code: 'NCC-009', name: 'Nhà máy Sơn', isSupplier: true, creditDays: 30 }),
+      );
+      renderPage('In');
+      fireEvent.change(byId('stock-voucher-at'), { target: { value: '2026-10-07T08:30' } });
+      expect(byId('stock-due-date').value).toBe('');
+      fireEvent.change(byId('stock-partner'), { target: { value: 'abc' } });
+
+      fireEvent.mouseDown(await screen.findByText('Xem danh mục đầy đủ'));
+      fireEvent.click(await dialog().findByText('Nhà máy Sơn'));
+
+      await waitFor(() => expect(supplierGetMock).toHaveBeenCalledWith('cat-9'));
+      await waitFor(() => expect(byId('stock-partner').value).toBe('NCC-009'));
+      await waitFor(() => expect(byId('stock-due-date').value).toBe('2026-11-06'));
+      await waitFor(() => expect(byId('stock-partner-name')).toHaveFocus());
+    });
+
+    it('a read-only voucher has no + button', () => {
+      const { unmount } = renderPage('In');
+      expect(screen.getByRole('button', { name: /Thêm nhanh/ })).toBeInTheDocument();
+      unmount();
+
+      routeParams.id = V1;
+      voucherState.data = voucher({ status: 'Cancelled', canEdit: false });
+      renderPage('In');
+
+      expect(screen.queryByRole('button', { name: /Thêm nhanh/ })).toBeNull();
+    });
   });
 
   it('new voucher sends no excludeVoucherId to stock-at', async () => {
@@ -992,14 +1380,6 @@ describe('StockVoucherFormPage', () => {
   });
 
   describe('server errors clear when the user corrects the field', () => {
-    async function saveWithServerErrors(details: Record<string, string[]>) {
-      createMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', details));
-      renderPage('In');
-      await fillPerUnitLine(3);
-      await waitFor(() => expect(byId('stock-fund').value).toBe(FUND_CASH));
-      fireEvent.click(screen.getByRole('button', { name: 'Lưu tạm' }));
-    }
-
     // A hidden optional column shows only while it has an error: with every column on, a cell stays to be asserted
     // on after its error has gone. Call before rendering.
     const showEveryColumn = () =>
@@ -1007,14 +1387,6 @@ describe('StockVoucherFormPage', () => {
         stockGridPrefsKey('user-test', 'In'),
         JSON.stringify({ version: 1, hiddenColumns: [], enterStops: {} }),
       );
-
-    it('focuses the partner field for a partnerId server error, even with a tab error', async () => {
-      await saveWithServerErrors({ partnerId: ['Đối tượng không hợp lệ'], fundId: ['Quỹ không hợp lệ'] });
-      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
-
-      await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
-      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
-    });
 
     it('the fund error and the tab dot go away when a new payment method auto-fills a fund', async () => {
       await saveWithServerErrors({ fundId: ['Chi nhánh chưa có quỹ mặc định loại ngân hàng.'] });
@@ -2191,9 +2563,7 @@ describe('StockVoucherFormPage', () => {
     await screen.findByRole('listbox');
     fireEvent.keyDown(byId('stock-partner'), { key: 'Enter' });
     await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument());
-    await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
-    fireEvent.keyDown(byId('stock-partner'), { key: 'Enter' });
-    expect(document.activeElement).toBe(byId('stock-partner-name'));
+    await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner-name')));
   });
 
   it('stock-out uses Ngày xuất, Lý do xuất and Người nhận hàng labels', () => {

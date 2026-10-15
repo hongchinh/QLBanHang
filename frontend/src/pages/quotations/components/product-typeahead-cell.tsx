@@ -2,10 +2,14 @@ import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from
 import { createPortal } from 'react-dom';
 import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
+import { StopFormEvents } from '@/components/partner-autocomplete/stop-form-events';
 import { cn } from '@/lib/utils';
+import { useDialogOpening } from '@/lib/use-dialog-opening';
 import { useProductSearch } from '@/features/products/hooks';
 import type { ProductSuggestion } from '@/features/products/types';
 import { ProductCatalogDialog } from '@/features/products/components/product-catalog-dialog';
+import { ProductQuickAddDialog } from '@/features/products/components/product-quick-add-dialog';
+import { useAuthStore } from '@/stores/auth-store';
 
 interface Props {
   value: string;
@@ -19,7 +23,11 @@ interface Props {
   nextFocusId?: string;
   /** Mở danh sách gợi ý khi ô nhận focus. Mặc định true (báo giá giữ nguyên). */
   openOnFocus?: boolean;
+  /** Dòng "Thêm mới hàng hóa" và F4 (cần quyền products.create). Mặc định tắt. */
+  allowQuickAdd?: boolean;
 }
+
+type ListRow = { kind: 'result'; item: ProductSuggestion } | { kind: 'addNew' };
 
 const PRICING_LABEL: Record<ProductSuggestion['pricingMode'], string> = {
   PerUnit: 'ĐV',
@@ -54,10 +62,13 @@ export function ProductTypeaheadCell({
   inputId,
   nextFocusId,
   openOnFocus = true,
+  allowQuickAdd = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [catalogOpen, setCatalogOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  // An Enter that came before the results of the typed text; settled once they arrive.
+  const [enterWaiting, setEnterWaiting] = useState(false);
   const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
   const [placement, setPlacement] = useState<Placement>({ above: false });
   const containerRef = useRef<HTMLDivElement>(null);
@@ -70,6 +81,20 @@ export function ProductTypeaheadCell({
   const items = search.data ?? [];
   const isLoading = search.isLoading && value.trim().length >= 1;
   const isError = search.isError;
+  // Pending: the results shown are not (yet) the results of the typed text.
+  const pending = value.trim() !== (search.settledQuery ?? value).trim() || !!search.isFetching;
+
+  // Every quick add branch (F4, waiting Enter, the add row) hangs on canAdd; without it the cell works as before.
+  const canCreate = useAuthStore((s) => s.hasPermission('products.create'));
+  const canAdd = !!allowQuickAdd && canCreate;
+  const quickAdd = useDialogOpening();
+  // The product a save in the quick add dialog created; picked once the dialog has closed.
+  const createdRef = useRef<ProductSuggestion | null>(null);
+
+  const rows: ListRow[] = items.map((item) => ({ kind: 'result', item }));
+  if (canAdd && !isLoading && !isError && !pending && value.trim() !== '') rows.push({ kind: 'addNew' });
+  const addNewId = `${listboxId}-add-new`;
+  const rowId = (row: ListRow) => (row.kind === 'result' ? `product-option-${row.item.id}` : addNewId);
 
   const syncDropdownRect = useCallback(() => {
     setDropdownRect(inputRef.current?.getBoundingClientRect() ?? null);
@@ -81,6 +106,7 @@ export function ProductTypeaheadCell({
       if (containerRef.current?.contains(target)) return;
       if (dropdownRef.current?.contains(target)) return;
       setOpen(false);
+      setEnterWaiting(false);
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
@@ -111,18 +137,19 @@ export function ProductTypeaheadCell({
     const available = flip ? above : below;
     const next: Placement = { above: flip, maxHeight: natural > available ? Math.max(available, 0) : undefined };
     setPlacement((prev) => (prev.above === next.above && prev.maxHeight === next.maxHeight ? prev : next));
-  }, [showDropdown, dropdownRect, items.length, isLoading, isError]);
+  }, [showDropdown, dropdownRect, rows.length, isLoading, isError]);
 
   useEffect(() => {
-    if (highlightedIndex >= items.length) setHighlightedIndex(0);
-  }, [items.length, highlightedIndex]);
+    if (highlightedIndex >= rows.length) setHighlightedIndex(0);
+  }, [rows.length, highlightedIndex]);
 
   // Keep the highlighted option inside the scrolling list.
-  const highlightedId = items[highlightedIndex]?.id;
+  const highlightedRow = rows[highlightedIndex];
+  const highlightedId = highlightedRow ? rowId(highlightedRow) : undefined;
   useEffect(() => {
     if (!open || !highlightedId) return;
     const list = dropdownRef.current;
-    const option = document.getElementById(`product-option-${highlightedId}`);
+    const option = document.getElementById(highlightedId);
     if (!list || !option) return;
     // Scroll by hand: scrollIntoView would leave the option under the sticky table header.
     const header = list.querySelector('thead')?.getBoundingClientRect().height ?? 0;
@@ -155,42 +182,86 @@ export function ProductTypeaheadCell({
     [onSelect, nextFocusId],
   );
 
+  // The add row and F4: the dialog starts from the typed text.
+  function openQuickAdd() {
+    setOpen(false);
+    setEnterWaiting(false);
+    quickAdd.show(value.trim());
+  }
+
+  // The results of a waiting Enter arrived: exact code, else the first result, else just show the add row.
+  function settleWaitingEnter() {
+    setEnterWaiting(false);
+    const upper = value.trim().toUpperCase();
+    const pick = items.find((s) => s.code.toUpperCase() === upper) ?? items[0];
+    if (pick) {
+      commit(pick);
+    } else {
+      setOpen(true);
+      setHighlightedIndex(0);
+    }
+  }
+  const settleWaitingEnterRef = useRef(settleWaitingEnter);
+  useEffect(() => {
+    settleWaitingEnterRef.current = settleWaitingEnter;
+  });
+  useEffect(() => {
+    if (enterWaiting && !pending) settleWaitingEnterRef.current();
+  }, [enterWaiting, pending, search.data]);
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!open || items.length === 0) {
+    if (e.key === 'F4') {
+      if (!canAdd) return;
+      e.preventDefault();
+      openQuickAdd();
+      return;
+    }
+    // Enter before the results of the typed text: wait for them rather than act on older ones.
+    if (e.key === 'Enter' && open && canAdd && value.trim() !== '' && pending) {
+      e.preventDefault();
+      setEnterWaiting(true);
+      return;
+    }
+    if (!open || rows.length === 0) {
       if (e.key === 'Escape' && open) {
         e.preventDefault();
         setOpen(false);
+        setEnterWaiting(false);
       }
       return;
     }
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setHighlightedIndex((i) => (i + 1) % items.length);
+        setHighlightedIndex((i) => (i + 1) % rows.length);
         break;
       case 'ArrowUp':
         e.preventDefault();
-        setHighlightedIndex((i) => (i - 1 + items.length) % items.length);
+        setHighlightedIndex((i) => (i - 1 + rows.length) % rows.length);
         break;
       case 'Tab':
         e.preventDefault();
         setHighlightedIndex((i) =>
-          e.shiftKey ? (i - 1 + items.length) % items.length : (i + 1) % items.length,
+          e.shiftKey ? (i - 1 + rows.length) % rows.length : (i + 1) % rows.length,
         );
         break;
-      case 'Enter':
+      case 'Enter': {
         e.preventDefault();
-        commit(items[highlightedIndex]);
+        const row = rows[highlightedIndex];
+        if (!row) break;
+        if (row.kind === 'result') commit(row.item);
+        else openQuickAdd();
         break;
+      }
       case 'Escape':
         e.preventDefault();
         setOpen(false);
+        setEnterWaiting(false);
         break;
     }
   }
 
-  const activeOptionId =
-    open && items[highlightedIndex] ? `product-option-${items[highlightedIndex].id}` : undefined;
+  const activeOptionId = open && highlightedId ? highlightedId : undefined;
 
   const triggerProps = {
     ref: inputRef,
@@ -208,6 +279,7 @@ export function ProductTypeaheadCell({
     },
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange(e.target.value);
+      setEnterWaiting(false);
       syncDropdownRect();
       setOpen(true);
     },
@@ -259,6 +331,12 @@ export function ProductTypeaheadCell({
               chọn
               <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">Esc</kbd>
               đóng
+              {canAdd && (
+                <>
+                  <kbd className="rounded border bg-background px-1 py-0.5 font-mono text-[10px]">F4</kbd>
+                  thêm mới
+                </>
+              )}
             </span>
           </div>
           {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- WAI-ARIA combobox listbox pattern */}
@@ -324,6 +402,32 @@ export function ProductTypeaheadCell({
                     </tr>
                   );
                 })}
+              {rows[rows.length - 1]?.kind === 'addNew' && (
+                <tr
+                  id={addNewId}
+                  role="option"
+                  aria-selected={highlightedIndex === rows.length - 1}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    openQuickAdd();
+                  }}
+                  onMouseEnter={() => setHighlightedIndex(rows.length - 1)}
+                  className={cn(
+                    'cursor-pointer border-t',
+                    highlightedIndex === rows.length - 1 && 'qldh-lookup-row-highlight',
+                  )}
+                >
+                  <td colSpan={5} className="px-2 py-1.5">
+                    <span className="flex items-center gap-2">
+                      <AppIcon name="add" size={14} />
+                      <span>{`Thêm mới hàng hóa "${value.trim()}"`}</span>
+                      <kbd className="ml-auto rounded border bg-background px-1 py-0.5 font-mono text-[10px]">
+                        {items.length === 0 ? 'Enter / F4' : 'F4'}
+                      </kbd>
+                    </span>
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
           {/* Catalog browser button */}
@@ -359,6 +463,31 @@ export function ProductTypeaheadCell({
           setCatalogOpen(false);
         }}
       />
+      <StopFormEvents>
+        <ProductQuickAddDialog
+          open={quickAdd.open}
+          onOpenChange={quickAdd.onOpenChange}
+          seed={quickAdd.seed}
+          onCreated={(s) => {
+            if (quickAdd.isCurrent()) createdRef.current = s;
+          }}
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            const created = createdRef.current;
+            createdRef.current = null;
+            if (created) {
+              commit(created);
+              // Without nextFocusId (opening stock) the focus stays in the cell, as after a pick from the list;
+              // commit has set pickedAtRef, so the list does not reopen. With nextFocusId, commit moves on.
+              if (!nextFocusId) inputRef.current?.focus();
+              return;
+            }
+            // Cancel: back to the cell with the typed text, the list stays closed.
+            pickedAtRef.current = performance.now();
+            inputRef.current?.focus();
+          }}
+        />
+      </StopFormEvents>
     </div>
   );
 }

@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import type * as DialogModule from '@/components/ui/dialog';
+import type { ProductQuickAddDialogProps } from '@/features/products/components/product-quick-add-dialog';
 import type { ProductSuggestion } from '@/features/products/types';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
 
@@ -24,8 +26,53 @@ const sheet: ProductSuggestion = {
   priceIncludesVat: true,
 };
 
+const created: ProductSuggestion = { ...sheet, id: '44444444-4444-4444-4444-444444444444', code: 'TL-50', name: 'Tôn lạnh 0.50' };
+
+interface SearchState {
+  data: ProductSuggestion[] | undefined;
+  isLoading: boolean;
+  isError: boolean;
+  isFetching: boolean;
+  /** Undefined: the results belong to the text shown. */
+  settledQuery: string | undefined;
+}
+const settledSearch = (): SearchState => ({ data: [sheet], isLoading: false, isError: false, isFetching: false, settledQuery: undefined });
+let searchState = settledSearch();
+
+let permissions: string[] = [];
+vi.mock('@/stores/auth-store', () => ({
+  useAuthStore: (selector: (s: { hasPermission: (p: string) => boolean; isInRole: () => boolean }) => unknown) =>
+    selector({ hasPermission: (p) => permissions.includes(p), isInRole: () => false }),
+}));
+
+// Stands in for the real form: a save hands back `created`, then closes, as the real dialog does.
+vi.mock('@/features/products/components/product-quick-add-dialog', async () => {
+  const ui = await vi.importActual<typeof DialogModule>('@/components/ui/dialog');
+  return {
+    ProductQuickAddDialog: ({ open, onOpenChange, seed, onCreated, onCloseAutoFocus }: ProductQuickAddDialogProps) => (
+      <ui.Dialog open={open} onOpenChange={onOpenChange}>
+        <ui.DialogContent aria-describedby={undefined} onCloseAutoFocus={onCloseAutoFocus}>
+          <ui.DialogTitle>Thêm nhanh hàng hóa</ui.DialogTitle>
+          <p data-testid="seed">{seed}</p>
+          <input aria-label="fake field" />
+          <button
+            type="button"
+            onClick={() => {
+              onCreated(created);
+              onOpenChange(false);
+            }}
+          >
+            fake lưu
+          </button>
+          <button type="submit">fake submit</button>
+        </ui.DialogContent>
+      </ui.Dialog>
+    ),
+  };
+});
+
 vi.mock('@/features/products/hooks', () => ({
-  useProductSearch: () => ({ data: [sheet], isLoading: false, isError: false }),
+  useProductSearch: () => searchState,
   // The list of the full catalog ("Xem danh mục đầy đủ").
   useProducts: () => ({ data: { items: [sheet], totalPages: 1, totalItems: 1 }, isLoading: false }),
   useProductGroups: () => ({ data: [] }),
@@ -40,6 +87,11 @@ function renderCell(openOnFocus?: boolean) {
 }
 
 describe('ProductTypeaheadCell', () => {
+  beforeEach(() => {
+    searchState = settledSearch();
+    permissions = [];
+  });
+
   // Quotations rely on this default; the stock grid opts out.
   it('opens the suggestion list when a filled cell takes focus', () => {
     renderCell();
@@ -248,6 +300,261 @@ describe('ProductTypeaheadCell', () => {
       // below: 112, above: 242 -> above, capped to 242 - 4
       expect(box.style.bottom).toBe('154px');
       expect(box.style.maxHeight).toBe('238px');
+    });
+  });
+
+  describe('quick add', () => {
+    const ADD_ROW = 'Thêm mới hàng hóa "TL-50"';
+
+    function setup({
+      allowQuickAdd = true,
+      openOnFocus,
+      nextFocusId,
+    }: { allowQuickAdd?: boolean; openOnFocus?: boolean; nextFocusId?: string } = {}) {
+      const onSelect = vi.fn();
+      const onChange = vi.fn();
+      // A fresh element each time: React skips a re-render of the very same element.
+      const element = () => (
+        <>
+          <ProductTypeaheadCell
+            value="TL-50"
+            onChange={onChange}
+            onSelect={onSelect}
+            inputId="code"
+            nextFocusId={nextFocusId}
+            openOnFocus={openOnFocus}
+            allowQuickAdd={allowQuickAdd}
+          />
+          <input id="next" aria-label="next" />
+        </>
+      );
+      const view = render(element());
+      const input = screen.getByRole('combobox');
+      act(() => input.focus());
+      return { onSelect, onChange, input, rerender: () => view.rerender(element()) };
+    }
+
+    const quickAddDialog = () => screen.queryByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+
+    it('shows no add row and ignores F4 without allowQuickAdd', () => {
+      permissions = ['products.create'];
+      searchState.data = [];
+      const { input } = setup({ allowQuickAdd: false });
+
+      expect(screen.getByRole('listbox')).toBeInTheDocument();
+      expect(screen.queryByText(/Thêm mới hàng hóa/)).toBeNull();
+      fireEvent.keyDown(input, { key: 'F4' });
+      expect(quickAddDialog()).toBeNull();
+    });
+
+    it('shows no add row and ignores F4 without products.create', () => {
+      searchState.data = [];
+      const { input } = setup();
+
+      expect(screen.queryByText(/Thêm mới hàng hóa/)).toBeNull();
+      fireEvent.keyDown(input, { key: 'F4' });
+      expect(quickAddDialog()).toBeNull();
+    });
+
+    describe('with products.create', () => {
+      beforeEach(() => {
+        permissions = ['products.create'];
+      });
+
+      it('highlights the add row when nothing matches, and Enter opens the dialog with the typed text', async () => {
+        searchState.data = [];
+        const { input, onSelect } = setup();
+
+        const addRow = screen.getByRole('option', { name: new RegExp(ADD_ROW) });
+        expect(addRow).toHaveAttribute('aria-selected', 'true');
+        expect(input).toHaveAttribute('aria-activedescendant', addRow.id);
+        expect(screen.getByText('Không tìm thấy sản phẩm phù hợp')).toBeInTheDocument();
+
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' })).toBeInTheDocument();
+        expect(screen.getByTestId('seed')).toHaveTextContent('TL-50');
+        expect(screen.queryByRole('listbox')).toBeNull();
+        expect(onSelect).not.toHaveBeenCalled();
+      });
+
+      it('puts the add row after the results; ArrowDown reaches it and Enter opens the dialog', async () => {
+        const { input, onSelect } = setup();
+        const options = screen.getAllByRole('option');
+        expect(options).toHaveLength(2);
+        expect(options[1]).toHaveTextContent(ADD_ROW);
+        expect(options[0]).toHaveAttribute('aria-selected', 'true');
+
+        fireEvent.keyDown(input, { key: 'ArrowDown' });
+        expect(screen.getByRole('option', { name: new RegExp(ADD_ROW) })).toHaveAttribute('aria-selected', 'true');
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' })).toBeInTheDocument();
+        expect(onSelect).not.toHaveBeenCalled();
+      });
+
+      it('Enter on the first result still picks it', () => {
+        const { input, onSelect } = setup();
+
+        fireEvent.keyDown(input, { key: 'Enter' });
+
+        expect(onSelect).toHaveBeenCalledWith(sheet);
+        expect(quickAddDialog()).toBeNull();
+      });
+
+      it('opens the add row with the mouse', async () => {
+        searchState.data = [];
+        setup();
+
+        fireEvent.mouseDown(screen.getByRole('option', { name: new RegExp(ADD_ROW) }));
+
+        expect(await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' })).toBeInTheDocument();
+      });
+
+      it('F4 opens the dialog with the list closed', async () => {
+        const { input } = setup({ openOnFocus: false });
+        expect(screen.queryByRole('listbox')).toBeNull();
+
+        fireEvent.keyDown(input, { key: 'F4' });
+
+        expect(await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' })).toBeInTheDocument();
+        expect(screen.getByTestId('seed')).toHaveTextContent('TL-50');
+      });
+
+      describe('an Enter before the results of the typed text', () => {
+        beforeEach(() => {
+          searchState = { ...settledSearch(), data: [], settledQuery: 'TL' };
+        });
+
+        it('hides the add row and waits, then picks the result that arrives', () => {
+          const { input, onSelect, rerender } = setup();
+          expect(screen.queryByText(/Thêm mới hàng hóa/)).toBeNull();
+
+          const notCancelled = fireEvent.keyDown(input, { key: 'Enter' });
+          expect(notCancelled).toBe(false);
+          expect(onSelect).not.toHaveBeenCalled();
+          expect(quickAddDialog()).toBeNull();
+
+          searchState = { ...settledSearch(), settledQuery: 'TL-50' };
+          rerender();
+
+          expect(onSelect).toHaveBeenCalledTimes(1);
+          expect(onSelect).toHaveBeenCalledWith(sheet);
+        });
+
+        it('waits on a refetch too', () => {
+          searchState = { ...settledSearch(), data: [], isFetching: true };
+          const { input, onSelect, rerender } = setup();
+          expect(screen.queryByText(/Thêm mới hàng hóa/)).toBeNull();
+
+          expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+
+          searchState = settledSearch();
+          rerender();
+          expect(onSelect).toHaveBeenCalledWith(sheet);
+        });
+
+        it('with no result arriving, keeps the list open on the add row and opens no dialog', () => {
+          const { input, onSelect, rerender } = setup();
+          fireEvent.keyDown(input, { key: 'Enter' });
+
+          searchState = { ...settledSearch(), data: [], settledQuery: 'TL-50' };
+          rerender();
+
+          expect(onSelect).not.toHaveBeenCalled();
+          expect(screen.getByRole('option', { name: new RegExp(ADD_ROW) })).toHaveAttribute('aria-selected', 'true');
+          expect(quickAddDialog()).toBeNull();
+        });
+      });
+
+      describe('the dialog closing', () => {
+        it('after a save, picks the new product once, after the dialog has closed, and moves to nextFocusId', async () => {
+          const { input, onSelect } = setup({ nextFocusId: 'next' });
+          let dialogAtPick: Element | null = null;
+          onSelect.mockImplementation(() => {
+            dialogAtPick = document.querySelector('[role="dialog"]');
+          });
+          fireEvent.keyDown(input, { key: 'F4' });
+          await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+
+          fireEvent.click(screen.getByRole('button', { name: 'fake lưu' }));
+
+          await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
+          expect(onSelect).toHaveBeenCalledWith(created);
+          expect(dialogAtPick).toBeNull();
+          await waitFor(() => expect(document.getElementById('next')).toHaveFocus());
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          expect(onSelect).toHaveBeenCalledTimes(1);
+        });
+
+        it('after a save without nextFocusId, leaves the focus in the cell with the list closed', async () => {
+          const { input, onSelect } = setup();
+          fireEvent.keyDown(input, { key: 'F4' });
+          await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+
+          fireEvent.click(screen.getByRole('button', { name: 'fake lưu' }));
+
+          await waitFor(() => expect(onSelect).toHaveBeenCalledWith(created));
+          await waitFor(() => expect(input).toHaveFocus());
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          expect(screen.queryByRole('listbox')).toBeNull();
+          expect(onSelect).toHaveBeenCalledTimes(1);
+        });
+
+        it('on Esc, picks nothing and gives the focus back to the cell with its text and the list closed', async () => {
+          const user = userEvent.setup();
+          const { input, onSelect, onChange } = setup();
+          fireEvent.keyDown(input, { key: 'F4' });
+          await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+
+          await user.keyboard('{Escape}');
+
+          await waitFor(() => expect(quickAddDialog()).toBeNull());
+          await waitFor(() => expect(input).toHaveFocus());
+          await new Promise((resolve) => setTimeout(resolve, 20));
+          expect(onSelect).not.toHaveBeenCalled();
+          expect(onChange).not.toHaveBeenCalled();
+          expect(input).toHaveValue('TL-50');
+          expect(screen.queryByRole('listbox')).toBeNull();
+        });
+      });
+
+      it('keeps keys and submit of the dialog away from the voucher form', async () => {
+        const submitSpy = vi.fn((e: React.FormEvent) => e.preventDefault());
+        const keySpy = vi.fn();
+        render(
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the test stands in for the voucher form.
+          <form onSubmit={submitSpy} onKeyDown={keySpy}>
+            <ProductTypeaheadCell value="TL-50" onChange={vi.fn()} onSelect={vi.fn()} inputId="code" allowQuickAdd />
+          </form>,
+        );
+        const input = screen.getByRole('combobox');
+        act(() => input.focus());
+        fireEvent.keyDown(input, { key: 'F4' });
+        const dialog = await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+        keySpy.mockClear();
+
+        fireEvent.keyDown(within(dialog).getByLabelText('fake field'), { key: 'Enter' });
+        fireEvent.keyDown(within(dialog).getByLabelText('fake field'), { key: 's', ctrlKey: true });
+        fireEvent.submit(within(dialog).getByRole('button', { name: 'fake submit' }));
+        await userEvent.setup().click(within(dialog).getByRole('button', { name: 'fake submit' }));
+
+        expect(keySpy).not.toHaveBeenCalled();
+        expect(submitSpy).not.toHaveBeenCalled();
+      });
+    });
+
+    it('without allowQuickAdd, an Enter before the results passes through to the grid and picks nothing', () => {
+      permissions = ['products.create'];
+      searchState = { ...settledSearch(), data: [], settledQuery: 'TL' };
+      const { input, onSelect, rerender } = setup({ allowQuickAdd: false });
+
+      const notCancelled = fireEvent.keyDown(input, { key: 'Enter' });
+      expect(notCancelled).toBe(true);
+
+      searchState = { ...settledSearch(), settledQuery: 'TL-50' };
+      rerender();
+      expect(onSelect).not.toHaveBeenCalled();
     });
   });
 });

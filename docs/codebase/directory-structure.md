@@ -131,7 +131,6 @@ frontend/src/
 │   ├── auth/                    # permission-aware UI helpers
 │   ├── confirm-required-dialog/ # dialog for confirmable/blocked 422 responses
 │   ├── activity-history/        # ActivityHistory: activity list of a document
-│   ├── customer-autocomplete/   # quotation customer picker + quick add
 │   ├── icons/                   # icon-registry.ts (business name → lucide drawing + tone, the only lucide-react importer), AppIcon, and the tests that block direct lucide imports and glyph-character icons
 │   ├── layout/                  # app shell, header (header/header-branch-switcher.tsx marks a demo branch "(demo)"),
 │   │                            # sidebar, search, notifications
@@ -139,7 +138,10 @@ frontend/src/
 │   │   └── sidebar/             # sidebar (wide), sidebar-rail + sidebar-flyout (collapsed), sidebar-search,
 │   │                            # sidebar-pin-chips, sidebar-group, sidebar-item, nav-search.ts (pure filter/highlight/active item)
 │   ├── money-cell/              # MoneyCell, CellError: editable money cell of the line and allocation grids
-│   ├── partner-autocomplete/    # customer/supplier picker for cash and debt screens
+│   ├── partner-autocomplete/    # the shared partner picker: partner-autocomplete.tsx (code combobox: rows, Enter rules, F4),
+│   │                            # partner-code-name-field.tsx (label + code + name; owns the dialogs; vouchers and quotations),
+│   │                            # partner-quick-add-dialog.tsx, partner-catalog-dialog.tsx + partner-catalog-list.tsx,
+│   │                            # stop-form-events.tsx, use-unpicked-partner-guard.ts, search-summary.ts
 │   ├── period-preset-select/    # PeriodPresetSelect: month / quarter / year presets of a report date range
 │   ├── report-scope-select/     # ReportScopeSelect and useReportScope: Branch / Company scope of a report, kept in the URL
 │   ├── search-combobox/         # generic search combobox behind DebtPartnerPicker and the ledger PartnerPicker
@@ -158,14 +160,18 @@ frontend/src/
 │   │                            # sample-data.ts (branchesRefetchInterval: poll while a branch is Running),
 │   │                            # useDemoBranchDeletionPreview / useDeleteDemoBranch, keys.ts branchKeys.demoDeletion
 │   ├── branding/
-│   ├── cash-common/             # ['cash'] root key, shared cash/debt types and labels
+│   ├── cash-common/             # ['cash'] root key, shared cash/debt types and labels; reason-match.ts (required role per reason,
+│   │                            # reason auto-match), reason-notice.ts + reason-notice-line.tsx (the line under the reason select),
+│   │                            # use-reason-notice.ts (useReasonSwitchNotice: text and 1.6 s flash)
 │   ├── cash-reasons/
 │   ├── cash-reports/            # debt balance, debt ledger and cash book queries
 │   ├── cash-settings/           # credit-limit and negative-fund policies
-│   ├── cash-vouchers/           # receipts/payments, allocation helpers, schema, payload
+│   ├── cash-vouchers/           # receipts/payments, allocation helpers, schema, payload; auto-text.ts + use-cash-auto-text.ts
+│   │                            # ("reason - partner" text of Lý do nộp/chi and the line descriptions)
 │   ├── company-profile/         # Thông tin đơn vị: GET/PUT /settings/company
 │   ├── credit-limits/
-│   ├── customers/
+│   ├── customers/               # also partner-search-item.ts (customer record to search item), use-partner-permissions.ts
+│   │                            # (create/view of customers and suppliers), use-quotation-customer-search.ts
 │   ├── dashboard/               # quotation dashboards; format.ts (also compact money and percent) and the shared tiles
 │   │                            # in components/: TileCard (+ TileError), StatTile, LiveStatus, RangePicker (optional
 │   │                            # `presets`); stat-tile-state.ts (statTileState: the StatTile props that follow a query)
@@ -199,7 +205,8 @@ frontend/src/
 │   ├── admin/
 │   ├── cash-reasons/
 │   ├── cash-reports/            # /reports/debt-balance, /reports/debt-ledger, /reports/cash-book
-│   ├── cash-vouchers/           # /receipts and /payments list + form, allocation grid
+│   ├── cash-vouchers/           # /receipts and /payments list + form, allocation grid; utils/cash-navigation.ts (Enter order of the
+│   │                            # header fields and the line grid, cashLineCellId)
 │   ├── credit-limits/
 │   ├── customers/
 │   ├── debt/                    # /debt/opening, /debt/matching, /debt/offsets list + form
@@ -230,7 +237,8 @@ frontend/src/
 ├── lib/                         # includes date-only.ts, to-number.ts, money-input.ts, vn-datetime.ts,
 │                                # report-scope.ts, period-presets.ts, blob-error.ts, date-range-presets.ts (dashboard
 │                                # and quotation range presets), realtime-bus.ts (hub status and dashboard signal),
-│                                # blob-download.ts (requestBlob, saveBlob), pdf-tab.ts (openPdfTab), use-row-selection.ts
+│                                # blob-download.ts (requestBlob, saveBlob), pdf-tab.ts (openPdfTab), use-row-selection.ts,
+│                                # enter-focus.ts (focusNextInOrder, focusById)
 ├── styles/
 └── test/
 ```

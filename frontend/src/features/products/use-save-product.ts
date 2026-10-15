@@ -5,7 +5,7 @@ import { lookupKeys, productKeys } from '@/features/products/keys';
 import type { ProductFormParsed } from '@/features/products/schema';
 import type { CreateProductRequest, UpdateProductRequest } from '@/features/products/types';
 
-export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function useSaveProduct() {
   const qc = useQueryClient();
@@ -48,7 +48,7 @@ function toInventoryPayload(parsed: ProductFormParsed) {
   };
 }
 
-export function toCreatePayload(parsed: ProductFormParsed): CreateProductRequest {
+function toCreatePayload(parsed: ProductFormParsed): CreateProductRequest {
   return {
     code: parsed.code,
     name: parsed.name,
@@ -68,7 +68,7 @@ export function toCreatePayload(parsed: ProductFormParsed): CreateProductRequest
   };
 }
 
-export function toUpdatePayload(parsed: ProductFormParsed): UpdateProductRequest {
+function toUpdatePayload(parsed: ProductFormParsed): UpdateProductRequest {
   return {
     name: parsed.name,
     productGroupId: parsed.productGroupId,

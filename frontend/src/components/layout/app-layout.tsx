@@ -5,6 +5,8 @@ import { useBranchStore } from '@/stores/branch-store';
 import { useUiStore } from '@/stores/ui-store';
 import { useNotificationHub } from '@/hooks/useNotificationHub';
 import { useBranchContext } from '@/features/branches/use-branch-context';
+import { useHelpShortcut } from '@/features/help/use-help-shortcut';
+import { HelpPanel } from '@/components/help/help-panel';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { PageLoaderOverlay } from '@/components/ui/page-loader-overlay';
 import { cn } from '@/lib/utils';
@@ -22,7 +24,10 @@ export function AppLayout() {
   const mobileDrawerOpen = useUiStore((s) => s.mobileDrawerOpen);
   const closeMobileDrawer = useUiStore((s) => s.closeMobileDrawer);
 
+  const helpOpen = useUiStore((s) => s.helpOpen);
+
   useNotificationHub();
+  useHelpShortcut();
   // Pages render only once the working branch is in the store, so their first
   // request already carries X-Branch-Id.
   const { ready: branchReady } = useBranchContext();
@@ -42,7 +47,12 @@ export function AppLayout() {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[4rem_minmax(0,1fr)] overflow-hidden bg-muted/30 md:grid-cols-[auto_1fr]">
+      <div
+        className={cn(
+          'relative grid min-h-0 flex-1 grid-cols-1 grid-rows-[4rem_minmax(0,1fr)] overflow-hidden bg-muted/30 md:grid-cols-[auto_1fr]',
+          helpOpen && 'min-[1600px]:grid-cols-[auto_1fr_400px]',
+        )}
+      >
         <SkipToContent />
         <AppHeader />
 
@@ -65,6 +75,7 @@ export function AppLayout() {
         >
           {branchReady ? <Outlet key={workingBranchId ?? 'none'} /> : <PageLoaderOverlay open title="Đang tải chi nhánh..." />}
         </main>
+        <HelpPanel />
 
         {mobileDrawerOpen && (
           <div

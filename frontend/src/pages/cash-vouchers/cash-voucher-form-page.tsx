@@ -32,13 +32,8 @@ import type {
   UpsertCashVoucherRequest,
 } from '@/features/cash-vouchers/types';
 import type { DebtDirection, DebtEffect, DebtSide, SettlementOrigin } from '@/features/cash-common/types';
-import {
-  matchReasonForPartner,
-  partnerFitsReason,
-  partnerRolesKnown,
-  reasonMismatchMessage,
-  reasonSwitchMessage,
-} from '@/features/cash-common/reason-match';
+import { matchReasonForPartner, reasonSwitchMessage } from '@/features/cash-common/reason-match';
+import { reasonNoticeOf } from '@/features/cash-common/reason-notice';
 import { useReasonSwitchNotice } from '@/features/cash-common/use-reason-notice';
 import { useCashReasons } from '@/features/cash-reasons/hooks';
 import { useFunds } from '@/features/funds/hooks';
@@ -271,18 +266,7 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
   }, []);
 
   // The red line is derived: roles known (picked in this session) and the partner does not fit the reason.
-  const mismatch =
-    selectedPartner &&
-    selectedReason &&
-    partnerRolesKnown(selectedPartner) &&
-    !partnerFitsReason(selectedPartner, selectedReason)
-      ? reasonMismatchMessage(selectedReason, selectedPartner.code)
-      : undefined;
-  const reasonNotice = mismatch
-    ? { text: mismatch, tone: 'error' as const }
-    : switchNotice.notice
-      ? { text: switchNotice.notice, tone: 'info' as const }
-      : null;
+  const reasonNotice = reasonNoticeOf(selectedPartner, selectedReason, switchNotice.notice);
   const ownEntry = OWN_ENTRY[debtEffect];
   const showAllocations = !!ownEntry && !!partnerId;
 

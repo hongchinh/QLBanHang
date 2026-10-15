@@ -1,13 +1,17 @@
 import type { UseFormReturn } from 'react-hook-form';
-import { PartnerAutocomplete } from '@/components/partner-autocomplete/partner-autocomplete';
+import { PartnerCodeNameField } from '@/components/partner-autocomplete/partner-code-name-field';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { preferredPartnerRole } from '@/features/cash-common/reason-match';
+import type { ReasonNotice } from '@/features/cash-common/reason-notice';
+import { ReasonNoticeLine } from '@/features/cash-common/reason-notice-line';
 import type { StockVoucherFormParsed, StockVoucherFormValues } from '@/features/stock-vouchers/schema';
 import type { StockVoucherDraftPartner } from '@/features/stock-vouchers/use-stock-voucher-draft';
 import type { PartnerSearchItem, StockDirection } from '@/features/stock-vouchers/types';
 import type { PaymentMethod } from '@/features/payment-methods/types';
 import type { StockReason } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
+import { cn } from '@/lib/utils';
 import type { StockVoucherLabels } from '../labels';
 
 export const SELECT_CLASS =
@@ -35,6 +39,13 @@ export interface StockVoucherMainFieldsProps {
   onWarehouseChange: (id: string) => void;
   onReasonChange: (id: string) => void;
   onSelectPartner: (p: PartnerSearchItem | null) => void;
+  // The yellow "reason changed" line or the red "reason does not fit the partner" line under the reason select.
+  reasonNotice?: ReasonNotice | null;
+  // Highlights the reason select for a moment after the reason was switched for the partner.
+  reasonFlash?: boolean;
+  // Server or guard message under the partner row.
+  partnerError?: string;
+  onUnpickedPartnerChange: (has: boolean) => void;
   // Enter on the last field.
   onEnterGrid: () => void;
 }
@@ -66,6 +77,10 @@ export function StockVoucherMainFields({
   onWarehouseChange,
   onReasonChange,
   onSelectPartner,
+  reasonNotice,
+  reasonFlash,
+  partnerError,
+  onUnpickedPartnerChange,
   onEnterGrid,
 }: StockVoucherMainFieldsProps) {
   const errors = form.formState.errors;
@@ -81,12 +96,6 @@ export function StockVoucherMainFields({
       .find((el) => el && !el.disabled);
     if (next) next.focus();
     else onEnterGrid();
-  }
-
-  // PartnerAutocomplete swaps its input when a value is set, which drops the focus: put it back so Enter can go on.
-  function handleSelectPartner(p: PartnerSearchItem | null) {
-    onSelectPartner(p);
-    if (p) setTimeout(() => document.getElementById('stock-partner')?.focus(), 0);
   }
 
   return (
@@ -106,7 +115,7 @@ export function StockVoucherMainFields({
         <div>
           <select
             id="stock-reason"
-            className={SELECT_CLASS}
+            className={cn(SELECT_CLASS, reasonFlash && 'ring-2 ring-amber-400')}
             value={reasonId}
             onChange={(e) => onReasonChange(e.target.value)}
           >
@@ -117,7 +126,7 @@ export function StockVoucherMainFields({
               </option>
             ))}
           </select>
-          <FieldError message={errors.reasonId?.message} />
+          <ReasonNoticeLine error={errors.reasonId?.message} notice={reasonNotice ?? null} />
         </div>
         <Label htmlFor="stock-warehouse" className="field-label required">Kho</Label>
         <div>
@@ -155,20 +164,23 @@ export function StockVoucherMainFields({
         </div>
       </div>
 
-      <div className="form-inline-grid form-cols-stock-main-2">
-        <Label htmlFor="stock-partner" className="field-label">Mã đối tượng</Label>
-        <PartnerAutocomplete
-          inputId="stock-partner"
+      <div className="form-inline-grid form-cols-stock-partner">
+        <PartnerCodeNameField
+          label="Đối tượng"
+          scope="partner"
+          preferredRole={preferredPartnerRole(selectedReason, type === 'Out' ? 'customer' : 'supplier')}
+          codeInputId="stock-partner"
+          nameInputId="stock-partner-name"
+          nameInputProps={form.register('partnerName')}
           type={type}
-          reasonId={reasonId || undefined}
           partnerType={selectedReason?.partnerType}
           value={selectedPartner}
-          onSelect={handleSelectPartner}
+          onSelect={onSelectPartner}
           disabled={readOnly}
+          error={partnerError}
+          onUnpickedChange={onUnpickedPartnerChange}
         />
-        <Label htmlFor="stock-partner-name" className="field-label">Tên đối tượng</Label>
-        <Input id="stock-partner-name" className="h-7" {...form.register('partnerName')} />
-        <Label htmlFor="stock-partner-address" className="field-label">Địa chỉ</Label>
+        <Label htmlFor="stock-partner-address" className="field-label">Đ.chỉ</Label>
         <Input id="stock-partner-address" className="h-7" {...form.register('partnerAddress')} />
       </div>
     </fieldset>

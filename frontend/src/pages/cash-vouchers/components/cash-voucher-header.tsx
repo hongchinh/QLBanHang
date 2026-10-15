@@ -7,6 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { FUND_KIND_LABELS } from '@/features/cash-common/labels';
 import { preferredPartnerRole } from '@/features/cash-common/reason-match';
+import type { ReasonNotice } from '@/features/cash-common/reason-notice';
+import { ReasonNoticeLine } from '@/features/cash-common/reason-notice-line';
 import type { CashReason } from '@/features/cash-reasons/types';
 import { useCashPartnerSearch } from '@/features/cash-vouchers/hooks';
 import type { CashVoucherFormParsed, CashVoucherFormValues } from '@/features/cash-vouchers/schema';
@@ -59,7 +61,7 @@ export interface CashVoucherHeaderProps {
   onSelectPartner: (partner: PartnerSearchItem | null) => void;
   onReasonChange: (reasonId: string) => void;
   // The yellow "reason changed" line or the red mismatch line under Lý do (section-01 §4).
-  reasonNotice?: { text: string; tone: 'info' | 'error' } | null;
+  reasonNotice?: ReasonNotice | null;
   reasonFlash?: boolean;
   partnerError?: string;
   onUnpickedPartnerChange: (hasUnpickedText: boolean) => void;
@@ -195,16 +197,7 @@ export function CashVoucherHeader({
                   </option>
                 ))}
               </select>
-              {reasonError ? (
-                <p className="mt-0.5 text-xs text-destructive">{reasonError}</p>
-              ) : reasonNotice ? (
-                <p
-                  role="status"
-                  className={cn('mt-0.5 text-xs', reasonNotice.tone === 'info' ? 'text-amber-700' : 'text-destructive')}
-                >
-                  {reasonNotice.text}
-                </p>
-              ) : null}
+              <ReasonNoticeLine error={reasonError} notice={reasonNotice ?? null} />
             </div>
             <Label htmlFor="cash-person-name" className="field-label">{labels.personLabel}</Label>
             <Input id="cash-person-name" className="h-7" {...form.register('personName')} />

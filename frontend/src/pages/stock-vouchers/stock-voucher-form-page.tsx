@@ -29,7 +29,9 @@ import {
   type StockVoucherDraftStorage,
 } from '@/features/stock-vouchers/use-stock-voucher-draft';
 import type { FundKind } from '@/features/cash-common/types';
-import type { PartnerType } from '@/features/stock-reasons/types';
+import { matchReasonForPartner, reasonSwitchMessage } from '@/features/cash-common/reason-match';
+import { reasonNoticeOf } from '@/features/cash-common/reason-notice';
+import { useReasonSwitchNotice } from '@/features/cash-common/use-reason-notice';
 import type {
   PartnerSearchItem,
   StockAtItem,
@@ -46,6 +48,7 @@ import { defaultFund, selectableFunds } from '@/features/funds/utils';
 import { useInventorySettings } from '@/features/inventory-settings/hooks';
 import { ActivityHistory } from '@/components/activity-history/activity-history';
 import { ConfirmRequiredDialog } from '@/components/confirm-required-dialog/confirm-required-dialog';
+import { useUnpickedPartnerGuard } from '@/components/partner-autocomplete/use-unpicked-partner-guard';
 import { VoucherPrintButton } from '@/components/voucher-print/voucher-print-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -139,8 +142,9 @@ const JUMP_IDS: Record<TotalsJumpField, string> = {
   paidAmount: 'stock-paid-amount',
 };
 
-// Form key -> element id for the fields that live in a tab.
+// Form key -> element id for the fields that live in a tab or in the main area.
 const FIELD_FOCUS_IDS: Record<string, string> = {
+  partnerId: 'stock-partner',
   partnerTaxCode: 'stock-partner-tax-code',
   handlerName: 'stock-handler-name',
   note: 'stock-voucher-note',
@@ -296,6 +300,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   const [selectedPartner, setSelectedPartner] = useState<StockVoucherDraftPartner | null>(
     () => mountData.draft?.selectedPartner ?? partnerOf(voucher),
   );
+  const switchNotice = useReasonSwitchNotice();
+  const guard = useUnpickedPartnerGuard('stock-partner');
   // `busy` is set only after async validation; the ref blocks a second submit (Ctrl+S key repeat) at once.
   const submittingRef = useRef(false);
   const [confirmKind, setConfirmKind] = useState<VoucherActionKind | null>(null);
@@ -447,6 +453,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     dueDateTouchedRef.current = !!values.dueDate;
     form.reset(values);
     setSelectedPartner(partnerOf(fresh));
+    // The notice named a partner of the form before the reset.
+    switchNotice.clear();
   }
 
   const { busy, run: runAction, confirmDialogProps } = useDocumentActions<PendingAction>({
@@ -509,22 +517,24 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     return allMapped;
   }
 
-  // Switches to the first tab with an error and focuses its first erroring field.
+  // Switches to the first tab with an error and focuses its first erroring field. A main-area field with an error
+  // (the partner) is tried before any tab field; the tab is still shown so its dot and panel are visible.
   function focusFirstError(keys: string[]) {
     const tab = firstErrorTab(keys);
-    if (!tab) return;
-    setActiveTab(tab);
-    const ids = keys.filter((k) => tabOfField(k) === tab).map(focusIdsOf).find((v) => v.length > 0) ?? [];
+    if (tab) setActiveTab(tab);
+    const firstIdsOf = (match: (key: string) => boolean) =>
+      keys.filter(match).map(focusIdsOf).find((ids) => ids.length > 0) ?? [];
+    const mainIds = firstIdsOf((k) => tabOfField(k) === null);
+    const tabIds = tab ? firstIdsOf((k) => tabOfField(k) === tab) : [];
+    if (mainIds.length === 0 && !tab) return;
     // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
-    // A missing target (e.g. a voucher with no lines has no first cell) falls back to a control inside the form.
     setTimeout(() => {
       const candidates = [
-        ...ids.map((id) => document.getElementById(id)),
-        document.getElementById('stock-line-add'),
+        ...[...mainIds, ...tabIds, 'stock-line-add'].map((id) => document.getElementById(id)),
         document.querySelector<HTMLElement>('[role="tab"][data-state="active"]'),
       ];
-      // A control in a hidden panel, or a disabled one, refuses focus, so take the first candidate that actually
-      // receives it.
+      // A control in a hidden panel, or a disabled one (the partner locked by a reason without a partner), refuses
+      // focus, so take the first candidate that actually receives it.
       for (const el of candidates) {
         el?.focus();
         if (el && document.activeElement === el) return;
@@ -548,6 +558,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   function submitWithIntent(intent: SubmitIntent) {
     if (submittingRef.current || busy || readOnly) return;
+    if (!guard.assertPicked()) return;
     submittingRef.current = true;
     dropBlankLines();
     void form
@@ -627,9 +638,20 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     setTimeout(() => productCodeCell(idx)?.focus(), 0);
   }
 
+  function clearPartnerFields() {
+    form.setValue('partnerId', '', { shouldDirty: true });
+    form.setValue('partnerName', '', { shouldDirty: true });
+    form.setValue('partnerAddress', '', { shouldDirty: true });
+    form.setValue('partnerTaxCode', '', { shouldDirty: true });
+    setSelectedPartner(null);
+  }
+
+  // A picked partner (list, quick add or catalog) fills the header and, when the reason does not fit its role,
+  // switches the reason to one that does.
   function handleSelectPartner(p: PartnerSearchItem | null) {
     if (!p) {
-      clearPartner();
+      clearPartnerFields();
+      switchNotice.clear();
       return;
     }
     form.setValue('partnerId', p.id, { shouldDirty: true });
@@ -644,14 +666,12 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
       isSupplier: p.isSupplier,
       creditDays: p.creditDays,
     });
-  }
-
-  function clearPartner() {
-    form.setValue('partnerId', '', { shouldDirty: true });
-    form.setValue('partnerName', '', { shouldDirty: true });
-    form.setValue('partnerAddress', '', { shouldDirty: true });
-    form.setValue('partnerTaxCode', '', { shouldDirty: true });
-    setSelectedPartner(null);
+    switchNotice.clear();
+    const match = matchReasonForPartner(p, form.getValues('reasonId'), reasons);
+    if (match.kind === 'switch') {
+      form.setValue('reasonId', match.reasonId, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
+      switchNotice.show(reasonSwitchMessage(p.code, p));
+    }
   }
 
   // Lines that still follow the header warehouse move with it; lines set to another warehouse stay.
@@ -665,16 +685,16 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     });
   }
 
-  // A partner that does not fit the new reason's role is dropped (the server would reject it).
+  // The partner stays when the new reason needs another role (a red line says so); a reason without a partner clears it.
   function handleReasonChange(nextId: string) {
-    const previousType = selectedReason?.partnerType;
-    const nextType = reasons.find((r) => r.id === nextId)?.partnerType;
     form.setValue('reasonId', nextId, { shouldDirty: true, shouldValidate: form.formState.isSubmitted });
-    if (nextType === 'None') clearPartner();
-    else if (selectedPartner && !partnerFits(selectedPartner, nextType, previousType)) clearPartner();
+    switchNotice.clear();
+    if (reasons.find((r) => r.id === nextId)?.partnerType === 'None') clearPartnerFields();
   }
 
   const errors = form.formState.errors;
+  // Derived: roles are known only for a partner picked in this session (or restored from a draft).
+  const reasonNotice = reasonNoticeOf(selectedPartner, selectedReason, switchNotice.notice);
   const linesError = errors.lines as { message?: string; root?: { message?: string } } | undefined;
   const linesRootMessage = linesError?.root?.message ?? linesError?.message;
 
@@ -711,6 +731,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
                     dueDateTouchedRef.current = false;
                     form.reset(toFormDefaults(undefined, defaults));
                     setSelectedPartner(null);
+                    switchNotice.clear();
                   }}
                   aria-label="Xóa nháp"
                 >
@@ -800,6 +821,10 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
           onWarehouseChange={handleWarehouseChange}
           onReasonChange={handleReasonChange}
           onSelectPartner={handleSelectPartner}
+          reasonNotice={reasonNotice}
+          reasonFlash={switchNotice.flash}
+          partnerError={guard.error ?? errors.partnerId?.message}
+          onUnpickedPartnerChange={guard.onUnpickedChange}
           onEnterGrid={enterGrid}
         />
 
@@ -998,18 +1023,6 @@ function addDaysToLocalDate(local: string | undefined, days: number): string {
 function partnerOf(voucher?: StockVoucher): StockVoucherDraftPartner | null {
   if (!voucher?.partnerId) return null;
   return { id: voucher.partnerId, code: voucher.partnerCode ?? '', name: voucher.partnerName ?? '' };
-}
-
-// Role flags are known only for a partner picked in this session; otherwise the partner is kept
-// only while the required role stays the same.
-function partnerFits(
-  partner: StockVoucherDraftPartner,
-  nextType: PartnerType | undefined,
-  previousType: PartnerType | undefined,
-): boolean {
-  if (nextType !== 'Customer' && nextType !== 'Supplier') return true;
-  const role = nextType === 'Customer' ? partner.isCustomer : partner.isSupplier;
-  return role ?? nextType === previousType;
 }
 
 function toStockLineLike(line: StockLineFormValues): StockLineLike {

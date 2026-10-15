@@ -149,6 +149,7 @@ export function RecalcCostPage() {
               ) : (
                 <ProductTypeaheadCell
                   inputId="recalc-product"
+                  openOnFocus={false}
                   value={productQuery}
                   onChange={setProductQuery}
                   onSelect={onSelectProduct}

@@ -28,8 +28,16 @@ vi.mock('@/features/warehouses/hooks', () => ({
 
 const PRODUCT = { id: 'p1', code: 'SP01', name: 'Tôn lạnh' } as ProductSuggestion;
 vi.mock('@/pages/quotations/components/product-typeahead-cell', () => ({
-  ProductTypeaheadCell: ({ onSelect, inputId }: { onSelect: (s: ProductSuggestion) => void; inputId?: string }) => (
-    <button type="button" id={inputId} onClick={() => onSelect(PRODUCT)}>
+  ProductTypeaheadCell: ({
+    onSelect,
+    inputId,
+    openOnFocus,
+  }: {
+    onSelect: (s: ProductSuggestion) => void;
+    inputId?: string;
+    openOnFocus?: boolean;
+  }) => (
+    <button type="button" id={inputId} data-open-on-focus={String(openOnFocus)} onClick={() => onSelect(PRODUCT)}>
       Chọn hàng
     </button>
   ),
@@ -88,6 +96,15 @@ describe('RecalcCostPage', () => {
     expect(toast).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Đã tính lại giá vốn cho 3 phạm vi hàng hóa' }),
     );
+  });
+
+  it('the Hàng hóa box does not open its list on focus', () => {
+    render(
+      <MemoryRouter>
+        <RecalcCostPage />
+      </MemoryRouter>,
+    );
+    expect(document.getElementById('recalc-product')).toHaveAttribute('data-open-on-focus', 'false');
   });
 
   it('keeps the button disabled while the settings load', () => {

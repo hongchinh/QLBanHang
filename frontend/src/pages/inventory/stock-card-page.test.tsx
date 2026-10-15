@@ -34,9 +34,15 @@ vi.mock('@/pages/quotations/components/product-typeahead-cell', () => ({
     value: string;
     onChange: (v: string) => void;
     onSelect: (s: { id: string; code: string; name: string }) => void;
+    openOnFocus?: boolean;
   }) => (
     <div>
-      <input id={props.inputId} value={props.value} onChange={(e) => props.onChange(e.target.value)} />
+      <input
+        id={props.inputId}
+        value={props.value}
+        onChange={(e) => props.onChange(e.target.value)}
+        data-open-on-focus={String(props.openOnFocus)}
+      />
       {[
         { id: 'p2', code: 'THEP02', name: 'Thép' },
         { id: 'p3', code: 'SON03', name: 'Sơn' },
@@ -301,6 +307,17 @@ describe('StockCardPage', () => {
       act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'pdf'));
       expect(await screen.findByRole('radio', { name: 'Chọn nhiều' })).toBeChecked();
       expect(screen.queryByRole('radio', { name: /^Đang xem/ })).not.toBeInTheDocument();
+    });
+
+    it('the product boxes do not open their list on focus', async () => {
+      cardState.data = undefined;
+      renderAt('/inventory/stock-card');
+      expect(document.getElementById('stock-card-product')).toHaveAttribute('data-open-on-focus', 'false');
+
+      // the export dialog starts at "Chọn nhiều" when no product is selected, which shows the picker
+      act(() => exportButtonProps.onSelect!(exportButtonProps.forms[0], 'pdf'));
+      await screen.findByRole('radio', { name: 'Chọn nhiều' });
+      expect(document.getElementById('stock-card-export-product')).toHaveAttribute('data-open-on-focus', 'false');
     });
 
     it('an invalid range disables the button', () => {

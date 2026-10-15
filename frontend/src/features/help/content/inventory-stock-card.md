@@ -4,13 +4,13 @@ title: Thẻ kho
 routes: [/inventory/stock-card]
 sources: [frontend/src/pages/inventory/stock-card-page.tsx, frontend/src/features/inventory-reports/**, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/components/period-preset-select/**, frontend/src/components/tt133-export/**, frontend/src/components/layout/back-link.tsx, backend/src/OrderMgmt.Application/Inventory/Reports/**]
 related: [stock-in.form, stock-out.form, inventory-opening-stock, settings-inventory]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 ## Dùng để
 Xem mọi lần nhập, xuất của một mặt hàng trong khoảng ngày, kèm số tồn sau từng lần. Có thể xuất sổ S08 (số lượng) hoặc S06 (kèm giá trị) theo mẫu TT133.
 
 ## Các bước
-1. {#product} Gõ mã hoặc tên vào ô **Hàng hóa** rồi chọn một mặt hàng.
+1. {#product} Gõ mã hoặc tên vào ô **Hàng hóa** rồi chọn một mặt hàng trong danh sách gợi ý hiện ra.
 2. {#warehouse} Chọn **Kho**, hoặc để **Tất cả kho**.
 3. {#period} Chọn nhanh trong **Kỳ** hoặc nhập **Từ ngày** và **Đến ngày**.
 4. {#read} Đọc khối tóm tắt **Tồn đầu**, **Nhập**, **Xuất**, **Tồn cuối** rồi đến bảng từng lần phát sinh.
@@ -18,6 +18,7 @@ Xem mọi lần nhập, xuất của một mặt hàng trong khoảng ngày, kè
 6. {#export} Bấm **Xuất theo mẫu TT133**, chọn mẫu và định dạng (**Excel** hoặc **PDF**), chọn mặt hàng cần xuất rồi bấm **Xuất**.
 
 ## Lưu ý
+- Bấm vào ô **Hàng hóa** đã có mã chưa mở danh sách gợi ý; gõ thêm hoặc sửa chữ thì danh sách hiện.
 - Nút ← chỉ hiện khi mở bằng cách bấm một dòng trong Tồn kho hoặc Tổng hợp nhập – xuất – tồn, và quay lại báo cáo đó. Tổng hợp nhập – xuất – tồn vẫn giữ khoảng ngày và phạm vi, còn kho, nhóm hàng và ô tìm kiếm trở về mặc định; Tồn kho thì mọi bộ lọc trở về mặc định.
 - Mở từ báo cáo khác thì mặt hàng đã được chọn sẵn, còn **Kho** theo dòng bạn bấm ở Tồn kho hoặc theo bộ lọc kho của Tổng hợp nhập – xuất – tồn. **Từ ngày** và **Đến ngày** luôn đặt lại từ đầu tháng đến hôm nay, kể cả khi báo cáo trước đang xem kỳ khác; chọn lại kỳ nếu cần.
 - Chưa chọn hàng thì màn hình báo Chọn hàng hóa để xem thẻ kho. Thiếu ngày thì báo Chọn đủ Từ ngày và Đến ngày; **Từ ngày** sau **Đến ngày** thì báo Từ ngày không được sau Đến ngày. Khi đó không hiện thẻ và nút xuất bị mờ. Không có phát sinh thì bảng báo Không có phát sinh trong khoảng thời gian này.

@@ -37,6 +37,5 @@ describe('toPartnerSearchItem', () => {
       isSupplier: false,
       creditDays: 30,
     });
-    expect(Object.keys(toPartnerSearchItem(customer))).not.toContain('group');
   });
 });

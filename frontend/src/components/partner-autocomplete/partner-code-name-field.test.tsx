@@ -81,6 +81,15 @@ describe('PartnerCodeNameField', () => {
     expect(document.getElementById('partner-name')).toHaveAttribute('placeholder', 'Tên người nhận');
   });
 
+  it('gives the name input an accessible name from its effective placeholder', () => {
+    const { unmount } = renderField();
+    expect(screen.getByRole('textbox', { name: 'Tên đối tượng' })).toHaveAttribute('id', 'partner-name');
+    unmount();
+
+    renderField({ scope: 'customer', label: 'Khách hàng' });
+    expect(screen.getByRole('textbox', { name: 'Tên khách hàng' })).toHaveAttribute('id', 'partner-name');
+  });
+
   it('applies nameInputProps to the name input', () => {
     const onChange = vi.fn();
     renderField({ nameInputProps: { value: 'Anh Nam', onChange } });
@@ -127,6 +136,7 @@ describe('PartnerCodeNameField', () => {
 
   it('searches active partners without a reason', async () => {
     renderField();
+    expect(screen.getByRole('combobox')).toBeEnabled();
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'cong' } });
     await waitFor(() => expect(usePartnerSearchMock).toHaveBeenLastCalledWith('In', 'cong', undefined, true));
   });

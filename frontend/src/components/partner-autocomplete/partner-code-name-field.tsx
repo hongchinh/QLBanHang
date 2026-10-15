@@ -61,6 +61,7 @@ export function PartnerCodeNameField({
   const noun: PartnerNoun = isCustomer ? 'khách hàng' : 'đối tượng';
   const source: PartnerSearchSource = useSearch ? { useSearch, type } : { type: type ?? 'In' };
   const errorId = `${codeInputId}-error`;
+  const effectiveNamePlaceholder = namePlaceholder ?? (isCustomer ? 'Tên khách hàng' : 'Tên đối tượng');
 
   return (
     <>
@@ -87,7 +88,8 @@ export function PartnerCodeNameField({
         <Input
           id={nameInputId}
           className="h-7"
-          placeholder={namePlaceholder ?? (isCustomer ? 'Tên khách hàng' : 'Tên đối tượng')}
+          placeholder={effectiveNamePlaceholder}
+          aria-label={effectiveNamePlaceholder}
           {...nameInputProps}
         />
       </div>

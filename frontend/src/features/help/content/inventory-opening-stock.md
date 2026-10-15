@@ -4,19 +4,20 @@ title: Tồn đầu kỳ
 routes: [/inventory/opening-stock]
 sources: [frontend/src/pages/inventory/opening-stock-page.tsx, frontend/src/features/opening-stock/**, backend/src/OrderMgmt.Application/Inventory/OpeningStocks/**, frontend/src/pages/stock-vouchers/components/negative-stock-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/lib/use-dialog-opening.ts, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/features/products/split-typed-text.ts]
 related: [stock-in.form, stock-out.form]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 ## Dùng để
 Khai báo hàng đang có trong từng kho tại ngày đầu kỳ: số lượng và giá trị của mỗi mặt hàng. Đây là số dư gốc của tồn kho, sau đó tồn kho thay đổi qua phiếu nhập kho và phiếu xuất kho.
 
 ## Các bước
 1. {#warehouse} Chọn **Kho** cần khai báo, mỗi kho có danh sách riêng. **Ngày đầu kỳ** hiện bên cạnh.
-2. {#add} Bấm **Thêm dòng**, rồi chọn hàng ở cột **Mã hàng**.
+2. {#add} Bấm **Thêm dòng**, rồi gõ mã hoặc tên hàng ở cột **Mã hàng** và chọn trong danh sách gợi ý.
 3. {#qty} Nhập **Số lượng** và **Giá trị** (tổng giá trị của số hàng đó), cột **Đơn giá** tự tính.
 4. {#remove} Bớt hàng thì bấm nút xóa ở cuối dòng.
 5. {#save} Bấm **Lưu** để ghi danh sách của kho này.
 
 ## Lưu ý
+- Bấm vào ô **Mã hàng** chưa mở danh sách gợi ý; gõ một ký tự thì danh sách hiện. Danh sách chỉ hiện khi ô có chữ.
 - **Lưu** thay toàn bộ danh sách tồn đầu kỳ của kho: hàng đã xóa khỏi danh sách sẽ mất tồn đầu kỳ.
 - Đổi **Kho** khi chưa bấm **Lưu** thì các thay đổi chưa lưu bị bỏ, không hỏi lại.
 - Ngày đầu kỳ đặt theo chi nhánh. Chưa có thì trang báo Chi nhánh chưa có ngày đầu kỳ và chưa lưu được, cần người có quyền đặt ở Cấu hình hệ thống, mục Chi nhánh.

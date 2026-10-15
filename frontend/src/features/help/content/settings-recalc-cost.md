@@ -4,7 +4,7 @@ title: Tính lại giá vốn
 routes: [/settings/recalc-cost]
 sources: [frontend/src/pages/settings/recalc-cost-page.tsx, frontend/src/features/inventory-settings/**, frontend/src/features/warehouses/**, backend/src/OrderMgmt.Application/Inventory/Costing/InventoryRecalcService.cs]
 related: [settings-inventory]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 ## Dùng để
 Tính lại giá vốn bình quân từ một kỳ đã chọn đến nay cho chi nhánh làm việc. Hệ thống vẫn tự tính lại khi chứng từ thay đổi; trang này dùng khi cần chạy lại bằng tay.
@@ -12,7 +12,7 @@ Tính lại giá vốn bình quân từ một kỳ đã chọn đến nay cho ch
 ## Các bước
 1. {#period} Chọn **Từ kỳ**: kỳ đầu tiên cần tính lại. Kỳ hiện tại được chọn sẵn.
 2. {#warehouse} Chọn **Kho**, hoặc để **Tất cả kho**.
-3. {#product} Chọn **Hàng hóa** nếu chỉ cần tính một mặt hàng; để trống là **Tất cả hàng hóa**.
+3. {#product} Gõ mã hoặc tên vào **Hàng hóa** và chọn trong danh sách gợi ý nếu chỉ cần tính một mặt hàng; để trống là **Tất cả hàng hóa**.
 4. {#run} Bấm **Tính lại giá vốn**, rồi bấm **Tính lại** trong hộp thoại xác nhận.
 
 ## Lưu ý

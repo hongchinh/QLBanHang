@@ -9,14 +9,19 @@ import type {
 } from '@/features/quotations/schema';
 import { useAuthStore } from '@/stores/auth-store';
 
+const cellProps = vi.hoisted(() => ({ last: undefined as Record<string, unknown> | undefined }));
+
 vi.mock('./product-typeahead-cell', () => ({
-  ProductTypeaheadCell: ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
-    <input
-      aria-label="product-code"
-      value={value}
-      onChange={(e) => onChange((e.target as HTMLInputElement).value)}
-    />
-  ),
+  ProductTypeaheadCell: (props: { value: string; onChange: (value: string) => void }) => {
+    cellProps.last = props;
+    return (
+      <input
+        aria-label="product-code"
+        value={props.value}
+        onChange={(e) => props.onChange((e.target as HTMLInputElement).value)}
+      />
+    );
+  },
 }));
 
 const baseLines: QuotationLineFormValues[] = [
@@ -85,6 +90,13 @@ function renderGrid(lines: QuotationLineFormValues[] = baseLines) {
 describe('LineItemsGrid', () => {
   beforeEach(() => {
     setCostPermission(false);
+  });
+
+  it('turns on product quick add for the code cell and returns to the name cell', () => {
+    renderGrid([baseLines[0]]);
+
+    expect(cellProps.last?.allowQuickAdd).toBe(true);
+    expect(cellProps.last?.nextFocusId).toBe('line-name-0');
   });
 
   it('renders existing rows and subtotal footer', () => {

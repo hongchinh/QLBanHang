@@ -291,6 +291,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                       variant="cell"
                       inputId={getLineCellId('product-code', idx)}
                       nextFocusId={getLineCellId('name', idx)}
+                      allowQuickAdd
                       value={(line.productCode ?? '') as string}
                       onChange={(v) => setLineField(idx, 'productCode', v)}
                       onSelect={(s) => {

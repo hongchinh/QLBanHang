@@ -1,12 +1,53 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { OpeningStockPage } from './opening-stock-page';
+import { useAuthStore } from '@/stores/auth-store';
+import type * as DialogModule from '@/components/ui/dialog';
+import type { ProductQuickAddDialogProps } from '@/features/products/components/product-quick-add-dialog';
 import type { OpeningStockGrid } from '@/features/opening-stock/types';
 import type { ProductListItem, ProductSuggestion } from '@/features/products/types';
 
 const toastMock = vi.fn();
 vi.mock('@/lib/use-toast', () => ({ toast: (...args: unknown[]) => toastMock(...args) }));
+
+const quickAdded = vi.hoisted(() => ({
+  id: '77777777-7777-7777-7777-777777777777',
+  code: 'TL-50',
+  name: 'Tôn lạnh 0.50',
+  unitName: 'Tấm',
+  pricingMode: 'PerUnit',
+  defaultPrice: 1,
+  costPrice: 1,
+  defaultTaxRate: 0,
+  trackInventory: true,
+  purchaseDiscountRate: 0,
+  salesDiscountRate: 0,
+  priceIncludesVat: false,
+}));
+
+// Stands in for the real form: a save hands back a product, then closes, as the real dialog does.
+vi.mock('@/features/products/components/product-quick-add-dialog', async () => {
+  const ui = await vi.importActual<typeof DialogModule>('@/components/ui/dialog');
+  return {
+    ProductQuickAddDialog: ({ open, onOpenChange, onCreated, onCloseAutoFocus }: ProductQuickAddDialogProps) => (
+      <ui.Dialog open={open} onOpenChange={onOpenChange}>
+        <ui.DialogContent aria-describedby={undefined} onCloseAutoFocus={onCloseAutoFocus}>
+          <ui.DialogTitle>Thêm nhanh hàng hóa</ui.DialogTitle>
+          <button
+            type="button"
+            onClick={() => {
+              onCreated(quickAdded as never);
+              onOpenChange(false);
+            }}
+          >
+            fake lưu
+          </button>
+        </ui.DialogContent>
+      </ui.Dialog>
+    ),
+  };
+});
 
 const WH1 = '11111111-1111-1111-1111-111111111111';
 const WH2 = '22222222-2222-2222-2222-222222222222';
@@ -63,7 +104,13 @@ const suggestion = (over: Partial<ProductSuggestion>): ProductSuggestion => ({
 const searchItems: { data: ProductSuggestion[] } = { data: [] };
 const catalogItems: { items: ProductListItem[] } = { items: [] };
 vi.mock('@/features/products/hooks', () => ({
-  useProductSearch: () => ({ data: searchItems.data, isLoading: false, isError: false }),
+  useProductSearch: (text: string) => ({
+    data: searchItems.data,
+    isLoading: false,
+    isError: false,
+    isFetching: false,
+    settledQuery: text,
+  }),
   useProducts: () => ({
     data: { items: catalogItems.items, page: 1, pageSize: 20, totalItems: catalogItems.items.length, totalPages: 1 },
     isLoading: false,
@@ -137,6 +184,39 @@ describe('OpeningStockPage', () => {
         { productId: P1, quantity: 10, amount: 1_000_000 },
         { productId: P2, quantity: 2.5, amount: 500_000 },
       ],
+    });
+  });
+
+  describe('product quick add', () => {
+    const before = useAuthStore.getState();
+    afterEach(() => useAuthStore.setState(before, true));
+
+    it('adds an unknown code through the dialog, fills the row and keeps the focus in the cell', async () => {
+      useAuthStore.setState({
+        accessToken: 'token',
+        expiresAt: '2099-01-01T00:00:00Z',
+        user: {
+          id: '11111111-1111-1111-1111-111111111111',
+          username: 'tester',
+          email: 'tester@example.com',
+          fullName: 'Tester',
+          roles: [],
+          permissions: ['products.create'],
+        },
+      });
+      render(<OpeningStockPage />);
+      fireEvent.click(screen.getByRole('button', { name: /Thêm dòng/ }));
+
+      const input = byId('opening-product-code-1');
+      act(() => input.focus());
+      fireEvent.change(input, { target: { value: 'TL-50' } });
+      await screen.findByRole('option', { name: /Thêm mới hàng hóa "TL-50"/ });
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+      fireEvent.click(screen.getByRole('button', { name: 'fake lưu' }));
+
+      await waitFor(() => expect(screen.getByText(quickAdded.name)).toBeInTheDocument());
+      await waitFor(() => expect(byId('opening-product-code-1')).toHaveFocus());
     });
   });
 

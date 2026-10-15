@@ -12,10 +12,16 @@ export async function copyText(text: string): Promise<void> {
   }
 }
 
-// Opens the share sheet where files can be shared (phones); otherwise, or when sharing fails, saves the file.
+// Desktop browsers (Chromium, Edge, Safari) also report that they can share files, but a computer should save the
+// picture, so the share sheet is only for touch-primary devices.
+function isTouchPrimary(): boolean {
+  return typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches === true;
+}
+
+// Opens the share sheet on a touch device that can share files; otherwise, or when sharing fails, saves the file.
 export async function shareOrDownload(blob: Blob, fileName: string): Promise<void> {
   const file = new File([blob], fileName, { type: 'image/png' });
-  if (typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
+  if (isTouchPrimary() && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: fileName.replace(/\.[^.]+$/, '') });
       return;

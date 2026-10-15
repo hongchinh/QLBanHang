@@ -13,12 +13,26 @@ function setNavigator(props: Record<string, unknown>) {
   }
 }
 
+// A touch-primary device (phone, tablet) reports a coarse pointer; a desktop reports a fine one.
+function setPointer(pointer: 'coarse' | 'fine' | 'none') {
+  if (pointer === 'none') {
+    vi.stubGlobal('matchMedia', undefined);
+    return;
+  }
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({ matches: pointer === 'coarse' && query === '(pointer: coarse)' })),
+  );
+}
+
 describe('qr-actions', () => {
   beforeEach(() => {
     toast.mockReset();
     saveBlob.mockReset();
+    setPointer('coarse');
   });
   afterEach(() => {
+    vi.unstubAllGlobals();
     setNavigator({ clipboard: undefined, share: undefined, canShare: undefined });
   });
 
@@ -51,7 +65,7 @@ describe('qr-actions', () => {
   describe('shareOrDownload', () => {
     const blob = new Blob(['x'], { type: 'image/png' });
 
-    it('shares the picture when the browser can share files', async () => {
+    it('shares the picture on a touch device that can share files', async () => {
       const share = vi.fn().mockResolvedValue(undefined);
       setNavigator({ canShare: vi.fn().mockReturnValue(true), share });
       await shareOrDownload(blob, 'QR_PT1.png');
@@ -77,6 +91,24 @@ describe('qr-actions', () => {
         share: vi.fn().mockRejectedValue(new Error('boom')),
       });
       await shareOrDownload(blob, 'QR_PT1.png');
+      expect(saveBlob).toHaveBeenCalledWith(blob, 'QR_PT1.png');
+    });
+
+    it('downloads on a desktop (fine pointer) even when the browser can share files', async () => {
+      setPointer('fine');
+      const share = vi.fn().mockResolvedValue(undefined);
+      setNavigator({ canShare: vi.fn().mockReturnValue(true), share });
+      await shareOrDownload(blob, 'QR_PT1.png');
+      expect(share).not.toHaveBeenCalled();
+      expect(saveBlob).toHaveBeenCalledWith(blob, 'QR_PT1.png');
+    });
+
+    it('downloads when matchMedia is missing', async () => {
+      setPointer('none');
+      const share = vi.fn().mockResolvedValue(undefined);
+      setNavigator({ canShare: vi.fn().mockReturnValue(true), share });
+      await shareOrDownload(blob, 'QR_PT1.png');
+      expect(share).not.toHaveBeenCalled();
       expect(saveBlob).toHaveBeenCalledWith(blob, 'QR_PT1.png');
     });
 

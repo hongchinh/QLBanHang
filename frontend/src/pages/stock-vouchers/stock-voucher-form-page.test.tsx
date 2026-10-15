@@ -1008,6 +1008,14 @@ describe('StockVoucherFormPage', () => {
         JSON.stringify({ version: 1, hiddenColumns: [], enterStops: {} }),
       );
 
+    it('focuses the partner field for a partnerId server error, even with a tab error', async () => {
+      await saveWithServerErrors({ partnerId: ['Đối tượng không hợp lệ'], fundId: ['Quỹ không hợp lệ'] });
+      expect(await screen.findByText('Quỹ không hợp lệ')).toBeInTheDocument();
+
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-partner')));
+      expect(screen.getByTestId('tab-error-payment')).toBeInTheDocument();
+    });
+
     it('the fund error and the tab dot go away when a new payment method auto-fills a fund', async () => {
       await saveWithServerErrors({ fundId: ['Chi nhánh chưa có quỹ mặc định loại ngân hàng.'] });
       expect(await screen.findByText('Chi nhánh chưa có quỹ mặc định loại ngân hàng.')).toBeInTheDocument();

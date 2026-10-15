@@ -139,8 +139,9 @@ const JUMP_IDS: Record<TotalsJumpField, string> = {
   paidAmount: 'stock-paid-amount',
 };
 
-// Form key -> element id for the fields that live in a tab.
+// Form key -> element id for the fields that live in a tab or in the main area.
 const FIELD_FOCUS_IDS: Record<string, string> = {
+  partnerId: 'stock-partner',
   partnerTaxCode: 'stock-partner-tax-code',
   handlerName: 'stock-handler-name',
   note: 'stock-voucher-note',
@@ -509,11 +510,23 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     return allMapped;
   }
 
-  // Switches to the first tab with an error and focuses its first erroring field.
+  // Switches to the first tab with an error and focuses its first erroring field. A main-area field with an error
+  // (the partner) takes the focus before any tab field; the tab is still shown so its dot and panel are visible.
   function focusFirstError(keys: string[]) {
     const tab = firstErrorTab(keys);
+    if (tab) setActiveTab(tab);
+    const mainIds = keys.filter((k) => tabOfField(k) === null).map(focusIdsOf).find((v) => v.length > 0);
+    if (mainIds) {
+      setTimeout(() => {
+        for (const id of mainIds) {
+          const el = document.getElementById(id);
+          el?.focus();
+          if (el && document.activeElement === el) return;
+        }
+      }, 0);
+      return;
+    }
     if (!tab) return;
-    setActiveTab(tab);
     const ids = keys.filter((k) => tabOfField(k) === tab).map(focusIdsOf).find((v) => v.length > 0) ?? [];
     // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
     // A missing target (e.g. a voucher with no lines has no first cell) falls back to a control inside the form.

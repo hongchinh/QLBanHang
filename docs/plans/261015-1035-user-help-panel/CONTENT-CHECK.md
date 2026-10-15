@@ -74,3 +74,50 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Sau | frontend/src/pages/quotations/components/list-footer.tsx:118 |
 | Chủ sở hữu | frontend/src/pages/quotations/quotation-list-page.tsx:513 (column) and :649 (filter, only with view_all) |
 | KT xác nhận đã nhận tiền | frontend/src/pages/quotations/quotation-list-page.tsx:182 (tooltip title of the row icon, needs accounting_confirm) |
+
+## stock-in.form
+
+| label | evidence |
+|---|---|
+| Ngày nhập | frontend/src/pages/stock-vouchers/labels.ts:17 (STOCK_VOUCHER_LABELS.In.dateLabel, shown in components/stock-voucher-main-fields.tsx:100) |
+| Lý do nhập | frontend/src/pages/stock-vouchers/labels.ts:18 (reasonLabel, shown in components/stock-voucher-main-fields.tsx:105) |
+| Kho | frontend/src/pages/stock-vouchers/components/stock-voucher-main-fields.tsx:122 |
+| Mã đối tượng | frontend/src/pages/stock-vouchers/components/stock-voucher-main-fields.tsx:159 |
+| Hàng hóa | frontend/src/pages/stock-vouchers/components/stock-voucher-tabs.tsx:30 |
+| Mã hàng | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:68 |
+| SL | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:76 |
+| Đơn giá | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:78 |
+| Số tấm | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:72 |
+| Dài | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:73 |
+| Rộng | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:74 |
+| Dày | frontend/src/pages/stock-vouchers/components/stock-line-grid.tsx:75 |
+| Phí vận chuyển | frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx:73 |
+| CK cả đơn | frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx:76 |
+| Thanh toán | frontend/src/pages/stock-vouchers/components/stock-voucher-tabs.tsx:34 |
+| Thông tin khác | frontend/src/pages/stock-vouchers/components/stock-voucher-tabs.tsx:33 |
+| Người giao hàng | frontend/src/pages/stock-vouchers/labels.ts:19 (handlerLabel, shown in stock-voucher-form-page.tsx:831) |
+| Tổng thanh toán | frontend/src/pages/stock-vouchers/components/stock-totals-bar.tsx:31 |
+| HTTT | frontend/src/pages/stock-vouchers/components/stock-voucher-main-fields.tsx:139 |
+| Số tiền thanh toán | frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx:84 |
+| Lưu tạm | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:739 |
+| Lưu và thoát | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:735 |
+| Cập nhật | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:746 |
+| % VAT cho mọi dòng | frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx:109 (only for the In variant: type === 'In' && onApplyVatToAll) |
+| Áp dụng | frontend/src/pages/stock-vouchers/components/stock-voucher-payment-tab.tsx:130 |
+| Hạn thanh toán | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:892 (only when the reason raises receivable or payable) |
+| Hủy phiếu | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:752 |
+| Khôi phục | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:758 |
+| Xóa | frontend/src/pages/stock-vouchers/stock-voucher-form-page.tsx:764 |
+
+## inventory-opening-stock
+
+| label | evidence |
+|---|---|
+| Kho | frontend/src/pages/inventory/opening-stock-page.tsx:185 |
+| Ngày đầu kỳ | frontend/src/pages/inventory/opening-stock-page.tsx:200 |
+| Thêm dòng | frontend/src/pages/inventory/opening-stock-page.tsx:313 |
+| Mã hàng | frontend/src/pages/inventory/opening-stock-page.tsx:220 |
+| Số lượng | frontend/src/pages/inventory/opening-stock-page.tsx:223 |
+| Giá trị | frontend/src/pages/inventory/opening-stock-page.tsx:224 |
+| Đơn giá | frontend/src/pages/inventory/opening-stock-page.tsx:225 |
+| Lưu | frontend/src/pages/inventory/opening-stock-page.tsx:178 |

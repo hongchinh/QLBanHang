@@ -454,6 +454,39 @@ describe('QuotationFormPage — customer row on the shared partner field', () =>
       await waitFor(() => expect(createQuotationMock).toHaveBeenCalledTimes(1));
     });
 
+    it('a catalog pick sets the customer, fills only the empty delivery fields and focuses the name', async () => {
+      permissionState.granted = new Set(['customers.view']);
+      customerGetMock.mockResolvedValue(
+        customerRecord({
+          id: CUST_ID,
+          code: 'KH-001',
+          name: 'Công ty ABC',
+          defaultShippingAddress: '2 Nguyễn Huệ',
+          contactPerson: 'Anh Nam',
+          phoneNumber: '0901234567',
+        }),
+      );
+      render(<QuotationFormPage />);
+      fireEvent.change(byId('deliveryPhone'), { target: { value: '0999' } });
+      fireEvent.click(saveButton());
+      expect(await screen.findByText('Chọn khách hàng')).toBeInTheDocument();
+      fireEvent.change(byId('customerId'), { target: { value: 'abc' } });
+
+      fireEvent.mouseDown(await screen.findByText('Xem danh mục đầy đủ'));
+      fireEvent.click(await dialog().findByText('Công ty ABC'));
+
+      await waitFor(() => expect(customerGetMock).toHaveBeenCalledWith('cat-1'));
+      await waitFor(() => expect(byId('customerId').value).toBe('KH-001'));
+      expect(byId('customerName').value).toBe('Công ty ABC');
+      // customerId is set: its save error is gone.
+      await waitFor(() => expect(screen.queryByText('Chọn khách hàng')).toBeNull());
+      expect(byId('deliveryAddress').value).toBe('2 Nguyễn Huệ');
+      expect(byId('deliveryRecipient').value).toBe('Anh Nam');
+      expect(byId('deliveryPhone').value).toBe('0999');
+      await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+      await waitFor(() => expect(byId('customerName')).toHaveFocus());
+    });
+
     it('the catalog row needs customers.view', async () => {
       permissionState.granted = new Set(['customers.create']);
       const { unmount } = render(<QuotationFormPage />);

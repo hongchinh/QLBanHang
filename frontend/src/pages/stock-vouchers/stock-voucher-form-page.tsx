@@ -29,13 +29,8 @@ import {
   type StockVoucherDraftStorage,
 } from '@/features/stock-vouchers/use-stock-voucher-draft';
 import type { FundKind } from '@/features/cash-common/types';
-import {
-  matchReasonForPartner,
-  partnerFitsReason,
-  partnerRolesKnown,
-  reasonMismatchMessage,
-  reasonSwitchMessage,
-} from '@/features/cash-common/reason-match';
+import { matchReasonForPartner, reasonSwitchMessage } from '@/features/cash-common/reason-match';
+import { reasonNoticeOf } from '@/features/cash-common/reason-notice';
 import { useReasonSwitchNotice } from '@/features/cash-common/use-reason-notice';
 import type {
   PartnerSearchItem,
@@ -699,15 +694,7 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
 
   const errors = form.formState.errors;
   // Derived: roles are known only for a partner picked in this session (or restored from a draft).
-  const mismatch =
-    selectedPartner && selectedReason && partnerRolesKnown(selectedPartner) && !partnerFitsReason(selectedPartner, selectedReason)
-      ? reasonMismatchMessage(selectedReason, selectedPartner.code)
-      : undefined;
-  const reasonNotice = mismatch
-    ? { text: mismatch, tone: 'error' as const }
-    : switchNotice.notice
-      ? { text: switchNotice.notice, tone: 'info' as const }
-      : null;
+  const reasonNotice = reasonNoticeOf(selectedPartner, selectedReason, switchNotice.notice);
   const linesError = errors.lines as { message?: string; root?: { message?: string } } | undefined;
   const linesRootMessage = linesError?.root?.message ?? linesError?.message;
 

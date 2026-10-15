@@ -231,13 +231,13 @@ describe('StockVoucherMainFields', () => {
       expect(notice.parentElement).toContainElement(byId('stock-reason'));
     });
 
-    it('renders an error notice in the destructive colour, not as a status', () => {
+    it('renders an error notice in the destructive colour, also as a status line', () => {
       render(<Harness reasonNotice={{ text: 'Lý do "Xuất bán hàng" cần khách hàng — NCC01 không phải khách hàng', tone: 'error' }} />);
 
       const notice = screen.getByText(/cần khách hàng/);
       expect(notice).toHaveClass('text-destructive');
       expect(notice).not.toHaveClass('text-amber-700');
-      expect(screen.queryByRole('status')).toBeNull();
+      expect(notice).toHaveAttribute('role', 'status');
       expect(notice.parentElement).toContainElement(byId('stock-reason'));
     });
 
@@ -255,7 +255,7 @@ describe('StockVoucherMainFields', () => {
       expect(byId('stock-reason')).not.toHaveClass('ring-amber-400');
     });
 
-    it('still renders errors.reasonId under the reason select', async () => {
+    it('renders errors.reasonId under the reason select instead of a notice, never both', async () => {
       function WithReasonError() {
         const form = useForm<StockVoucherFormValues, unknown, StockVoucherFormParsed>({
           defaultValues: { voucherAt: '', partnerName: '', partnerAddress: '' } as StockVoucherFormValues,
@@ -276,6 +276,7 @@ describe('StockVoucherMainFields', () => {
               warehouseId=""
               reasonId=""
               selectedPartner={null}
+              reasonNotice={{ text: 'Đã đổi lý do', tone: 'info' }}
               onWarehouseChange={vi.fn()}
               onReasonChange={vi.fn()}
               onSelectPartner={vi.fn()}
@@ -286,11 +287,14 @@ describe('StockVoucherMainFields', () => {
         );
       }
       render(<WithReasonError />);
+      expect(screen.getByText('Đã đổi lý do')).toBeInTheDocument();
 
       fireEvent.click(screen.getByRole('button', { name: 'set error' }));
 
       const message = await screen.findByText('Chọn lý do', { selector: 'p' });
       expect(message.parentElement).toContainElement(byId('stock-reason'));
+      expect(message).toHaveClass('text-destructive');
+      expect(screen.queryByText('Đã đổi lý do')).toBeNull();
     });
   });
 

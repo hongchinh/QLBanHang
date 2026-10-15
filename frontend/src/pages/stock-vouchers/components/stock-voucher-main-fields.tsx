@@ -3,6 +3,8 @@ import { PartnerCodeNameField } from '@/components/partner-autocomplete/partner-
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { preferredPartnerRole } from '@/features/cash-common/reason-match';
+import type { ReasonNotice } from '@/features/cash-common/reason-notice';
+import { ReasonNoticeLine } from '@/features/cash-common/reason-notice-line';
 import type { StockVoucherFormParsed, StockVoucherFormValues } from '@/features/stock-vouchers/schema';
 import type { StockVoucherDraftPartner } from '@/features/stock-vouchers/use-stock-voucher-draft';
 import type { PartnerSearchItem, StockDirection } from '@/features/stock-vouchers/types';
@@ -38,7 +40,7 @@ export interface StockVoucherMainFieldsProps {
   onReasonChange: (id: string) => void;
   onSelectPartner: (p: PartnerSearchItem | null) => void;
   // The yellow "reason changed" line or the red "reason does not fit the partner" line under the reason select.
-  reasonNotice?: { text: string; tone: 'info' | 'error' } | null;
+  reasonNotice?: ReasonNotice | null;
   // Highlights the reason select for a moment after the reason was switched for the partner.
   reasonFlash?: boolean;
   // Server or guard message under the partner row.
@@ -124,18 +126,7 @@ export function StockVoucherMainFields({
               </option>
             ))}
           </select>
-          <FieldError message={errors.reasonId?.message} />
-          {reasonNotice && (
-            <p
-              role={reasonNotice.tone === 'info' ? 'status' : undefined}
-              className={cn(
-                'field-message field-message-code',
-                reasonNotice.tone === 'info' ? 'text-amber-700' : 'text-destructive',
-              )}
-            >
-              {reasonNotice.text}
-            </p>
-          )}
+          <ReasonNoticeLine error={errors.reasonId?.message} notice={reasonNotice ?? null} />
         </div>
         <Label htmlFor="stock-warehouse" className="field-label required">Kho</Label>
         <div>

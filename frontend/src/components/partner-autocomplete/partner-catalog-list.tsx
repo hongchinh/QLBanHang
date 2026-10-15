@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCustomers } from '@/features/customers/hooks';
+import { useSuppliers } from '@/features/suppliers/hooks';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 import type { CustomerGroup } from '@/features/customers/types';
@@ -16,19 +17,26 @@ const GROUP_LABELS: Record<CustomerGroup, string> = {
 
 const ALL_GROUPS: CustomerGroup[] = ['Company', 'Agent', 'Retail', 'Project'];
 
-interface Props {
-  initialQuery: string;
+export interface PartnerCatalogListProps {
+  role: 'customer' | 'supplier';
+  query: string;
+  onQueryChange: (q: string) => void;
   onSelect: (id: string) => void;
 }
 
-export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
-  const [query, setQuery] = useState(initialQuery);
+// Controlled by the dialog, which renders it with key={role}: the role never changes within an instance, so the
+// hook below is always the same one.
+export function PartnerCatalogList({ role, query, onQueryChange, onSelect }: PartnerCatalogListProps) {
   const [group, setGroup] = useState<CustomerGroup | undefined>(undefined);
   const [page, setPage] = useState(1);
+  const [highlighted, setHighlighted] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTableSectionElement>(null);
 
   const debouncedQuery = useDebouncedValue(query, 250);
 
-  const { data, isLoading } = useCustomers({
+  const useList = role === 'customer' ? useCustomers : useSuppliers;
+  const { data, isLoading } = useList({
     page,
     pageSize: 20,
     search: debouncedQuery || undefined,
@@ -36,12 +44,49 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
     status: 'Active',
   });
 
+  const noun = role === 'customer' ? 'khách hàng' : 'nhà cung cấp';
   const items = data?.items ?? [];
   const totalPages = data?.totalPages ?? 1;
+  const active = Math.min(highlighted, Math.max(items.length - 1, 0));
+
+  // Not autoFocus: the dialog keeps recording what had the focus before it opened.
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    bodyRef.current?.children[active]?.scrollIntoView?.({ block: 'nearest' });
+  }, [active, data]);
+
+  function handleQueryChange(value: string) {
+    onQueryChange(value);
+    setPage(1);
+    setHighlighted(0);
+  }
 
   function handleGroupChange(value: string) {
     setGroup(value === 'all' ? undefined : (value as CustomerGroup));
     setPage(1);
+    setHighlighted(0);
+  }
+
+  function goToPage(next: number) {
+    setPage(next);
+    setHighlighted(0);
+  }
+
+  function handleSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setHighlighted(Math.min(active + 1, Math.max(items.length - 1, 0)));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setHighlighted(Math.max(active - 1, 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const item = items[active];
+      if (item) onSelect(item.id);
+    }
   }
 
   return (
@@ -52,10 +97,11 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
           <AppIcon name="search" className="absolute left-2.5 top-2.5" />
           <Input
             className="pl-8"
-            placeholder="Tìm mã, tên khách hàng..."
+            placeholder={`Tìm mã, tên ${noun}...`}
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setPage(1); }}
-            autoFocus
+            onChange={(e) => handleQueryChange(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            ref={searchRef}
           />
         </div>
       </div>
@@ -79,7 +125,7 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-muted/80 backdrop-blur-sm">
             <tr className="border-b">
-              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Mã KH</th>
+              <th className="px-3 py-2 text-left font-medium text-muted-foreground">Mã</th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Tên</th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">MST</th>
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Người LH</th>
@@ -87,7 +133,7 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
               <th className="px-3 py-2 text-left font-medium text-muted-foreground">Nhóm</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody ref={bodyRef}>
             {isLoading && (
               <>
                 {Array.from({ length: 8 }).map((_, i) => (
@@ -102,15 +148,19 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
             {!isLoading && items.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
-                  Không tìm thấy khách hàng phù hợp
+                  Không tìm thấy {noun} phù hợp
                 </td>
               </tr>
             )}
             {!isLoading &&
-              items.map((item) => (
+              items.map((item, i) => (
                 <tr
                   key={item.id}
-                  className={cn('cursor-pointer border-b transition-colors hover:bg-muted/50')}
+                  aria-selected={i === active}
+                  className={cn(
+                    'cursor-pointer border-b transition-colors hover:bg-muted/50',
+                    i === active && 'qldh-lookup-row-highlight',
+                  )}
                   onClick={() => onSelect(item.id)}
                 >
                   <td className="px-3 py-2 font-mono text-xs">{item.code}</td>
@@ -129,14 +179,14 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
       <div className="flex items-center justify-between border-t px-3 py-2 text-sm">
         <span className="text-muted-foreground">
           Trang {page} / {totalPages}
-          {data && <span className="ml-2 text-xs">({data.totalItems} khách hàng)</span>}
+          {data && <span className="ml-2 text-xs">({data.totalItems} {noun})</span>}
         </span>
         <div className="flex gap-1">
           <button
             type="button"
             className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
             disabled={page <= 1}
-            onClick={() => setPage((p) => p - 1)}
+            onClick={() => goToPage(page - 1)}
           >
             <AppIcon name="chevronLeft" size={14} /> Trước
           </button>
@@ -144,7 +194,7 @@ export function CustomerCatalogList({ initialQuery, onSelect }: Props) {
             type="button"
             className="inline-flex items-center gap-1 rounded border px-2 py-1 text-xs disabled:opacity-40 hover:bg-muted"
             disabled={page >= totalPages}
-            onClick={() => setPage((p) => p + 1)}
+            onClick={() => goToPage(page + 1)}
           >
             Sau <AppIcon name="chevronRight" size={14} />
           </button>

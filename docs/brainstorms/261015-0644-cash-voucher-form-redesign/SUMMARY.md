@@ -1,6 +1,6 @@
 # Thiết kế lại form phiếu thu/chi và ô đối tượng dùng chung
 
-> Brainstorm: 2026-10-15 06:44:11 · Review: 2026-10-15 07:27:02, đã sửa theo [section-02-review.md](section-02-review.md) · Trạng thái: **thiết kế đã duyệt**, chưa có plan · Chi tiết hành vi: [section-01-behaviour-spec.md](section-01-behaviour-spec.md)
+> Brainstorm: 2026-10-15 06:44:11 · Review: 2026-10-15 07:27:02, đã sửa theo [section-02-review.md](section-02-review.md) · Trạng thái: **thiết kế đã duyệt**, plan: [261015-0926-cash-voucher-form-redesign](../../plans/archived/261015-0926-cash-voucher-form-redesign/SUMMARY.md) · Chi tiết hành vi: [section-01-behaviour-spec.md](section-01-behaviour-spec.md)
 >
 > Mockup: [mockup-01-cash-voucher-form.html](mockup-01-cash-voucher-form.html) (form phiếu thu/chi) · [mockup-02-shared-partner-field.html](mockup-02-shared-partner-field.html) (ô đối tượng dùng chung; thay phần ô đối tượng của mockup-01). Mockup được vẽ trước review, nên có bốn chỗ **đã bị thay**:
 > 1. Chọn đối tượng xong thì focus sang **Tên đối tượng**, không ở lại ô mã (D11).

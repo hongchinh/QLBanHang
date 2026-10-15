@@ -4,6 +4,8 @@
 >
 > Reviewed against the code: 2026-10-15 (four reviewers, one per phase group). Fixed in the plan: 7 major findings (dialog event wrapper broke the Tab loop and missed the close button; stale typed text after a dialog pick; save blocked by locked typed text; catalog role switch lost the query; stock `partnerId` server error not focused; mismatch message missed "Any" reasons with a debt effect; Mode B browser run could hit the dev database) and about 25 minor ones (Phase 04 task order, unbuildable or vacuous tests, missing fixtures and mocks, git and grep commands, spec wording). Since then `qlbanhang/main` moved to `1a87763` (PR #20, docs only); the QR plan is being executed in `.claude/worktrees/voucher-qr` and will likely merge first.
 
+> Note: the "Shared contracts" below show the signatures before Task 6.1. After 6.1 `PartnerSearchHook` is `(keyword, activeOnly?)`, the search hooks, API calls and query keys carry no `reasonId`, and `requireReason` is gone.
+
 ## Goal
 
 Make the receipt/payment voucher form keyboard-first like MISA/Fast, and give cash vouchers, stock vouchers and quotations **one** partner field with the same look and keys.

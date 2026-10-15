@@ -15,8 +15,8 @@ Tick each item on the day the change reaches a running database.
 
 ## Check after deploy
 
-- [ ] 3. Sign in as an Accountant and as a Warehouse user. F4 opens the quick add on receipts, payments, stock-in and stock-out; the roles are preselected by the reason; a role the user has no permission for is disabled.
-- [ ] 4. Type Vietnamese with Telex and with VNI in the partner code, the partner name and the reason fields of the three forms (cash voucher, stock voucher, quotation): the Enter that commits a composition must not move the focus.
+- [ ] 3. Sign in as an Accountant and as a Warehouse user. The seed gives the Accountant no stock permissions and the Warehouse role no cash permissions, so each role checks its own screens: the Accountant on receipts and payments, the Warehouse user on stock-in and stock-out. On those, F4 opens the quick add; the role is preselected by the reason; a role the user has no permission for is disabled.
+- [ ] 4. Type Vietnamese with Telex and with VNI in the partner code, the partner name and the other text inputs of the three forms (cash voucher, stock voucher, quotation): the Enter that commits a composition must not move the focus. The reason fields are native selects and take no typing, so they are not part of this check.
 - [ ] 5. F4 on a laptop may need Fn: tell users the `+` button does the same.
 
 ## Tell the users

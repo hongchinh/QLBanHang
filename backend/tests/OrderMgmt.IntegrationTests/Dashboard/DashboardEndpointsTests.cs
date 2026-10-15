@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
 using OrderMgmt.Application.Common.Models;
+using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Sales.Quotations.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Enums;
@@ -80,7 +81,7 @@ public class DashboardEndpointsTests : DashboardTestBase
     {
         await CreateTestUserAsync("dash_sp", "Sales@123", RoleCodes.Sales);
         var sale = await GetUserIdAsync("dash_sp");
-        var today = DateOnly.FromDateTime(DateTime.Now);
+        var today = VnTime.ToVnDate(DateTimeOffset.UtcNow);
 
         // Drafts: the spark counts quotations by QuotationDate, not only those that pass the revenue rule.
         await SeedQuotationAsync("BG-SP-1", sale, QuotationStatus.Draft, today, 100m);

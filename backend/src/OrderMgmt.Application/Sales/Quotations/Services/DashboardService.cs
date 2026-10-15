@@ -140,10 +140,9 @@ public class DashboardService : IDashboardService
         var todayRevenue = revenueByDay.GetValueOrDefault(today);
 
         // Count spark — quotations by QuotationDate over the 7 days ending today, like TotalCount
-        var quotationToday = DateOnly.FromDateTime(_clock.Now.DateTime);
-        var countFrom = quotationToday.AddDays(-6);
+        var countFrom = today.AddDays(-6);
         var countByDay = await scope
-            .Where(q => q.QuotationDate >= countFrom && q.QuotationDate <= quotationToday)
+            .Where(q => q.QuotationDate >= countFrom && q.QuotationDate <= today)
             .GroupBy(q => q.QuotationDate)
             .Select(g => new { Date = g.Key, Count = g.Count() })
             .ToDictionaryAsync(r => r.Date, r => r.Count, ct);

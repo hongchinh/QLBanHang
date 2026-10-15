@@ -35,4 +35,19 @@ describe('Toaster', () => {
     expect(document.querySelector('ol')).toHaveClass('pointer-events-none')
     expect(screen.getByText('Đã lưu phiếu').closest('li')).toHaveClass('pointer-events-auto', 'data-[state=open]:slide-in-from-bottom-full')
   })
+
+  // At the bottom center a toast lies over tables and forms; a see-through background made its text hard to read.
+  it('gives every toast variant an opaque background', () => {
+    render(<Toaster />)
+    act(() => {
+      shown.push(toast({ title: 'Mặc định' }))
+      shown.push(toast({ title: 'Thành công', variant: 'success' }))
+      shown.push(toast({ title: 'Lỗi', variant: 'destructive' }))
+    })
+    for (const title of ['Mặc định', 'Thành công', 'Lỗi']) {
+      const li = screen.getByText(title).closest('li')!
+      expect(li.className).toMatch(/\bbg-(background|emerald-50|red-50)\b/)
+      expect(li.className).not.toMatch(/\bbg-[\w-]+\/\d+/)
+    }
+  })
 })

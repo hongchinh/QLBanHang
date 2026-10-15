@@ -5,8 +5,8 @@ import { dismissToast, useToasts, type ToastVariant } from '@/lib/use-toast';
 
 const variantClasses: Record<ToastVariant, string> = {
   default: 'border bg-background text-foreground',
-  success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100',
-  destructive: 'border-destructive/30 bg-destructive/10 text-destructive',
+  success: 'border-emerald-500/30 bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100',
+  destructive: 'border-destructive/30 bg-red-50 text-destructive dark:bg-red-950',
 };
 
 export function Toaster() {

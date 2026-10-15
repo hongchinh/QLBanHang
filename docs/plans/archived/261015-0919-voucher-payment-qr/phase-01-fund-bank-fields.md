@@ -1,6 +1,6 @@
 # Phase 01 — Bank and account holder on funds
 
-**Status:** [ ] pending
+**Status:** [x] completed
 **Complexity:** M
 
 ## Objective

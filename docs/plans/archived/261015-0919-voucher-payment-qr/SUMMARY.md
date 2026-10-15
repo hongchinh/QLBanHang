@@ -1,6 +1,6 @@
 # VietQR transfer QR on receipts and stock-out vouchers (QR chuyển khoản trên phiếu thu và phiếu xuất kho)
 
-> Created: 2026-10-15 09:19 · Based on `qlbanhang/main` at `3ae3804` (PR #19 branch sample data merged; PR #18 app icon registry included) · Source design: [brainstorm SUMMARY](../../brainstorms/261015-0656-voucher-payment-qr/SUMMARY.md) (design approved, reviewed against code 2026-10-15, R1–R14; mockups alongside) · Builds on: [TT133 voucher print forms](../archived/261014-1632-tt133-voucher-print-forms/SUMMARY.md) (PR #15)
+> Created: 2026-10-15 09:19 · Based on `qlbanhang/main` at `3ae3804` (PR #19 branch sample data merged; PR #18 app icon registry included) · Source design: [brainstorm SUMMARY](../../../brainstorms/261015-0656-voucher-payment-qr/SUMMARY.md) (design approved, reviewed against code 2026-10-15, R1–R14; mockups alongside) · Builds on: [TT133 voucher print forms](../261014-1632-tt133-voucher-print-forms/SUMMARY.md) (PR #15)
 
 ## Goal
 
@@ -31,7 +31,7 @@ Let a customer pay a receipt (01-TT) or a stock-out voucher (02-VT) by scanning 
 - Payment confirmation, matching bank transactions to vouchers, webhooks (SePay is mobile hub round 5).
 - QR on payments (02-TT), stock-in (01-VT), the voucher list screens (only the bulk-print checkbox).
 - Mapping the old free-text `BankName` to `Banks`; choosing the receiving account at print time; the employee's personal account; VietQR/NAPAS logo; QR size settings.
-- Cash voucher form redesign ([brainstorm 261015-0644](../../brainstorms/261015-0644-cash-voucher-form-redesign/SUMMARY.md)): this plan only adds one button to the form page's button row; whichever plan merges second rebases.
+- Cash voucher form redesign ([brainstorm 261015-0644](../../../brainstorms/261015-0644-cash-voucher-form-redesign/SUMMARY.md)): this plan only adds one button to the form page's button row; whichever plan merges second rebases.
 
 ## Decisions made while planning (in addition to the brainstorm and its review R1–R14)
 
@@ -70,12 +70,12 @@ Let a customer pay a receipt (01-TT) or a stock-out voucher (02-VT) by scanning 
 
 ## Phases
 
-- [ ] Phase 00 — Worktree, branch, failure baseline (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Bank and account holder on funds (M) — `phase-01-fund-bank-fields.md`
-- [ ] Phase 02 — Payment QR rules, service and `payment-qr` routes (L) — `phase-02-payment-qr-backend.md`
-- [ ] Phase 03 — QR on the printed vouchers and the print switch (XL) — `phase-03-print-with-qr.md`
-- [ ] Phase 04 — QR button and dialog on the voucher screens (M) — `phase-04-screen-dialog.md`
-- [ ] Phase 05 — Docs, real output, go-live checklist, final verification (M) — `phase-05-docs-and-verification.md`
+- [x] Phase 00 — Worktree, branch, failure baseline (S) — `phase-00-baseline.md`
+- [x] Phase 01 — Bank and account holder on funds (M) — `phase-01-fund-bank-fields.md`
+- [x] Phase 02 — Payment QR rules, service and `payment-qr` routes (L) — `phase-02-payment-qr-backend.md`
+- [x] Phase 03 — QR on the printed vouchers and the print switch (XL) — `phase-03-print-with-qr.md`
+- [x] Phase 04 — QR button and dialog on the voucher screens (M) — `phase-04-screen-dialog.md`
+- [x] Phase 05 — Docs, real output, go-live checklist, final verification (M) — `phase-05-docs-and-verification.md`
 
 Order: 00 → 01 → 02. After 02, Phase 03 (backend print + print switch, worktree `voucher-qr`) and Phase 04 (screen, frontend only, may use the second worktree) are independent: Phase 04 mocks the API and the route is fixed below. Phase 05 runs last on the merged result. Run one phase per request (session limits) unless the user asks for several.
 

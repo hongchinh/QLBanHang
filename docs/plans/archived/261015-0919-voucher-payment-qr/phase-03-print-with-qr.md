@@ -1,6 +1,6 @@
 # Phase 03 — QR on the printed vouchers and the print switch
 
-**Status:** [ ] pending
+**Status:** [x] completed
 **Complexity:** XL
 
 ## Objective

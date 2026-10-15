@@ -1,6 +1,6 @@
 # Phase 04 — QR button and dialog on the voucher screens
 
-**Status:** [ ] pending
+**Status:** [x] completed
 **Complexity:** M
 
 ## Objective

@@ -1,6 +1,6 @@
 # Phase 02 — Payment QR rules, service and `payment-qr` routes
 
-**Status:** [ ] pending
+**Status:** [x] completed
 **Complexity:** L
 
 ## Objective

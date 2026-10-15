@@ -1,6 +1,6 @@
 # QR chuyển khoản trên phiếu thu và phiếu xuất kho
 
-> Brainstorm: 2026-10-15 06:56:58 · Tiếp nối [mẫu in chứng từ TT133](../261013-2042-tt133-voucher-print-forms/SUMMARY.md) (đã hiện thực, PR #15) · Review đối chiếu code: 2026-10-15, đã sửa theo mục [Review đối chiếu code](#review-đối-chiếu-code-2026-10-15) · Trạng thái: **đã hiện thực** (2026-10-15; [kế hoạch](../../plans/261015-0919-voucher-payment-qr/SUMMARY.md), [kết quả đo và chỗ lệch so với thiết kế](#kết-quả-hiện-thực-2026-10-15), [danh sách kiểm tra trước go-live](../../plans/261015-0919-voucher-payment-qr/GO-LIVE-CHECKLIST.md)) · Mockup: [vị trí QR trên bản in](mockup-01-print-placement.html), [hộp thoại QR trên màn phiếu](mockup-02-screen-dialog.html). Mockup-01 vẽ trước khi chốt quy tắc số tiền và trước review, nên có hai chỗ khác bản hiện thực: chữ "Còn phải thu" đổi thành "Cần chuyển khoản"; QR trong khung của 02-VT chuyển sang bên phải (R3)
+> Brainstorm: 2026-10-15 06:56:58 · Tiếp nối [mẫu in chứng từ TT133](../261013-2042-tt133-voucher-print-forms/SUMMARY.md) (đã hiện thực, PR #15) · Review đối chiếu code: 2026-10-15, đã sửa theo mục [Review đối chiếu code](#review-đối-chiếu-code-2026-10-15) · Trạng thái: **đã hiện thực** (2026-10-15; [kế hoạch](../../plans/archived/261015-0919-voucher-payment-qr/SUMMARY.md), [kết quả đo và chỗ lệch so với thiết kế](#kết-quả-hiện-thực-2026-10-15), [danh sách kiểm tra trước go-live](../../plans/archived/261015-0919-voucher-payment-qr/GO-LIVE-CHECKLIST.md)) · Mockup: [vị trí QR trên bản in](mockup-01-print-placement.html), [hộp thoại QR trên màn phiếu](mockup-02-screen-dialog.html). Mockup-01 vẽ trước khi chốt quy tắc số tiền và trước review, nên có hai chỗ khác bản hiện thực: chữ "Còn phải thu" đổi thành "Cần chuyển khoản"; QR trong khung của 02-VT chuyển sang bên phải (R3)
 
 ## Problem framing
 
@@ -285,8 +285,8 @@ Những điểm đã sửa:
 
 ## Next steps
 
-- [x] `write-plan` theo 5 phase ở trên ([kế hoạch](../../plans/261015-0919-voucher-payment-qr/SUMMARY.md)).
-- [ ] Gửi kế toán các câu hỏi Kế toán/PO ở trên trước go-live. Các câu hỏi, cách thiết lập quỹ, bảng quét thử và rủi ro đã được soạn trong [GO-LIVE-CHECKLIST.md](../../plans/261015-0919-voucher-payment-qr/GO-LIVE-CHECKLIST.md); việc gửi và nhận câu trả lời chưa làm.
+- [x] `write-plan` theo 5 phase ở trên ([kế hoạch](../../plans/archived/261015-0919-voucher-payment-qr/SUMMARY.md)).
+- [ ] Gửi kế toán các câu hỏi Kế toán/PO ở trên trước go-live. Các câu hỏi, cách thiết lập quỹ, bảng quét thử và rủi ro đã được soạn trong [GO-LIVE-CHECKLIST.md](../../plans/archived/261015-0919-voucher-payment-qr/GO-LIVE-CHECKLIST.md); việc gửi và nhận câu trả lời chưa làm.
 - [x] Cập nhật `docs/project-pdr/product-goals.md` khi hiện thực xong (P5), cùng `conventions.md`, `system-architecture.md`, `directory-structure.md` và `pwa-mobile.md`.
 
 ## Kết quả hiện thực (2026-10-15)

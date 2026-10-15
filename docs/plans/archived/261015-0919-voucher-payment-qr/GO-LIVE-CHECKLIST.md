@@ -1,6 +1,6 @@
 # Danh sách kiểm tra trước khi dùng QR chuyển khoản trên phiếu
 
-> Lập: 2026-10-15 · Dành cho: kế toán và PO · Thuộc [kế hoạch QR chuyển khoản trên phiếu thu và phiếu xuất kho](SUMMARY.md) · Thiết kế: [brainstorm](../../brainstorms/261015-0656-voucher-payment-qr/SUMMARY.md)
+> Lập: 2026-10-15 · Dành cho: kế toán và PO · Thuộc [kế hoạch QR chuyển khoản trên phiếu thu và phiếu xuất kho](SUMMARY.md) · Thiết kế: [brainstorm](../../../brainstorms/261015-0656-voucher-payment-qr/SUMMARY.md)
 
 Phần mềm in mã **VietQR** (có sẵn số tiền và nội dung chuyển khoản) trên hai mẫu in, đồng thời hiện mã đó trên màn phiếu để khách quét ngay tại quầy:
 

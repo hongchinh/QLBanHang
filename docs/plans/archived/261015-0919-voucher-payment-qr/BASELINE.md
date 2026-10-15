@@ -32,5 +32,8 @@ Failing tests (compare by name in later phases):
 
 - `npm run typecheck`: clean.
 - `npm run lint`: 16 problems (3 errors, 13 warnings), all in files outside this plan.
-- `npm run test -- --testTimeout=30000 --maxWorkers=3`: 226 files, 2199 tests; **3 failed**, 2196 passed. The captured output was cut off, so only one failing name was seen: `src/pages/payment-qr/payment-qr-page.test.tsx` › "generates and displays a QR after submitting valid data" (Radix option "Vietcombank" not found). The other two are not confirmed by name; earlier runs listed bank-accounts-tab "adds a new account" and useNotificationHub "invalidates unread-count" as flaky. Phase 05 re-runs the frontend suite with the failing names captured.
+- `npm run test -- --testTimeout=30000 --maxWorkers=3`: 226 files, 2199 tests; **3 failed**, 2196 passed. The captured output was cut off, so only one failing name was seen at first: `src/pages/payment-qr/payment-qr-page.test.tsx` › "generates and displays a QR after submitting valid data" (Radix option "Vietcombank" not found). The Phase 05 final run (234 files, 2296 tests, 3 failed) confirmed all three by name:
+  - `useNotificationHub` › "invalidates unread-count query on NewNotification";
+  - `bank-accounts-tab` › "adds a new account via the form";
+  - `payment-qr-page` › "generates and displays a QR after submitting valid data".
 - `npm run build`: succeeds (service worker generated).

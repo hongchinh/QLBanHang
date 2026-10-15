@@ -110,6 +110,16 @@ function SearchDisplay() {
   return <div data-testid="search">{useLocation().search}</div>;
 }
 
+function renderWithState(url: string, state?: unknown) {
+  const [pathname, search = ''] = url.split('?');
+  return render(
+    <MemoryRouter initialEntries={[{ pathname, search: search ? `?${search}` : '', state }]}>
+      <StockCardPage />
+      <SearchDisplay />
+    </MemoryRouter>,
+  );
+}
+
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
@@ -313,6 +323,36 @@ describe('StockCardPage', () => {
       const last = periodPreset('lastMonth');
       expect(screen.getByLabelText('Từ ngày')).toHaveValue(last.from);
       expect(screen.getByLabelText('Đến ngày')).toHaveValue(last.to);
+    });
+  });
+
+  describe('back link', () => {
+    const CARD_URL = '/inventory/stock-card?productId=p1';
+
+    it('links back to the report it was opened from', () => {
+      cardState.data = card();
+      renderWithState(CARD_URL, { from: '/parent?x=1' });
+
+      expect(screen.getByRole('link', { name: 'Quay lại báo cáo trước' })).toHaveAttribute('href', '/parent?x=1');
+    });
+
+    it('has no back link without state', () => {
+      cardState.data = card();
+      renderWithState(CARD_URL);
+
+      expect(screen.queryByRole('link', { name: /^Quay lại/ })).not.toBeInTheDocument();
+    });
+
+    it('keeps the back link after a filter change', async () => {
+      cardState.data = card();
+      const user = userEvent.setup();
+      renderWithState(CARD_URL, { from: '/parent?x=1' });
+
+      await user.click(screen.getByRole('combobox', { name: 'Kho' }));
+      await user.click(await screen.findByRole('option', { name: 'KHO01 — Kho chính' }));
+
+      expect(screen.getByTestId('search')).toHaveTextContent('warehouseId=w1');
+      expect(screen.getByRole('link', { name: 'Quay lại báo cáo trước' })).toHaveAttribute('href', '/parent?x=1');
     });
   });
 });

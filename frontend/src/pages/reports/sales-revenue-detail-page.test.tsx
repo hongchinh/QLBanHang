@@ -1,8 +1,62 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { renderHook } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import type { SalesRevenueLineItemDto } from '@/features/reports/sales-revenue-detail/types';
-import { calculateRevenueTotals, useRevenueTotals, TotalsRow } from './sales-revenue-detail-page';
+import { useAuthStore } from '@/stores/auth-store';
+import {
+  SalesRevenueDetailPage,
+  calculateRevenueTotals,
+  useRevenueTotals,
+  TotalsRow,
+} from './sales-revenue-detail-page';
+
+vi.mock('@/features/reports/sales-revenue-detail/hooks', () => ({
+  useSalesRevenueDetail: () => ({ data: [], isLoading: false, isError: false }),
+}));
+
+describe('SalesRevenueDetailPage back link', () => {
+  const PATH = '/reports/sales-revenue/u1';
+  const SEARCH = '?from=2026-10-01&to=2026-10-31';
+
+  function renderPage(state?: unknown) {
+    return render(
+      <MemoryRouter initialEntries={[{ pathname: PATH, search: SEARCH, state }]}>
+        <Routes>
+          <Route path="/reports/sales-revenue/:saleUserId" element={<SalesRevenueDetailPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+  }
+
+  beforeEach(() => {
+    useAuthStore.setState({
+      user: { id: 'u1', username: 'u', email: 'u@x', fullName: 'U', roles: [], permissions: ['reports.revenue'] },
+    });
+  });
+
+  it('links back to the report it was opened from', () => {
+    const from = '/reports/sales-revenue?from=2026-10-01&to=2026-10-31';
+    renderPage({ from, saleName: 'An' });
+
+    expect(screen.getByRole('link', { name: 'Quay lại báo cáo trước' })).toHaveAttribute('href', from);
+  });
+
+  it('falls back to the sales revenue report without state', () => {
+    renderPage();
+
+    expect(screen.getByRole('link', { name: 'Quay lại Doanh thu theo sale' })).toHaveAttribute(
+      'href',
+      '/reports/sales-revenue',
+    );
+  });
+
+  it('no longer has the history-based Quay lại button', () => {
+    renderPage();
+
+    expect(screen.queryByRole('button', { name: /Quay lại/ })).not.toBeInTheDocument();
+  });
+});
 
 describe('calculateRevenueTotals', () => {
   it('returns zero totals for empty items array', () => {

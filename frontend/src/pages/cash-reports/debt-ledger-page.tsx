@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { tt133FileBase, type ExportFormat, type Tt133ExportForm } from '@/features/tt133-export/types';
 import { useTt133Download } from '@/features/tt133-export/use-tt133-download';
 import { getErrorMessage } from '@/lib/api-client';
+import { BackLink, useBackTarget } from '@/components/layout/back-link';
 import { useReplaceSearchParams } from '@/lib/use-search-param-state';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
 import { parseDebtSide } from './document-link';
@@ -29,6 +30,7 @@ const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 export function DebtLedgerPage() {
   const [searchParams] = useSearchParams();
   const setParams = useReplaceSearchParams();
+  const back = useBackTarget();
   const side = parseDebtSide(searchParams.get('side'));
   const partnerId = searchParams.get('partnerId') ?? '';
   const from = searchParams.get('from') || firstDayOfMonthYmd();
@@ -88,7 +90,10 @@ export function DebtLedgerPage() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-xl font-semibold">Sổ chi tiết công nợ</h1>
+        <div className="flex items-center gap-2">
+          {back && <BackLink to={back} label="báo cáo trước" />}
+          <h1 className="text-xl font-semibold">Sổ chi tiết công nợ</h1>
+        </div>
         <Tt133ExportButton
           forms={[exportForm]}
           disabled={!!rangeError}

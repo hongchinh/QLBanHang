@@ -76,6 +76,16 @@ function renderAt(url: string) {
   );
 }
 
+function renderWithState(url: string, state?: unknown) {
+  const [pathname, search = ''] = url.split('?');
+  return render(
+    <MemoryRouter initialEntries={[{ pathname, search: search ? `?${search}` : '', state }]}>
+      <DebtDocumentsPage />
+      <LocationDisplay />
+    </MemoryRouter>,
+  );
+}
+
 describe('DebtDocumentsPage', () => {
   beforeEach(() => {
     useDebtDocumentsMock.mockClear();
@@ -157,5 +167,30 @@ describe('DebtDocumentsPage', () => {
     const location = screen.getByTestId('location');
     expect(location).toHaveTextContent('side=Payable');
     expect(location).not.toHaveTextContent('partnerId');
+  });
+
+  describe('back link', () => {
+    const DOCS_URL = '/reports/debt-documents?side=Receivable&at=2026-10-31';
+
+    it('links back to the report it was opened from', () => {
+      renderWithState(DOCS_URL, { from: '/parent?x=1' });
+
+      expect(screen.getByRole('link', { name: 'Quay lại báo cáo trước' })).toHaveAttribute('href', '/parent?x=1');
+    });
+
+    it('has no back link without state', () => {
+      renderWithState(DOCS_URL);
+
+      expect(screen.queryByRole('link', { name: /^Quay lại/ })).not.toBeInTheDocument();
+    });
+
+    it('keeps the back link after a filter change', () => {
+      renderWithState(DOCS_URL, { from: '/parent?x=1' });
+
+      fireEvent.change(screen.getByLabelText('Tại ngày'), { target: { value: '2026-11-15' } });
+
+      expect(screen.getByTestId('location')).toHaveTextContent('at=2026-11-15');
+      expect(screen.getByRole('link', { name: 'Quay lại báo cáo trước' })).toHaveAttribute('href', '/parent?x=1');
+    });
   });
 });

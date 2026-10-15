@@ -12,6 +12,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { BackLink, useBackTarget } from '@/components/layout/back-link';
 import { toast } from '@/lib/use-toast';
 import { useAuthStore } from '@/stores/auth-store';
 import { KpiCard } from '@/features/dashboard/components/kpi-card';
@@ -68,6 +69,7 @@ export function RevenuePage() {
   const isAdmin = useAuthStore((s) => s.hasPermission('quotations.view_all'));
   const currentUser = useAuthStore((s) => s.user);
   const [searchParams] = useSearchParams();
+  const back = useBackTarget();
 
   const didInitDate = useRef(false);
   useEffect(() => {
@@ -133,13 +135,16 @@ export function RevenuePage() {
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center lg:justify-between">
-        <div className="lg:shrink-0 lg:whitespace-nowrap">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {!isAdmin && currentUser ? `Báo cáo doanh thu của ${currentUser.fullName}` : 'Báo cáo doanh thu'}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {summary.data ? `Từ ${summary.data.from} đến ${summary.data.to}` : 'Báo giá xác nhận trong khoảng đang xem.'}
-          </p>
+        <div className="flex items-start gap-2 lg:shrink-0 lg:whitespace-nowrap">
+          {back && <BackLink to={back} label="báo cáo trước" />}
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {!isAdmin && currentUser ? `Báo cáo doanh thu của ${currentUser.fullName}` : 'Báo cáo doanh thu'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {summary.data ? `Từ ${summary.data.from} đến ${summary.data.to}` : 'Báo giá xác nhận trong khoảng đang xem.'}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (

@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Đóng khung Hướng dẫn</title>
+<style>
+
+  :root {
+    --fg: #020817; --muted-fg: #64748B; --border: #E2E8F0; --muted: #F1F5F9; --card: #FFFFFF;
+    --primary: #2563EB; --header-bg: #1457A3; --group-bg: #F4F7FA;
+    --signal: #FF5A1F; --mute: #9A9EA6;
+    --page: #F8FAFC;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: #E9EDF2; }
+  .bar { position: sticky; top: 0; z-index: 5; background: #0F172A; color: #E2E8F0; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .bar h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 700; }
+  .seg { display: inline-flex; background: #1E293B; border-radius: 8px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: transparent; color: #CBD5E1; font: inherit; font-weight: 600; padding: 7px 14px; border-radius: 6px; cursor: pointer; min-height: 36px; }
+  .seg button[aria-pressed="true"] { background: #F8FAFC; color: #0F172A; }
+  .hint { font-size: 12px; color: #94A3B8; }
+  .wrap { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+  .stage { flex: 1 1 auto; min-width: 0; overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 3px rgba(15,23,42,.15); }
+  .notes { width: 340px; flex: none; background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(15,23,42,.15); position: sticky; top: 72px; }
+  .notes h2 { margin: 0 0 4px; font-size: 16px; }
+  .notes p.sub { margin: 0 0 12px; color: var(--muted-fg); font-size: 12.5px; }
+  .notes ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .notes li { display: flex; gap: 10px; font-size: 13px; }
+  .notes code { font-size: 12px; background: var(--muted); padding: 1px 4px; border-radius: 4px; }
+  .num { flex: none; width: 20px; height: 20px; border-radius: 50%; background: #F59E0B; color: #111; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+  .pin { position: absolute; z-index: 2; pointer-events: none; }
+  @media (max-width: 1100px) { .wrap { flex-direction: column; } .notes { width: 100%; position: static; } }
+
+  /* App frame (mirrors the current layout) */
+  .app { width: 1280px; background: var(--page); display: grid; grid-template-columns: 256px 1fr; grid-template-rows: 64px auto; position: relative; }
+  .hdr { grid-column: 1 / -1; background: var(--header-bg); color: #fff; display: flex; align-items: center; height: 64px; position: relative; }
+  .brand { width: 256px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; }
+  .logo { width: 30px; height: 30px; border-radius: 6px; background: rgba(255,255,255,.16); display: flex; align-items: center; justify-content: center; }
+  .brand b { font-size: 16px; flex: 1; }
+  .hbtn { width: 40px; height: 40px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: #fff; position: relative; }
+  .hsearch { display: flex; align-items: center; gap: 8px; width: 420px; height: 38px; border-radius: 8px; background: rgba(255,255,255,.14); padding: 0 12px; color: rgba(255,255,255,.85); font-size: 13px; }
+  .hsearch kbd { margin-left: auto; font: 11px ui-monospace, monospace; background: rgba(255,255,255,.18); border-radius: 4px; padding: 2px 6px; }
+  .hright { margin-left: auto; display: flex; align-items: center; gap: 6px; padding-right: 16px; }
+  .branch { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 6px; background: rgba(255,255,255,.12); font-size: 13px; }
+  .badge { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; border-radius: 8px; background: #EF4444; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+  .user { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding-left: 6px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: #fff; color: var(--header-bg); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+  .side { background: #fff; border-right: 1px solid var(--border); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; min-height: 900px; position: relative; }
+  .msearch { display: flex; align-items: center; gap: 8px; height: 34px; border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; color: var(--muted-fg); font-size: 13px; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; border-radius: 13px; background: #FFF7E0; color: #7A4A0E; border: 1px solid #FBE3A6; font-size: 12px; font-weight: 600; }
+  .item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 6px; color: var(--muted-fg); font-weight: 500; position: relative; }
+  .item.active { background: var(--primary); color: #fff; }
+  .group { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px; border-radius: 6px; background: var(--group-bg); font-weight: 600; margin-top: 8px; }
+  .group span.l { flex: 1; }
+  .tile { width: 26px; height: 26px; border-radius: 6px; background: var(--c); display: flex; align-items: center; justify-content: center; color: #fff; flex: none; }
+  .sub { padding-left: 14px; display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+  .chev { color: var(--muted-fg); display: inline-flex; }
+
+  .main { padding: 24px 28px 32px; display: flex; flex-direction: column; gap: 22px; position: relative; }
+  .ph { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .ph h2 { margin: 0; font-size: 24px; font-weight: 650; letter-spacing: -.01em; }
+  .ph p { margin: 2px 0 0; color: var(--muted-fg); font-size: 13px; }
+  .range { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; position: relative; }
+  .rchip { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--border); background: #fff; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .rchip.on { background: var(--fg); color: #fff; border-color: var(--fg); }
+  .rdate { font-size: 12.5px; color: var(--muted-fg); display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; position: relative; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.05); position: relative; }
+  .kpi .lab { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted-fg); }
+  .kpi .val { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; }
+  .kpi .val b { font-size: 22px; white-space: nowrap; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .delta { display: inline-flex; align-items: center; gap: 3px; border-radius: 10px; padding: 2px 8px; font-size: 12px; font-weight: 600; }
+  .up { background: #ECFDF5; color: #047857; } .down { background: #FFF1F2; color: #BE123C; }
+  .spark { height: 44px; margin-top: 10px; color: var(--primary); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.05); position: relative; }
+  .card h3 { margin: 0 0 14px; font-size: 16px; font-weight: 650; display: flex; justify-content: space-between; align-items: center; }
+  .gran { display: inline-flex; background: var(--muted); border-radius: 6px; padding: 3px; gap: 2px; font-size: 12px; font-weight: 600; }
+  .gran span { padding: 4px 10px; border-radius: 4px; color: var(--muted-fg); } .gran span.on { background: #fff; color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .fun { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 12.5px; color: var(--muted-fg); }
+  .fun .t { width: 100px; } .fun .b { flex: 1; height: 24px; background: var(--muted); border-radius: 4px; overflow: hidden; } .fun .b i { display: block; height: 100%; }
+  .act { display: flex; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+  .act .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; }
+  .act small { display: block; color: var(--muted-fg); font-size: 12px; }
+  .omit { font-size: 12px; color: var(--muted-fg); text-align: center; border: 1px dashed var(--border); border-radius: 10px; padding: 14px; }
+
+  /* Registry fallback marker (step 2): a business icon the Notch set does not have yet. */
+  .fallback { outline: 1.5px dashed #F59E0B; outline-offset: 2px; border-radius: 3px; }
+  svg.ic { display: block; flex: none; }
+
+  /* Step 2 surface changes required for the notch to stay visible */
+  .m-s2 .tile { background: var(--tint); color: var(--fg); }
+  .m-s2 .item.active { background: #fff; color: var(--fg); font-weight: 650; box-shadow: inset 3px 0 0 var(--primary); }
+
+  /* Voucher form */
+  .app { grid-template-columns: 256px minmax(0, 1fr); }
+  .main { min-width: 0; }
+  .main.form { padding: 0 20px 20px; gap: 8px; }
+  .vbar { position: sticky; top: 0; margin: 0 -20px; padding: 10px 20px; background: rgba(248,250,252,.96); border-bottom: 1px solid var(--border); box-shadow: 0 1px 2px rgba(15,23,42,.05); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+  .vbar .l { display: flex; align-items: center; gap: 8px; }
+  .vbar h2 { margin: 0; font-size: 20px; font-weight: 700; }
+  .ghost { width: 36px; height: 36px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn { height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: #fff; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; position: relative; color: var(--fg); }
+  .btn.pri { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.plan { border-style: dashed; }
+  .btn.plan small { font-weight: 500; color: var(--muted-fg); font-size: 11px; }
+  .m-s2 .btn.danger { color: #B42318; border-color: #F3C5C0; }
+  .fields { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: 92px minmax(0,1fr) 82px minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr); gap: 6px 10px; align-items: center; font-size: 13px; }
+  .fields label { color: var(--muted-fg); font-size: 12.5px; text-align: right; }
+  .fields label.req::after { content: " *"; color: #DC2626; }
+  .inp { height: 28px; border: 1px solid var(--border); border-radius: 5px; padding: 0 8px; display: flex; align-items: center; gap: 6px; background: #fff; font-size: 13px; min-width: 0; white-space: nowrap; overflow: hidden; }
+  .inp.ro { background: #F8FAFC; color: #334155; }
+  .inp .sel { margin-left: auto; color: var(--muted-fg); display: inline-flex; }
+  .span3 { grid-column: span 3; } .span5 { grid-column: span 5; }
+  .tabsbox { background: #fff; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; min-width: 0; }
+  .tabs { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 8px; flex-wrap: wrap; }
+  .tab { height: 38px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--muted-fg); }
+  .tab.on { color: var(--fg); font-weight: 650; box-shadow: inset 0 -2px 0 var(--primary); }
+  .tab .cnt { font-size: 11px; background: var(--muted); border-radius: 9px; padding: 0 6px; }
+  .tools { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 4px 0; position: relative; }
+  .tbtn { height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 5px; background: #fff; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; position: relative; }
+  .kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; background: #fff; color: #334155; }
+  .gridwrap { overflow-x: auto; }
+  table.g { border-collapse: collapse; font-size: 12.5px; width: 100%; min-width: 1240px; }
+  table.g th { background: #F8FAFC; color: var(--muted-fg); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.g td { padding: 0 8px; height: 32px; border-bottom: 1px solid #EEF2F6; white-space: nowrap; }
+  table.g .n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.g .muted { color: var(--muted-fg); }
+  table.g tr.cur td { background: #F5F9FF; }
+  table.g td.act { width: 40px; min-width: 40px; text-align: center; }
+  table.g th:last-child, table.g td.act { position: sticky; right: 0; background: #fff; }
+  table.g th:nth-last-child(2), table.g td.net { position: sticky; right: 40px; background: #fff; box-shadow: -1px 0 0 var(--border); }
+  table.g th:last-child, table.g th:nth-last-child(2) { background: #F8FAFC; }
+  table.g tr.cur td.act, table.g tr.cur td.net { background: #F5F9FF; }
+  .gfill { height: 120px; border-bottom: 1px solid #EEF2F6; }
+  .totals { background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 -2px 6px rgba(0,0,0,.06); }
+  .trow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 20px; padding: 8px 12px; font-size: 13px; color: var(--muted-fg); }
+  .trow .l { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .trow b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .trow .tot { color: var(--primary); font-weight: 800; font-size: 15px; }
+  .debt { display: flex; flex-wrap: nowrap; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-top: 1px dashed var(--border); background: rgba(241,245,249,.5); padding: 5px 12px; font-size: 12px; color: var(--muted-fg); position: relative; }
+  .debt b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .debt .who { font-weight: 650; color: var(--fg); }
+  .debt .ar { display: inline-flex; vertical-align: middle; }
+  .t-danger { color: #DC2626; } .t-create { color: #0891B2; } .t-muted { color: #64748B; } .t-print { color: #4F46E5; }
+
+  .t-qr { color: #0F766E; }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-weight: 600; letter-spacing: .02em; }
+  .qrbtn { box-shadow: 0 0 0 2px #FDBA74; }
+  .stage { position: relative; }
+  .app { overflow: hidden; }
+  .overlay { position: absolute; inset: 0; background: rgba(2,8,23,.45); z-index: 20; }
+  .dlg { position: absolute; z-index: 21; left: 50%; top: 92px; transform: translateX(-50%); width: 440px; background: #fff; border-radius: 10px; box-shadow: 0 20px 50px rgba(2,8,23,.35); padding: 18px 20px 16px; }
+  .dh { display: flex; align-items: center; justify-content: space-between; font-size: 16px; margin-bottom: 12px; }
+  .x { color: var(--muted-fg); display: inline-flex; }
+  .qrbox { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 0 auto; }
+  .qrbox svg { display: block; width: 100%; height: auto; }
+  .qrbox.big { width: 264px; } .qrbox.mid { width: 196px; }
+  .amt { text-align: center; font-size: 26px; font-weight: 800; color: var(--primary); margin-top: 10px; font-variant-numeric: tabular-nums; }
+  .amt small { font-size: 16px; font-weight: 700; } .amt.s { font-size: 20px; margin-top: 8px; }
+  .amtsub { text-align: center; font-size: 12px; color: var(--muted-fg); }
+  .qrows { margin-top: 12px; border-top: 1px solid var(--border); }
+  .qrow { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #EEF2F6; font-size: 13px; }
+  .ql { width: 104px; color: var(--muted-fg); flex: none; } .qv { flex: 1; min-width: 0; }
+  .cp { width: 28px; height: 28px; border-radius: 5px; border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; color: #334155; flex: none; }
+  .cp.none { border: 0; }
+  .fund { font-size: 12px; color: var(--muted-fg); margin-top: 8px; }
+  .df { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .btn.sm { height: 28px; padding: 0 8px; font-size: 12px; gap: 5px; }
+  .pop { position: absolute; z-index: 21; top: 118px; right: 330px; width: 250px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 30px rgba(2,8,23,.22); padding: 14px; }
+  .pop::before { content: ""; position: absolute; top: -7px; right: 92px; width: 12px; height: 12px; background: #fff; border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
+  .pline { display: flex; align-items: center; gap: 6px; justify-content: center; font-size: 12.5px; margin-top: 6px; color: #334155; }
+  .pop .df { justify-content: center; margin-top: 10px; }
+  .phone-wrap { display: none; gap: 32px; padding: 24px; align-items: flex-start; }
+  .phone { width: 390px; height: 820px; border-radius: 44px; background: #0F172A; padding: 14px; flex: none; box-shadow: 0 10px 30px rgba(2,8,23,.3); }
+  .pscreen { position: relative; width: 100%; height: 100%; border-radius: 32px; overflow: hidden; background: var(--page); }
+  .phdr { height: 56px; background: var(--header-bg); color: #fff; display: flex; align-items: center; gap: 10px; padding: 18px 16px 0; }
+  .pbar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: #fff; }
+  .pbar b { flex: 1; font-size: 17px; }
+  .pbody { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .ghost-line { height: 40px; border-radius: 8px; background: #fff; border: 1px solid var(--border); } .ghost-line.s { height: 120px; }
+  .sheet { position: absolute; z-index: 21; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 18px 18px 0 0; padding: 8px 18px 26px; }
+  .sheet .qrbox.big { width: 250px; }
+  .grab { width: 40px; height: 5px; border-radius: 3px; background: #CBD5E1; margin: 0 auto 10px; }
+  .phone-note { max-width: 420px; background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(15,23,42,.15); font-size: 14px; }
+  .phone-note h3 { margin: 0 0 8px; } .phone-note p { margin: 0 0 8px; color: #334155; }
+  body[data-mode="a"] .pop, body[data-mode="b"] .dlg, body[data-mode="b"] .stage > .overlay { display: none; }
+  body[data-mode="m"] .wrap { display: none; } body[data-mode="m"] .phone-wrap { display: flex; }
+  .notes p { font-size: 13px; color: #334155; margin: 0 0 8px; }
+
+  .helpbtn .dot { display: none; position: absolute; top: 7px; right: 7px; width: 8px; height: 8px; border-radius: 50%; background: #FBBF24; box-shadow: 0 0 0 2px var(--header-bg); }
+  .helptitle { margin-left: 10px; color: #0F766E; display: none; }
+  .vbar .l { display: flex; align-items: center; }
+  .hintpop { display: none; position: absolute; z-index: 22; top: 70px; right: 199px; width: 320px; background: #fff; border: 1px solid #FDE68A; border-radius: 10px; box-shadow: 0 12px 30px rgba(2,8,23,.22); padding: 12px 14px; }
+  .hintpop::before { content: ""; position: absolute; top: -7px; right: 34px; width: 12px; height: 12px; background: #fff; border-left: 1px solid #FDE68A; border-top: 1px solid #FDE68A; transform: rotate(45deg); }
+  .hp-h { display: flex; align-items: center; gap: 8px; color: #78350F; } .hp-h svg { color: #D97706; }
+  .hintpop p { margin: 6px 0 10px; font-size: 13px; color: #1E293B; }
+  .hintpop .df { display: flex; align-items: center; gap: 8px; margin: 0; } .hintpop .off { margin-left: auto; font-size: 12px; color: var(--muted-fg); text-decoration: underline; }
+  .firstrun { display: none; align-items: center; gap: 10px; background: #FFFBEB; border: 1px solid #FDE68A; color: #78350F; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+  .firstrun > svg { color: #D97706; flex: none; }
+  .firstrun > span:nth-child(2) { flex: 1; }
+  .drawer { position: absolute; z-index: 22; top: 64px; right: 0; bottom: 0; width: 400px; background: #fff; border-left: 1px solid var(--border); box-shadow: -12px 0 30px rgba(2,8,23,.14); display: flex; flex-direction: column; }
+  .dhd { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border); }
+  .dhd > svg { color: #0F766E; margin-top: 2px; flex: none; }
+  .dhd > div { flex: 1; } .dhd b { font-size: 16px; }
+  .crumb { font-size: 12px; color: var(--muted-fg); }
+  .dbody { flex: 1; overflow: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+  .dbody > *, .sheet > * { flex: none; }
+  .dbody section h4, .sheet section h4 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted-fg); display: flex; align-items: center; gap: 6px; }
+  .dbody p, .sheet p { margin: 0; font-size: 13.5px; color: #1E293B; }
+  .thumb { position: relative; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; background: linear-gradient(135deg, #1457A3 0%, #0F2E5C 70%); color: #fff; }
+  .thumb::after { content: ""; position: absolute; inset: 38% 8% 10% 8%; border-radius: 6px; background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18); }
+  .th-brand { position: absolute; top: 10px; left: 12px; font-size: 11px; opacity: .8; }
+  .th-title { position: absolute; top: 26px; left: 12px; right: 12px; font-size: 17px; font-weight: 750; }
+  .th-play { position: absolute; z-index: 1; left: 50%; top: 62%; transform: translate(-50%, -50%); width: 54px; height: 38px; border-radius: 10px; background: #FF0000; display: flex; align-items: center; justify-content: center; }
+  .th-dur { position: absolute; z-index: 1; right: 8px; bottom: 8px; background: rgba(0,0,0,.75); font-size: 11px; font-weight: 700; padding: 1px 5px; border-radius: 4px; }
+  .yt { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #B91C1C; font-weight: 600; margin-top: -6px; }
+  .muted-s { color: var(--muted-fg); font-weight: 400; }
+  .steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  .steps li { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+  .sn { flex: none; width: 20px; height: 20px; border-radius: 50%; background: #CCFBF1; color: #0F766E; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; margin-top: 1px; }
+  .st { flex: 1; }
+  .ts { flex: none; display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; font-weight: 700; color: #B91C1C; background: #FEF2F2; border-radius: 10px; padding: 1px 7px; margin-top: 1px; }
+  .warn { background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 10px 12px; }
+  .warn h4 { color: #92400E !important; } .warn ul { margin: 0; padding-left: 18px; font-size: 13px; color: #78350F; }
+  .keys { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; }
+  .rel { display: flex; flex-direction: column; gap: 4px; } .rel a { display: flex; align-items: center; gap: 4px; color: var(--primary); font-size: 13px; }
+  .dft { border-top: 1px solid var(--border); padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted-fg); }
+  .dft a { color: var(--primary); display: inline-flex; align-items: center; gap: 5px; font-weight: 600; }
+  .hpop { position: absolute; z-index: 22; top: 136px; left: 300px; width: 340px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 30px rgba(2,8,23,.22); padding: 14px; display: none; }
+  .hpop::before { content: ""; position: absolute; top: -7px; left: 300px; width: 12px; height: 12px; background: #fff; border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
+  .hpop .pp { margin: 0 0 10px; font-size: 13px; color: #1E293B; }
+  .ring { box-shadow: 0 0 0 2px #FBBF24 !important; border-radius: 8px; }
+
+  body[data-mode="a"] .helpbtn { box-shadow: inset 0 0 0 2px #FBBF24; }
+  body[data-mode="b"] .drawer { display: none; } body[data-mode="b"] .hpop { display: block; } body[data-mode="b"] .helptitle { display: inline-flex; box-shadow: 0 0 0 2px #FBBF24; }
+  body[data-mode="c"] .drawer { display: none; } body[data-mode="c"] .hintpop { display: block; } body[data-mode="c"] .helpbtn .dot { display: block; }
+  body[data-mode="m"] .wrap { display: none; } body[data-mode="m"] .phone-wrap { display: flex; }
+  .note-a, .note-b, .note-c { display: none; }
+  body[data-mode="a"] .note-a, body[data-mode="b"] .note-b, body[data-mode="c"] .note-c { display: block; }
+  .sheet { max-height: 78%; overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+  .sheet .thumb { border-radius: 10px; }
+
+  .slow { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #CBD5E1; cursor: pointer; }
+  #helpBtn, #helpX { cursor: pointer; }
+  #helpX { border-radius: 6px; padding: 4px; margin: -4px; }
+  #helpX:hover { background: var(--muted); color: var(--fg); }
+  body[data-mode="a"] .helpbtn { box-shadow: none; }
+  .helpbtn.on { background: rgba(255,255,255,.18); }
+  .drawer { transform-origin: var(--ox, 100%) var(--oy, 0); }
+  .drawer[hidden] { display: none; }
+  .drawer.closing { animation: help-shrink var(--dur) cubic-bezier(.4, 0, .9, .5) forwards; pointer-events: none; }
+  .drawer.opening { animation: help-grow var(--dur) cubic-bezier(.1, .6, .3, 1) both; }
+  @keyframes help-shrink { from { transform: scale(1); opacity: 1; } 70% { opacity: .85; } to { transform: scale(.04); opacity: 0; border-radius: 40px; } }
+  @keyframes help-grow { from { transform: scale(.04); opacity: 0; border-radius: 40px; } to { transform: scale(1); opacity: 1; } }
+  .helpbtn.ping::after { content: ""; position: absolute; inset: 2px; border-radius: 50%; box-shadow: 0 0 0 2px #FBBF24; animation: help-ping calc(var(--dur) * 2.5) ease-out forwards; }
+  @keyframes help-ping { from { transform: scale(.7); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .drawer.closing, .drawer.opening, .helpbtn.ping::after { animation: none; } }
+  .note-cur, .note-new { display: none; }
+  body[data-close="cur"] .note-cur, body[data-close="new"] .note-new { display: block; }
+  .notes .trade { margin-top: 12px; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 8px 10px; color: #78350F; }
+  .log { margin-top: 12px; font-size: 12px; color: var(--muted-fg); border-top: 1px dashed var(--border); padding-top: 8px; }
+  .app { cursor: default; }
+  @media (max-width: 1700px) { .wrap { flex-direction: column; } .stage { flex: none; } .notes { width: 1280px; max-width: 100%; position: static; } .notes ol { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; } }
+</style></head>
+<body data-mode="a" data-close="new" style="--dur:200ms">
+<div class="bar">
+  <h1>Đóng khung Hướng dẫn: bấm ra ngoài</h1>
+  <div class="seg" role="group" aria-label="Cách đóng">
+    <button type="button" data-close="cur" aria-pressed="false">Hiện tại</button>
+    <button type="button" data-close="new" aria-pressed="true">Đề xuất</button>
+  </div>
+  <label class="slow"><input type="checkbox" id="slow"> Chạy chậm x5 để xem hiệu ứng</label>
+  <span class="hint">Bấm thử: nút ?, phím F1, Esc, nút X, hoặc bấm vào bất kỳ chỗ nào ngoài khung.</span>
+</div>
+<div class="wrap">
+  <div class="stage">
+    <div class="app" id="app">
+      <header class="hdr">
+        <div class="brand">
+          <span class="logo"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg></span>
+          <b>QLBanHang</b>
+          <span class="hbtn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg></span>
+        </div>
+        <div class="hsearch"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>Tìm khách hàng, báo giá, chức năng…<kbd>Ctrl K</kbd></div>
+        <div class="hright">
+          <span class="branch"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"></path><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"></path><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"></path><path d="M10 6h4"></path><path d="M10 10h4"></path><path d="M10 14h4"></path><path d="M10 18h4"></path></svg>CN01 — Chi nhánh chính<svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+          <span class="hbtn helpbtn" id="helpBtn" role="button" title="Hướng dẫn màn hình này (F1)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-help" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg><span class="dot"></span></span>
+          <span class="hbtn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg><span class="badge">3</span></span>
+          <span class="user"><span class="avatar">QT</span>Quản trị hệ thống<svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+        </div>
+      </header>
+
+      <nav class="side" aria-label="Menu chính">
+        <div class="msearch"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>Tìm menu…</div>
+        <a class="item"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Tổng quan</a>
+        <div class="group"><span class="tile" style="--c:#2563EB;--tint:#DCE7FD"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg></span><span class="l">Bán hàng</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#D97706;--tint:#FBEBD3"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"></path><path d="M6 18h12"></path><path d="M6 14h12"></path><rect width="12" height="12" x="6" y="10"></rect></svg></span><span class="l">Kho</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></div>
+        <div class="sub">
+          <a class="item"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"></path><path d="m6 11 6 6 6-6"></path><path d="M19 21H5"></path></svg>Phiếu nhập kho</a>
+          <a class="item active" style="position:relative"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 9-6-6-6 6"></path><path d="M12 3v14"></path><path d="M5 21h14"></path></svg>Phiếu xuất kho</a>
+          <a class="item"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>Tồn đầu kỳ</a>
+        </div>
+        <div class="group"><span class="tile" style="--c:#059669;--tint:#D2F1E6"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path></svg></span><span class="l">Thu chi</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#DC2626;--tint:#FBDCDC"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="M7 21h10"></path><path d="M12 3v18"></path><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path></svg></span><span class="l">Công nợ</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#7C3AED;--tint:#E9DFFD"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg></span><span class="l">Báo cáo</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#0891B2;--tint:#D3EEF4"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"></path><path d="M12 6v14"></path><path d="M8 8v12"></path><path d="M4 4v16"></path></svg></span><span class="l">Danh mục</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#4A5668;--tint:#E2E5EA"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span class="l">Hệ thống</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+      </nav>
+
+      <main class="main form">
+        <div class="vbar">
+          <div class="l">
+            <span class="ghost" aria-label="Quay lại"><svg class="ic t-muted" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></span>
+            <h2>Phiếu xuất kho PX00012</h2><span class="tbtn helptitle"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-help" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>Hướng dẫn</span>
+          </div>
+          <div class="btns">
+            <span class="btn"><svg class="ic t-print" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg>In<svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+            <span class="btn pri"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"></path><path d="M7 3v4a1 1 0 0 0 1 1h7"></path></svg>Cập nhật</span>
+            <span class="btn"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg>Hủy phiếu</span>
+            <span class="btn"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>Xóa</span>
+          </div>
+        </div>
+
+        <div class="fields" style="position:relative">
+          
+          <label class="req">Ngày xuất</label><span class="inp">14/10/2026 09:30</span>
+          <label class="req">Lý do xuất</label><span class="inp">Xuất bán hàng<span class="sel"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></span>
+          <label class="req">Kho</label><span class="inp">Kho chính<span class="sel"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></span>
+          <label>HTTT</label><span class="inp">Tiền mặt<span class="sel"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></span>
+          <label>Mã đối tượng</label><span class="inp"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>KH0012</span>
+          <label>Tên đối tượng</label><span class="inp ro span5">Công ty TNHH An Phát</span>
+          <label>Địa chỉ</label><span class="inp ro" style="grid-column: span 7">12 Nguyễn Văn Linh, phường Tân Phong, TP. Hồ Chí Minh</span>
+        </div>
+
+        <div class="tabsbox">
+          <div class="tabs">
+            <span class="tab on">Hàng hóa <span class="cnt">3</span></span>
+            <span class="tab">Thông tin khác</span>
+            <span class="tab">Thanh toán</span>
+            <span class="tab">Lịch sử</span>
+            <div class="tools">
+              <span class="tbtn"><svg class="ic t-create" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Thêm dòng</span>
+              <span class="tbtn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg>Cột &amp; phím Enter</span>
+              <span class="tbtn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 8h.01"></path><path d="M12 12h.01"></path><path d="M14 8h.01"></path><path d="M16 12h.01"></path><path d="M18 8h.01"></path><path d="M6 8h.01"></path><path d="M7 16h10"></path><path d="M8 12h.01"></path><rect width="20" height="16" x="2" y="4" rx="2"></rect></svg>Phím tắt</span>
+            </div>
+          </div>
+          <div class="gridwrap">
+            <table class="g">
+              <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Kho</th><th class="n">Số tấm</th><th class="n">Dài</th><th class="n">Rộng</th><th class="n">SL</th><th class="n">SL tồn</th><th class="n">Đơn giá</th><th class="n">Số tiền</th><th class="n">%CK</th><th class="n">%VAT</th><th class="n">Số còn lại</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="muted">1</td><td>CN-PE05</td><td>Tấm cách nhiệt PE OPP 5mm</td><td>m²</td><td>Kho chính</td><td class="n">10</td><td class="n">25</td><td class="n">1,2</td><td class="n">300</td><td class="n muted">1.250</td><td class="n">18.500</td><td class="n">5.550.000</td><td class="n">0</td><td class="n">10</td><td class="n net"><b>6.105.000</b></td><td class="act"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg></td></tr>
+                <tr class="cur"><td class="muted">2</td><td>CN-BTT50</td><td>Bông thủy tinh 50mm</td><td>cuộn</td><td>Kho chính</td><td class="n muted">—</td><td class="n muted">—</td><td class="n muted">—</td><td class="n">12</td><td class="n muted">40</td><td class="n">465.000</td><td class="n">5.580.000</td><td class="n">5</td><td class="n">10</td><td class="n net"><b>5.831.100</b></td><td class="act"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg></td></tr>
+                <tr><td class="muted">3</td><td>CN-EPS50</td><td>Tôn xốp EPS 50mm</td><td>m</td><td>Kho chính</td><td class="n">8</td><td class="n">6</td><td class="n muted">—</td><td class="n">48</td><td class="n muted">96</td><td class="n">235.000</td><td class="n">11.280.000</td><td class="n">0</td><td class="n">10</td><td class="n net"><b>12.408.000</b></td><td class="act"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg></td></tr>
+              </tbody>
+            </table>
+            <div class="gfill"></div>
+          </div>
+        </div>
+
+        <div class="totals">
+          <div class="trow">
+            <div class="l"><span>3 dòng</span><span>Tiền hàng <b>22.410.000</b></span><span>CK <b>279.000</b></span><span>VAT <b>2.213.100</b></span><span>Phí VC <b>300.000</b></span><span>CK đơn <b>0</b></span><span>Đã thanh toán <b>10.000.000</b></span></div>
+            <span class="tot">Tổng thanh toán: 24.644.100</span>
+          </div>
+          <div class="debt">
+            
+            <span class="who">KH0012 — Công ty TNHH An Phát</span>
+            <span>Phải thu <b>18.200.000</b> <span class="ar"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></span> sau phiếu <b>32.844.100</b></span>
+            <span>Phải trả <b>0</b></span>
+            <span>Hạn mức <b>50.000.000</b></span>
+            <span>Còn được nợ sau phiếu <b>17.155.900</b></span>
+            <span>Quá hạn <b>0</b></span>
+          </div>
+        </div>
+      </main><aside class="drawer" aria-label="Hướng dẫn">
+  <div class="dhd"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-book-open" aria-hidden="true"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg><div><b>Phiếu xuất kho</b><div class="crumb">Kho › Phiếu xuất kho · thêm mới và sửa phiếu</div></div><span class="x" id="helpX" role="button" title="Đóng hướng dẫn"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></span></div>
+  <div class="dbody">
+  <div class="thumb ">
+  <div class="th-brand">QLBanHang · Hướng dẫn</div>
+  <div class="th-title">Lập phiếu xuất bán hàng</div>
+  <div class="th-play"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#fff" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg></div>
+  <div class="th-dur">2:35</div>
+</div>
+  <div class="yt"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-youtube" aria-hidden="true"><path d="M2.5 17a24.12 24.12 0 0 1 0-10 2 2 0 0 1 1.4-1.4 49.56 49.56 0 0 1 16.2 0A2 2 0 0 1 21.5 7a24.12 24.12 0 0 1 0 10 2 2 0 0 1-1.4 1.4 49.55 49.55 0 0 1-16.2 0A2 2 0 0 1 2.5 17"></path><path d="m10 15 5-3-5-3z"></path></svg><span>Xem trên YouTube</span><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-external-link" aria-hidden="true"><path d="M15 3h6v6"></path><path d="M10 14 21 3"></path><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path></svg><span class="muted-s">· phụ đề tiếng Việt</span></div>
+  <section><h4>Màn hình này dùng để</h4>
+    <p>Ghi nhận hàng xuất khỏi kho: bán cho khách, trả hàng nhà cung cấp, xuất dùng nội bộ. Phiếu xuất bán trừ tồn kho và tăng công nợ phải thu của khách.</p></section>
+  <section><h4>Các bước chính</h4><ol class="steps"><li><span class="sn">1</span><span class="st">Chọn <b>Lý do xuất</b> (Xuất bán hàng) và <b>Kho</b>.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:08</span></li><li><span class="sn">2</span><span class="st">Gõ mã hoặc tên khách ở <b>Mã đối tượng</b>, Enter để chọn.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:21</span></li><li><span class="sn">3</span><span class="st">Nhập hàng ở lưới: mã hàng → số lượng → đơn giá. Enter sang ô kế tiếp, <span class="kbd">Insert</span> thêm dòng.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:40</span></li><li><span class="sn">4</span><span class="st">Xem <b>Tổng thanh toán</b> và dải công nợ của khách ở cuối phiếu.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>1:32</span></li><li><span class="sn">5</span><span class="st">Khách trả ngay: chọn HTTT và nhập <b>Số tiền thanh toán</b> ở tab Thanh toán. Phiếu thu được tạo tự động.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>1:50</span></li><li><span class="sn">6</span><span class="st">Bấm <b>Lưu</b> (<span class="kbd">Ctrl S</span>), rồi In phiếu 02-VT nếu cần.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>2:15</span></li></ol></section>
+  <section class="warn"><h4><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-triangle-alert" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>Lưu ý</h4>
+    <ul><li>Khách đã ngừng theo dõi thì không chọn được.</li><li>Vượt hạn mức nợ: hệ thống cảnh báo hoặc chặn, tùy cấu hình Hạn mức nợ.</li><li>Xuất quá số tồn: có cảnh báo âm kho trước khi lưu.</li></ul></section>
+  <section><h4><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-keyboard" aria-hidden="true"><path d="M10 8h.01"></path><path d="M12 12h.01"></path><path d="M14 8h.01"></path><path d="M16 12h.01"></path><path d="M18 8h.01"></path><path d="M6 8h.01"></path><path d="M7 16h10"></path><path d="M8 12h.01"></path><rect width="20" height="16" x="2" y="4" rx="2"></rect></svg>Phím tắt</h4>
+    <div class="keys"><span><span class="kbd">Ctrl S</span> Lưu</span><span><span class="kbd">Alt 1–4</span> Đổi tab</span><span><span class="kbd">Insert</span> Thêm dòng</span><span><span class="kbd">Ctrl Del</span> Xóa dòng</span></div></section>
+  <section><h4>Xem thêm</h4>
+    <div class="rel"><a><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>Phiếu thu tự động từ phiếu xuất</a><a><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>Hạn mức nợ của khách</a><a><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>In phiếu 02-VT: ba cách in giá</a></div></section></div>
+  <div class="dft"><span></span><span>Cập nhật 15/10/2026</span></div>
+</aside><div class="hpop" role="dialog" aria-label="Hướng dẫn nhanh">
+  <p class="pp">Ghi nhận hàng xuất khỏi kho. Phiếu xuất bán trừ tồn và tăng công nợ phải thu.</p>
+  <ol class="steps"><li><span class="sn">1</span><span class="st">Chọn <b>Lý do xuất</b> (Xuất bán hàng) và <b>Kho</b>.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:08</span></li><li><span class="sn">2</span><span class="st">Gõ mã hoặc tên khách ở <b>Mã đối tượng</b>, Enter để chọn.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:21</span></li><li><span class="sn">3</span><span class="st">Nhập hàng ở lưới: mã hàng → số lượng → đơn giá. Enter sang ô kế tiếp, <span class="kbd">Insert</span> thêm dòng.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:40</span></li></ol>
+  <div class="df"><span class="btn sm"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>Video 2:35</span><span class="btn sm pri" style="margin-left:auto">Xem đầy đủ <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-chevron-right" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+</div><div class="hintpop" role="status">
+  <div class="hp-h"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-lightbulb" aria-hidden="true"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path><path d="M9 18h6"></path><path d="M10 22h4"></path></svg><b>Lần đầu dùng Phiếu xuất kho?</b></div>
+  <p>Bấm <b>?</b> hoặc <span class="kbd">F1</span> để xem 6 bước chính và video 2:35. Khung mở bên phải, vẫn nhập phiếu được.</p>
+  <div class="df"><span class="btn sm pri"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-help" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg>Xem hướng dẫn</span><span class="btn sm">Ẩn</span><a class="off">Không hiện gợi ý nữa</a></div>
+</div>
+</div>
+  </div>
+  <aside class="notes">
+  <h2>Bấm ra ngoài là đóng, thu nhỏ về nút ?</h2>
+  <p class="sub">Màn Phiếu xuất kho thật, dữ liệu mẫu. Khung đang mở như khi người dùng bấm F1.</p>
+  <div class="note-cur">
+    <p><b>Hiện tại.</b> Trên laptop, bấm ra ngoài khung không có tác dụng. Muốn đóng phải bấm nút X hoặc nhấn Esc, và khung biến mất ngay, không có hiệu ứng.</p>
+  </div>
+  <div class="note-new">
+    <ol>
+      <li><span class="num">1</span><span>Bấm vào <b>bất kỳ chỗ nào ngoài khung</b> (form, menu trái, thanh trên) thì khung thu nhỏ dần về nút <b>?</b> trong khoảng 0,2 giây. Nút ? nháy nhẹ một lần để người dùng biết hướng dẫn "cất" ở đâu.</span></li>
+      <li><span class="num">2</span><span>Cú bấm vẫn có tác dụng như bình thường: bấm vào ô nhập thì vừa đóng hướng dẫn vừa vào ô đó. Không phải bấm hai lần.</span></li>
+      <li><span class="num">3</span><span>Nút X, phím Esc, F1 và nút ? cũng đóng bằng cùng hiệu ứng. Mở lại thì khung bung ra từ nút ?, vẫn đúng bài đang đọc.</span></li>
+      <li><span class="num">4</span><span>Bấm bên trong khung (cuộn, bấm bài liên quan, xem video) thì khung không đóng.</span></li>
+      <li><span class="num">5</span><span>Màn hình rộng từ 1600px trở lên: khung là một cột riêng, không che form, nên <b>giữ như cũ</b>, bấm ra ngoài không đóng. Điện thoại: đã đóng khi chạm nền tối, chỉ thêm hiệu ứng trượt xuống.</span></li>
+      <li><span class="num">6</span><span>Máy bật "giảm chuyển động" (Windows/iOS) thì khung đóng ngay, không có hiệu ứng.</span></li>
+    </ol>
+    <p class="trade"><b>Đánh đổi:</b> trên laptop không còn vừa đọc hướng dẫn vừa nhập phiếu. Bù lại, F1 mở lại đúng chỗ đang đọc.</p>
+  </div>
+  <div class="log" id="log">Khung đang mở.</div>
+</aside>
+</div>
+<div class="phone-wrap">
+  <div class="phone"><div class="pscreen">
+    <div class="phdr"><b style="flex:1">QLBanHang</b><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-circle-help" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><path d="M12 17h.01"></path></svg><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bell" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></div>
+    <div class="pbar"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-arrow-left" aria-hidden="true"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg><b>Phiếu xuất PX00012</b></div>
+    <div class="pbody"><div class="ghost-line"></div><div class="ghost-line s"></div><div class="ghost-line"></div></div>
+    <div class="overlay"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="dh"><b>Hướng dẫn · Phiếu xuất kho</b><span class="x"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-x" aria-hidden="true"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></span></div>
+      <div class="thumb ">
+  <div class="th-brand">QLBanHang · Hướng dẫn</div>
+  <div class="th-title">Lập phiếu xuất bán hàng</div>
+  <div class="th-play"><svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="#fff" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg></div>
+  <div class="th-dur">2:35</div>
+</div>
+      <section><h4>Các bước chính</h4><ol class="steps"><li><span class="sn">1</span><span class="st">Chọn <b>Lý do xuất</b> (Xuất bán hàng) và <b>Kho</b>.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:08</span></li><li><span class="sn">2</span><span class="st">Gõ mã hoặc tên khách ở <b>Mã đối tượng</b>, Enter để chọn.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:21</span></li><li><span class="sn">3</span><span class="st">Nhập hàng ở lưới: mã hàng → số lượng → đơn giá. Enter sang ô kế tiếp, <span class="kbd">Insert</span> thêm dòng.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>0:40</span></li><li><span class="sn">4</span><span class="st">Xem <b>Tổng thanh toán</b> và dải công nợ của khách ở cuối phiếu.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>1:32</span></li><li><span class="sn">5</span><span class="st">Khách trả ngay: chọn HTTT và nhập <b>Số tiền thanh toán</b> ở tab Thanh toán. Phiếu thu được tạo tự động.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>1:50</span></li><li><span class="sn">6</span><span class="st">Bấm <b>Lưu</b> (<span class="kbd">Ctrl S</span>), rồi In phiếu 02-VT nếu cần.</span><span class="ts" title="Xem đoạn này trong video"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-play" aria-hidden="true"><polygon points="6 3 20 12 6 21 6 3"></polygon></svg>2:15</span></li></ol></section>
+      <section class="warn"><h4><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-triangle-alert" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg>Lưu ý</h4><ul><li>Vượt hạn mức nợ: cảnh báo hoặc chặn tùy cấu hình.</li></ul></section>
+    </div>
+  </div></div>
+  <div class="phone-note">
+    <h3>Trên điện thoại (PWA)</h3>
+    <p>Nút <b>?</b> ở thanh đầu trang, cạnh chuông thông báo. Cùng nội dung với khung bên phải, mở thành tấm trượt từ dưới lên.</p>
+    <p>Bấm video thì mở app YouTube. Bấm mốc giờ ở một bước thì video chạy từ đúng đoạn đó.</p>
+    <p>Phần Phím tắt ẩn trên điện thoại.</p>
+  </div>
+</div>
+<script>
+(() => {
+  const body = document.body;
+  const drawer = document.querySelector('.drawer');
+  const btn = document.getElementById('helpBtn');
+  const x = document.getElementById('helpX');
+  const log = document.getElementById('log');
+  const slow = document.getElementById('slow');
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)');
+  let open = true;
+  const say = (t) => { log.textContent = t; };
+  const animated = () => body.dataset.close === 'new' && !reduce.matches;
+
+  // Shrink toward the centre of the ? button: the origin can lie outside the drawer box.
+  const aimAtButton = () => {
+    const d = drawer.getBoundingClientRect();
+    const b = btn.getBoundingClientRect();
+    drawer.style.setProperty('--ox', (b.left + b.width / 2 - d.left) + 'px');
+    drawer.style.setProperty('--oy', (b.top + b.height / 2 - d.top) + 'px');
+  };
+
+  const setOpen = (next, why) => {
+    if (next === open) return;
+    open = next;
+    btn.classList.toggle('on', open);
+    drawer.classList.remove('closing', 'opening');
+    if (open) {
+      drawer.hidden = false;
+      if (animated()) { aimAtButton(); void drawer.offsetWidth; drawer.classList.add('opening'); }
+      say('Mở bằng ' + why + '.');
+      return;
+    }
+    say('Đóng bằng ' + why + '.');
+    if (!animated()) { drawer.hidden = true; return; }
+    aimAtButton();
+    drawer.classList.add('closing');
+    drawer.addEventListener('animationend', () => {
+      if (open) return;
+      drawer.hidden = true;
+      drawer.classList.remove('closing');
+      btn.classList.remove('ping'); void btn.offsetWidth; btn.classList.add('ping');
+    }, { once: true });
+  };
+
+  drawer.addEventListener('animationend', () => drawer.classList.remove('opening'));
+  btn.addEventListener('click', () => setOpen(!open, 'nút ?'));
+  x.addEventListener('click', () => setOpen(false, 'nút X'));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'F1') { e.preventDefault(); setOpen(!open, 'phím F1'); }
+    if (e.key === 'Escape') setOpen(false, 'phím Esc');
+  });
+  // Pointerdown, not click: the click itself still reaches what was pressed.
+  document.querySelector('.app').addEventListener('pointerdown', (e) => {
+    if (!open || body.dataset.close !== 'new') return;
+    if (drawer.contains(e.target) || btn.contains(e.target)) return;
+    setOpen(false, 'bấm ra ngoài khung');
+  });
+  document.querySelector('.app').addEventListener('pointerdown', (e) => {
+    if (open && body.dataset.close === 'cur' && !drawer.contains(e.target) && !btn.contains(e.target)) {
+      say('Bấm ra ngoài: khung vẫn mở (cách hiện tại).');
+    }
+  });
+
+  slow.addEventListener('change', () => body.style.setProperty('--dur', slow.checked ? '1000ms' : '200ms'));
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+    body.dataset.close = b.dataset.close;
+    document.querySelectorAll('.seg button').forEach((o) => o.setAttribute('aria-pressed', String(o === b)));
+    setOpen(true, 'đổi phương án');
+  }));
+  btn.classList.add('on');
+  const m = new URLSearchParams(location.search).get('close');
+  if (m) document.querySelector('.seg button[data-close="' + m + '"]').click();
+})();
+</script>
+</body></html>

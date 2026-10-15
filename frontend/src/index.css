@@ -115,3 +115,21 @@
   .pl-safe { padding-left: env(safe-area-inset-left); }
   .pr-safe { padding-right: env(safe-area-inset-right); }
 }
+
+/* One ring around the help button after the help panel shrinks into it. */
+@layer utilities {
+  .help-ping::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border-radius: 9999px;
+    box-shadow: 0 0 0 2px hsl(var(--icon-warn));
+    pointer-events: none;
+    animation: help-ping 500ms ease-out forwards;
+  }
+}
+
+@keyframes help-ping {
+  from { transform: scale(0.7); opacity: 1; }
+  to { transform: scale(1.5); opacity: 0; }
+}

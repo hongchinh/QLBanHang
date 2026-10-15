@@ -130,9 +130,10 @@ vi.mock('@/features/stock-vouchers/hooks', () => ({
     error: null,
     refetch: vi.fn(),
   }),
-  usePartnerSearch: (type: string, keyword: string, activeOnly?: boolean) => {
-    partnerSearchMock(type, keyword, activeOnly);
-    return { data: keyword ? partnerResults.data : [], isLoading: false, isError: false };
+  // Forwards every argument so a test can see an extra or a missing one.
+  usePartnerSearch: (...args: unknown[]) => {
+    partnerSearchMock(...args);
+    return { data: args[1] ? partnerResults.data : [], isLoading: false, isError: false };
   },
   useCreateStockVoucher: () => mutation(createMock),
   useUpdateStockVoucher: () => mutation(updateMock),

@@ -141,10 +141,10 @@ describe('CashVoucherHeader layout (section-01 §1.1)', () => {
     expect(byId('cash-partner').closest('.form-inline-grid')).toHaveClass('form-align-top');
   });
 
-  it('searches active partners of the voucher type without a reason', () => {
-    renderHeader();
+  it.each(['Receipt', 'Payment'] as const)('searches active partners of the %s voucher type without a reason', (type) => {
+    renderHeader({ type, labels: CASH_VOUCHER_LABELS[type] });
 
-    expect(partnerSearchMock).toHaveBeenLastCalledWith('Receipt', expect.any(String), true);
+    expect(partnerSearchMock).toHaveBeenLastCalledWith(type, expect.any(String), true);
   });
 });
 

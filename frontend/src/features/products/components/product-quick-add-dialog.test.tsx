@@ -14,6 +14,7 @@ const createMock = vi.fn();
 const refetchGroups = vi.fn();
 const refetchUnits = vi.fn();
 let unitsError = false;
+let unitsLoading = false;
 
 vi.mock('@/features/products/hooks', () => ({
   useProductGroups: () => ({
@@ -23,8 +24,8 @@ vi.mock('@/features/products/hooks', () => ({
     refetch: refetchGroups,
   }),
   useUnits: () => ({
-    data: unitsError ? undefined : [{ id: UNIT_ID, code: 'TAM', name: 'Tấm' }],
-    isLoading: false,
+    data: unitsError || unitsLoading ? undefined : [{ id: UNIT_ID, code: 'TAM', name: 'Tấm' }],
+    isLoading: unitsLoading,
     isError: unitsError,
     refetch: refetchUnits,
   }),
@@ -77,6 +78,7 @@ describe('ProductQuickAddDialog', () => {
     refetchUnits.mockReset();
     vi.mocked(toast).mockReset();
     unitsError = false;
+    unitsLoading = false;
   });
 
   it('a code-like seed fills Mã and focuses Tên', async () => {
@@ -97,6 +99,13 @@ describe('ProductQuickAddDialog', () => {
   it('an empty seed focuses Mã', async () => {
     renderDialog('');
     await waitFor(() => expect(screen.getByLabelText('Mã hàng hóa')).toHaveFocus());
+  });
+
+  it('while the lookups load, focus is in the dialog rather than the cell behind it', async () => {
+    unitsLoading = true;
+    renderDialog('');
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(dialog).toHaveFocus());
   });
 
   it('has its own title and no status field', async () => {

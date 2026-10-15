@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { ProductFormFields } from '@/features/products/components/product-form-fields';
@@ -34,8 +34,12 @@ export function ProductQuickAddDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-4xl max-h-[90vh] overflow-y-auto"
-        // The form renders after the lookups load, so QuickAddBody focuses the first field itself.
-        onOpenAutoFocus={(e) => e.preventDefault()}
+        // The form renders after the lookups load, so QuickAddBody focuses the first field itself; until then
+        // focus sits on the dialog so keystrokes do not reach the cell behind it.
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          (e.currentTarget as HTMLElement).focus();
+        }}
         aria-describedby={undefined}
         onCloseAutoFocus={onCloseAutoFocus}
       >
@@ -55,8 +59,6 @@ function QuickAddBody({ onOpenChange, seed, onCreated }: Pick<ProductQuickAddDia
   const save = useSaveProduct();
   // Local: a unit get-or-create failure happens before the mutation and never reaches save.error.
   const [error, setError] = useState('');
-  // useSaveProduct hands a repeat call the same promise; this keeps the toast and onCreated to one.
-  const submitting = useRef(false);
 
   const { code, name } = splitTypedProductText(seed);
   const loading = groups.isLoading || units.isLoading;
@@ -68,8 +70,6 @@ function QuickAddBody({ onOpenChange, seed, onCreated }: Pick<ProductQuickAddDia
   }, [ready, code]);
 
   async function handleSubmit(parsed: ProductFormParsed) {
-    if (submitting.current) return;
-    submitting.current = true;
     save.reset();
     setError('');
     try {
@@ -80,8 +80,6 @@ function QuickAddBody({ onOpenChange, seed, onCreated }: Pick<ProductQuickAddDia
     } catch (err) {
       setError(getErrorMessage(err));
       toast({ variant: 'destructive', title: 'Không thể lưu', description: formatApiErrorDetails(err) });
-    } finally {
-      submitting.current = false;
     }
   }
 

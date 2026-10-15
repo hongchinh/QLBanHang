@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Controller, useForm, type Resolver, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
@@ -54,7 +54,7 @@ export interface ProductFormFieldsProps {
   submitting: boolean;
   submitError: string;
   hasSubmitError: boolean;
-  onSubmit: (parsed: ProductFormParsed) => void;
+  onSubmit: (parsed: ProductFormParsed) => void | Promise<void>;
   onCancel: () => void;
   /** Back link + title. The quick add dialog has its own title, so it turns this off. */
   showHeader?: boolean;
@@ -93,10 +93,30 @@ export function ProductFormFields({
   });
   const locked = !!initial?.hasInventoryActivity;
 
+  // One submit at a time: react-hook-form does not block a second handleSubmit while the first onSubmit runs,
+  // and the ref is checked before validation so that time is covered too (state would lag a repeating key).
+  const busy = useRef(false);
+  const submitGuarded = form.handleSubmit(async (parsed) => {
+    try {
+      await onSubmit(parsed);
+    } finally {
+      busy.current = false;
+    }
+  });
+  async function guardedSubmit(e?: React.BaseSyntheticEvent) {
+    if (busy.current) {
+      e?.preventDefault();
+      return;
+    }
+    busy.current = true;
+    await submitGuarded(e);
+    busy.current = false; // validation failed: onSubmit never ran
+  }
+
   function handleEnterKeys(e: React.KeyboardEvent<HTMLFormElement>) {
     if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.altKey || e.metaKey) return;
     const submit = () => {
-      if (!submitting) void form.handleSubmit(onSubmit)();
+      if (!submitting) void guardedSubmit();
     };
     if (e.ctrlKey) {
       if (e.shiftKey) return;
@@ -133,7 +153,7 @@ export function ProductFormFields({
       )}
 
       <form
-        onSubmit={form.handleSubmit(onSubmit)}
+        onSubmit={guardedSubmit}
         onKeyDownCapture={enterNavigation ? handleEnterKeys : undefined}
         className="space-y-4"
       >

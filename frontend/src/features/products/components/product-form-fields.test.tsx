@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ProductFormFields } from './product-form-fields';
@@ -157,6 +157,27 @@ describe('ProductFormFields Enter navigation', () => {
     byId('code').focus();
     await user.keyboard('{Control>}{Enter}{/Control}');
     await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+  });
+
+  it('ignores a second submit (form submit or Ctrl+Enter) while onSubmit is pending, then submits again', async () => {
+    const user = userEvent.setup();
+    let finish!: () => void;
+    const onSubmit = vi.fn().mockReturnValueOnce(new Promise<void>((r) => (finish = r))).mockResolvedValue(undefined);
+    setup({ enterNavigation: true, onSubmit });
+    await fillValid(user);
+    const form = byId('name').closest('form') as HTMLFormElement;
+    fireEvent.submit(form);
+    fireEvent.submit(form);
+    byId('code').focus();
+    await user.keyboard('{Control>}{Enter}{Enter}{/Control}');
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+
+    finish();
+    await new Promise((r) => setTimeout(r, 0));
+    fireEvent.submit(form);
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(2));
   });
 
   it('(h) Ctrl+Enter with an empty Tên does not submit and shows the error', async () => {

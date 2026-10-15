@@ -92,27 +92,23 @@ describe('useSaveProduct', () => {
     await expect(result.current.create(parsed())).rejects.toBe(err);
   });
 
-  it('isPending covers the typed-unit step and a second create joins the first save', async () => {
+  it('isPending covers the typed-unit step', async () => {
     let resolveUnit!: (u: { id: string }) => void;
     getOrCreateUnit.mockReturnValue(new Promise((r) => (resolveUnit = r)));
     createMutate.mockResolvedValue({ id: 'p1' });
     const { result } = setup();
     expect(result.current.isPending).toBe(false);
 
-    let first!: Promise<unknown>;
-    let second!: Promise<unknown>;
+    let saved!: Promise<unknown>;
     act(() => {
-      first = result.current.create(parsed({ unitId: 'Cuộn' }));
-      second = result.current.create(parsed({ unitId: 'Cuộn' }));
+      saved = result.current.create(parsed({ unitId: 'Cuộn' }));
     });
     expect(result.current.isPending).toBe(true);
-    expect(second).toBe(first);
 
     await act(async () => {
       resolveUnit({ id: 'u-new' });
-      await first;
+      await saved;
     });
-    expect(getOrCreateUnit).toHaveBeenCalledTimes(1);
     expect(createMutate).toHaveBeenCalledTimes(1);
     expect(result.current.isPending).toBe(false);
   });

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCreateProduct, useUpdateProduct } from '@/features/products/hooks';
 import { lookupsApi } from '@/features/products/api';
@@ -13,19 +13,15 @@ export function useSaveProduct() {
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   // Covers the whole save (typed-unit step + mutation): the mutations' own isPending is false during the unit step.
-  const inFlight = useRef<Promise<unknown> | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // One save at a time: a repeat call while one runs gets the same promise instead of starting another request.
-  function runOnce<T>(run: () => Promise<T>): Promise<T> {
-    if (inFlight.current) return inFlight.current as Promise<T>;
+  async function track<T>(run: () => Promise<T>): Promise<T> {
     setSaving(true);
-    const p = run().finally(() => {
-      inFlight.current = null;
+    try {
+      return await run();
+    } finally {
       setSaving(false);
-    });
-    inFlight.current = p;
-    return p;
+    }
   }
 
   // A unit typed by hand (not a UUID) is created on the fly, as the product page always did.
@@ -38,14 +34,14 @@ export function useSaveProduct() {
 
   return {
     create: (parsed: ProductFormParsed) =>
-      runOnce(async () => {
+      track(async () => {
         const created = await createProduct.mutateAsync(toCreatePayload(await resolveUnit(parsed)));
         // Cached "not found" searches must not hide the new product (search staleTime is 30 s).
         qc.invalidateQueries({ queryKey: productKeys.searches() });
         return created;
       }),
     update: (id: string, parsed: ProductFormParsed) =>
-      runOnce(async () => updateProduct.mutateAsync({ id, data: toUpdatePayload(await resolveUnit(parsed)) })),
+      track(async () => updateProduct.mutateAsync({ id, data: toUpdatePayload(await resolveUnit(parsed)) })),
     isPending: saving || createProduct.isPending || updateProduct.isPending,
     error: createProduct.error ?? updateProduct.error,
     isError: createProduct.isError || updateProduct.isError,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Copy, Download, FileText, Loader2, Plus, Share2, Trash2, Undo2 } from 'lucide-react';
+import { CircleHelp, Copy, Download, ExternalLink, FileText, Lightbulb, Loader2, Play, Plus, Share2, Trash2, Undo2 } from 'lucide-react';
 import { ICONS, ICON_TONES, iconDef, type IconName } from './icon-registry';
 
 describe('icon registry', () => {
@@ -18,6 +18,10 @@ describe('icon registry', () => {
     ['copy', Copy, undefined],
     ['download', Download, undefined],
     ['share', Share2, undefined],
+    ['help', CircleHelp, undefined],
+    ['helpHint', Lightbulb, 'warn'],
+    ['video', Play, undefined],
+    ['externalLink', ExternalLink, undefined],
   ])('%s maps to its drawing and tone', (name, icon, tone) => {
     expect(iconDef(name).icon).toBe(icon);
     expect(iconDef(name).tone).toBe(tone);

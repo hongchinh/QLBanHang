@@ -1,6 +1,9 @@
 /** Any open dialog: Radix Dialog content has role="dialog", an AlertDialog role="alertdialog". */
 export const DIALOG_SELECTOR = '[role="dialog"], [role="alertdialog"]';
 
+/** Radix wraps every popper (popover, select list, tooltip) in this element; a role="dialog" inside it is a popover, not a modal. */
+export const POPPER_WRAPPER_SELECTOR = '[data-radix-popper-content-wrapper]';
+
 /** The page area of the app layout, where the routed page lives. The app header and the sidebar are outside it. */
 export const PAGE_AREA_SELECTOR = 'main#main-content';
 

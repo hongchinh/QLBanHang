@@ -163,3 +163,45 @@ describe('useUiStore pinnedNavPaths', () => {
     expect(useUiStore.getState().pinnedNavPaths).toEqual({});
   });
 });
+
+describe('useUiStore help', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useUiStore.setState({ helpOpen: false, helpHintSeen: {}, helpHintsOff: {} });
+  });
+
+  it('openHelp, closeHelp and toggleHelp set helpOpen', () => {
+    useUiStore.getState().openHelp();
+    expect(useUiStore.getState().helpOpen).toBe(true);
+    useUiStore.getState().closeHelp();
+    expect(useUiStore.getState().helpOpen).toBe(false);
+    useUiStore.getState().toggleHelp();
+    expect(useUiStore.getState().helpOpen).toBe(true);
+    useUiStore.getState().toggleHelp();
+    expect(useUiStore.getState().helpOpen).toBe(false);
+  });
+
+  it('markHelpHintSeen keeps one entry per key and a list per user', () => {
+    useUiStore.getState().markHelpHintSeen('u1', 'stock-out.form');
+    useUiStore.getState().markHelpHintSeen('u1', 'stock-out.form');
+    expect(useUiStore.getState().helpHintSeen).toEqual({ u1: ['stock-out.form'] });
+    useUiStore.getState().markHelpHintSeen('u2', 'receipts.form');
+    expect(useUiStore.getState().helpHintSeen).toEqual({ u1: ['stock-out.form'], u2: ['receipts.form'] });
+  });
+
+  it('turnOffHelpHints turns the hints off for that user only', () => {
+    useUiStore.getState().turnOffHelpHints('u1');
+    expect(useUiStore.getState().helpHintsOff.u1).toBe(true);
+    expect(useUiStore.getState().helpHintsOff.u2).toBeUndefined();
+  });
+
+  it('persists the hint state but not whether the panel is open', () => {
+    useUiStore.getState().openHelp();
+    useUiStore.getState().markHelpHintSeen('u1', 'stock-out.form');
+    useUiStore.getState().turnOffHelpHints('u1');
+    const state = readPersisted()?.state;
+    expect(state?.helpHintSeen).toEqual({ u1: ['stock-out.form'] });
+    expect(state?.helpHintsOff).toEqual({ u1: true });
+    expect(state).not.toHaveProperty('helpOpen');
+  });
+});

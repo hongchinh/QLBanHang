@@ -49,8 +49,7 @@ export function SalesLeaderboard({ items, loading, empty, drillHref }: SalesLead
                 <div className="h-full bg-foreground/70" style={{ width: `${pct}%` }} />
               </div>
               <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                <span>{formatNumber(it.confirmedCount)} BG</span>
-                {it.conversionRate != null && <span>CR {it.conversionRate.toFixed(1)}%</span>}
+                <span>{formatNumber(it.voucherCount)} phiếu</span>
                 <span
                   className={cn(
                     'inline-flex items-center gap-0.5',

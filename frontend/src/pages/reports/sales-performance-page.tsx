@@ -21,7 +21,7 @@ import type { SalesLeaderboardItem } from '@/features/dashboard/types';
 import { DeltaArrow } from '@/features/dashboard/components/delta-arrow';
 import { formatDelta, formatNumber, formatVnd, formatVndShort } from '@/features/dashboard/format';
 
-type SortKey = 'rank' | 'revenue' | 'confirmedCount' | 'conversionRate' | 'deltaPct';
+type SortKey = 'rank' | 'revenue' | 'voucherCount' | 'deltaPct';
 
 export function SalesPerformancePage() {
   const { from, to, setRange, setPreset } = useDashboardParams();
@@ -71,14 +71,11 @@ export function SalesPerformancePage() {
               <TableRow>
                 <TableHead className="w-12">#</TableHead>
                 <TableHead>Sale</TableHead>
-                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('confirmedCount')}>
-                  Số BG xác nhận{sortIcon('confirmedCount')}
+                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('voucherCount')}>
+                  Số phiếu{sortIcon('voucherCount')}
                 </TableHead>
                 <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('revenue')}>
                   Doanh thu{sortIcon('revenue')}
-                </TableHead>
-                <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('conversionRate')}>
-                  Conversion{sortIcon('conversionRate')}
                 </TableHead>
                 <TableHead className="cursor-pointer text-right" onClick={() => toggleSort('deltaPct')}>
                   Δ kỳ trước{sortIcon('deltaPct')}
@@ -88,14 +85,14 @@ export function SalesPerformancePage() {
             <TableBody>
               {leaderboard.isLoading && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                     Đang tải…
                   </TableCell>
                 </TableRow>
               )}
               {!leaderboard.isLoading && sorted.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={5} className="text-center text-sm text-muted-foreground">
                     Chưa có dữ liệu.
                   </TableCell>
                 </TableRow>
@@ -110,11 +107,8 @@ export function SalesPerformancePage() {
                   >
                     <TableCell className="font-semibold text-muted-foreground">{idx + 1}</TableCell>
                     <TableCell className="font-medium">{it.fullName}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatNumber(it.confirmedCount)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatNumber(it.voucherCount)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatVnd(it.revenue)}</TableCell>
-                    <TableCell className="text-right tabular-nums">
-                      {it.conversionRate != null ? `${it.conversionRate.toFixed(1)}%` : '—'}
-                    </TableCell>
                     <TableCell
                       className={cn(
                         'text-right tabular-nums',
@@ -135,29 +129,14 @@ export function SalesPerformancePage() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Top 10 doanh thu</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SalesBarChart data={top10} dataKey="revenue" formatter={formatVndShort} tooltipFormatter={formatVnd} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Top 10 tỉ lệ chuyển đổi</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SalesBarChart
-              data={[...top10].sort((a, b) => (b.conversionRate ?? 0) - (a.conversionRate ?? 0))}
-              dataKey="conversionRate"
-              formatter={(v: number) => `${v.toFixed(1)}%`}
-              tooltipFormatter={(v: number) => `${v.toFixed(1)}%`}
-            />
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Top 10 doanh thu</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SalesBarChart data={top10} formatter={formatVndShort} tooltipFormatter={formatVnd} />
+        </CardContent>
+      </Card>
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={() => navigate('/reports/revenue')}>
           Xem chi tiết doanh thu
@@ -169,18 +148,16 @@ export function SalesPerformancePage() {
 
 function SalesBarChart({
   data,
-  dataKey,
   formatter,
   tooltipFormatter,
 }: {
   data: SalesLeaderboardItem[];
-  dataKey: 'revenue' | 'conversionRate';
   formatter: (v: number) => string;
   tooltipFormatter: (v: number) => string;
 }) {
   const rows = data.map((d) => ({
     name: d.fullName,
-    value: dataKey === 'conversionRate' ? (d.conversionRate ?? 0) : d.revenue,
+    value: d.revenue,
   }));
   return (
     <div className="h-72 w-full">
@@ -201,10 +178,8 @@ function compareLeaderboard(a: SalesLeaderboardItem, b: SalesLeaderboardItem, ke
   switch (key) {
     case 'revenue':
       return b.revenue - a.revenue;
-    case 'confirmedCount':
-      return b.confirmedCount - a.confirmedCount;
-    case 'conversionRate':
-      return (b.conversionRate ?? -Infinity) - (a.conversionRate ?? -Infinity);
+    case 'voucherCount':
+      return b.voucherCount - a.voucherCount;
     case 'deltaPct':
       return (b.deltaPct ?? -Infinity) - (a.deltaPct ?? -Infinity);
     case 'rank':

@@ -153,7 +153,7 @@ export function AdminDashboardPage() {
                 id: c.customerId,
                 name: c.customerName,
                 primary: c.revenue,
-                secondary: `${formatNumber(c.quotationCount)} BG`,
+                secondary: `${formatNumber(c.voucherCount)} phiếu`,
               }))}
             />
           </CardContent>

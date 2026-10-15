@@ -41,7 +41,7 @@ function DetailRow({ label, value, copyValue }: { label: string; value: ReactNod
           type="button"
           variant="ghost"
           size="icon"
-          aria-label="Sao chép"
+          aria-label={`Sao chép ${label.toLowerCase()}`}
           title="Sao chép"
           onClick={() => void copyText(copyValue)}
         >
@@ -74,7 +74,7 @@ function PaymentQrDetails({ qr, voucherCode }: { qr: VoucherPaymentQr; voucherCo
     <div className="space-y-3">
       <div className="flex justify-center">
         <div className="rounded-lg border bg-white p-1">
-          <QRCodeCanvas ref={qrRef} value={qr.payload} size={QR_SIZE} level="M" marginSize={4} bgColor="#ffffff" />
+          <QRCodeCanvas ref={qrRef} value={qr.payload} size={QR_SIZE} level="M" boostLevel={false} marginSize={4} bgColor="#ffffff" />
         </div>
       </div>
       <div className="text-center">
@@ -120,10 +120,11 @@ function PaymentQrBody({
 }) {
   const canManageFunds = useAuthStore((s) => s.hasPermission('cash.catalogs.manage'));
 
-  if (query.isLoading) {
+  // isFetching, not isLoading: the dialog stays mounted while closed, so on a reopening the old answer is still there.
+  if (query.isFetching) {
     return (
       <div role="status" className="flex items-center justify-center py-16 text-muted-foreground">
-        <AppIcon name="loading" size={24} />
+        <AppIcon name="loading" size={24} label="Đang tải" />
       </div>
     );
   }
@@ -187,7 +188,7 @@ export function PaymentQrDialog({ kind, id, voucherCode, open, onOpenChange }: P
       <SheetContent
         side="bottom"
         data-testid="payment-qr-sheet"
-        className="pb-safe max-h-[90dvh] space-y-4 overflow-y-auto rounded-t-xl"
+        className="grid max-h-[90dvh] overflow-y-auto rounded-t-xl pb-[max(1.5rem,env(safe-area-inset-bottom))]"
       >
         {header}
         {body}

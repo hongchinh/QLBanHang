@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import { AxiosError } from 'axios';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -15,14 +16,23 @@ const mocks = vi.hoisted(() => ({
   shareOrDownload: vi.fn(),
   composeQrImage: vi.fn(),
   canvasToBlob: vi.fn(),
+  toast: vi.fn(),
 }));
 
 vi.mock('qrcode.react', () => ({
   QRCodeCanvas: forwardRef<
     HTMLCanvasElement,
-    { value: string; size: number; level: string; marginSize: number }
-  >(({ value, size, level, marginSize }, ref) => (
-    <canvas ref={ref} data-testid="qr" data-value={value} data-level={level} data-margin={marginSize} width={size} />
+    { value: string; size: number; level: string; marginSize: number; boostLevel?: boolean }
+  >(({ value, size, level, marginSize, boostLevel }, ref) => (
+    <canvas
+      ref={ref}
+      data-testid="qr"
+      data-value={value}
+      data-level={level}
+      data-margin={marginSize}
+      data-boost={String(boostLevel)}
+      width={size}
+    />
   )),
 }));
 vi.mock('@/features/voucher-payment-qr/hooks', () => ({ useVoucherPaymentQr: mocks.useVoucherPaymentQr }));
@@ -34,6 +44,7 @@ vi.mock('./qr-actions', async (importOriginal) => {
   const actual: Record<string, unknown> = await importOriginal();
   return { ...actual, copyText: mocks.copyText, shareOrDownload: mocks.shareOrDownload };
 });
+vi.mock('@/lib/use-toast', () => ({ toast: mocks.toast }));
 vi.mock('./qr-image', () => ({ composeQrImage: mocks.composeQrImage, canvasToBlob: mocks.canvasToBlob }));
 
 const qr: VoucherPaymentQr = {
@@ -59,7 +70,7 @@ function stubMatchMedia(matches: boolean) {
 }
 
 function hookResult(overrides: Record<string, unknown> = {}) {
-  return { data: qr, isLoading: false, isError: false, error: null, refetch: vi.fn(), ...overrides };
+  return { data: qr, isLoading: false, isFetching: false, isError: false, error: null, refetch: vi.fn(), ...overrides };
 }
 
 function renderDialog(open = true) {
@@ -91,6 +102,7 @@ describe('PaymentQrDialog', () => {
     expect(canvas).toHaveAttribute('data-value', qr.payload);
     expect(canvas).toHaveAttribute('data-level', 'M');
     expect(canvas).toHaveAttribute('data-margin', '4');
+    expect(canvas).toHaveAttribute('data-boost', 'false');
     expect(canvas).toHaveAttribute('width', '264');
     expect(screen.getByText('1.000.000')).toBeInTheDocument();
     expect(screen.getByText('QR chuyển khoản')).toBeInTheDocument();
@@ -126,9 +138,9 @@ describe('PaymentQrDialog', () => {
     const user = userEvent.setup();
     renderDialog();
     const rowOf = (label: string) => screen.getByText(label).parentElement as HTMLElement;
-    await user.click(within(rowOf('Số tài khoản')).getByRole('button', { name: 'Sao chép' }));
+    await user.click(within(rowOf('Số tài khoản')).getByRole('button', { name: 'Sao chép số tài khoản' }));
     expect(mocks.copyText).toHaveBeenLastCalledWith('0123456789');
-    await user.click(within(rowOf('Nội dung')).getByRole('button', { name: 'Sao chép' }));
+    await user.click(within(rowOf('Nội dung')).getByRole('button', { name: 'Sao chép nội dung' }));
     expect(mocks.copyText).toHaveBeenLastCalledWith('PX000318');
     await user.click(screen.getByRole('button', { name: 'Sao chép thông tin' }));
     expect(mocks.copyText).toHaveBeenLastCalledWith(buildQrInfoText(qr));
@@ -151,7 +163,31 @@ describe('PaymentQrDialog', () => {
     expect(mocks.canvasToBlob).toHaveBeenCalledWith(composed);
   });
 
+  it('tells the user when the picture cannot be made', async () => {
+    mocks.composeQrImage.mockReturnValue(document.createElement('canvas'));
+    mocks.canvasToBlob.mockRejectedValue(new Error('no picture'));
+    const user = userEvent.setup();
+    renderDialog();
+    await user.click(screen.getByRole('button', { name: 'Tải ảnh QR' }));
+    await waitFor(() =>
+      expect(mocks.toast).toHaveBeenCalledWith({ title: 'Không tạo được ảnh QR', variant: 'destructive' }),
+    );
+    expect(mocks.shareOrDownload).not.toHaveBeenCalled();
+  });
+
   describe('422 message', () => {
+    it('reads the message from the real transport shape', () => {
+      withError(
+        new AxiosError('Request failed', 'ERR_BAD_REQUEST', undefined, undefined, {
+          status: 422,
+          data: { success: false, error: { code: 'PAYMENT_QR_UNAVAILABLE', message: 'Phiếu đã hủy.' } },
+        } as never),
+      );
+      renderDialog();
+      expect(screen.getByText('Phiếu đã hủy.')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Thử lại' })).not.toBeInTheDocument();
+    });
+
     it('shows the message without a link', () => {
       withError(new ApiCallError({ code: 'PAYMENT_QR_UNAVAILABLE', message: 'Phiếu đã hủy.' }));
       mocks.hasPermission.mockReturnValue(true);
@@ -193,10 +229,19 @@ describe('PaymentQrDialog', () => {
   });
 
   it('loading', () => {
-    mocks.useVoucherPaymentQr.mockReturnValue(hookResult({ data: undefined, isLoading: true }));
+    mocks.useVoucherPaymentQr.mockReturnValue(hookResult({ data: undefined, isLoading: true, isFetching: true }));
     renderDialog();
     expect(document.querySelector('[data-icon="loading"]')).toBeInTheDocument();
     expect(screen.queryByTestId('qr')).not.toBeInTheDocument();
+  });
+
+  it('hides the previous answer while the server is asked again', () => {
+    mocks.useVoucherPaymentQr.mockReturnValue(hookResult({ isFetching: true }));
+    renderDialog();
+    expect(document.querySelector('[data-icon="loading"]')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Đang tải' })).toBeInTheDocument();
+    expect(screen.queryByTestId('qr')).not.toBeInTheDocument();
+    expect(screen.queryByText('1.000.000')).not.toBeInTheDocument();
   });
 
   it('dialog or sheet', () => {

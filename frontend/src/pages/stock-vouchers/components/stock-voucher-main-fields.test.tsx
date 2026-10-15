@@ -103,8 +103,8 @@ describe('StockVoucherMainFields', () => {
       expect(container).not.toBeNull();
       expect(container).toContainElement(byId('stock-partner-name'));
       const row = container?.closest('.form-inline-grid');
-      expect(row).toHaveClass('form-cols-stock-partner');
-      expect(row).not.toHaveClass('form-cols-stock-main-2');
+      // Exactly these classes: the old two-field row class is gone.
+      expect(row).toHaveAttribute('class', 'form-inline-grid form-cols-stock-partner');
     });
 
     it('renames the address label to Đ.chỉ, still pointing at stock-partner-address', () => {

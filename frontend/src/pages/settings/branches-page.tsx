@@ -7,6 +7,7 @@ import { useBranches, useDeleteBranch } from '@/features/branches/hooks';
 import { branchKeys } from '@/features/branches/keys';
 import { useSwitchWorkingBranch } from '@/features/branches/use-switch-working-branch';
 import type { Branch } from '@/features/branches/types';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
@@ -16,11 +17,13 @@ import { formatDateOnly } from '@/lib/date-only';
 import { toast } from '@/lib/use-toast';
 import { useBranchStore } from '@/stores/branch-store';
 import { BranchFormDialog, BranchOpeningDateDialog } from './branch-form-dialog';
+import { DemoBranchDeleteDialog } from './demo-branch-delete-dialog';
 
 export function BranchesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Branch | undefined>();
   const [pendingDelete, setPendingDelete] = useState<Branch | null>(null);
+  const [pendingDemoDelete, setPendingDemoDelete] = useState<Branch | null>(null);
   const [openingDateTarget, setOpeningDateTarget] = useState<Branch | null>(null);
 
   const { data, isLoading, isError, error } = useBranches();
@@ -56,6 +59,27 @@ export function BranchesPage() {
       { header: 'Tên', accessorKey: 'name' },
       { header: 'Địa chỉ', accessorKey: 'address', cell: ({ row }) => row.original.address ?? '' },
       {
+        header: 'Loại',
+        id: 'kind',
+        cell: ({ row }) => {
+          const branch = row.original;
+          if (!branch.isDemo) return null;
+          return (
+            <div className="flex flex-wrap items-center gap-1">
+              <Badge variant="info">Demo</Badge>
+              {branch.sampleDataStatus === 'Running' && (
+                <Badge variant="warning">Đang tạo dữ liệu {branch.sampleDataProgress ?? 0}%</Badge>
+              )}
+              {branch.sampleDataStatus === 'Failed' && (
+                <Badge variant="destructive" title={branch.sampleDataError ?? undefined}>
+                  Lỗi tạo dữ liệu
+                </Badge>
+              )}
+            </div>
+          );
+        },
+      },
+      {
         header: 'Khóa sổ đến',
         accessorKey: 'lockedUntil',
         cell: ({ row }) => formatDateOnly(row.original.lockedUntil),
@@ -89,14 +113,28 @@ export function BranchesPage() {
             >
               <AppIcon name="edit" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Xóa chi nhánh"
-              onClick={() => setPendingDelete(row.original)}
-            >
-              <AppIcon name="delete" />
-            </Button>
+            {row.original.isDemo ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Xóa chi nhánh demo"
+                className="disabled:pointer-events-auto disabled:cursor-not-allowed"
+                disabled={row.original.sampleDataStatus === 'Running'}
+                title={row.original.sampleDataStatus === 'Running' ? 'Đang tạo dữ liệu mẫu' : undefined}
+                onClick={() => setPendingDemoDelete(row.original)}
+              >
+                <AppIcon name="delete" />
+              </Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Xóa chi nhánh"
+                onClick={() => setPendingDelete(row.original)}
+              >
+                <AppIcon name="delete" />
+              </Button>
+            )}
           </div>
         ),
       },
@@ -181,6 +219,12 @@ export function BranchesPage() {
       <BranchFormDialog open={dialogOpen} onOpenChange={setDialogOpen} initial={editTarget} />
 
       <BranchOpeningDateDialog branch={openingDateTarget} onClose={() => setOpeningDateTarget(null)} />
+
+      <DemoBranchDeleteDialog
+        branch={pendingDemoDelete}
+        onClose={() => setPendingDemoDelete(null)}
+        onDeleted={(id) => void leaveDeletedWorkingBranch(id)}
+      />
 
       <ConfirmDialog
         open={!!pendingDelete}

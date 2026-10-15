@@ -33,7 +33,7 @@ QLBanHang/
 | `OrderMgmt.Domain` | Entities, enums, permissions, role codes and domain exceptions |
 | `OrderMgmt.Application` | Use-case services, DTOs, validators, Mapster registrations and application ports |
 | `OrderMgmt.Infrastructure` | EF Core persistence, migrations, seed, JWT/BCrypt/refresh-token implementations, Excel/PDF export and system services |
-| `OrderMgmt.WebApi` | Controllers, middleware, authorization policies, current-user adapter and startup configuration |
+| `OrderMgmt.WebApi` | Controllers, middleware, authorization policies, current-user adapter, background jobs (`BackgroundJobs/`) and startup configuration |
 | `OrderMgmt.IntegrationTests` | xUnit integration tests using `WebApplicationFactory` and Testcontainers PostgreSQL |
 
 ## Backend Modules
@@ -74,6 +74,7 @@ QLBanHang/
 | Company profile | `Domain/Entities/Organization/CompanyProfile.cs` (one row, `Id = 1`), `Application/Organization/Company`, `Infrastructure/Persistence/Configurations/CompanyProfileConfiguration.cs`, `CompanyProfileController.cs` |
 | TT133 report forms | `Application/Tt133` (`ITt133ExportService` / `Tt133ExportService`, `ITt133FormRenderer`, `Models/Tt133ExportModels.cs`, `Validators`, `Tt133ExportOptions`), `Infrastructure/Excel/Tt133` (`Tt133FormBuilder`, `Tt133Column`, `Tt133FormRenderer` and one class per form: `CashBookForm`, `DebtLedgerForm`, `DebtSummaryForm`, `DebtReconciliationForm`, `StockSummaryForm`, `StockDetailForm`, `StockCardForm`), `Tt133ExportController.cs`. Voucher prints (01-TT, 02-TT, 01-VT, 02-VT): `Application/Tt133/Vouchers` (`IVoucherPrintService` / `VoucherPrintService`, `IVoucherFormRenderer`, `VoucherPrintModels.cs`, `VoucherPrintRules`), `Application/Tt133/Services/Tt133ExportSupport.cs` (context, sheet count, file conversion shared with the report exports), `Infrastructure/Excel/Tt133/Vouchers` (`VoucherFormBuilder`, `CashVoucherForm`, `StockVoucherForm`, `VoucherFormRenderer`) |
 | Executive dashboard | `Application/Dashboards/Executive`: `Models` (`ExecutiveModels.cs` with the queries, then `SalesModels`, `CashModels`, `DebtModels`, `InventoryModels`, `OverviewModels`), `Common` (`ExecutiveScope`, `ExecutivePeriod`, `ExecutiveDay`, `ExecutiveMath`, `ExecutiveSeries`, `DebtPositionMath`, `OpenDebtItem`), `Interfaces` (`IExecutiveScopeResolver` and one interface per service), `Services` (`SalesMetricsService`, `CashMetricsService`, `DebtMetricsService`, `InventoryMetricsService`, `ExecutiveOverviewService`, `ExecutiveScopeResolver`, `ExecutiveLookups`), `Validators/ExecutiveQueryValidators.cs`, `Realtime/DashboardDomains.cs`; helpers shared with the inventory reports `Application/Inventory/Common/CostProvisional.cs` and `StockValueSplit.cs`; `Domain/Constants/StockReasonCodes.cs` (`XBH`, `NTL`); `ExecutiveDashboardController.cs`; tests in `tests/OrderMgmt.IntegrationTests/ExecutiveDashboard` (pure tests in `ExecutiveDashboard/Unit`, base class `ExecutiveDashboardTestBase`) |
+| Demo branches and sample data | `Application/Organization/SampleData`: `Models` (`SampleDataJob`, `SampleDataRunResult`, `SampleDataPlan` with its specs and step records), `Interfaces` (`ISampleDataQueue`, `ISampleDataGenerator`, `ISampleDataRunner`, `IDemoBranchService`), `Services` (`SampleDataQueue`, `SampleDataRunner`, `SampleStepExecutor`, `SampleCatalogWriter`, `SampleRunState`, `SampleDataPlanException`, `DemoBranchService`), `Generation` (the pure `SampleDataGenerator` and its helpers: `SampleRandom`, `SampleCalendar`, `SampleCatalog` with `SampleCatalogModels` (payment habits, sales tiers, product plans, customer profiles), `SampleOpeningBalances`, `SampleDocumentSimulator` (the day loop and schedule, split into the partial files `SampleDocumentSimulator.Sales.cs`, `.Stock.cs` and `.Cash.cs`), `SampleLedger`, and the volume knobs `SampleDataVolumes`); `WebApi/BackgroundJobs/SampleDataHostedService.cs` (the worker); the acting identity `Application/Common/Interfaces/IActingIdentity.cs` with `Application/Common/ActingIdentityHolder.cs`, read by `WebApi/Services/CurrentUser.cs` and `CurrentBranch.cs`; `Application/Inventory/StockVouchers/Services/ProductCostPrices.cs` (cost price recompute shared with the stock voucher saves); the flags on `Branch`, `Product` and `Customer`; endpoints on `BranchesController.cs`; tests in `tests/OrderMgmt.IntegrationTests/SampleData` (pure tests in `SampleData/Unit`) |
 | Real-time signals | `WebApi/Hubs` (`NotificationHub` at `/hubs/notifications` with the `user-{id}` and dashboard groups, `SignalRNotifier` implementing `Application/Notifications/Interfaces/IRealtimeNotifier`, `DashboardGroups.cs` with the event and group names), `WebApi/Filters/DashboardSignalAttribute.cs` (`[DashboardSignal]`, `[SkipDashboardSignal]`, `DashboardSignalFilter`) |
 
 ## API Controllers
@@ -98,7 +99,7 @@ QLBanHang/
 | `BanksController` | `/api/banks` — seeded Vietnamese bank list |
 | `PaymentQrController` | `/api/payment-qr/generate` — builds a VietQR payload string |
 | `MeBankAccountsController` | `/api/me/bank-accounts` CRUD + `/default`, scoped to the current user |
-| `BranchesController` | `/api/branches` CRUD, `/api/branches/{id}/lock` (period lock), `/api/branches/{id}/opening-date` |
+| `BranchesController` | `/api/branches` CRUD (POST takes `withSampleData`), `/api/branches/{id}/lock` (period lock), `/api/branches/{id}/opening-date`, GET `/api/branches/{id}/demo-deletion` (preview), DELETE `/api/branches/{id}/demo` (demo branch hard delete) |
 | `MeBranchesController` | `/api/me/branches` — default/working branch and switchable branches |
 | `WarehousesController` | `/api/warehouses` CRUD, scoped to the working branch |
 | `StockReasonsController` | `/api/stock-reasons` CRUD |
@@ -132,7 +133,8 @@ frontend/src/
 │   ├── activity-history/        # ActivityHistory: activity list of a document
 │   ├── customer-autocomplete/   # quotation customer picker + quick add
 │   ├── icons/                   # icon-registry.ts (business name → lucide drawing + tone, the only lucide-react importer), AppIcon, and the tests that block direct lucide imports and glyph-character icons
-│   ├── layout/                  # app shell, header, sidebar, search, notifications
+│   ├── layout/                  # app shell, header (header/header-branch-switcher.tsx marks a demo branch "(demo)"),
+│   │                            # sidebar, search, notifications
 │   │   ├── nav-config.ts        # sidebar groups/items, permissions, icons, sections
 │   │   └── sidebar/             # sidebar (wide), sidebar-rail + sidebar-flyout (collapsed), sidebar-search,
 │   │                            # sidebar-pin-chips, sidebar-group, sidebar-item, nav-search.ts (pure filter/highlight/active item)
@@ -152,7 +154,9 @@ frontend/src/
 │   ├── auth/
 │   ├── bank-accounts/           # saved receiving bank accounts (CRUD, current user)
 │   ├── banks/                   # read-only seeded bank list
-│   ├── branches/                # branches, /me/branches, useBranchContext, useSwitchWorkingBranch
+│   ├── branches/                # branches, /me/branches, useBranchContext, useSwitchWorkingBranch; demo branches:
+│   │                            # sample-data.ts (branchesRefetchInterval: poll while a branch is Running),
+│   │                            # useDemoBranchDeletionPreview / useDeleteDemoBranch, keys.ts branchKeys.demoDeletion
 │   ├── branding/
 │   ├── cash-common/             # ['cash'] root key, shared cash/debt types and labels
 │   ├── cash-reasons/
@@ -211,7 +215,9 @@ frontend/src/
 │   ├── quotations/
 │   ├── reports/
 │   ├── settings/                # also branches (period lock, opening date), inventory and cash settings, numbering, recalc,
-│   │                            # company profile (/settings/company, Thông tin đơn vị)
+│   │                            # company profile (/settings/company, Thông tin đơn vị); branches-page.tsx ("Loại" column
+│   │                            # with the Demo / progress / error badges), branch-form-dialog.tsx (the sample data
+│   │                            # checkbox), demo-branch-delete-dialog.tsx (preview counts, type the code to confirm)
 │   ├── stock-reasons/
 │   ├── stock-vouchers/          # /stock-in and /stock-out list + form (main fields, tabs, line grid, totals bar, partner debt strip)
 │   ├── suppliers/

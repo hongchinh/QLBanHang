@@ -298,7 +298,14 @@ public class InventoryReportService : IInventoryReportService
         var ledger = _db.InventoryLedger.AsNoTracking()
             .Where(e => e.PostedAt < end && productIds.Contains(e.ProductId));
         if (request.Scope == ReportScope.Branch)
+        {
             ledger = ledger.Where(e => e.BranchId == branchId);
+        }
+        else
+        {
+            // S15: company scope skips demo branches, soft-deleted ones included.
+            ledger = ledger.Where(e => !_db.Branches.IgnoreQueryFilters().Any(b => b.Id == e.BranchId && b.IsDemo));
+        }
         if (request.WarehouseId is { } warehouseId)
             ledger = ledger.Where(e => e.WarehouseId == warehouseId);
         var sums = await ledger

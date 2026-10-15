@@ -61,3 +61,12 @@ public enum UserStatus
     Active = 1,
     Disabled = 0,
 }
+
+/// <summary>Progress of the background sample-data fill of a demo branch.</summary>
+public enum SampleDataStatus
+{
+    None = 0,
+    Running = 1,
+    Ready = 2,
+    Failed = 3,
+}

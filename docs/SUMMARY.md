@@ -8,7 +8,7 @@ System design, component interactions, data flows, deployment, and external inte
 
 | File | Description |
 | ---- | ----------- |
-| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile), the executive dashboard (metrics services, scope, routes and permissions, which figures are tested against which report, the real-time `DashboardChanged` SignalR signal), API response, soft-delete/audit, migration/seed, logging and frontend layering |
+| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile), the executive dashboard (metrics services, scope, routes and permissions, which figures are tested against which report, the real-time `DashboardChanged` SignalR signal), demo branches and sample data (create flow through the queue, worker, runner and business services, acting identity, status and start-up recovery, hard delete order and sample catalog cleanup, company scope excluding demo branches, one dashboard signal per seed), API response, soft-delete/audit, migration/seed, logging and frontend layering |
 | [architecture/pwa-mobile.md](architecture/pwa-mobile.md) | PWA platform matrix (Android, desktop, iOS before and after install), iOS limits and safe-area rules, web push flow from NotificationService to the service worker and the NAVIGATE message, push prompt states, API cache allow-list, hosting (Caddy no-cache, API-origin icons, VAPID) and the manual test checklist |
 
 ## Codebase
@@ -17,7 +17,7 @@ Directory structure, entry points, API patterns, and key modules.
 
 | File | Description |
 | ---- | ----------- |
-| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms and voucher prints, the executive dashboard and the real-time signal), API controllers, entry points, runtime artifacts and production configuration keys |
+| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms and voucher prints, the executive dashboard, the real-time signal and the demo branches with `Application/Organization/SampleData` and `WebApi/BackgroundJobs`), API controllers, entry points, runtime artifacts and production configuration keys |
 
 ## Code Standard
 
@@ -25,7 +25,7 @@ Conventions, naming rules, tech stack versions, and development workflows.
 
 | File | Description |
 | ---- | ----------- |
-| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and voucher print (`IVoucherPrintService`, `Tt133ExportSupport`, nullable list bodies, selection through table meta) and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets), and the frontend icon registry (`AppIcon`, tones, the lucide import ban) |
+| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and voucher print (`IVoucherPrintService`, `Tt133ExportSupport`, nullable list bodies, selection through table meta) and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets), demo branch and background job patterns (`IActingIdentity` only in background work, `Channel` queue + `BackgroundService` with start-up recovery, the demo hard delete as the soft-delete exception, company-wide queries skip `IsDemo` branches), test doubles through `WithWebHostBuilder` + `ConfigureTestServices`, and the frontend icon registry (`AppIcon`, tones, the lucide import ban) |
 
 ## Project PDR
 
@@ -33,7 +33,7 @@ Product goals, use cases, business rules, and constraints.
 
 | File | Description |
 | ---- | ----------- |
-| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms, the TT133 voucher print forms and the executive dashboard), planned Round 3 scope and role dashboards, and non-goals |
+| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms, the TT133 voucher print forms, the executive dashboard and demo branches with sample data, with their limits), planned Round 3 scope and role dashboards, and non-goals |
 
 ## Other
 
@@ -70,6 +70,8 @@ Repository-specific docs outside the standard topic folders.
 | [brainstorms/261014-0618-mobile-manager-hub/section-02-events-and-notifications.md](brainstorms/261014-0618-mobile-manager-hub/section-02-events-and-notifications.md) | Round 3 (Zalo in round 6) — document events, fund balance movements taken from the fund guard, outbox and dispatcher, recipients and preferences, group destinations and channels, message format, edge cases |
 | [brainstorms/261014-0618-mobile-manager-hub/section-03-review.md](brainstorms/261014-0618-mobile-manager-hub/section-03-review.md) | Round 4 — post-posting review: scope, state transitions, rules (self-approval allowed), data, API, screens, notifications |
 | [brainstorms/261014-0618-mobile-manager-hub/section-04-bank-feed.md](brainstorms/261014-0618-mobile-manager-hub/section-04-bank-feed.md) | Round 5 — SePay webhook bank feed: provider comparison, webhook flow and payload mapping, security, bank accounts, visibility, product-goals change |
+| [brainstorms/261014-1601-branch-sample-data/SUMMARY.md](brainstorms/261014-1601-branch-sample-data/SUMMARY.md) | Brainstorm for training demo branches — "create with sample data" checkbox on new branch, shared `DM-` sample catalog, background seeder calling the business services in date order (opening balances + 3 months of documents), demo-branch hard delete, company-scope reports exclude demo branches, parallel-agent split |
+| [brainstorms/261014-1601-branch-sample-data/section-01-dataset-spec.md](brainstorms/261014-1601-branch-sample-data/section-01-dataset-spec.md) | Sample dataset content — code conventions, 30 insulation products, customers/suppliers with payment habits, opening balances, monthly document mix and rules, expected end state, volume fallbacks |
 | [plans/261014-2227-pwa-push-ios-foundation/SUMMARY.md](plans/261014-2227-pwa-push-ios-foundation/SUMMARY.md) | Plan for round 1 of the manager mobile hub — service worker push and notificationclick with SPA navigation, 180px apple-touch-icon and API-origin favicon, iOS meta and safe-area utilities, iOS install hint, Caddy no-cache for sw.js and the manifest, VAPID key in the frontend build, pwa-mobile.md; 3 phases |
 | [plans/archived/261013-2313-executive-dashboard/SUMMARY.md](plans/archived/261013-2313-executive-dashboard/SUMMARY.md) | Archived plan (executed; report in `EXECUTION-REPORT.md`) for the executive dashboard — permission `dashboard.executive`, read-only `Dashboards/Executive` module (sales, cash, debt, inventory metrics, branch comparison, attention, recent documents), `[DashboardSignal]` SignalR signal, `/dashboard/executive` page with overview and four deep-dive tabs |
 | [plans/archived/261013-0622-stock-voucher-form-tabs/SUMMARY.md](plans/archived/261013-0622-stock-voucher-form-tabs/SUMMARY.md) | Archived plan (executed, PR #8) for the stock voucher form redesign — backend PayableBalance, pure navigation/prefs/debt logic, T2 layout with tabs and debt strip, grid columns and keyboard |
@@ -78,6 +80,7 @@ Repository-specific docs outside the standard topic folders.
 | [plans/260522-2326-zalo-send-quotation/SUMMARY.md](plans/260522-2326-zalo-send-quotation/SUMMARY.md) | Plan for sending quotation files to a Zalo group via Zalo OA |
 | [plans/archived/260523-1530-pwa-progressive-web-app/SUMMARY.md](plans/archived/260523-1530-pwa-progressive-web-app/SUMMARY.md) | Implementation plan for PWA — 4 phases: installable, API cache, push backend, push frontend |
 | [plans/260528-1833-product-form-dialog/SUMMARY.md](plans/260528-1833-product-form-dialog/SUMMARY.md) | Plan for create/edit actions in the product catalog dialog |
+| [plans/archived/261014-1616-branch-sample-data/SUMMARY.md](plans/archived/261014-1616-branch-sample-data/SUMMARY.md) | Archived plan (executed; report in `EXECUTION-REPORT.md`, decisions pending the user's confirmation listed there) for demo branches with sample data — Branch/Product/Customer flags, acting identity for background work, deterministic dataset generator, background runner calling the business services, demo-branch hard delete with catalog cleanup, company-scope reports excluding demo branches, branches page UI; four parallel lanes |
 | [plans/archived/261006-2259-inventory-round1/SUMMARY.md](plans/archived/261006-2259-inventory-round1/SUMMARY.md) | Implementation plan for inventory Round 1 — stock vouchers, ledger, costing, reports |
 | [plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md](plans/archived/261007-2314-cash-debt-round2a/SUMMARY.md) | Implementation plan for Round 2A — receipts/payments, funds, fund transfers, receivables/payables with matching and offset, credit limits, debt balance/ledger and cash book reports |
 | [plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md](plans/archived/261012-1709-cash-debt-round2b/SUMMARY.md) | Implementation plan for Round 2B — debt documents, aging, overdue, by-salesperson and reconciliation reports |

@@ -48,6 +48,7 @@ using OrderMgmt.Application.CashDebt.Reports.Interfaces;
 using OrderMgmt.Application.CashDebt.Reports.Services;
 using OrderMgmt.Application.CashDebt.Settings.Interfaces;
 using OrderMgmt.Application.CashDebt.Settings.Services;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.References;
 using OrderMgmt.Application.Dashboards.Executive.Interfaces;
@@ -74,6 +75,9 @@ using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Services;
 using OrderMgmt.Application.Organization.Company.Interfaces;
 using OrderMgmt.Application.Organization.Company.Services;
+using OrderMgmt.Application.Organization.SampleData.Generation;
+using OrderMgmt.Application.Organization.SampleData.Interfaces;
+using OrderMgmt.Application.Organization.SampleData.Services;
 using OrderMgmt.Application.Payments.Interfaces;
 using OrderMgmt.Application.Payments.Services;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
@@ -103,6 +107,7 @@ public static class DependencyInjection
         ValidatorOptions.Global.PropertyNameResolver = (_, member, _) =>
             member is null ? null : JsonNamingPolicy.CamelCase.ConvertName(member.Name);
 
+        services.AddScoped<IActingIdentity, ActingIdentityHolder>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ICustomerService, CustomerService>();
         services.AddScoped<IProductService, ProductService>();
@@ -169,6 +174,12 @@ public static class DependencyInjection
         services.AddScoped<IDebtMetricsService, DebtMetricsService>();
         services.AddScoped<IInventoryMetricsService, InventoryMetricsService>();
         services.AddScoped<IExecutiveOverviewService, ExecutiveOverviewService>();
+
+        // Sample data (demo branches)
+        services.AddSingleton<ISampleDataQueue, SampleDataQueue>();
+        services.AddSingleton<ISampleDataGenerator, SampleDataGenerator>();
+        services.AddScoped<ISampleDataRunner, SampleDataRunner>();
+        services.AddScoped<IDemoBranchService, DemoBranchService>();
 
         return services;
     }

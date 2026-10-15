@@ -9,6 +9,8 @@ using OrderMgmt.Application.Inventory.Numbering;
 using OrderMgmt.Application.Inventory.OpeningStocks.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Interfaces;
 using OrderMgmt.Application.Organization.Branches.Models;
+using OrderMgmt.Application.Organization.SampleData.Interfaces;
+using OrderMgmt.Application.Organization.SampleData.Models;
 using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.CashDebt;
@@ -29,10 +31,12 @@ public class BranchService : IBranchService
     private readonly IOpeningDebtService _openingDebt;
     private readonly IAutoCashVoucherService _autoVouchers;
     private readonly IReferenceUsage _usage;
+    private readonly ISampleDataQueue _sampleDataQueue;
 
     public BranchService(IAppDbContext db, IDateTime clock, ICurrentUser currentUser, ICurrentBranch currentBranch,
         ITransactionRunner transaction, IInventoryLock inventoryLock, IOpeningStockService openingStock,
-        IOpeningDebtService openingDebt, IAutoCashVoucherService autoVouchers, IReferenceUsage usage)
+        IOpeningDebtService openingDebt, IAutoCashVoucherService autoVouchers, IReferenceUsage usage,
+        ISampleDataQueue sampleDataQueue)
     {
         _db = db;
         _clock = clock;
@@ -44,6 +48,7 @@ public class BranchService : IBranchService
         _openingDebt = openingDebt;
         _autoVouchers = autoVouchers;
         _usage = usage;
+        _sampleDataQueue = sampleDataQueue;
     }
 
     public async Task<MyBranchesDto> GetMyBranchesAsync(CancellationToken ct = default)
@@ -90,6 +95,7 @@ public class BranchService : IBranchService
         var code = request.Code.Trim();
         if (await _db.Branches.AnyAsync(b => b.Code == code, ct))
             throw new ConflictException($"Mã chi nhánh '{code}' đã tồn tại.");
+        var requestedBy = Guid.Empty;
 
         var branch = new Branch
         {
@@ -97,6 +103,12 @@ public class BranchService : IBranchService
             Name = request.Name.Trim(),
             Address = request.Address?.Trim(),
         };
+        if (request.WithSampleData)
+        {
+            requestedBy = _currentUser.UserId ?? throw new UnauthorizedAccessException();
+            branch.IsDemo = true;
+            branch.SampleDataStatus = SampleDataStatus.Running;
+        }
         _db.Branches.Add(branch);
         // A new branch starts with the default document numbering (D13), so vouchers can be numbered at once.
         foreach (var docType in DocumentNumberingDefaults.AllTypes)
@@ -104,6 +116,10 @@ public class BranchService : IBranchService
         // Every branch has a default cash fund (P18).
         _db.Funds.Add(new Fund { BranchId = branch.Id, Code = "QTM", Name = "Quỹ tiền mặt", Kind = FundKind.Cash, IsDefault = true });
         await _db.SaveChangesAsync(ct);
+        // Enqueue only once the branch row is committed, so the worker always finds it.
+        // A branch committed but never queued (a crash here) is failed by the worker's start-up recovery (S9).
+        if (request.WithSampleData)
+            _sampleDataQueue.Enqueue(new SampleDataJob(branch.Id, requestedBy));
         return ToDto(branch);
     }
 
@@ -122,6 +138,9 @@ public class BranchService : IBranchService
 
         if (branch.Id == BranchDefaults.MainBranchId)
             throw new ConflictException("Không thể xóa chi nhánh chính.");
+        // A demo branch has its own hard delete; a soft delete here would strand the rows the sample-data worker writes.
+        if (branch.IsDemo)
+            throw new ConflictException("DEMO_BRANCH_USE_DEMO_DELETE", "Chi nhánh demo phải xóa bằng chức năng Xóa chi nhánh demo.");
         // Soft-deleted users count too: their rows still reference the branch (review finding).
         if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.DefaultBranchId == id, ct))
             throw new ConflictException("Chi nhánh đang là chi nhánh mặc định của người dùng, không thể xóa.");
@@ -233,5 +252,9 @@ public class BranchService : IBranchService
         Address = b.Address,
         LockedUntil = b.LockedUntil,
         OpeningDate = b.OpeningDate,
+        IsDemo = b.IsDemo,
+        SampleDataStatus = b.SampleDataStatus,
+        SampleDataProgress = b.SampleDataProgress,
+        SampleDataError = b.SampleDataError,
     };
 }

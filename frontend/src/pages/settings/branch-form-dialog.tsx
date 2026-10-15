@@ -16,6 +16,8 @@ const editSchema = z.object({
   code: z.string(),
   name: z.string().trim().min(1, 'Tên chi nhánh không được để trống').max(255, 'Tối đa 255 ký tự'),
   address: z.string().max(1000, 'Tối đa 1000 ký tự'),
+  // Create only; kept in the shared shape so both resolvers type the same values.
+  withSampleData: z.boolean(),
 });
 
 // The code is entered only on create; it cannot change afterwards.
@@ -56,8 +58,21 @@ export function BranchFormDialog({ open, onOpenChange, initial }: Props) {
         await update.mutateAsync({ id: initial.id, data: { name: values.name.trim(), address } });
         toast({ variant: 'success', title: 'Đã cập nhật chi nhánh' });
       } else {
-        await create.mutateAsync({ code: values.code.trim(), name: values.name.trim(), address });
-        toast({ variant: 'success', title: 'Đã tạo chi nhánh' });
+        await create.mutateAsync({
+          code: values.code.trim(),
+          name: values.name.trim(),
+          address,
+          withSampleData: values.withSampleData,
+        });
+        if (values.withSampleData) {
+          toast({
+            variant: 'success',
+            title: 'Đã tạo chi nhánh demo',
+            description: 'Dữ liệu mẫu đang được tạo, có thể mất khoảng một phút.',
+          });
+        } else {
+          toast({ variant: 'success', title: 'Đã tạo chi nhánh' });
+        }
       }
       onOpenChange(false);
     } catch (err) {
@@ -94,6 +109,19 @@ export function BranchFormDialog({ open, onOpenChange, initial }: Props) {
             {errors.address && <p className="text-sm text-destructive">{errors.address.message}</p>}
           </div>
 
+          {!isEdit && (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <input id="withSampleData" type="checkbox" className="h-4 w-4" {...form.register('withSampleData')} />
+                <Label htmlFor="withSampleData">Tạo kèm dữ liệu mẫu để đào tạo</Label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tạo danh mục mẫu, tồn kho, công nợ, số dư quỹ đầu kỳ và khoảng 3 tháng chứng từ. Chi nhánh được đánh dấu
+                Demo và xóa được bằng nút "Xóa chi nhánh demo".
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isPending}>
               Hủy
@@ -113,6 +141,7 @@ function toDefaults(item?: Branch): FormValues {
     code: item?.code ?? '',
     name: item?.name ?? '',
     address: item?.address ?? '',
+    withSampleData: false,
   };
 }
 

@@ -8,6 +8,9 @@ public class Product : BaseEntity
     public string Code { get; set; } = default!;
     public string Name { get; set; } = default!;
 
+    /// <summary>Sample row created by the demo-branch data fill.</summary>
+    public bool IsSample { get; set; }
+
     public Guid? ProductGroupId { get; set; }
     public ProductGroup? ProductGroup { get; set; }
 

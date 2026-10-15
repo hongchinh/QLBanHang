@@ -1,3 +1,5 @@
+using OrderMgmt.Domain.Enums;
+
 namespace OrderMgmt.Application.Organization.Branches.Models;
 
 public class BranchDto
@@ -8,6 +10,10 @@ public class BranchDto
     public string? Address { get; set; }
     public DateOnly? LockedUntil { get; set; }
     public DateOnly? OpeningDate { get; set; }
+    public bool IsDemo { get; set; }
+    public SampleDataStatus SampleDataStatus { get; set; }
+    public int SampleDataProgress { get; set; }
+    public string? SampleDataError { get; set; }
 }
 
 public class CreateBranchRequest
@@ -15,6 +21,7 @@ public class CreateBranchRequest
     public string Code { get; set; } = default!;
     public string Name { get; set; } = default!;
     public string? Address { get; set; }
+    public bool WithSampleData { get; set; }
 }
 
 public class UpdateBranchRequest
@@ -40,4 +47,17 @@ public class MyBranchesDto
     public bool CanSwitch { get; set; }
     /// All branches when CanSwitch, otherwise only the default branch.
     public IReadOnlyList<BranchDto> Branches { get; set; } = Array.Empty<BranchDto>();
+}
+
+public class DemoBranchDeletionPreviewDto
+{
+    public int DocumentCount { get; set; }
+    public int ReassignedUserCount { get; set; }
+}
+
+public class DemoBranchDeletionResultDto
+{
+    public int ReassignedUserCount { get; set; }
+    public int KeptSampleProductCount { get; set; }
+    public int KeptSamplePartnerCount { get; set; }
 }

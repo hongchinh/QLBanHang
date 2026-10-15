@@ -61,7 +61,7 @@ public class Tt133ExportSupport
         {
             context.Address = profile?.Address;
             context.OpeningDate = await _db.Branches.AsNoTracking()
-                .Where(b => b.OpeningDate != null)
+                .Where(b => b.OpeningDate != null && !b.IsDemo)
                 .OrderBy(b => b.OpeningDate)
                 .Select(b => b.OpeningDate)
                 .FirstOrDefaultAsync(ct);

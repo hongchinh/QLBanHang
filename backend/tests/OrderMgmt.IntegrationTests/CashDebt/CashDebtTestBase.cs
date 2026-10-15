@@ -35,7 +35,8 @@ public abstract partial class CashDebtTestBase : InventoryTestBase
         return await runner.RunAsync(ct => work(scope.ServiceProvider, ct));
     }
 
-    /// Direct DB update of the settings singleton. Callers that change policies must restore Warn/Warn in a finally block.
+    /// Direct DB update of the settings singleton. Every test has its own clone database, so a changed policy needs no
+    /// restore.
     protected Task UpdateCashDebtSettingsAsync(Action<CashDebtSettings> mutate) => InDbAsync(async db =>
     {
         var settings = await db.CashDebtSettings.SingleAsync(s => s.Id == 1);

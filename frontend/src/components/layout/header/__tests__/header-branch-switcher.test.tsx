@@ -1,6 +1,6 @@
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HeaderBranchSwitcher } from '../header-branch-switcher';
@@ -86,6 +86,60 @@ describe('HeaderBranchSwitcher', () => {
     renderSwitcher('/');
 
     expect(screen.queryByRole('combobox', { name: 'Chi nhánh làm việc' })).not.toBeInTheDocument();
+  });
+
+  it('marks a demo branch with "(demo)" and leaves normal branches unmarked', async () => {
+    mockMyBranches({
+      ...MY_BRANCHES,
+      branches: [
+        MY_BRANCHES.branches[0],
+        { id: 'b3', code: 'DEMO1', name: 'CN demo', isDemo: true },
+      ],
+    });
+    const user = userEvent.setup();
+    renderSwitcher('/');
+
+    await user.click(screen.getByRole('combobox', { name: 'Chi nhánh làm việc' }));
+
+    expect(await screen.findByRole('option', { name: 'DEMO1 — CN demo (demo)' })).toBeInTheDocument();
+    const normal = screen.getByRole('option', { name: 'CN01 — Chi nhánh chính' });
+    expect(normal).not.toHaveTextContent('(demo)');
+  });
+
+  it('shows a non-truncated Demo badge beside the label of the selected demo branch, title keeps the full label', () => {
+    mockMyBranches({
+      ...MY_BRANCHES,
+      branches: [
+        MY_BRANCHES.branches[0],
+        { id: 'b3', code: 'DEMO1', name: 'CN demo', isDemo: true },
+      ],
+    });
+    act(() => useBranchStore.setState({ workingBranchId: 'b3' }));
+    renderSwitcher('/');
+
+    const trigger = screen.getByRole('combobox', { name: 'Chi nhánh làm việc (demo)' });
+    expect(trigger).toHaveTextContent('DEMO1 — CN demo');
+    expect(trigger).toHaveAttribute('title', 'DEMO1 — CN demo (demo)');
+    const badge = within(trigger).getByText('Demo');
+    // A button holds phrasing content only, so the badge is a span beside the label, not inside it.
+    expect(badge.tagName).toBe('SPAN');
+    expect(badge.parentElement).toBe(trigger);
+    // The trigger clamps its direct child spans; the badge keeps its own display and overflow and sits at the end.
+    expect(badge).toHaveClass('ml-auto', 'shrink-0', '!inline-flex', '!overflow-visible');
+    // The label is the other direct child span, which the trigger's clamp truncates.
+    const label = within(trigger).getByText('DEMO1 — CN demo');
+    expect(label.tagName).toBe('SPAN');
+    expect(label.parentElement).toBe(trigger);
+    expect(label).not.toContainElement(badge);
+    expect(trigger).toHaveClass('[&>span]:line-clamp-1');
+  });
+
+  it('shows no Demo badge in the trigger for a real branch', () => {
+    mockMyBranches(MY_BRANCHES);
+    renderSwitcher('/');
+
+    const trigger = screen.getByRole('combobox', { name: 'Chi nhánh làm việc' });
+    expect(within(trigger).queryByText('Demo')).not.toBeInTheDocument();
   });
 
   it('lists branches and switches working branch', async () => {

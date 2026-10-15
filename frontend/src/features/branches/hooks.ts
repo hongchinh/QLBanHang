@@ -1,8 +1,13 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { cashKeys } from '@/features/cash-common/keys';
+import { invalidatePartnerQueries } from '@/features/customers/hooks';
+import { productGroupKeys } from '@/features/product-groups/keys';
+import { lookupKeys, productKeys } from '@/features/products/keys';
 import { inventoryKeys } from '@/features/stock-vouchers/keys';
+import { warehouseKeys } from '@/features/warehouses/keys';
 import { branchesApi } from './api';
 import { branchKeys } from './keys';
+import { branchesRefetchInterval } from './sample-data';
 import type { CreateBranchRequest, UpdateBranchRequest } from './types';
 
 function invalidateBranches(qc: QueryClient) {
@@ -14,6 +19,9 @@ export function useBranches() {
   return useQuery({
     queryKey: branchKeys.lists(),
     queryFn: () => branchesApi.list(),
+    // Poll while a demo branch's sample data is being filled.
+    refetchInterval: (query) => branchesRefetchInterval(query.state.data),
+    refetchIntervalInBackground: false,
   });
 }
 
@@ -46,6 +54,32 @@ export function useDeleteBranch() {
   return useMutation({
     mutationFn: (id: string) => branchesApi.remove(id),
     onSuccess: () => invalidateBranches(qc),
+  });
+}
+
+export function useDemoBranchDeletionPreview(id: string | null) {
+  return useQuery({
+    queryKey: branchKeys.demoDeletion(id),
+    queryFn: () => branchesApi.deletionPreview(id!),
+    enabled: !!id,
+    staleTime: 0,
+  });
+}
+
+// The delete also hard-deletes the DM- products and partners, the DM product group and the branch's
+// warehouses, so the catalog lists and pickers are refetched too.
+export function useDeleteDemoBranch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => branchesApi.removeDemo(id),
+    onSuccess: () => {
+      invalidateBranches(qc);
+      invalidatePartnerQueries(qc);
+      qc.invalidateQueries({ queryKey: productKeys.all });
+      qc.invalidateQueries({ queryKey: productGroupKeys.all });
+      qc.invalidateQueries({ queryKey: lookupKeys.productGroups() });
+      qc.invalidateQueries({ queryKey: warehouseKeys.all });
+    },
   });
 }
 

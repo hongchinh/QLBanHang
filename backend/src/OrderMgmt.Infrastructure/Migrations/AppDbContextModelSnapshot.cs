@@ -1145,6 +1145,12 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsSample")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_sample");
+
                     b.Property<bool>("IsSupplier")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1333,6 +1339,12 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
+
+                    b.Property<bool>("IsSample")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_sample");
 
                     b.Property<decimal?>("Length")
                         .HasColumnType("numeric(18,4)")
@@ -3079,6 +3091,12 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("boolean")
                         .HasColumnName("is_deleted");
 
+                    b.Property<bool>("IsDemo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_demo");
+
                     b.Property<DateOnly?>("LockedUntil")
                         .HasColumnType("date")
                         .HasColumnName("locked_until");
@@ -3092,6 +3110,23 @@ namespace OrderMgmt.Infrastructure.Migrations
                     b.Property<DateOnly?>("OpeningDate")
                         .HasColumnType("date")
                         .HasColumnName("opening_date");
+
+                    b.Property<string>("SampleDataError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("sample_data_error");
+
+                    b.Property<int>("SampleDataProgress")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("sample_data_progress");
+
+                    b.Property<int>("SampleDataStatus")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("sample_data_status");
 
                     b.Property<DateTimeOffset?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -3118,7 +3153,10 @@ namespace OrderMgmt.Infrastructure.Migrations
                             Code = "CN01",
                             CreatedAt = new DateTimeOffset(new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
                             IsDeleted = false,
-                            Name = "Chi nhánh chính"
+                            IsDemo = false,
+                            Name = "Chi nhánh chính",
+                            SampleDataProgress = 0,
+                            SampleDataStatus = 0
                         });
                 });
 

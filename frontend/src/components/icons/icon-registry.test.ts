@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FileText, Loader2, Plus, Trash2, Undo2 } from 'lucide-react';
+import { CircleHelp, ExternalLink, FileText, Lightbulb, Loader2, Play, Plus, Trash2, Undo2 } from 'lucide-react';
 import { ICONS, ICON_TONES, iconDef, type IconName } from './icon-registry';
 
 describe('icon registry', () => {
@@ -15,6 +15,10 @@ describe('icon registry', () => {
     ['discardChanges', Undo2, 'muted'],
     ['exportPdf', FileText, 'print'],
     ['quotation', FileText, undefined],
+    ['help', CircleHelp, undefined],
+    ['helpHint', Lightbulb, 'warn'],
+    ['video', Play, undefined],
+    ['externalLink', ExternalLink, undefined],
   ])('%s maps to its drawing and tone', (name, icon, tone) => {
     expect(iconDef(name).icon).toBe(icon);
     expect(iconDef(name).tone).toBe(tone);

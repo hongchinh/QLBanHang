@@ -226,7 +226,7 @@ export function ProductTypeaheadCell({
       setEnterWaiting(true);
       return;
     }
-    // Tab and the arrows only ever walk the results; the add row is reached with the arrows (or F4), never with Tab.
+    // Tab only walks the results; the arrows also reach the add row.
     if (!open || rows.length === 0 || (e.key === 'Tab' && items.length === 0)) {
       if (e.key === 'Escape' && open) {
         e.preventDefault();
@@ -485,7 +485,8 @@ export function ProductTypeaheadCell({
             createdRef.current = null;
             if (created) {
               commit(created);
-              // Without nextFocusId (opening stock) the focus stays in the cell, as after a pick from the list;
+              // Without nextFocusId (opening stock, stock line grid) the focus stays in the cell, as after a pick
+              // from the list; the screen's onSelect then moves it to the next stop with a timer.
               // commit has set pickedAtRef, so the list does not reopen. With nextFocusId, commit moves on.
               if (!nextFocusId) inputRef.current?.focus();
               return;

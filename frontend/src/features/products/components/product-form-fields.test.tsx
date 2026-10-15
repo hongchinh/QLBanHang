@@ -112,3 +112,90 @@ describe('ProductFormFields', () => {
     expect(error.compareDocumentPosition(lastCard) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
   });
 });
+
+describe('ProductFormFields Enter navigation', () => {
+  const byId = (id: string) => document.getElementById(id) as HTMLElement;
+
+  async function fillValid(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(byId('name'), 'Tôn lạnh');
+    await user.click(byId('productGroupId'));
+    await user.click(screen.getByRole('option', { name: 'Tôn' }));
+    await user.type(byId('unitId'), 'Tấm');
+  }
+
+  it('(f) Enter walks Mã, Tên, Nhóm (closed), Đơn vị; Shift+Enter goes back', async () => {
+    const user = userEvent.setup();
+    setup({ enterNavigation: true });
+    byId('code').focus();
+    await user.keyboard('{Enter}');
+    expect(byId('name')).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(byId('productGroupId')).toHaveFocus();
+    expect(byId('productGroupId')).toHaveAttribute('aria-expanded', 'false');
+    await user.keyboard('{Enter}');
+    expect(byId('unitId')).toHaveFocus();
+    await user.keyboard('{Shift>}{Enter}{/Shift}');
+    expect(byId('productGroupId')).toHaveFocus();
+  });
+
+  it('(g) Enter on an open Nhóm Select picks the option and the form leaves focus alone', async () => {
+    const user = userEvent.setup();
+    setup({ enterNavigation: true });
+    byId('productGroupId').focus();
+    await user.keyboard('{ArrowDown}');
+    expect(byId('productGroupId')).toHaveAttribute('aria-expanded', 'true');
+    await user.keyboard('{Enter}');
+    await vi.waitFor(() => expect(byId('productGroupId')).toHaveAttribute('aria-expanded', 'false'));
+    expect(byId('productGroupId')).toHaveTextContent('Tôn');
+    expect(byId('unitId')).not.toHaveFocus();
+  });
+
+  it('(h) Ctrl+Enter submits a valid form', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = setup({ enterNavigation: true });
+    await fillValid(user);
+    byId('code').focus();
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+  });
+
+  it('(h) Ctrl+Enter with an empty Tên does not submit and shows the error', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = setup({ enterNavigation: true });
+    byId('code').focus();
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await vi.waitFor(() => expect(screen.getAllByText(/bắt buộc|Vui lòng|không được/i).length).toBeGreaterThan(0));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('(i) Enter on Ghi chú submits; Shift+Enter goes back to % CK bán', async () => {
+    const user = userEvent.setup();
+    const { onSubmit } = setup({ enterNavigation: true });
+    await fillValid(user);
+    byId('note').focus();
+    await user.keyboard('{Shift>}{Enter}{/Shift}');
+    expect(byId('salesDiscountRate')).toHaveFocus();
+    expect(onSubmit).not.toHaveBeenCalled();
+    byId('note').focus();
+    await user.keyboard('{Enter}');
+    await vi.waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+  });
+
+  it('(j) without enterNavigation Enter in Tên does not move to Nhóm', async () => {
+    const user = userEvent.setup();
+    setup({ initialName: 'X' });
+    byId('name').focus();
+    await user.keyboard('{Enter}');
+    expect(byId('productGroupId')).not.toHaveFocus();
+  });
+
+  it('(k) Enter in Đơn vị with the list open moves on and keeps the typed unit', async () => {
+    const user = userEvent.setup();
+    setup({ enterNavigation: true });
+    await user.type(byId('unitId'), 'Tấm');
+    expect(screen.getByRole('button', { name: 'Tấm' })).toBeInTheDocument();
+    await user.keyboard('{Enter}');
+    expect(byId('specification')).toHaveFocus();
+    expect(byId('unitId')).toHaveValue('Tấm');
+  });
+});

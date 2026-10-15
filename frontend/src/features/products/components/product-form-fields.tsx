@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
+import { focusNextInOrder } from '@/lib/enter-focus';
 
 const statuses = [
   { value: 'Active', label: 'Đang bán' },
@@ -34,6 +35,16 @@ const pricingModes = [
   { value: 'PerLinearMeter', label: 'Theo m dài' },
   { value: 'PerCubicMeter', label: 'Theo m³' },
 ] as const;
+
+// Field ids in visual order. Missing or disabled ones (status on create, locked fields) are skipped.
+const ENTER_ORDER = [
+  'code', 'name', 'productGroupId', 'unitId', 'specification', 'pricingMode', 'status',
+  'length', 'width', 'thickness', 'density',
+  'defaultPrice', 'costPrice', 'defaultTaxRate',
+  'trackInventory', 'priceIncludesVat', 'purchaseDiscountRate', 'salesDiscountRate',
+  'note',
+] as const;
+const SELECT_IDS: readonly string[] = ['productGroupId', 'pricingMode', 'status'];
 
 export interface ProductFormFieldsProps {
   isEdit: boolean;
@@ -50,7 +61,7 @@ export interface ProductFormFieldsProps {
   /** Prefill for a new product; ignored when `initial` is given. */
   initialCode?: string;
   initialName?: string;
-  /** Enter moves to the next field (quick add dialog). Not wired yet. */
+  /** Enter moves to the next field, Ctrl+Enter saves (quick add dialog). */
   enterNavigation?: boolean;
   /** Overrides the submit button text. */
   submitLabel?: string;
@@ -69,6 +80,7 @@ export function ProductFormFields({
   showHeader = true,
   initialCode,
   initialName,
+  enterNavigation,
   submitLabel,
 }: ProductFormFieldsProps) {
   const form = useForm<ProductFormValues, unknown, ProductFormParsed>({
@@ -80,6 +92,28 @@ export function ProductFormFields({
     defaultValues: toFormDefaults(initial, initialCode, initialName),
   });
   const locked = !!initial?.hasInventoryActivity;
+
+  function handleEnterKeys(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.key !== 'Enter' || e.nativeEvent.isComposing || e.altKey || e.metaKey) return;
+    const submit = () => {
+      if (!submitting) void form.handleSubmit(onSubmit)();
+    };
+    if (e.ctrlKey) {
+      if (e.shiftKey) return;
+      e.preventDefault();
+      e.stopPropagation();
+      submit();
+      return;
+    }
+    const target = e.target as HTMLElement;
+    if (!(ENTER_ORDER as readonly string[]).includes(target.id)) return; // buttons keep their own Enter
+    if (SELECT_IDS.includes(target.id) && target.getAttribute('aria-expanded') === 'true') return; // an open Select is Radix's
+    e.preventDefault();
+    e.stopPropagation(); // capture phase: the Radix trigger would otherwise open on Enter
+    const step = focusNextInOrder(ENTER_ORDER, target.id, e.shiftKey ? -1 : 1);
+    if (step === 'end' && !e.shiftKey) submit();
+  }
+
   // The dialog scrolls, so its error sits above the first card; the page keeps it at the bottom.
   const errorBox = (
     <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
@@ -98,7 +132,11 @@ export function ProductFormFields({
         </div>
       )}
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        onKeyDownCapture={enterNavigation ? handleEnterKeys : undefined}
+        className="space-y-4"
+      >
         {hasSubmitError && !showHeader && errorBox}
 
         <Card>

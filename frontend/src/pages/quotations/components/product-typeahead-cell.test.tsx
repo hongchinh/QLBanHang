@@ -618,6 +618,12 @@ describe('ProductTypeaheadCell', () => {
       });
     });
 
+    it('without allowQuickAdd, an IME Enter with a result highlighted picks nothing', () => {
+      const { input, onSelect } = setup({ allowQuickAdd: false });
+      fireEvent.keyDown(input, { key: 'Enter', isComposing: true, keyCode: 229 });
+      expect(onSelect).not.toHaveBeenCalled();
+    });
+
     it('without allowQuickAdd, an Enter before the results passes through to the grid and picks nothing', () => {
       permissions = ['products.create'];
       searchState = { ...settledSearch(), data: [], settledQuery: 'TL' };

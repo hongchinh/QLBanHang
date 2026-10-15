@@ -657,6 +657,15 @@ describe('StockLineGrid', () => {
     expect(document.getElementById('stock-line-product-code-1')).toBeNull();
   });
 
+  it('an Enter that commits an IME composition does not move the focus', () => {
+    renderGrid({ lines: [line({ pricingMode: 'PerSquareMeter' })] });
+    byId('stock-line-product-code-0').focus();
+    fireEvent.keyDown(byId('stock-line-product-code-0'), { key: 'Enter', isComposing: true, keyCode: 229 });
+    expect(focused()).toBe('stock-line-product-code-0');
+    enter('stock-line-product-code-0');
+    expect(focused()).not.toBe('stock-line-product-code-0');
+  });
+
   it('ArrowDown keeps the column, or falls back to Mã when the row below cannot use it', () => {
     renderGrid({
       lines: [line({ pricingMode: 'PerSquareMeter' }), line({ _uiKey: 'b', pricingMode: 'PerUnit' }), line({ _uiKey: 'c', pricingMode: 'PerUnit' })],

@@ -183,6 +183,22 @@ describe('ProductQuickAddDialog', () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
+  it('saves again after a failed save: only a success blocks further saves', async () => {
+    createMock.mockReset().mockRejectedValueOnce(new Error('Mã hàng hóa đã tồn tại')).mockResolvedValue(CREATED);
+    const user = userEvent.setup();
+    const { onCreated } = renderDialog('Tôn lạnh');
+    await user.click(await screen.findByRole('combobox', { name: 'Nhóm hàng hóa *' }));
+    await user.click(screen.getByRole('option', { name: 'Tôn' }));
+    await user.type(screen.getByLabelText('Đơn vị tính *'), 'Tấm');
+    await user.click(screen.getByLabelText('Tên hàng hóa *'));
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    expect(await screen.findByText('Mã hàng hóa đã tồn tại')).toBeInTheDocument();
+
+    await user.keyboard('{Control>}{Enter}{/Control}');
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(createMock).toHaveBeenCalledTimes(2);
+  });
+
   it('offers a retry when a lookup fails to load', async () => {
     unitsError = true;
     const user = userEvent.setup();

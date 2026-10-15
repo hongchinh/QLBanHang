@@ -192,6 +192,16 @@ describe('LineItemsGrid', () => {
     });
   });
 
+  it('an Enter that commits an IME composition does not move the focus', () => {
+    renderGrid();
+    const unit = document.getElementById('line-unit-0') as HTMLElement;
+    unit.focus();
+    fireEvent.keyDown(unit, { key: 'Enter', isComposing: true, keyCode: 229 });
+    expect(document.activeElement).toBe(unit);
+    fireEvent.keyDown(unit, { key: 'Enter' });
+    expect(document.activeElement).not.toBe(unit);
+  });
+
   it('removes active row with Ctrl+Delete', async () => {
     renderGrid();
     const betaInput = screen.getByDisplayValue('Beta');

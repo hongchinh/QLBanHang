@@ -493,7 +493,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       return;
     }
 
-    if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey) return;
+    // `isComposing`: the Enter that commits a Telex/VNI composition must not jump to the next field.
+    if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
     const current = parseCellId(target.id);
     if (!current) return;
     e.preventDefault();

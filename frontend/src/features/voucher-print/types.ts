@@ -16,6 +16,7 @@ export interface VoucherPrintRequest {
   vouchers: VoucherPrintTarget[];
   format: ExportFormat;
   priceMode?: StockPrintPriceMode; // stock only
+  includeQr?: boolean; // receipts and stock-out vouchers: append the transfer QR
 }
 
 const FILE_PREFIX: Record<string, string> = {

@@ -17,6 +17,13 @@ public sealed class RecordingRealtimeNotifier : IRealtimeNotifier
     /// stopped reading.
     public bool StallOnDashboardSignal { get; set; }
 
+    /// How many quotation signals were asked for.
+    private int _quotationSignals;
+    public int QuotationSignals => _quotationSignals;
+
+    /// When set, a quotation signal fails instead of being counted, through the returned task like a failed send.
+    public bool ThrowOnQuotationSignal { get; set; }
+
     public Task NotifyUserAsync(Guid userId, CancellationToken ct = default) => Task.CompletedTask;
 
     public Task NotifyDashboardChangedAsync(Guid branchId, DashboardDomains domains, CancellationToken ct = default)
@@ -27,6 +34,15 @@ public sealed class RecordingRealtimeNotifier : IRealtimeNotifier
             return Task.Delay(Timeout.Infinite, ct);
 
         DashboardSignals.Enqueue((branchId, domains));
+        return Task.CompletedTask;
+    }
+
+    public Task NotifyQuotationsChangedAsync(CancellationToken ct = default)
+    {
+        if (ThrowOnQuotationSignal)
+            return Task.FromException(new InvalidOperationException("The notifier is down."));
+
+        Interlocked.Increment(ref _quotationSignals);
         return Task.CompletedTask;
     }
 }

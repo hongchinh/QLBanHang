@@ -75,6 +75,13 @@
   grid-column: span 3;
 }
 
+/* Stock voucher partner row: the field's error sits under the code, so Đ.chỉ and the address stay on row 1. */
+@media (min-width: 1024px) {
+  .form-inline-grid.form-cols-stock-partner > .field-message-code {
+    grid-row: 2;
+  }
+}
+
 @media (max-width: 1023px) {
   .form-inline-grid.customer-row,
   .form-inline-grid.info-row-2,

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { readFileSync } from 'node:fs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useForm } from 'react-hook-form';
@@ -8,6 +9,9 @@ import type { StockVoucherFormParsed, StockVoucherFormValues } from '@/features/
 import type { StockVoucherDraftPartner } from '@/features/stock-vouchers/use-stock-voucher-draft';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 import type { StockReason } from '@/features/stock-reasons/types';
+
+// Vitest runs from frontend/.
+const formInlineCss = readFileSync('src/styles/form-inline.css', 'utf-8');
 
 const usePartnerSearchMock = vi.fn();
 vi.mock('@/features/stock-vouchers/hooks', () => ({
@@ -114,6 +118,16 @@ describe('StockVoucherMainFields', () => {
       expect(label).toHaveAttribute('for', 'stock-partner-address');
       expect(screen.getByLabelText('Đ.chỉ')).toBe(byId('stock-partner-address'));
       expect(screen.queryByText('Địa chỉ')).toBeNull();
+    });
+
+    // jsdom does not lay out a grid, so the rule is read from the stylesheet source: from 1024px up the error is
+    // pinned to row 2, or auto-placement would push Đ.chỉ and the address onto row 2 (checked in a real browser).
+    it('pins the error to row 2 of the partner row from 1024px up, and not below', () => {
+      const wide = /@media \(min-width: 1024px\)\s*\{([^@]*?\})\s*\}/.exec(formInlineCss);
+      expect(wide?.[1]).toMatch(/\.form-cols-stock-partner > \.field-message-code\s*\{\s*grid-row: 2;/);
+      expect(formInlineCss).not.toMatch(/grid-auto-flow:\s*dense/);
+      const narrow = /@media \(max-width: 1023px\)\s*\{[\s\S]*?\n\}/.exec(formInlineCss);
+      expect(narrow?.[0]).not.toMatch(/grid-row/);
     });
 
     it('renders partnerError under the partner row', () => {

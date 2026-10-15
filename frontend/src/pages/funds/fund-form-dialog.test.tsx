@@ -91,28 +91,88 @@ describe('FundFormDialog bank fields', () => {
     await user.click(screen.getByRole('button', { name: 'Cập nhật' }));
 
     await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
-    expect(updateMock.mock.calls[0][0].data).toEqual(
-      expect.objectContaining({
+    expect(updateMock).toHaveBeenCalledWith({
+      id: 'f2',
+      data: expect.objectContaining({
         bankId: 'b1',
         accountHolderName: 'CONG TY ABC',
         accountNumber: '0123456789',
       }),
-    );
+    });
   });
 
   it('cash_fund_sends_no_bank_fields', async () => {
     const user = userEvent.setup();
-    renderDialog(CASH_FUND);
+    // Stale bank values left on a cash fund must not be sent.
+    renderDialog({
+      ...CASH_FUND,
+      bankId: 'b1',
+      accountHolderName: 'X',
+      bankName: 'Y',
+      accountNumber: '1',
+    });
 
     await user.click(screen.getByRole('button', { name: 'Cập nhật' }));
 
-    await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
-    expect(updateMock.mock.calls[0][0].data).toEqual(
-      expect.objectContaining({
-        bankId: null,
-        accountHolderName: null,
-        bankName: null,
-        accountNumber: null,
+    await waitFor(() =>
+      expect(updateMock).toHaveBeenCalledWith({
+        id: 'f1',
+        data: expect.objectContaining({
+          bankId: null,
+          accountHolderName: null,
+          bankName: null,
+          accountNumber: null,
+        }),
+      }),
+    );
+  });
+
+  it('keeps_a_legacy_account_number_editable_without_a_bank', async () => {
+    const user = userEvent.setup();
+    renderDialog({ ...BANK_FUND, bankId: null, accountNumber: '12 34' });
+
+    await user.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+    await waitFor(() =>
+      expect(updateMock).toHaveBeenCalledWith({
+        id: 'f2',
+        data: expect.objectContaining({ bankId: null, accountNumber: '12 34' }),
+      }),
+    );
+  });
+
+  it('rejects_a_bad_account_number_with_a_bank_on_create', async () => {
+    const user = userEvent.setup();
+    render(<FundFormDialog open onOpenChange={vi.fn()} />);
+
+    await user.type(screen.getByLabelText('Mã quỹ *'), 'ACB');
+    await user.type(screen.getByLabelText('Tên quỹ *'), 'TK ACB');
+    await user.click(screen.getByRole('combobox', { name: 'Loại quỹ' }));
+    await user.click(await screen.findByRole('option', { name: 'Ngân hàng' }));
+    await user.click(screen.getByRole('combobox', { name: 'Ngân hàng (cho QR)' }));
+    await user.click(await screen.findByRole('option', { name: 'Vietcombank · 970436' }));
+    await user.type(screen.getByLabelText('Số tài khoản'), '12 34');
+    await user.click(screen.getByRole('button', { name: 'Tạo mới' }));
+
+    expect(await screen.findByText('Số tài khoản chỉ gồm chữ và số, tối đa 19 ký tự.')).toBeInTheDocument();
+    expect(createMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['Chưa chọn', null],
+    ['TCB · 970407', 'b2'],
+  ])('select_option_%s_sends_the_matching_bank_id', async (option, expected) => {
+    const user = userEvent.setup();
+    renderDialog(BANK_FUND);
+
+    await user.click(screen.getByRole('combobox', { name: 'Ngân hàng (cho QR)' }));
+    await user.click(await screen.findByRole('option', { name: option }));
+    await user.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+    await waitFor(() =>
+      expect(updateMock).toHaveBeenCalledWith({
+        id: 'f2',
+        data: expect.objectContaining({ bankId: expected }),
       }),
     );
   });

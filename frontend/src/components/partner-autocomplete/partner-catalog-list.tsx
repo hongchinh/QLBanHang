@@ -23,7 +23,7 @@ export interface PartnerCatalogListProps {
   onQueryChange: (q: string) => void;
   onSelect: (id: string) => void;
   /** Lets the dialog's role tabs return the focus to the search box; the list owns one when omitted. */
-  searchRef?: RefObject<HTMLInputElement | null>;
+  searchRef?: RefObject<HTMLInputElement>;
 }
 
 // Controlled by the dialog, which renders it with key={role}: the role never changes within an instance, so the

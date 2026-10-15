@@ -191,8 +191,7 @@ public sealed class VoucherFormBuilder
         var qr = _qr ?? throw new InvalidOperationException("BeginQrBeside was not called.");
         var count = _columns.Count;
         var first = _qrFirstRow;
-        var pixels = QrPixels;
-        var needed = pixels * PointsPerPixel + QrTopOffsetPixels;
+        var needed = QrPixels * PointsPerPixel + QrTopOffsetPixels;
 
         var rows = Math.Max(3, Table.Row - first);
         if (Table.Row - first < rows) Table.Skip(rows - (Table.Row - first));
@@ -203,14 +202,7 @@ public sealed class VoucherFormBuilder
         }
 
         var firstColumn = count - QrColumns + 1;
-        var columnsPixels = 0d;
-        for (var i = firstColumn; i <= count; i++) columnsPixels += _columns[i - 1].Width * PixelsPerWidthUnit + ColumnPaddingPixels;
-        var xOffset = Math.Max(0, (int)Math.Round((columnsPixels - pixels) / 2));
-
-        using var png = new MemoryStream(QrPngRenderer.Render(qr.Payload));
-        Sheet.AddPicture(png, "payment-qr")
-            .MoveTo(Sheet.Cell(first, firstColumn), xOffset, QrTopOffsetPixels)
-            .WithSize(pixels, pixels);
+        AddQrPicture(qr, first);
 
         var last = first + rows - 1;
         PutQrCaption(last - 1, firstColumn, VoucherPrintRules.QrScanCaption, bold: true);
@@ -218,6 +210,53 @@ public sealed class VoucherFormBuilder
 
         _qr = null;
         _textLastColumn = null;
+    }
+
+    /// The payment block of the stock-out voucher (02-VT), after the last text line and before the signatures: the
+    /// transfer details on the left in a thin outside border, the QR in the last two columns from the first row, its
+    /// caption in the last row. The rows get explicit heights (the page-break estimate reads only those) that hold
+    /// the picture and the caption.
+    public void WritePaymentBlock(VoucherPaymentQrDto qr)
+    {
+        var count = _columns.Count;
+        if (count < 4)
+            throw new InvalidOperationException("A payment block needs at least four columns.");
+        var textEnd = count - QrColumns;
+
+        var lines = new List<(string Text, bool Bold)>
+        {
+            ("THÔNG TIN CHUYỂN KHOẢN", true),
+            ($"Ngân hàng: {qr.BankName}", false),
+            ($"Số tài khoản: {qr.AccountNumber}", false),
+            ($"Chủ tài khoản: {qr.AccountHolderName}", false),
+            (VoucherPrintRules.QrAmountLine(qr), true),
+        };
+        if (VoucherPrintRules.QrBreakdownLine(qr) is { } breakdown) lines.Add((breakdown, false));
+        lines.Add(($"Nội dung chuyển khoản: {qr.Content}", false));
+
+        var first = Table.Row;
+        var heights = new double[lines.Count];
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var (text, bold) = lines[i];
+            var cell = Merged(first + i, 1, textEnd);
+            cell.Value = text;
+            cell.Style.Font.Bold = bold;
+            cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Left;
+            heights[i] = Wrap(cell, text, 1, textEnd, bold) * Sheet.RowHeight;
+        }
+
+        // The rows hold the picture and a default row for the caption; the missing height is shared equally.
+        var needed = QrPixels * PointsPerPixel + QrTopOffsetPixels + Sheet.RowHeight;
+        var extra = Math.Max(0, needed - heights.Sum()) / lines.Count;
+        for (var i = 0; i < lines.Count; i++) Sheet.Row(first + i).Height = heights[i] + extra;
+
+        var last = first + lines.Count - 1;
+        Sheet.Range(first, 1, last, count).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
+        AddQrPicture(qr, first);
+        PutQrCaption(last, count - QrColumns + 1, VoucherPrintRules.QrScanCaption, bold: true);
+
+        Table.Skip(lines.Count);
     }
 
     /// One table body row (see Tt133FormBuilder.WriteRow); the builder keeps the last ones with the signatures.
@@ -316,6 +355,21 @@ public sealed class VoucherFormBuilder
         var height = 0d;
         for (var r = firstRow; r <= lastRow; r++) height += Sheet.Row(r).Height;
         return height;
+    }
+
+    /// The QR picture centred over the last QrColumns columns, from the top of the given row.
+    private void AddQrPicture(VoucherPaymentQrDto qr, int row)
+    {
+        var pixels = QrPixels;
+        var firstColumn = _columns.Count - QrColumns + 1;
+        var columnsPixels = 0d;
+        for (var i = firstColumn; i <= _columns.Count; i++) columnsPixels += _columns[i - 1].Width * PixelsPerWidthUnit + ColumnPaddingPixels;
+        var xOffset = Math.Max(0, (int)Math.Round((columnsPixels - pixels) / 2));
+
+        using var png = new MemoryStream(QrPngRenderer.Render(qr.Payload));
+        Sheet.AddPicture(png, "payment-qr")
+            .MoveTo(Sheet.Cell(row, firstColumn), xOffset, QrTopOffsetPixels)
+            .WithSize(pixels, pixels);
     }
 
     private void PutQrCaption(int row, int firstColumn, string text, bool bold)

@@ -1,5 +1,7 @@
 using ClosedXML.Excel;
 using FluentAssertions;
+using OrderMgmt.Application.CashDebt.PaymentQr;
+using OrderMgmt.Application.Payments.Services;
 using OrderMgmt.Application.Tt133.Models;
 using OrderMgmt.Application.Tt133.Vouchers;
 using OrderMgmt.Domain.Enums;
@@ -320,5 +322,153 @@ public class StockVoucherFormTests
         using var wb = Render(StockIn(), StockOut());
 
         wb.Worksheets.Select(w => w.Name).Should().Equal("PN00001", "PX00001");
+    }
+
+    private const string BlockTitle = "THÔNG TIN CHUYỂN KHOẢN";
+    private const string ScanCaption = "Quét để chuyển khoản";
+    private const string BreakdownLine = "Tổng 1.500.000 · Đã trả tiền mặt 500.000 · Cần chuyển khoản 1.000.000";
+    private const string ContentLine = "Nội dung chuyển khoản: PX000318";
+
+    private static VoucherPaymentQrDto Qr(decimal cashPaid = 500_000m) => new()
+    {
+        Payload = VietQrPayloadBuilder.Build("970436", "0123456789", "CONG TY ABC", 1_000_000m, "PX000318"),
+        Amount = 1_000_000m,
+        Total = 1_500_000m,
+        CashPaid = cashPaid,
+        BankName = "Ngân hàng TMCP Ngoại thương Việt Nam",
+        BankShortName = "Vietcombank",
+        AccountNumber = "0123456789",
+        AccountHolderName = "CONG TY ABC",
+        Content = "PX000318",
+        FundCode = "NH01",
+        FundName = "Vietcombank",
+    };
+
+    private static StockVoucherPrintModel StockOutWithQr(decimal cashPaid = 500_000m, bool warehouseColumn = false)
+    {
+        var m = StockOut();
+        m.Qr = Qr(cashPaid);
+        if (warehouseColumn)
+        {
+            m.ShowWarehouseColumn = true;
+            m.Lines[0].WarehouseCode = "KHO01";
+            m.Lines[1].WarehouseCode = "KHO02";
+        }
+        return m;
+    }
+
+    private static StockVoucherPrintModel StockOutWithLines(int count)
+    {
+        var m = StockInWithLines(count);
+        m.Type = StockDirection.Out;
+        m.PartnerAddress = "Hà Nội";
+        m.ReasonName = "Xuất bán hàng";
+        m.HandlerName = "Lê Nhận";
+        m.Qr = Qr();
+        return m;
+    }
+
+    [Fact]
+    public void Stock_out_with_qr_has_the_payment_block()
+    {
+        using var wb = Render(StockOutWithQr());
+        var ws = wb.Worksheet(1);
+
+        string[] block =
+        [
+            BlockTitle, "Ngân hàng: Ngân hàng TMCP Ngoại thương Việt Nam", "Số tài khoản: 0123456789",
+            "Chủ tài khoản: CONG TY ABC", "Số tiền: 1.000.000 đồng", BreakdownLine, ContentLine,
+        ];
+        var after = RowOf(ws, $"- Số chứng từ gốc kèm theo: {Dots}");
+        var signatures = RowOf(ws, "Người lập phiếu");
+        var previous = after;
+        foreach (var text in block)
+        {
+            var row = RowOf(ws, text);
+            row.Should().BeGreaterThan(previous, text);
+            previous = row;
+        }
+        previous.Should().BeLessThan(signatures);
+
+        // With nothing paid in cash there is no breakdown row.
+        using var noCash = Render(StockOutWithQr(cashPaid: 0));
+        Texts(noCash.Worksheet(1)).Should().NotContain(BreakdownLine);
+        Texts(noCash.Worksheet(1)).Should().NotContain(t => t.StartsWith("Tổng 1.500.000"));
+        Texts(noCash.Worksheet(1)).Should().Contain(ContentLine);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Block_has_a_border_and_the_qr_is_on_the_right(bool warehouseColumn)
+    {
+        using var wb = Render(StockOutWithQr(warehouseColumn: warehouseColumn));
+        var ws = wb.Worksheet(1);
+
+        var titleRow = RowOf(ws, BlockTitle);
+        var lastRow = RowOf(ws, ContentLine);
+        ws.Cell(titleRow, 1).Style.Border.TopBorder.Should().NotBe(XLBorderStyleValues.None);
+        ws.Cell(lastRow, 1).Style.Border.BottomBorder.Should().NotBe(XLBorderStyleValues.None);
+        var lastColumn = ColumnOf(ws, "Thành tiền");
+        ws.Cell(titleRow, lastColumn).Style.Border.RightBorder.Should().NotBe(XLBorderStyleValues.None);
+
+        ws.Pictures.Count.Should().Be(1);
+        var picture = ws.Pictures.First();
+        var priceColumn = ColumnOf(ws, "Đơn giá");
+        picture.TopLeftCell.Address.ColumnNumber.Should().Be(priceColumn);
+        picture.TopLeftCell.Address.RowNumber.Should().Be(titleRow);
+
+        var caption = CellWith(ws, ScanCaption);
+        caption.Address.RowNumber.Should().Be(lastRow);
+        caption.IsMerged().Should().BeTrue();
+        caption.MergedRange().FirstColumn().ColumnNumber().Should().Be(priceColumn);
+        caption.MergedRange().LastColumn().ColumnNumber().Should().Be(lastColumn);
+        priceColumn.Should().Be(lastColumn - 1);
+
+        // The left text stops before the QR columns.
+        var left = CellWith(ws, BlockTitle);
+        left.MergedRange().FirstColumn().ColumnNumber().Should().Be(1);
+        left.MergedRange().LastColumn().ColumnNumber().Should().Be(priceColumn - 1);
+    }
+
+    [Fact]
+    public void Block_rows_cover_the_picture()
+    {
+        using var wb = Render(StockOutWithQr());
+        var ws = wb.Worksheet(1);
+
+        var picture = ws.Pictures.First();
+        var height = 0d;
+        for (var r = RowOf(ws, BlockTitle); r <= RowOf(ws, ContentLine); r++) height += ws.Row(r).Height;
+        height.Should().BeGreaterThanOrEqualTo(picture.Height * 0.75 + ws.RowHeight);
+    }
+
+    [Fact]
+    public void Payment_block_and_signatures_are_never_split_by_a_page_break()
+    {
+        for (var n = 30; n <= 110; n += 2)
+        {
+            using var wb = Render(StockOutWithLines(n));
+            var ws = wb.Worksheet(1);
+            var titleRow = RowOf(ws, BlockTitle);
+            var namesRow = RowOf(ws, "Quản trị hệ thống");
+
+            ws.PageSetup.RowBreaks.Where(b => b >= titleRow && b <= namesRow - 1)
+                .Should().BeEmpty($"{n} lines, block rows {titleRow}-{namesRow - 1}");
+        }
+    }
+
+    [Fact]
+    public void Without_qr_nothing_changes()
+    {
+        using var stockOut = Render(StockOut());
+        Texts(stockOut.Worksheet(1)).Should().NotContain(BlockTitle);
+        stockOut.Worksheet(1).Pictures.Count.Should().Be(0);
+
+        var stockIn = StockIn();
+        stockIn.Qr = Qr();
+        using var ignored = Render(stockIn);
+        Texts(ignored.Worksheet(1)).Should().NotContain(BlockTitle);
+        ignored.Worksheet(1).Pictures.Count.Should().Be(0);
     }
 }

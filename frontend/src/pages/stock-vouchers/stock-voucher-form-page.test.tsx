@@ -177,7 +177,13 @@ const funds: Fund[] = [
   fund(FUND_BANK, 'NH01', 'Bank', { isDefault: true }),
 ];
 
-vi.mock('@/components/payment-qr/payment-qr-dialog', () => ({ PaymentQrDialog: () => null }));
+let qrDialogProps: Record<string, unknown> = {};
+vi.mock('@/components/payment-qr/payment-qr-dialog', () => ({
+  PaymentQrDialog: (props: unknown) => {
+    qrDialogProps = props as Record<string, unknown>;
+    return null;
+  },
+}));
 
 let printProps: Record<string, unknown> = {};
 vi.mock('@/components/voucher-print/voucher-print-button', () => ({
@@ -364,6 +370,7 @@ function dialog() {
 describe('StockVoucherFormPage', () => {
   beforeEach(() => {
     printProps = {};
+    qrDialogProps = {};
     localStorage.clear();
     routeParams.id = 'new';
     voucherState.data = undefined;
@@ -839,10 +846,12 @@ describe('StockVoucherFormPage', () => {
   describe('payment QR button', () => {
     it('shows on a saved stock-out', () => {
       routeParams.id = V1;
-      voucherState.data = voucher({ type: 'Out', code: 'PX00007' });
+      const saved = voucher({ type: 'Out', code: 'PX00007' });
+      voucherState.data = saved;
       renderPage('Out');
 
       expect(screen.getByRole('button', { name: 'QR chuyển khoản' })).toBeEnabled();
+      expect(qrDialogProps).toMatchObject({ kind: 'stock', id: saved.id, voucherCode: saved.code, open: false });
     });
 
     it('is absent on a stock-in', () => {

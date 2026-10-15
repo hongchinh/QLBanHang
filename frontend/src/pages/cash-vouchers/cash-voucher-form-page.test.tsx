@@ -93,7 +93,13 @@ vi.mock('@/features/debt/hooks', () => ({
   },
 }));
 
-vi.mock('@/components/payment-qr/payment-qr-dialog', () => ({ PaymentQrDialog: () => null }));
+let qrDialogProps: Record<string, unknown> = {};
+vi.mock('@/components/payment-qr/payment-qr-dialog', () => ({
+  PaymentQrDialog: (props: unknown) => {
+    qrDialogProps = props as Record<string, unknown>;
+    return null;
+  },
+}));
 
 let printProps: Record<string, unknown> = {};
 vi.mock('@/components/voucher-print/voucher-print-button', () => ({
@@ -316,6 +322,7 @@ function dialog() {
 describe('CashVoucherFormPage', () => {
   beforeEach(() => {
     printProps = {};
+    qrDialogProps = {};
     routeParams.id = 'new';
     voucherState.data = undefined;
     activitiesState.data = [];
@@ -683,10 +690,12 @@ describe('CashVoucherFormPage', () => {
   describe('payment QR button', () => {
     it('shows on a saved receipt', () => {
       routeParams.id = V1;
-      voucherState.data = voucher();
+      const saved = voucher();
+      voucherState.data = saved;
       renderPage('Receipt');
 
       expect(screen.getByRole('button', { name: 'QR chuyển khoản' })).toBeEnabled();
+      expect(qrDialogProps).toMatchObject({ kind: 'cash', id: saved.id, voucherCode: saved.code, open: false });
     });
 
     it('is absent on a payment voucher', () => {

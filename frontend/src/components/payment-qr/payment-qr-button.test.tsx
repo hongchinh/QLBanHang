@@ -14,18 +14,20 @@ vi.mock('./payment-qr-dialog', () => ({
 
 describe('PaymentQrButton', () => {
   it('opens the dialog of the voucher', async () => {
+    const user = userEvent.setup();
     render(<PaymentQrButton kind="stock" id="v1" code="PX00001" />);
 
     expect(screen.queryByTestId('dialog-open')).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'QR chuyển khoản' }));
+    await user.click(screen.getByRole('button', { name: 'QR chuyển khoản' }));
 
     expect(screen.getByTestId('dialog-open')).toBeInTheDocument();
     expect(dialogProps.current).toMatchObject({ open: true, kind: 'stock', id: 'v1', voucherCode: 'PX00001' });
   });
 
   it('closing the dialog sets open to false', async () => {
+    const user = userEvent.setup();
     render(<PaymentQrButton kind="cash" id="v2" code="01-TT00001" />);
-    await userEvent.click(screen.getByRole('button', { name: 'QR chuyển khoản' }));
+    await user.click(screen.getByRole('button', { name: 'QR chuyển khoản' }));
 
     const onOpenChange = dialogProps.current?.onOpenChange as (open: boolean) => void;
     expect(screen.getByTestId('dialog-open')).toBeInTheDocument();
@@ -36,16 +38,18 @@ describe('PaymentQrButton', () => {
   });
 
   it('disabled shows the reason as the title and does not open', async () => {
+    const user = userEvent.setup();
     render(<PaymentQrButton kind="cash" id="v1" code="01-TT00001" disabled disabledReason="Phiếu đã hủy" />);
 
     const button = screen.getByRole('button', { name: 'QR chuyển khoản' });
     expect(button).toBeDisabled();
     expect(button).toHaveAttribute('title', 'Phiếu đã hủy');
-    await userEvent.click(button);
+    await user.click(button);
     expect(screen.queryByTestId('dialog-open')).not.toBeInTheDocument();
   });
 
   it('has no title while enabled', () => {
+    const user = userEvent.setup();
     render(<PaymentQrButton kind="cash" id="v1" code="01-TT00001" disabledReason="Phiếu đã hủy" />);
 
     expect(screen.getByRole('button', { name: 'QR chuyển khoản' })).not.toHaveAttribute('title');

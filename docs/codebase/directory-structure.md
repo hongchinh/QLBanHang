@@ -48,8 +48,8 @@ QLBanHang/
 | Roles/permissions | `Application/Identity/Admin`, `AdminRolesController.cs`, `Domain/Constants/Permissions.cs` |
 | User quotation settings | `Application/Identity/UserSettings`, `AdminUserSettingsController.cs`, `MeQuotationSettingsController.cs` |
 | Quotations | `Application/Sales/Quotations`, `Domain/Entities/Sales`, `QuotationsController.cs` |
-| Quotation dashboard | `Application/Sales/Quotations/Services`, `DashboardController.cs` |
-| Reports | `Application/Reports/SalesRevenue`, `ReportsController.cs` |
+| Overview dashboards | `Application/Sales/Quotations/Services` (`DashboardService`), `Application/Dashboards/Common` (`SalesRevenueSource`), `DashboardController.cs` |
+| Reports | `Application/Reports/SalesRevenue`, `Application/Reports/QuotationRevenue` (`QuotationRevenueReportService`, `/api/reports/revenue/*`), `ReportsController.cs` |
 | Search | `Application/Search`, `SearchController.cs` |
 | Branding | `Domain/Branding`, `Application/Branding`, `SettingsController.cs` |
 | Notifications | `Domain/Notifications`, `Application/Notifications`, `NotificationsController.cs` |
@@ -177,7 +177,7 @@ frontend/src/
 │   ├── credit-limits/
 │   ├── customers/               # also partner-search-item.ts (customer record to search item), use-partner-permissions.ts
 │   │                            # (create/view of customers and suppliers), use-quotation-customer-search.ts
-│   ├── dashboard/               # quotation dashboards; format.ts (also compact money and percent) and the shared tiles
+│   ├── dashboard/               # overview dashboards (`/`, `/admin/dashboard`), `use-overview-live`, `revenue-subtitle`; format.ts (also compact money and percent) and the shared tiles
 │   │                            # in components/: TileCard (+ TileError), StatTile, LiveStatus, RangePicker (optional
 │   │                            # `presets`); stat-tile-state.ts (statTileState: the StatTile props that follow a query)
 │   ├── debt/                    # partner summary, open items, matching helpers, settlements
@@ -230,7 +230,7 @@ frontend/src/
 │   ├── payment-qr/              # /qr-thanh-toan standalone page
 │   ├── products/
 │   ├── quotations/
-│   ├── reports/
+│   ├── reports/                 # reports/revenue: API and hooks of the Doanh thu report (`/api/reports/revenue/*`)
 │   ├── settings/                # also branches (period lock, opening date), inventory and cash settings, numbering, recalc,
 │   │                            # company profile (/settings/company, Thông tin đơn vị); branches-page.tsx ("Loại" column
 │   │                            # with the Demo / progress / error badges), branch-form-dialog.tsx (the sample data
@@ -241,7 +241,8 @@ frontend/src/
 │   └── warehouses/
 ├── hooks/                       # useDocumentActions (shared save flow of the four document forms), route access hooks
 │                                # (useCanAccessRoute, useCanOpenLink for links with a query string), useNotificationHub
-│                                # (the one SignalR connection: notifications, dashboard signal, connection status)
+│                                # (the one SignalR connection: notifications, dashboard signal, connection status), use-dashboard-signal
+│                                # (listens to the dashboard and quotation signals for the live overview and executive pages)
 ├── routes/
 ├── stores/
 ├── lib/                         # includes date-only.ts, to-number.ts, money-input.ts, vn-datetime.ts,

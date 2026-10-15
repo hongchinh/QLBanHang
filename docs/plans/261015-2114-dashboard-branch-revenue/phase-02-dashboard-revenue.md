@@ -1,6 +1,6 @@
 # Phase 02 — Overview dashboard revenue from stock-outs
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** L
 
 ## Objective

@@ -1,6 +1,6 @@
 # Phase 04 — Frontend: labels, types and live refresh
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 
 ## Objective

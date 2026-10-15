@@ -9,8 +9,7 @@ Ship the in-app help of both overview screens (AGENTS.md "User Guide Rule"), rem
 
 ## Files
 
-- Create: `frontend/src/features/help/content/dashboard-overview.md` (route `/`)
-- Create: `frontend/src/features/help/content/dashboard-admin.md` (route `/admin/dashboard`)
+- Create: `frontend/src/features/help/content/home.md` (route `/`) and `admin-dashboard.md` (route `/admin/dashboard`). The keys follow `conventions.md` (`/` is `home`) instead of the `dashboard-overview` / `dashboard-admin` names first planned.
 - Modify: `frontend/src/features/help/help-pending.ts` (remove `'/'` and `'/admin/dashboard'`)
 - Modify: whatever `npm run help:stale` lists. Expected: `frontend/src/features/help/content/dashboard-executive.md`, because `live-status.tsx` is in its sources and the hook it uses moved.
 - Modify: `docs/project-pdr/product-goals.md`, `docs/architecture/system-architecture.md`, `docs/code-standard/conventions.md`, and the matching rows of `docs/SUMMARY.md` if their descriptions change.

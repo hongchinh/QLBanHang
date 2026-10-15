@@ -1,6 +1,6 @@
 # Phase 03 — Real-time signals: hub groups and QuotationsChanged
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 
 ## Objective

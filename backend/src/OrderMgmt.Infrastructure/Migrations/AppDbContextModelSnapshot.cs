@@ -776,10 +776,19 @@ namespace OrderMgmt.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("AccountHolderName")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("account_holder_name");
+
                     b.Property<string>("AccountNumber")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("account_number");
+
+                    b.Property<Guid?>("BankId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("bank_id");
 
                     b.Property<string>("BankName")
                         .HasMaxLength(255)
@@ -852,6 +861,9 @@ namespace OrderMgmt.Infrastructure.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_funds");
+
+                    b.HasIndex("BankId")
+                        .HasDatabaseName("ix_funds_bank_id");
 
                     b.HasIndex("BranchId", "Code")
                         .IsUnique()
@@ -4127,12 +4139,20 @@ namespace OrderMgmt.Infrastructure.Migrations
 
             modelBuilder.Entity("OrderMgmt.Domain.Entities.CashDebt.Fund", b =>
                 {
+                    b.HasOne("OrderMgmt.Domain.Entities.Payments.Bank", "Bank")
+                        .WithMany()
+                        .HasForeignKey("BankId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_funds_banks_bank_id");
+
                     b.HasOne("OrderMgmt.Domain.Entities.Organization.Branch", "Branch")
                         .WithMany()
                         .HasForeignKey("BranchId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_funds_branches_branch_id");
+
+                    b.Navigation("Bank");
 
                     b.Navigation("Branch");
                 });

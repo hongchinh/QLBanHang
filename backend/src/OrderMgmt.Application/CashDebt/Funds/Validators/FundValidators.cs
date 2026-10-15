@@ -13,6 +13,11 @@ public class CreateFundRequestValidator : AbstractValidator<CreateFundRequest>
         RuleFor(x => x.Kind).IsInEnum().NotEqual(FundKind.None).WithMessage("Chọn loại quỹ.");
         RuleFor(x => x.BankName).MaximumLength(255);
         RuleFor(x => x.AccountNumber).MaximumLength(50);
+        RuleFor(x => x.AccountHolderName).MaximumLength(255);
+        RuleFor(x => x.AccountNumber)
+            .Must(a => !string.IsNullOrEmpty(a) && System.Text.RegularExpressions.Regex.IsMatch(a, "^[0-9A-Za-z]{1,19}$"))
+            .When(x => x.Kind == FundKind.Bank && x.BankId != null)
+            .WithMessage("Số tài khoản chỉ gồm chữ và số, tối đa 19 ký tự.");
     }
 }
 
@@ -24,6 +29,11 @@ public class UpdateFundRequestValidator : AbstractValidator<UpdateFundRequest>
         RuleFor(x => x.Kind).IsInEnum().NotEqual(FundKind.None).WithMessage("Chọn loại quỹ.");
         RuleFor(x => x.BankName).MaximumLength(255);
         RuleFor(x => x.AccountNumber).MaximumLength(50);
+        RuleFor(x => x.AccountHolderName).MaximumLength(255);
+        RuleFor(x => x.AccountNumber)
+            .Must(a => !string.IsNullOrEmpty(a) && System.Text.RegularExpressions.Regex.IsMatch(a, "^[0-9A-Za-z]{1,19}$"))
+            .When(x => x.Kind == FundKind.Bank && x.BankId != null)
+            .WithMessage("Số tài khoản chỉ gồm chữ và số, tối đa 19 ký tự.");
     }
 }
 

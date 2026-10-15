@@ -58,7 +58,7 @@ public class FundService : IFundService
         if (request.IsActive.HasValue)
             query = query.Where(f => f.IsActive == request.IsActive.Value);
 
-        var funds = await query.OrderBy(f => f.Kind).ThenBy(f => f.Code).ToListAsync(ct);
+        var funds = await query.Include(f => f.Bank).OrderBy(f => f.Kind).ThenBy(f => f.Code).ToListAsync(ct);
         var showOpening = CanSeeOpeningAmount;
         return funds.Select(f => ToDto(f, showOpening)).ToList();
     }
@@ -66,7 +66,8 @@ public class FundService : IFundService
     public async Task<FundDto> GetAsync(Guid id, CancellationToken ct = default)
     {
         var branchId = await _currentBranch.GetIdAsync(ct);
-        var fund = await _db.Funds.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id && f.BranchId == branchId, ct)
+        var fund = await _db.Funds.AsNoTracking().Include(f => f.Bank)
+            .FirstOrDefaultAsync(f => f.Id == id && f.BranchId == branchId, ct)
             ?? throw new NotFoundException(nameof(Fund), id);
         return ToDto(fund, CanSeeOpeningAmount);
     }
@@ -80,6 +81,7 @@ public class FundService : IFundService
         {
             if (await _db.Funds.AnyAsync(f => f.BranchId == branchId && f.Code == code, c))
                 throw new ConflictException($"Mã quỹ '{code}' đã tồn tại.");
+            var bankId = await ResolveBankAsync(request.Kind, request.BankId, c);
 
             // The first fund of a kind is the default even when the request says otherwise (P18).
             var makeDefault = request.IsDefault
@@ -96,6 +98,8 @@ public class FundService : IFundService
                 Kind = request.Kind,
                 BankName = Normalize(request.BankName),
                 AccountNumber = Normalize(request.AccountNumber),
+                BankId = bankId,
+                AccountHolderName = request.Kind == FundKind.Bank ? Normalize(request.AccountHolderName) : null,
                 IsDefault = makeDefault,
                 IsActive = request.IsActive,
             };
@@ -111,6 +115,7 @@ public class FundService : IFundService
         await _transaction.RunAsync(async c =>
         {
             var fund = await LockAsync(id, c);
+            var bankId = await ResolveBankAsync(request.Kind, request.BankId, c);
             var kindChanged = fund.Kind != request.Kind;
             if (kindChanged)
             {
@@ -134,6 +139,8 @@ public class FundService : IFundService
             fund.Kind = request.Kind;
             fund.BankName = Normalize(request.BankName);
             fund.AccountNumber = Normalize(request.AccountNumber);
+            fund.BankId = bankId;
+            fund.AccountHolderName = request.Kind == FundKind.Bank ? Normalize(request.AccountHolderName) : null;
             fund.IsDefault = makeDefault;
             fund.IsActive = request.IsActive;
             await _db.SaveChangesAsync(c);
@@ -206,6 +213,16 @@ public class FundService : IFundService
         return await FindAsync(id, ct);
     }
 
+    /// The bank is kept only on a Bank-kind fund; it must be an active bank.
+    private async Task<Guid?> ResolveBankAsync(FundKind kind, Guid? bankId, CancellationToken ct)
+    {
+        if (kind != FundKind.Bank || bankId == null)
+            return null;
+        if (!await _db.Banks.AsNoTracking().AnyAsync(b => b.Id == bankId && b.IsActive, ct))
+            throw Invalid("bankId", "Ngân hàng không tồn tại hoặc đã ngừng sử dụng.");
+        return bankId;
+    }
+
     private static void EnsureDefaultIsActive(bool isDefault, bool isActive)
     {
         if (isDefault && !isActive)
@@ -248,6 +265,9 @@ public class FundService : IFundService
         Kind = f.Kind,
         BankName = f.BankName,
         AccountNumber = f.AccountNumber,
+        BankId = f.BankId,
+        BankShortName = f.Bank == null ? null : f.Bank.ShortName ?? f.Bank.Code,
+        AccountHolderName = f.AccountHolderName,
         IsDefault = f.IsDefault,
         OpeningAmount = showOpening ? f.OpeningAmount : null,
         IsActive = f.IsActive,

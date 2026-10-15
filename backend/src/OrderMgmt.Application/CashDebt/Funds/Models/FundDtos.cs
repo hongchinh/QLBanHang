@@ -11,6 +11,9 @@ public class FundDto
     public FundKind Kind { get; set; }
     public string? BankName { get; set; }
     public string? AccountNumber { get; set; }
+    public Guid? BankId { get; set; }
+    public string? BankShortName { get; set; }
+    public string? AccountHolderName { get; set; }
     public bool IsDefault { get; set; }
     public decimal? OpeningAmount { get; set; }
     public bool IsActive { get; set; }
@@ -29,6 +32,8 @@ public class CreateFundRequest
     public FundKind Kind { get; set; }
     public string? BankName { get; set; }
     public string? AccountNumber { get; set; }
+    public Guid? BankId { get; set; }
+    public string? AccountHolderName { get; set; }
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; } = true;
 }
@@ -39,6 +44,8 @@ public class UpdateFundRequest
     public FundKind Kind { get; set; }
     public string? BankName { get; set; }
     public string? AccountNumber { get; set; }
+    public Guid? BankId { get; set; }
+    public string? AccountHolderName { get; set; }
     public bool IsDefault { get; set; }
     public bool IsActive { get; set; }
 }

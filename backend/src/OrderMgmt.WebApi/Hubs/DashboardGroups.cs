@@ -10,6 +10,10 @@ public static class DashboardGroups
     /// The group of the users who may see every branch.
     public const string All = "dashboard-all";
 
+    /// The event and the group of "quotations changed": a signal without a branch and without a payload.
+    public const string QuotationsEventName = "QuotationsChanged";
+    public const string Quotations = "quotations";
+
     // The order the names are sent in.
     private static readonly (DashboardDomains Domain, string Name)[] Names =
     {
@@ -21,11 +25,11 @@ public static class DashboardGroups
 
     public static string ForBranch(Guid branchId) => $"dashboard-branch-{branchId}";
 
-    /// The group a connection joins: null without dashboard.executive; All with branches.access_all;
-    /// otherwise the group of the user's default branch (null when it is unknown).
-    public static string? GroupFor(bool hasDashboard, bool accessAll, Guid? defaultBranchId)
+    /// The group a connection joins: null without dashboard.executive or quotations.view (`canSeeDashboard`); All with
+    /// branches.access_all; otherwise the group of the user's default branch (null when it is unknown).
+    public static string? GroupFor(bool canSeeDashboard, bool accessAll, Guid? defaultBranchId)
     {
-        if (!hasDashboard)
+        if (!canSeeDashboard)
             return null;
         if (accessAll)
             return All;

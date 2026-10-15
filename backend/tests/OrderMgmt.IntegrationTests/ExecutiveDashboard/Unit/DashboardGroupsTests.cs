@@ -13,24 +13,24 @@ public class DashboardGroupsTests
     [Fact]
     public void No_group_without_the_dashboard_permission()
     {
-        DashboardGroups.GroupFor(hasDashboard: false, accessAll: true, BranchId).Should().BeNull();
-        DashboardGroups.GroupFor(hasDashboard: false, accessAll: false, BranchId).Should().BeNull();
+        DashboardGroups.GroupFor(canSeeDashboard: false, accessAll: true, BranchId).Should().BeNull();
+        DashboardGroups.GroupFor(canSeeDashboard: false, accessAll: false, BranchId).Should().BeNull();
     }
 
     [Fact]
     public void Group_of_every_branch_with_access_to_all_branches()
     {
-        DashboardGroups.GroupFor(hasDashboard: true, accessAll: true, BranchId).Should().Be("dashboard-all");
-        DashboardGroups.GroupFor(hasDashboard: true, accessAll: true, defaultBranchId: null).Should().Be("dashboard-all");
+        DashboardGroups.GroupFor(canSeeDashboard: true, accessAll: true, BranchId).Should().Be("dashboard-all");
+        DashboardGroups.GroupFor(canSeeDashboard: true, accessAll: true, defaultBranchId: null).Should().Be("dashboard-all");
     }
 
     [Fact]
     public void Group_of_the_default_branch_without_access_to_all_branches() =>
-        DashboardGroups.GroupFor(hasDashboard: true, accessAll: false, BranchId).Should().Be(BranchGroup);
+        DashboardGroups.GroupFor(canSeeDashboard: true, accessAll: false, BranchId).Should().Be(BranchGroup);
 
     [Fact]
     public void No_group_when_the_default_branch_is_unknown() =>
-        DashboardGroups.GroupFor(hasDashboard: true, accessAll: false, defaultBranchId: null).Should().BeNull();
+        DashboardGroups.GroupFor(canSeeDashboard: true, accessAll: false, defaultBranchId: null).Should().BeNull();
 
     [Fact]
     public void Group_name_of_a_branch() => DashboardGroups.ForBranch(BranchId).Should().Be(BranchGroup);

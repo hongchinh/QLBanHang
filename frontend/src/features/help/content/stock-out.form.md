@@ -2,7 +2,7 @@
 key: stock-out.form
 title: Phiếu xuất kho
 routes: [/stock-out/new, /stock-out/:id]
-sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/voucher-print/stock-price-mode-dialog.tsx, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/payment-qr/**, frontend/src/features/voucher-payment-qr/**, frontend/src/features/voucher-print/**, backend/src/OrderMgmt.Application/CashDebt/PaymentQr/**, backend/src/OrderMgmt.Application/Tt133/Vouchers/**, backend/src/OrderMgmt.Infrastructure/Excel/Tt133/Vouchers/**]
+sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/voucher-print/stock-price-mode-dialog.tsx, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/payment-qr/**, frontend/src/features/voucher-payment-qr/**, frontend/src/features/voucher-print/**, backend/src/OrderMgmt.Application/CashDebt/PaymentQr/**, backend/src/OrderMgmt.Application/Tt133/Vouchers/**, backend/src/OrderMgmt.Infrastructure/Excel/Tt133/Vouchers/**, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx]
 related: [receipts.form, debt-matching]
 updated: 2026-10-15
 ---
@@ -24,6 +24,7 @@ Ghi nhận hàng xuất khỏi kho: bán cho khách, trả hàng nhà cung cấp
 - Lý do yêu cầu khách hoặc nhà cung cấp, hay có ghi công nợ, thì bắt buộc chọn đối tượng. Gõ chữ ở **Đối tượng** mà chưa chọn từ danh sách thì chưa lưu được và ô báo Vui lòng chọn đối tượng từ danh sách.
 - Danh sách gợi ý của **Đối tượng** gồm khách hàng và nhà cung cấp đang dùng (tìm theo mã, tên, MST), hiện Mã, Tên, MST, Địa chỉ, SĐT, Loại. Enter chọn dòng đang sáng, mã gõ khớp hoàn toàn được ưu tiên; Enter khi kết quả chưa về thì chờ rồi mới chọn. Chọn xong, con trỏ sang ô tên.
 - `F4` hoặc nút **+** (cũng là dòng Thêm mới trong danh sách) mở **Thêm nhanh đối tượng**: vai trò chọn sẵn theo lý do, Enter đi qua từng ô, `Ctrl Enter` lưu đối tượng mới (không lưu phiếu), `Esc` hủy và về ô mã. Cần quyền tạo khách hàng hoặc nhà cung cấp.
+- `F4` trong ô **Mã hàng** (cũng là dòng **Thêm mới hàng hóa** trong danh sách khi gõ mà không thấy) mở **Thêm nhanh hàng hóa**: chữ đã gõ điền sẵn vào Mã (nếu không có dấu cách, không dấu) hoặc Tên, Enter đi qua từng ô, `Ctrl Enter` lưu và điền hàng vào dòng (không lưu phiếu), `Esc` hủy và về ô mã. Cần quyền tạo hàng hóa.
 - **Xem danh mục đầy đủ** (dòng cuối danh sách) mở danh mục có hai tab Khách hàng và Nhà cung cấp; ↑↓ rồi Enter để chọn. Cần quyền xem khách hàng hoặc nhà cung cấp.
 - Đối tượng ngừng sử dụng không hiện trong ô **Đối tượng**; nếu bị ngừng sau khi đã chọn, lúc lưu sẽ báo Đối tượng đã ngừng hoạt động. Phiếu cũ của đối tượng đó vẫn sửa được.
 - Vượt hạn mức nợ: tùy chính sách trong cấu hình, hệ thống cho qua, hiện hộp thoại **Vượt hạn mức nợ** để bạn xác nhận, hoặc chặn lưu.
@@ -41,4 +42,5 @@ Ghi nhận hàng xuất khỏi kho: bán cho khách, trả hàng nhà cung cấp
 - `Insert` Thêm dòng
 - `Ctrl Del` Xóa dòng
 - `F4` Thêm nhanh đối tượng (ở ô mã **Đối tượng**)
+- `F4` (ở ô **Mã hàng**) — Thêm nhanh hàng hóa
 - `Enter` Sang ô kế tiếp: **Ngày xuất**, **Lý do xuất**, **Kho**, **HTTT**, **Đối tượng** (mã), tên, **Đ.chỉ**, rồi vào bảng hàng

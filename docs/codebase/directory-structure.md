@@ -199,7 +199,8 @@ frontend/src/
 │   ├── opening-stock/
 │   ├── payment-methods/
 │   ├── payment-qr/              # VietQR payload generation
-│   ├── products/
+│   ├── products/                # split-typed-text.ts, use-save-product.ts (unit get-or-create), components/product-form-fields.tsx
+│   │                            # (the single product form), components/product-quick-add-dialog.tsx (product quick add, F4)
 │   ├── quotations/
 │   ├── reports/sales-revenue/
 │   ├── search/
@@ -248,7 +249,8 @@ frontend/src/
 │                                # report-scope.ts, period-presets.ts, blob-error.ts, date-range-presets.ts (dashboard
 │                                # and quotation range presets), realtime-bus.ts (hub status and dashboard signal),
 │                                # blob-download.ts (requestBlob, saveBlob), pdf-tab.ts (openPdfTab), use-row-selection.ts,
-│                                # enter-focus.ts (focusNextInOrder, focusById)
+│                                # enter-focus.ts (focusNextInOrder, focusById),
+│                                # use-dialog-opening.ts (token per dialog opening)
 ├── styles/
 └── test/
 

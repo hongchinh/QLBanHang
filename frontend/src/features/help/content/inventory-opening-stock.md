@@ -2,7 +2,7 @@
 key: inventory-opening-stock
 title: Tồn đầu kỳ
 routes: [/inventory/opening-stock]
-sources: [frontend/src/pages/inventory/opening-stock-page.tsx, frontend/src/features/opening-stock/**, backend/src/OrderMgmt.Application/Inventory/OpeningStocks/**, frontend/src/pages/stock-vouchers/components/negative-stock-dialog.tsx]
+sources: [frontend/src/pages/inventory/opening-stock-page.tsx, frontend/src/features/opening-stock/**, backend/src/OrderMgmt.Application/Inventory/OpeningStocks/**, frontend/src/pages/stock-vouchers/components/negative-stock-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx]
 related: [stock-in.form, stock-out.form]
 updated: 2026-10-15
 ---
@@ -24,3 +24,4 @@ Khai báo hàng đang có trong từng kho tại ngày đầu kỳ: số lượn
 - Mỗi dòng phải có **Số lượng** lớn hơn 0 và **Giá trị** không âm.
 - Ngày đầu kỳ nằm trong kỳ đã khóa sổ thì không sửa được, hệ thống báo Ngày tồn đầu kỳ đã khóa sổ.
 - Giảm tồn đầu kỳ làm tồn kho âm: tùy cấu hình, hệ thống cho qua, hiện Cảnh báo âm kho để bạn xác nhận, hoặc chặn (Không đủ tồn kho).
+- `F4` trong ô **Mã hàng** (cũng là dòng **Thêm mới hàng hóa** trong danh sách khi gõ mà không thấy) mở **Thêm nhanh hàng hóa**: chữ đã gõ điền sẵn vào Mã (nếu không có dấu cách, không dấu) hoặc Tên, Enter đi qua từng ô, `Ctrl Enter` lưu và điền hàng vào dòng, `Esc` hủy và về ô mã. Cần quyền tạo hàng hóa.

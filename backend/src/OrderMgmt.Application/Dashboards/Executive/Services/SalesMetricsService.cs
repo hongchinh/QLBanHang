@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
+using OrderMgmt.Application.Dashboards.Common;
 using OrderMgmt.Application.Dashboards.Executive.Common;
 using OrderMgmt.Application.Dashboards.Executive.Interfaces;
 using OrderMgmt.Application.Dashboards.Executive.Models;
 using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Domain.Constants;
-using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Enums;
 
 namespace OrderMgmt.Application.Dashboards.Executive.Services;
@@ -20,16 +20,18 @@ public class SalesMetricsService : ISalesMetricsService
     private readonly ICurrentUser _currentUser;
     private readonly IExecutiveScopeResolver _scopes;
     private readonly ExecutiveLookups _lookups;
+    private readonly SalesRevenueSource _source;
     private readonly IDateTime _clock;
     private readonly ITransactionRunner _transaction;
 
     public SalesMetricsService(IAppDbContext db, ICurrentUser currentUser, IExecutiveScopeResolver scopes,
-        ExecutiveLookups lookups, IDateTime clock, ITransactionRunner transaction)
+        ExecutiveLookups lookups, SalesRevenueSource source, IDateTime clock, ITransactionRunner transaction)
     {
         _db = db;
         _currentUser = currentUser;
         _scopes = scopes;
         _lookups = lookups;
+        _source = source;
         _clock = clock;
         _transaction = transaction;
     }
@@ -47,7 +49,7 @@ public class SalesMetricsService : ISalesMetricsService
 
         // One read for the period and the one before it; they are adjacent, so an instant tells them apart.
         var vouchers = await LoadVouchersAsync(
-            await BuildCountedQueryAsync(scope, period.PrevStart, period.End, ct), canViewCost, ct);
+            await _source.BuildAsync(scope.BranchIds, null, period.PrevStart, period.End, ct), canViewCost, ct);
         var current = vouchers.Where(v => v.At >= period.Start).ToList();
         var previous = vouchers.Where(v => v.At < period.Start).ToList();
         var revenue = current.Sum(v => v.Revenue);
@@ -85,7 +87,7 @@ public class SalesMetricsService : ISalesMetricsService
         var canViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost);
 
         var vouchers = await LoadVouchersAsync(
-            await BuildCountedQueryAsync(scope, period.Start, period.End, ct), canViewCost, ct);
+            await _source.BuildAsync(scope.BranchIds, null, period.Start, period.End, ct), canViewCost, ct);
         var totals = vouchers
             .GroupBy(v => ExecutiveSeries.BucketOf(VnTime.ToVnDate(v.At), query.Granularity))
             .ToDictionary(g => g.Key, g => new SalesTotals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
@@ -119,7 +121,7 @@ public class SalesMetricsService : ISalesMetricsService
         var period = ExecutivePeriod.Create(query.From, query.To, today);
         var canViewCost = _currentUser.HasPermission(Permissions.Inventory.ViewCost);
 
-        var counted = await BuildCountedQueryAsync(scope, period.Start, period.End, ct);
+        var counted = await _source.BuildAsync(scope.BranchIds, null, period.Start, period.End, ct);
         var totals = await TotalsAsync(query.By, counted, canViewCost, ct);
         var names = await LoadNamesAsync(query.By, totals.Keys.ToList(), ct);
 
@@ -151,54 +153,20 @@ public class SalesMetricsService : ISalesMetricsService
         CancellationToken ct = default)
     {
         var vouchers = await LoadVouchersAsync(
-            await BuildCountedQueryAsync(scope, period.Start, period.End, ct), withCost: true, ct);
+            await _source.BuildAsync(scope.BranchIds, null, period.Start, period.End, ct), withCost: true, ct);
         return vouchers
             .GroupBy(v => v.BranchId)
             .ToDictionary(g => g.Key, g => new SalesTotals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
     }
 
-    /// The query of the counted vouchers of the scope with VoucherAt in [from, to): Active, not deleted, reason XBH or
-    /// NTL. Only the reason ids are read here; the vouchers are read when the query is run.
-    private async Task<Counted> BuildCountedQueryAsync(ExecutiveScope scope, DateTimeOffset from, DateTimeOffset to,
-        CancellationToken ct)
-    {
-        // The reason ids come from their own query: IgnoreQueryFilters would also reveal deleted vouchers here.
-        var reasons = await _db.StockReasons.IgnoreQueryFilters().AsNoTracking()
-            .Where(r => r.IsSystem && (r.Code == StockReasonCodes.Sale || r.Code == StockReasonCodes.SaleReturn))
-            .Select(r => new { r.Id, r.Code })
-            .ToListAsync(ct);
-        var saleIds = reasons.Where(r => r.Code == StockReasonCodes.Sale).Select(r => r.Id).ToList();
-        var returnIds = reasons.Where(r => r.Code == StockReasonCodes.SaleReturn).Select(r => r.Id).ToList();
-        var branchIds = scope.BranchIds;
-
-        var vouchers = _db.StockVouchers.AsNoTracking()
-            .Where(v => v.Status == StockVoucherStatus.Active
-                && branchIds.Contains(v.BranchId)
-                && (saleIds.Contains(v.ReasonId) || returnIds.Contains(v.ReasonId))
-                && v.VoucherAt >= from && v.VoucherAt < to);
-        return new Counted(vouchers, returnIds);
-    }
-
     /// One row per counted voucher: a sale counts positive and a return negative, on revenue and on cost.
     /// Costs are read only when the user may see them.
-    private async Task<List<VoucherRow>> LoadVouchersAsync(Counted counted, bool withCost, CancellationToken ct)
+    private async Task<List<VoucherRow>> LoadVouchersAsync(CountedSales counted, bool withCost, CancellationToken ct)
     {
         var vouchers = counted.Vouchers;
-        var returnIds = counted.ReturnIds;
 
-        var rows = await vouchers
-            .Select(v => new
-            {
-                v.Id,
-                v.VoucherAt,
-                v.BranchId,
-                v.PartnerId,
-                v.OwnerUserId,
-                IsReturn = returnIds.Contains(v.ReasonId),
-                Revenue = v.Lines.Sum(l => l.Amount - l.DiscountAmount - l.OrderDiscountAllocated
-                    - (v.Type == StockDirection.Out && l.PriceIncludesVat ? l.VatAmount : 0m)),
-            })
-            .ToListAsync(ct);
+        // Revenue is already signed by the shared source; only the cost takes the sign here.
+        var rows = await counted.VoucherRevenues().ToListAsync(ct);
 
         // The ledger holds the rows of Active, non-deleted vouchers only; costs are written when a voucher is posted.
         var costs = withCost
@@ -219,13 +187,13 @@ public class SalesMetricsService : ISalesMetricsService
         {
             var sign = r.IsReturn ? -1m : 1m;
             var cost = costs is not null && costs.TryGetValue(r.Id, out var c) ? (r.IsReturn ? c.ValueIn : c.CostOut) : 0m;
-            return new VoucherRow(r.Id, r.VoucherAt, r.BranchId, r.PartnerId, r.OwnerUserId, sign * r.Revenue, sign * cost);
+            return new VoucherRow(r.Id, r.VoucherAt, r.BranchId, r.PartnerId, r.OwnerUserId, r.Revenue, sign * cost);
         }).ToList();
     }
 
     /// The totals of each customer, employee or product of the counted vouchers, by the grouping of the top list.
     private async Task<Dictionary<Guid, SalesTotals>> TotalsAsync(
-        SalesTopBy by, Counted counted, bool canViewCost, CancellationToken ct)
+        SalesTopBy by, CountedSales counted, bool canViewCost, CancellationToken ct)
     {
         if (by == SalesTopBy.Product)
             return await TotalsByProductAsync(counted, canViewCost, ct);
@@ -248,21 +216,13 @@ public class SalesMetricsService : ISalesMetricsService
             .ToDictionary(g => g.Key, g => new SalesTotals(g.Sum(v => v.Revenue), g.Sum(v => v.Cost)));
 
     /// Products: revenue from the voucher lines and cost from the ledger rows, each grouped by product in the database.
-    private async Task<Dictionary<Guid, SalesTotals>> TotalsByProductAsync(Counted counted, bool withCost, CancellationToken ct)
+    private async Task<Dictionary<Guid, SalesTotals>> TotalsByProductAsync(CountedSales counted, bool withCost, CancellationToken ct)
     {
         var vouchers = counted.Vouchers;
-        var returnIds = counted.ReturnIds;
 
-        var revenues = await _db.StockVoucherLines.AsNoTracking()
-            .Where(l => vouchers.Any(v => v.Id == l.StockVoucherId))
+        var revenues = await counted.LineRevenues(_db.StockVoucherLines)
             .GroupBy(l => l.ProductId)
-            .Select(g => new
-            {
-                ProductId = g.Key,
-                Revenue = g.Sum(l => (returnIds.Contains(l.StockVoucher!.ReasonId) ? -1m : 1m)
-                    * (l.Amount - l.DiscountAmount - l.OrderDiscountAllocated
-                        - (l.StockVoucher.Type == StockDirection.Out && l.PriceIncludesVat ? l.VatAmount : 0m))),
-            })
+            .Select(g => new { ProductId = g.Key, Revenue = g.Sum(l => l.Revenue) })
             .ToListAsync(ct);
 
         // Sale rows carry CostAmount and no InValue, return rows the opposite, so one difference gives the net cost.
@@ -297,9 +257,6 @@ public class SalesMetricsService : ISalesMetricsService
                 throw new ArgumentOutOfRangeException(nameof(by), by, "Unknown top list.");
         }
     }
-
-    /// The query of counted vouchers and the ids of the NTL reason (the vouchers that count negative).
-    private sealed record Counted(IQueryable<StockVoucher> Vouchers, List<Guid> ReturnIds);
 
     /// Revenue and Cost are signed: a return counts negative.
     private sealed record VoucherRow(Guid VoucherId, DateTimeOffset At, Guid BranchId, Guid? PartnerId, Guid OwnerUserId,

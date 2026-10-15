@@ -52,6 +52,8 @@ export type PartnerAutocompleteProps = PartnerSearchSource & {
   noun?: PartnerNoun;
   // h-7 input and buttons (dense forms).
   compact?: boolean;
+  // aria-describedby of the input (e.g. the id of an error paragraph).
+  describedBy?: string;
   // Focus target after a pick (the partner name input).
   nameInputId?: string;
   // Enables the + button, F4 and the "Thêm mới" row.
@@ -80,6 +82,7 @@ export function PartnerAutocomplete({
   activeOnly,
   noun = 'đối tượng',
   compact,
+  describedBy,
   nameInputId,
   onAddNew,
   onOpenCatalog,
@@ -323,6 +326,7 @@ export function PartnerAutocomplete({
             aria-controls={listboxId}
             aria-autocomplete="list"
             aria-activedescendant={activeOptionId}
+            aria-describedby={describedBy}
             placeholder={effectivePlaceholder}
             disabled={isDisabled}
             autoComplete="off"

@@ -77,3 +77,21 @@
     grid-column: 2 / -1;
   }
 }
+
+.partner-code-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.partner-code-name > :first-child {
+  flex: 0 1 250px;
+  min-width: 180px;
+}
+
+.partner-code-name > :last-child {
+  flex: 1 1 220px;
+  min-width: 0;
+}

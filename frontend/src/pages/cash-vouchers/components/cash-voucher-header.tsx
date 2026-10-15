@@ -154,11 +154,9 @@ export function CashVoucherHeader({
             <FieldError message={errors.reasonId?.message ?? errors.partnerId?.message} />
           </div>
 
-          <div className="form-inline-grid form-cols-2">
-            <Label htmlFor="cash-partner-name" className="field-label">Tên đối tượng</Label>
+          <div className="form-inline-grid">
+            <Label htmlFor="cash-partner-name"className="field-label">Tên đối tượng</Label>
             <Input id="cash-partner-name" className="h-7" {...form.register('partnerName')} />
-            <Label htmlFor="cash-partner-tax-code" className="field-label">MST</Label>
-            <Input id="cash-partner-tax-code" className="h-7" {...form.register('partnerTaxCode')} />
           </div>
 
           <div className="form-inline-grid">

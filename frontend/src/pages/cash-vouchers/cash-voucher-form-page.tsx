@@ -394,7 +394,6 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     form.setValue('partnerId', p.id, { shouldDirty: true });
     form.setValue('partnerName', p.name, { shouldDirty: true });
     form.setValue('partnerAddress', p.companyAddress ?? '', { shouldDirty: true });
-    form.setValue('partnerTaxCode', p.taxCode ?? '', { shouldDirty: true });
     setSelectedPartner({ id: p.id, code: p.code, name: p.name, isCustomer: p.isCustomer, isSupplier: p.isSupplier });
     resetAllocations();
   }
@@ -403,7 +402,6 @@ function CashVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormPr
     form.setValue('partnerId', '', { shouldDirty: true });
     form.setValue('partnerName', '', { shouldDirty: true });
     form.setValue('partnerAddress', '', { shouldDirty: true });
-    form.setValue('partnerTaxCode', '', { shouldDirty: true });
     setSelectedPartner(null);
     resetAllocations();
   }

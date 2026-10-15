@@ -14,9 +14,11 @@ import type { CurrentUser } from '@/stores/auth-store';
 interface HeaderUserMenuProps {
   user: CurrentUser | null;
   onLogout: () => void;
+  triggerRef?: React.Ref<HTMLButtonElement>;
+  onOpenHelp?: () => void;
 }
 
-export function HeaderUserMenu({ user, onLogout }: HeaderUserMenuProps) {
+export function HeaderUserMenu({ user, onLogout, triggerRef, onOpenHelp }: HeaderUserMenuProps) {
   const navigate = useNavigate();
 
   if (!user) return null;
@@ -28,6 +30,7 @@ export function HeaderUserMenu({ user, onLogout }: HeaderUserMenuProps) {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          ref={triggerRef}
           aria-label="Mở menu người dùng"
           className="flex items-center gap-2 rounded-md px-2 py-1 text-header-fg hover:bg-header-active focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
         >
@@ -49,6 +52,11 @@ export function HeaderUserMenu({ user, onLogout }: HeaderUserMenuProps) {
           <div className="text-xs font-normal text-muted-foreground">{user.username}</div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        {onOpenHelp && (
+          <DropdownMenuItem className="md:hidden" onSelect={onOpenHelp}>
+            <AppIcon name="help" /> Hướng dẫn màn hình này
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onSelect={() => navigate('/settings/my-quotation-settings')}>
           Cài đặt của tôi
         </DropdownMenuItem>

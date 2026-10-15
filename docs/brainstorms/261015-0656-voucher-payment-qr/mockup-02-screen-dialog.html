@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR chuyển khoản trên màn phiếu</title>
+<style>
+
+  :root {
+    --fg: #020817; --muted-fg: #64748B; --border: #E2E8F0; --muted: #F1F5F9; --card: #FFFFFF;
+    --primary: #2563EB; --header-bg: #1457A3; --group-bg: #F4F7FA;
+    --signal: #FF5A1F; --mute: #9A9EA6;
+    --page: #F8FAFC;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--fg); background: #E9EDF2; }
+  .bar { position: sticky; top: 0; z-index: 5; background: #0F172A; color: #E2E8F0; padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .bar h1 { font-size: 15px; margin: 0 12px 0 0; font-weight: 700; }
+  .seg { display: inline-flex; background: #1E293B; border-radius: 8px; padding: 3px; gap: 2px; }
+  .seg button { border: 0; background: transparent; color: #CBD5E1; font: inherit; font-weight: 600; padding: 7px 14px; border-radius: 6px; cursor: pointer; min-height: 36px; }
+  .seg button[aria-pressed="true"] { background: #F8FAFC; color: #0F172A; }
+  .hint { font-size: 12px; color: #94A3B8; }
+  .wrap { display: flex; gap: 16px; padding: 16px; align-items: flex-start; }
+  .stage { flex: 1 1 auto; min-width: 0; overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 3px rgba(15,23,42,.15); }
+  .notes { width: 340px; flex: none; background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(15,23,42,.15); position: sticky; top: 72px; }
+  .notes h2 { margin: 0 0 4px; font-size: 16px; }
+  .notes p.sub { margin: 0 0 12px; color: var(--muted-fg); font-size: 12.5px; }
+  .notes ol { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+  .notes li { display: flex; gap: 10px; font-size: 13px; }
+  .notes code { font-size: 12px; background: var(--muted); padding: 1px 4px; border-radius: 4px; }
+  .num { flex: none; width: 20px; height: 20px; border-radius: 50%; background: #F59E0B; color: #111; font-size: 11px; font-weight: 800; display: inline-flex; align-items: center; justify-content: center; }
+  .pin { position: absolute; z-index: 2; pointer-events: none; }
+  @media (max-width: 1100px) { .wrap { flex-direction: column; } .notes { width: 100%; position: static; } }
+
+  /* App frame (mirrors the current layout) */
+  .app { width: 1280px; background: var(--page); display: grid; grid-template-columns: 256px 1fr; grid-template-rows: 64px auto; position: relative; }
+  .hdr { grid-column: 1 / -1; background: var(--header-bg); color: #fff; display: flex; align-items: center; height: 64px; position: relative; }
+  .brand { width: 256px; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 16px; }
+  .logo { width: 30px; height: 30px; border-radius: 6px; background: rgba(255,255,255,.16); display: flex; align-items: center; justify-content: center; }
+  .brand b { font-size: 16px; flex: 1; }
+  .hbtn { width: 40px; height: 40px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: #fff; position: relative; }
+  .hsearch { display: flex; align-items: center; gap: 8px; width: 420px; height: 38px; border-radius: 8px; background: rgba(255,255,255,.14); padding: 0 12px; color: rgba(255,255,255,.85); font-size: 13px; }
+  .hsearch kbd { margin-left: auto; font: 11px ui-monospace, monospace; background: rgba(255,255,255,.18); border-radius: 4px; padding: 2px 6px; }
+  .hright { margin-left: auto; display: flex; align-items: center; gap: 6px; padding-right: 16px; }
+  .branch { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 6px; background: rgba(255,255,255,.12); font-size: 13px; }
+  .badge { position: absolute; top: 4px; right: 4px; min-width: 16px; height: 16px; border-radius: 8px; background: #EF4444; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+  .user { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; padding-left: 6px; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: #fff; color: var(--header-bg); font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+
+  .side { background: #fff; border-right: 1px solid var(--border); padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; min-height: 900px; position: relative; }
+  .msearch { display: flex; align-items: center; gap: 8px; height: 34px; border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; color: var(--muted-fg); font-size: 13px; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px; border-radius: 13px; background: #FFF7E0; color: #7A4A0E; border: 1px solid #FBE3A6; font-size: 12px; font-weight: 600; }
+  .item { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 10px; border-radius: 6px; color: var(--muted-fg); font-weight: 500; position: relative; }
+  .item.active { background: var(--primary); color: #fff; }
+  .group { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 8px; border-radius: 6px; background: var(--group-bg); font-weight: 600; margin-top: 8px; }
+  .group span.l { flex: 1; }
+  .tile { width: 26px; height: 26px; border-radius: 6px; background: var(--c); display: flex; align-items: center; justify-content: center; color: #fff; flex: none; }
+  .sub { padding-left: 14px; display: flex; flex-direction: column; gap: 2px; margin-top: 2px; }
+  .chev { color: var(--muted-fg); display: inline-flex; }
+
+  .main { padding: 24px 28px 32px; display: flex; flex-direction: column; gap: 22px; position: relative; }
+  .ph { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .ph h2 { margin: 0; font-size: 24px; font-weight: 650; letter-spacing: -.01em; }
+  .ph p { margin: 2px 0 0; color: var(--muted-fg); font-size: 13px; }
+  .range { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; position: relative; }
+  .rchip { height: 32px; padding: 0 12px; border-radius: 16px; border: 1px solid var(--border); background: #fff; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .rchip.on { background: var(--fg); color: #fff; border-color: var(--fg); }
+  .rdate { font-size: 12.5px; color: var(--muted-fg); display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; position: relative; }
+  .kpi { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.05); position: relative; }
+  .kpi .lab { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--muted-fg); }
+  .kpi .val { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; }
+  .kpi .val b { font-size: 22px; white-space: nowrap; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .delta { display: inline-flex; align-items: center; gap: 3px; border-radius: 10px; padding: 2px 8px; font-size: 12px; font-weight: 600; }
+  .up { background: #ECFDF5; color: #047857; } .down { background: #FFF1F2; color: #BE123C; }
+  .spark { height: 44px; margin-top: 10px; color: var(--primary); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(15,23,42,.05); position: relative; }
+  .card h3 { margin: 0 0 14px; font-size: 16px; font-weight: 650; display: flex; justify-content: space-between; align-items: center; }
+  .gran { display: inline-flex; background: var(--muted); border-radius: 6px; padding: 3px; gap: 2px; font-size: 12px; font-weight: 600; }
+  .gran span { padding: 4px 10px; border-radius: 4px; color: var(--muted-fg); } .gran span.on { background: #fff; color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .fun { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; font-size: 12.5px; color: var(--muted-fg); }
+  .fun .t { width: 100px; } .fun .b { flex: 1; height: 24px; background: var(--muted); border-radius: 4px; overflow: hidden; } .fun .b i { display: block; height: 100%; }
+  .act { display: flex; gap: 10px; padding: 6px 0; font-size: 13.5px; }
+  .act .dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 7px; flex: none; }
+  .act small { display: block; color: var(--muted-fg); font-size: 12px; }
+  .omit { font-size: 12px; color: var(--muted-fg); text-align: center; border: 1px dashed var(--border); border-radius: 10px; padding: 14px; }
+
+  /* Registry fallback marker (step 2): a business icon the Notch set does not have yet. */
+  .fallback { outline: 1.5px dashed #F59E0B; outline-offset: 2px; border-radius: 3px; }
+  svg.ic { display: block; flex: none; }
+
+  /* Step 2 surface changes required for the notch to stay visible */
+  .m-s2 .tile { background: var(--tint); color: var(--fg); }
+  .m-s2 .item.active { background: #fff; color: var(--fg); font-weight: 650; box-shadow: inset 3px 0 0 var(--primary); }
+
+  /* Voucher form */
+  .app { grid-template-columns: 256px minmax(0, 1fr); }
+  .main { min-width: 0; }
+  .main.form { padding: 0 20px 20px; gap: 8px; }
+  .vbar { position: sticky; top: 0; margin: 0 -20px; padding: 10px 20px; background: rgba(248,250,252,.96); border-bottom: 1px solid var(--border); box-shadow: 0 1px 2px rgba(15,23,42,.05); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; }
+  .vbar .l { display: flex; align-items: center; gap: 8px; }
+  .vbar h2 { margin: 0; font-size: 20px; font-weight: 700; }
+  .ghost { width: 36px; height: 36px; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; position: relative; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+  .btn { height: 34px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--border); background: #fff; font-weight: 600; font-size: 13px; display: inline-flex; align-items: center; gap: 8px; position: relative; color: var(--fg); }
+  .btn.pri { background: var(--primary); border-color: var(--primary); color: #fff; }
+  .btn.plan { border-style: dashed; }
+  .btn.plan small { font-weight: 500; color: var(--muted-fg); font-size: 11px; }
+  .m-s2 .btn.danger { color: #B42318; border-color: #F3C5C0; }
+  .fields { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; display: grid; grid-template-columns: 92px minmax(0,1fr) 82px minmax(0,1fr) 40px minmax(0,1fr) 40px minmax(0,1fr); gap: 6px 10px; align-items: center; font-size: 13px; }
+  .fields label { color: var(--muted-fg); font-size: 12.5px; text-align: right; }
+  .fields label.req::after { content: " *"; color: #DC2626; }
+  .inp { height: 28px; border: 1px solid var(--border); border-radius: 5px; padding: 0 8px; display: flex; align-items: center; gap: 6px; background: #fff; font-size: 13px; min-width: 0; white-space: nowrap; overflow: hidden; }
+  .inp.ro { background: #F8FAFC; color: #334155; }
+  .inp .sel { margin-left: auto; color: var(--muted-fg); display: inline-flex; }
+  .span3 { grid-column: span 3; } .span5 { grid-column: span 5; }
+  .tabsbox { background: #fff; border: 1px solid var(--border); border-radius: 8px; display: flex; flex-direction: column; min-width: 0; }
+  .tabs { display: flex; align-items: center; gap: 2px; border-bottom: 1px solid var(--border); padding: 0 8px; flex-wrap: wrap; }
+  .tab { height: 38px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--muted-fg); }
+  .tab.on { color: var(--fg); font-weight: 650; box-shadow: inset 0 -2px 0 var(--primary); }
+  .tab .cnt { font-size: 11px; background: var(--muted); border-radius: 9px; padding: 0 6px; }
+  .tools { margin-left: auto; display: flex; align-items: center; gap: 6px; padding: 4px 0; position: relative; }
+  .tbtn { height: 28px; padding: 0 9px; border: 1px solid var(--border); border-radius: 5px; background: #fff; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; position: relative; }
+  .kbd { font: 11px ui-monospace, monospace; border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; background: #fff; color: #334155; }
+  .gridwrap { overflow-x: auto; }
+  table.g { border-collapse: collapse; font-size: 12.5px; width: 100%; min-width: 1240px; }
+  table.g th { background: #F8FAFC; color: var(--muted-fg); font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  table.g td { padding: 0 8px; height: 32px; border-bottom: 1px solid #EEF2F6; white-space: nowrap; }
+  table.g .n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.g .muted { color: var(--muted-fg); }
+  table.g tr.cur td { background: #F5F9FF; }
+  table.g td.act { width: 40px; min-width: 40px; text-align: center; }
+  table.g th:last-child, table.g td.act { position: sticky; right: 0; background: #fff; }
+  table.g th:nth-last-child(2), table.g td.net { position: sticky; right: 40px; background: #fff; box-shadow: -1px 0 0 var(--border); }
+  table.g th:last-child, table.g th:nth-last-child(2) { background: #F8FAFC; }
+  table.g tr.cur td.act, table.g tr.cur td.net { background: #F5F9FF; }
+  .gfill { height: 120px; border-bottom: 1px solid #EEF2F6; }
+  .totals { background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 -2px 6px rgba(0,0,0,.06); }
+  .trow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 20px; padding: 8px 12px; font-size: 13px; color: var(--muted-fg); }
+  .trow .l { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .trow b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .trow .tot { color: var(--primary); font-weight: 800; font-size: 15px; }
+  .debt { display: flex; flex-wrap: nowrap; gap: 10px; align-items: center; overflow-x: auto; white-space: nowrap; border-top: 1px dashed var(--border); background: rgba(241,245,249,.5); padding: 5px 12px; font-size: 12px; color: var(--muted-fg); position: relative; }
+  .debt b { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .debt .who { font-weight: 650; color: var(--fg); }
+  .debt .ar { display: inline-flex; vertical-align: middle; }
+  .t-danger { color: #DC2626; } .t-create { color: #0891B2; } .t-muted { color: #64748B; } .t-print { color: #4F46E5; }
+
+  .t-qr { color: #0F766E; }
+  .mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-weight: 600; letter-spacing: .02em; }
+  .qrbtn { box-shadow: 0 0 0 2px #FDBA74; }
+  .stage { position: relative; }
+  .app { overflow: hidden; }
+  .overlay { position: absolute; inset: 0; background: rgba(2,8,23,.45); z-index: 20; }
+  .dlg { position: absolute; z-index: 21; left: 50%; top: 92px; transform: translateX(-50%); width: 440px; background: #fff; border-radius: 10px; box-shadow: 0 20px 50px rgba(2,8,23,.35); padding: 18px 20px 16px; }
+  .dh { display: flex; align-items: center; justify-content: space-between; font-size: 16px; margin-bottom: 12px; }
+  .x { color: var(--muted-fg); display: inline-flex; }
+  .qrbox { background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 0 auto; }
+  .qrbox svg { display: block; width: 100%; height: auto; }
+  .qrbox.big { width: 264px; } .qrbox.mid { width: 196px; }
+  .amt { text-align: center; font-size: 26px; font-weight: 800; color: var(--primary); margin-top: 10px; font-variant-numeric: tabular-nums; }
+  .amt small { font-size: 16px; font-weight: 700; } .amt.s { font-size: 20px; margin-top: 8px; }
+  .amtsub { text-align: center; font-size: 12px; color: var(--muted-fg); }
+  .qrows { margin-top: 12px; border-top: 1px solid var(--border); }
+  .qrow { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid #EEF2F6; font-size: 13px; }
+  .ql { width: 104px; color: var(--muted-fg); flex: none; } .qv { flex: 1; min-width: 0; }
+  .cp { width: 28px; height: 28px; border-radius: 5px; border: 1px solid var(--border); display: inline-flex; align-items: center; justify-content: center; color: #334155; flex: none; }
+  .cp.none { border: 0; }
+  .fund { font-size: 12px; color: var(--muted-fg); margin-top: 8px; }
+  .df { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .btn.sm { height: 28px; padding: 0 8px; font-size: 12px; gap: 5px; }
+  .pop { position: absolute; z-index: 21; top: 118px; right: 330px; width: 250px; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 30px rgba(2,8,23,.22); padding: 14px; }
+  .pop::before { content: ""; position: absolute; top: -7px; right: 92px; width: 12px; height: 12px; background: #fff; border-left: 1px solid var(--border); border-top: 1px solid var(--border); transform: rotate(45deg); }
+  .pline { display: flex; align-items: center; gap: 6px; justify-content: center; font-size: 12.5px; margin-top: 6px; color: #334155; }
+  .pop .df { justify-content: center; margin-top: 10px; }
+  .phone-wrap { display: none; gap: 32px; padding: 24px; align-items: flex-start; }
+  .phone { width: 390px; height: 820px; border-radius: 44px; background: #0F172A; padding: 14px; flex: none; box-shadow: 0 10px 30px rgba(2,8,23,.3); }
+  .pscreen { position: relative; width: 100%; height: 100%; border-radius: 32px; overflow: hidden; background: var(--page); }
+  .phdr { height: 56px; background: var(--header-bg); color: #fff; display: flex; align-items: center; gap: 10px; padding: 18px 16px 0; }
+  .pbar { display: flex; align-items: center; gap: 8px; padding: 10px 14px; border-bottom: 1px solid var(--border); background: #fff; }
+  .pbar b { flex: 1; font-size: 17px; }
+  .pbody { padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .ghost-line { height: 40px; border-radius: 8px; background: #fff; border: 1px solid var(--border); } .ghost-line.s { height: 120px; }
+  .sheet { position: absolute; z-index: 21; left: 0; right: 0; bottom: 0; background: #fff; border-radius: 18px 18px 0 0; padding: 8px 18px 26px; }
+  .sheet .qrbox.big { width: 250px; }
+  .grab { width: 40px; height: 5px; border-radius: 3px; background: #CBD5E1; margin: 0 auto 10px; }
+  .phone-note { max-width: 420px; background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 3px rgba(15,23,42,.15); font-size: 14px; }
+  .phone-note h3 { margin: 0 0 8px; } .phone-note p { margin: 0 0 8px; color: #334155; }
+  body[data-mode="a"] .pop, body[data-mode="b"] .dlg, body[data-mode="b"] .stage > .overlay { display: none; }
+  body[data-mode="m"] .wrap { display: none; } body[data-mode="m"] .phone-wrap { display: flex; }
+  .notes p { font-size: 13px; color: #334155; margin: 0 0 8px; }
+</style></head>
+<body data-mode="a">
+<div class="bar">
+  <h1>QR chuyển khoản trên màn phiếu xuất</h1>
+  <div class="seg" role="group" aria-label="Phương án">
+    <button type="button" data-mode="a" aria-pressed="true">A · Hộp thoại</button>
+    <button type="button" data-mode="b" aria-pressed="false">B · Popover dưới nút</button>
+    <button type="button" data-mode="m" aria-pressed="false">A trên điện thoại</button>
+  </div>
+  <span class="hint">Dữ liệu mẫu: HTTT tiền mặt, đã trả 10.000.000 nên QR = 24.644.100 − 10.000.000. STK giả, đừng bấm chuyển.</span>
+</div>
+<div class="wrap">
+  <div class="stage">
+    <div class="app" id="app">
+      <header class="hdr">
+        <div class="brand">
+          <span class="logo"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg></span>
+          <b>QLBanHang</b>
+          <span class="hbtn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"></rect><path d="M9 3v18"></path><path d="m16 15-3-3 3-3"></path></svg></span>
+        </div>
+        <div class="hsearch"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>Tìm khách hàng, báo giá, chức năng…<kbd>Ctrl K</kbd></div>
+        <div class="hright">
+          <span class="branch"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"></path><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"></path><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"></path><path d="M10 6h4"></path><path d="M10 10h4"></path><path d="M10 14h4"></path><path d="M10 18h4"></path></svg>CN01 — Chi nhánh chính<svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+          <span class="hbtn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg><span class="badge">3</span></span>
+          <span class="user"><span class="avatar">QT</span>Quản trị hệ thống<svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+        </div>
+      </header>
+
+      <nav class="side" aria-label="Menu chính">
+        <div class="msearch"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>Tìm menu…</div>
+        <a class="item"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Tổng quan</a>
+        <div class="group"><span class="tile" style="--c:#2563EB;--tint:#DCE7FD"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg></span><span class="l">Bán hàng</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#D97706;--tint:#FBEBD3"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 8.35V20a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8.35A2 2 0 0 1 3.26 6.5l8-3.2a2 2 0 0 1 1.48 0l8 3.2A2 2 0 0 1 22 8.35Z"></path><path d="M6 18h12"></path><path d="M6 14h12"></path><rect width="12" height="12" x="6" y="10"></rect></svg></span><span class="l">Kho</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></div>
+        <div class="sub">
+          <a class="item"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17V3"></path><path d="m6 11 6 6 6-6"></path><path d="M19 21H5"></path></svg>Phiếu nhập kho</a>
+          <a class="item active" style="position:relative"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 9-6-6-6 6"></path><path d="M12 3v14"></path><path d="M5 21h14"></path></svg>Phiếu xuất kho</a>
+          <a class="item"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"></rect><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><path d="M12 11h4"></path><path d="M12 16h4"></path><path d="M8 11h.01"></path><path d="M8 16h.01"></path></svg>Tồn đầu kỳ</a>
+        </div>
+        <div class="group"><span class="tile" style="--c:#059669;--tint:#D2F1E6"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1"></path><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"></path></svg></span><span class="l">Thu chi</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#DC2626;--tint:#FBDCDC"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="M7 21h10"></path><path d="M12 3v18"></path><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path></svg></span><span class="l">Công nợ</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#7C3AED;--tint:#E9DFFD"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg></span><span class="l">Báo cáo</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#0891B2;--tint:#D3EEF4"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 6 4 14"></path><path d="M12 6v14"></path><path d="M8 8v12"></path><path d="M4 4v16"></path></svg></span><span class="l">Danh mục</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+        <div class="group"><span class="tile" style="--c:#4A5668;--tint:#E2E5EA"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span><span class="l">Hệ thống</span><span class="chev"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg></span></div>
+      </nav>
+
+      <main class="main form">
+        <div class="vbar">
+          <div class="l">
+            <span class="ghost" aria-label="Quay lại"><svg class="ic t-muted" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg></span>
+            <h2>Phiếu xuất kho PX00012</h2>
+          </div>
+          <div class="btns">
+            <span class="btn"><svg class="ic t-print" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg>In<svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span>
+            <span class="btn qrbtn" id="qrbtn"><svg class="ic t-qr" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"></rect><rect width="5" height="5" x="16" y="3" rx="1"></rect><rect width="5" height="5" x="3" y="16" rx="1"></rect><path d="M21 16h-3a2 2 0 0 0-2 2v3"></path><path d="M21 21v.01"></path><path d="M12 7v3a2 2 0 0 1-2 2H7"></path><path d="M3 12h.01"></path><path d="M12 3h.01"></path><path d="M12 16v.01"></path><path d="M16 12h1"></path><path d="M21 12v.01"></path><path d="M12 21v-1"></path></svg>QR chuyển khoản</span>
+            <span class="btn pri"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"></path><path d="M7 3v4a1 1 0 0 0 1 1h7"></path></svg>Cập nhật</span>
+            <span class="btn"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m4.9 4.9 14.2 14.2"></path></svg>Hủy phiếu</span>
+            <span class="btn"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg>Xóa</span>
+          </div>
+        </div>
+
+        <div class="fields" style="position:relative">
+          
+          <label class="req">Ngày xuất</label><span class="inp">14/10/2026 09:30</span>
+          <label class="req">Lý do xuất</label><span class="inp">Xuất bán hàng<span class="sel"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></span>
+          <label class="req">Kho</label><span class="inp">Kho chính<span class="sel"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></span>
+          <label>HTTT</label><span class="inp">Tiền mặt<span class="sel"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg></span></span>
+          <label>Mã đối tượng</label><span class="inp"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>KH0012</span>
+          <label>Tên đối tượng</label><span class="inp ro span5">Công ty TNHH An Phát</span>
+          <label>Địa chỉ</label><span class="inp ro" style="grid-column: span 7">12 Nguyễn Văn Linh, phường Tân Phong, TP. Hồ Chí Minh</span>
+        </div>
+
+        <div class="tabsbox">
+          <div class="tabs">
+            <span class="tab on">Hàng hóa <span class="cnt">3</span></span>
+            <span class="tab">Thông tin khác</span>
+            <span class="tab">Thanh toán</span>
+            <span class="tab">Lịch sử</span>
+            <div class="tools">
+              <span class="tbtn"><svg class="ic t-create" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>Thêm dòng</span>
+              <span class="tbtn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"></path><path d="M14 17H5"></path><circle cx="17" cy="17" r="3"></circle><circle cx="7" cy="7" r="3"></circle></svg>Cột &amp; phím Enter</span>
+              <span class="tbtn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 8h.01"></path><path d="M12 12h.01"></path><path d="M14 8h.01"></path><path d="M16 12h.01"></path><path d="M18 8h.01"></path><path d="M6 8h.01"></path><path d="M7 16h10"></path><path d="M8 12h.01"></path><rect width="20" height="16" x="2" y="4" rx="2"></rect></svg>Phím tắt</span>
+            </div>
+          </div>
+          <div class="gridwrap">
+            <table class="g">
+              <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th>Kho</th><th class="n">Số tấm</th><th class="n">Dài</th><th class="n">Rộng</th><th class="n">SL</th><th class="n">SL tồn</th><th class="n">Đơn giá</th><th class="n">Số tiền</th><th class="n">%CK</th><th class="n">%VAT</th><th class="n">Số còn lại</th><th></th></tr></thead>
+              <tbody>
+                <tr><td class="muted">1</td><td>CN-PE05</td><td>Tấm cách nhiệt PE OPP 5mm</td><td>m²</td><td>Kho chính</td><td class="n">10</td><td class="n">25</td><td class="n">1,2</td><td class="n">300</td><td class="n muted">1.250</td><td class="n">18.500</td><td class="n">5.550.000</td><td class="n">0</td><td class="n">10</td><td class="n net"><b>6.105.000</b></td><td class="act"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg></td></tr>
+                <tr class="cur"><td class="muted">2</td><td>CN-BTT50</td><td>Bông thủy tinh 50mm</td><td>cuộn</td><td>Kho chính</td><td class="n muted">—</td><td class="n muted">—</td><td class="n muted">—</td><td class="n">12</td><td class="n muted">40</td><td class="n">465.000</td><td class="n">5.580.000</td><td class="n">5</td><td class="n">10</td><td class="n net"><b>5.831.100</b></td><td class="act"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg></td></tr>
+                <tr><td class="muted">3</td><td>CN-EPS50</td><td>Tôn xốp EPS 50mm</td><td>m</td><td>Kho chính</td><td class="n">8</td><td class="n">6</td><td class="n muted">—</td><td class="n">48</td><td class="n muted">96</td><td class="n">235.000</td><td class="n">11.280.000</td><td class="n">0</td><td class="n">10</td><td class="n net"><b>12.408.000</b></td><td class="act"><svg class="ic t-danger" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path><line x1="10" x2="10" y1="11" y2="17"></line><line x1="14" x2="14" y1="11" y2="17"></line></svg></td></tr>
+              </tbody>
+            </table>
+            <div class="gfill"></div>
+          </div>
+        </div>
+
+        <div class="totals">
+          <div class="trow">
+            <div class="l"><span>3 dòng</span><span>Tiền hàng <b>22.410.000</b></span><span>CK <b>279.000</b></span><span>VAT <b>2.213.100</b></span><span>Phí VC <b>300.000</b></span><span>CK đơn <b>0</b></span><span>Đã thanh toán <b>10.000.000</b></span></div>
+            <span class="tot">Tổng thanh toán: 24.644.100</span>
+          </div>
+          <div class="debt">
+            
+            <span class="who">KH0012 — Công ty TNHH An Phát</span>
+            <span>Phải thu <b>18.200.000</b> <span class="ar"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></span> sau phiếu <b>32.844.100</b></span>
+            <span>Phải trả <b>0</b></span>
+            <span>Hạn mức <b>50.000.000</b></span>
+            <span>Còn được nợ sau phiếu <b>17.155.900</b></span>
+            <span>Quá hạn <b>0</b></span>
+          </div>
+        </div>
+      </main>
+    </div>
+  
+    
+  <div class="overlay"></div>
+  <div class="dlg" role="dialog" aria-label="QR chuyển khoản">
+    <div class="dh"><b>QR chuyển khoản · PX00012</b><span class="x"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></span></div>
+    <div class="qrbox big"><svg viewBox="0 0 45 45" role="img"><path fill="#FFFFFF" d="M0,0 h45v45H0z" shape-rendering="crispEdges"></path><path fill="#000000" d="M0 0h7v1H0zM12 0h1v1H12zM18 0h1v1H18zM22 0h1v1H22zM24 0h1v1H24zM27 0h1v1H27zM29 0h2v1H29zM33 0h1v1H33zM36 0h1v1H36zM38,0 h7v1H38zM0 1h1v1H0zM6 1h1v1H6zM8 1h1v1H8zM10 1h1v1H10zM12 1h1v1H12zM14 1h3v1H14zM20 1h2v1H20zM23 1h1v1H23zM25 1h2v1H25zM30 1h4v1H30zM35 1h1v1H35zM38 1h1v1H38zM44,1 h1v1H44zM0 2h1v1H0zM2 2h3v1H2zM6 2h1v1H6zM9 2h3v1H9zM13 2h3v1H13zM20 2h1v1H20zM22 2h1v1H22zM24 2h1v1H24zM26 2h1v1H26zM28 2h1v1H28zM31 2h2v1H31zM35 2h1v1H35zM38 2h1v1H38zM40 2h3v1H40zM44,2 h1v1H44zM0 3h1v1H0zM2 3h3v1H2zM6 3h1v1H6zM9 3h1v1H9zM12 3h1v1H12zM14 3h1v1H14zM19 3h1v1H19zM21 3h1v1H21zM23 3h1v1H23zM28 3h2v1H28zM31 3h3v1H31zM35 3h2v1H35zM38 3h1v1H38zM40 3h3v1H40zM44,3 h1v1H44zM0 4h1v1H0zM2 4h3v1H2zM6 4h1v1H6zM8 4h7v1H8zM16 4h2v1H16zM20 4h5v1H20zM26 4h3v1H26zM30 4h2v1H30zM33 4h4v1H33zM38 4h1v1H38zM40 4h3v1H40zM44,4 h1v1H44zM0 5h1v1H0zM6 5h1v1H6zM11 5h1v1H11zM13 5h1v1H13zM15 5h1v1H15zM17 5h1v1H17zM19 5h2v1H19zM24 5h2v1H24zM27 5h1v1H27zM29 5h2v1H29zM33 5h1v1H33zM38 5h1v1H38zM44,5 h1v1H44zM0 6h7v1H0zM8 6h1v1H8zM10 6h1v1H10zM12 6h1v1H12zM14 6h1v1H14zM16 6h1v1H16zM18 6h1v1H18zM20 6h1v1H20zM22 6h1v1H22zM24 6h1v1H24zM26 6h1v1H26zM28 6h1v1H28zM30 6h1v1H30zM32 6h1v1H32zM34 6h1v1H34zM36 6h1v1H36zM38,6 h7v1H38zM10 7h3v1H10zM14 7h3v1H14zM19 7h2v1H19zM24 7h2v1H24zM27 7h2v1H27zM30 7h1v1H30zM32 7h2v1H32zM35 7h1v1H35zM0 8h1v1H0zM2 8h1v1H2zM4 8h1v1H4zM6 8h1v1H6zM9 8h2v1H9zM12 8h3v1H12zM18 8h1v1H18zM20 8h8v1H20zM29 8h4v1H29zM36 8h1v1H36zM40 8h1v1H40zM43 8h1v1H43zM0 9h3v1H0zM4 9h1v1H4zM9 9h1v1H9zM11 9h1v1H11zM13 9h1v1H13zM16 9h1v1H16zM19 9h1v1H19zM23 9h5v1H23zM29 9h1v1H29zM33 9h1v1H33zM37 9h1v1H37zM39 9h1v1H39zM43 9h1v1H43zM0 10h2v1H0zM3 10h1v1H3zM5 10h5v1H5zM11 10h2v1H11zM15 10h1v1H15zM17 10h2v1H17zM20 10h2v1H20zM23 10h1v1H23zM26 10h1v1H26zM28 10h3v1H28zM32 10h2v1H32zM38 10h1v1H38zM40 10h1v1H40zM42 10h1v1H42zM44,10 h1v1H44zM0 11h2v1H0zM3 11h3v1H3zM7 11h2v1H7zM10 11h1v1H10zM13 11h2v1H13zM17 11h1v1H17zM20 11h2v1H20zM23 11h1v1H23zM27 11h1v1H27zM29 11h1v1H29zM35 11h2v1H35zM38 11h4v1H38zM43 11h1v1H43zM0 12h1v1H0zM2 12h3v1H2zM6 12h1v1H6zM8 12h2v1H8zM14 12h1v1H14zM16 12h1v1H16zM18 12h1v1H18zM21 12h1v1H21zM24 12h2v1H24zM28 12h1v1H28zM30 12h1v1H30zM32 12h1v1H32zM38 12h2v1H38zM41 12h2v1H41zM44,12 h1v1H44zM2 13h2v1H2zM7 13h1v1H7zM9 13h4v1H9zM14 13h3v1H14zM20 13h2v1H20zM23 13h1v1H23zM25 13h1v1H25zM27 13h2v1H27zM30 13h1v1H30zM33 13h1v1H33zM36 13h2v1H36zM39 13h1v1H39zM41 13h1v1H41zM43 13h1v1H43zM0 14h2v1H0zM3 14h1v1H3zM6 14h1v1H6zM10 14h1v1H10zM15 14h2v1H15zM18 14h1v1H18zM20 14h1v1H20zM22 14h1v1H22zM24 14h1v1H24zM26 14h3v1H26zM30 14h2v1H30zM36 14h1v1H36zM38 14h2v1H38zM41,14 h4v1H41zM2 15h3v1H2zM8 15h1v1H8zM10 15h3v1H10zM14 15h2v1H14zM17 15h1v1H17zM20 15h2v1H20zM23 15h1v1H23zM25 15h3v1H25zM29 15h1v1H29zM33 15h1v1H33zM35 15h1v1H35zM37 15h3v1H37zM41 15h1v1H41zM43,15 h2v1H43zM0 16h1v1H0zM5 16h2v1H5zM8 16h1v1H8zM12 16h1v1H12zM16 16h1v1H16zM18 16h3v1H18zM22 16h2v1H22zM25 16h2v1H25zM30 16h3v1H30zM34 16h1v1H34zM37 16h1v1H37zM40 16h1v1H40zM42 16h2v1H42zM0 17h2v1H0zM5 17h1v1H5zM8 17h2v1H8zM11 17h2v1H11zM15 17h5v1H15zM21 17h1v1H21zM23 17h1v1H23zM25 17h2v1H25zM28 17h4v1H28zM33 17h1v1H33zM36 17h1v1H36zM41 17h1v1H41zM43 17h1v1H43zM3 18h1v1H3zM5 18h3v1H5zM10 18h7v1H10zM18 18h1v1H18zM22 18h1v1H22zM24 18h1v1H24zM26 18h1v1H26zM28 18h1v1H28zM30 18h1v1H30zM32 18h7v1H32zM42 18h1v1H42zM44,18 h1v1H44zM0 19h3v1H0zM4 19h1v1H4zM8 19h3v1H8zM12 19h5v1H12zM19 19h1v1H19zM21 19h1v1H21zM23 19h1v1H23zM26 19h1v1H26zM28 19h4v1H28zM33 19h1v1H33zM37 19h1v1H37zM41 19h1v1H41zM1 20h8v1H1zM10 20h1v1H10zM13 20h2v1H13zM17 20h2v1H17zM20 20h5v1H20zM29 20h2v1H29zM32 20h1v1H32zM34 20h1v1H34zM36 20h5v1H36zM42,20 h3v1H42zM1 21h2v1H1zM4 21h1v1H4zM8 21h2v1H8zM12 21h2v1H12zM15 21h3v1H15zM20 21h1v1H20zM24 21h2v1H24zM29 21h3v1H29zM33 21h1v1H33zM35 21h2v1H35zM40 21h2v1H40zM43 21h1v1H43zM0 22h3v1H0zM4 22h1v1H4zM6 22h1v1H6zM8 22h1v1H8zM10 22h4v1H10zM15 22h3v1H15zM19 22h2v1H19zM22 22h1v1H22zM24 22h1v1H24zM32 22h1v1H32zM34 22h1v1H34zM36 22h1v1H36zM38 22h1v1H38zM40 22h1v1H40zM42 22h1v1H42zM44,22 h1v1H44zM1 23h2v1H1zM4 23h1v1H4zM8 23h1v1H8zM10 23h4v1H10zM17 23h2v1H17zM20 23h1v1H20zM24 23h1v1H24zM27 23h1v1H27zM29 23h3v1H29zM34 23h1v1H34zM36 23h1v1H36zM40 23h2v1H40zM43 23h1v1H43zM0 24h2v1H0zM4 24h7v1H4zM12 24h3v1H12zM16 24h2v1H16zM20 24h5v1H20zM26 24h1v1H26zM28 24h1v1H28zM31 24h2v1H31zM34 24h7v1H34zM42 24h1v1H42zM44,24 h1v1H44zM1 25h1v1H1zM4 25h2v1H4zM8 25h4v1H8zM13 25h1v1H13zM16 25h2v1H16zM20 25h2v1H20zM23 25h1v1H23zM25 25h1v1H25zM27 25h1v1H27zM35 25h4v1H35zM41 25h3v1H41zM3 26h4v1H3zM11 26h1v1H11zM15 26h6v1H15zM22 26h3v1H22zM26 26h1v1H26zM28 26h1v1H28zM30 26h2v1H30zM33 26h1v1H33zM35 26h1v1H35zM40 26h1v1H40zM42 26h1v1H42zM3 27h1v1H3zM8 27h1v1H8zM11 27h1v1H11zM14 27h2v1H14zM18 27h4v1H18zM23 27h1v1H23zM25 27h3v1H25zM29 27h1v1H29zM31 27h3v1H31zM39 27h1v1H39zM41 27h1v1H41zM43 27h1v1H43zM4 28h1v1H4zM6 28h3v1H6zM13 28h3v1H13zM17 28h3v1H17zM21 28h2v1H21zM25 28h1v1H25zM30 28h1v1H30zM32 28h1v1H32zM36 28h1v1H36zM40 28h1v1H40zM42,28 h3v1H42zM1 29h3v1H1zM7 29h2v1H7zM10 29h2v1H10zM13 29h1v1H13zM15 29h1v1H15zM18 29h2v1H18zM27 29h1v1H27zM29 29h1v1H29zM31 29h1v1H31zM33 29h3v1H33zM37 29h1v1H37zM41 29h1v1H41zM43 29h1v1H43zM1 30h3v1H1zM5 30h2v1H5zM8 30h1v1H8zM14 30h4v1H14zM24 30h1v1H24zM26 30h1v1H26zM28 30h1v1H28zM30 30h2v1H30zM34 30h1v1H34zM36 30h1v1H36zM38 30h1v1H38zM40 30h1v1H40zM42,30 h3v1H42zM8 31h1v1H8zM11 31h2v1H11zM18 31h2v1H18zM23 31h1v1H23zM25 31h1v1H25zM27 31h3v1H27zM31 31h1v1H31zM35 31h3v1H35zM39 31h1v1H39zM42 31h1v1H42zM44,31 h1v1H44zM0 32h1v1H0zM2 32h6v1H2zM9 32h3v1H9zM15 32h1v1H15zM17 32h1v1H17zM20 32h1v1H20zM23 32h1v1H23zM25 32h1v1H25zM27 32h1v1H27zM30 32h1v1H30zM32 32h4v1H32zM38 32h1v1H38zM40 32h1v1H40zM42 32h2v1H42zM1 33h2v1H1zM4 33h2v1H4zM7 33h1v1H7zM9 33h2v1H9zM13 33h1v1H13zM16 33h5v1H16zM23 33h1v1H23zM25 33h1v1H25zM27 33h1v1H27zM29 33h1v1H29zM31 33h1v1H31zM33 33h5v1H33zM41 33h1v1H41zM43,33 h2v1H43zM4 34h1v1H4zM6 34h1v1H6zM8 34h3v1H8zM12 34h2v1H12zM15 34h1v1H15zM17 34h5v1H17zM24 34h1v1H24zM26 34h2v1H26zM30 34h1v1H30zM32 34h1v1H32zM34 34h1v1H34zM36 34h1v1H36zM38 34h2v1H38zM42 34h2v1H42zM1 35h4v1H1zM8 35h1v1H8zM14 35h1v1H14zM16 35h2v1H16zM19 35h1v1H19zM21 35h2v1H21zM24 35h1v1H24zM26 35h4v1H26zM31 35h1v1H31zM33 35h3v1H33zM37 35h1v1H37zM39 35h3v1H39zM43 35h1v1H43zM0 36h1v1H0zM3 36h2v1H3zM6 36h1v1H6zM8 36h1v1H8zM11 36h1v1H11zM13 36h1v1H13zM15 36h1v1H15zM17 36h1v1H17zM20 36h5v1H20zM31 36h3v1H31zM36 36h5v1H36zM44,36 h1v1H44zM8 37h1v1H8zM10 37h2v1H10zM14 37h1v1H14zM19 37h2v1H19zM24 37h2v1H24zM28 37h1v1H28zM31 37h1v1H31zM33 37h4v1H33zM40 37h1v1H40zM43,37 h2v1H43zM0 38h7v1H0zM9 38h2v1H9zM12 38h1v1H12zM15 38h4v1H15zM20 38h1v1H20zM22 38h1v1H22zM24 38h1v1H24zM26 38h2v1H26zM29 38h1v1H29zM32 38h1v1H32zM34 38h3v1H34zM38 38h1v1H38zM40 38h1v1H40zM42 38h1v1H42zM0 39h1v1H0zM6 39h1v1H6zM9 39h1v1H9zM11 39h3v1H11zM17 39h4v1H17zM24 39h2v1H24zM27 39h1v1H27zM29 39h1v1H29zM35 39h2v1H35zM40 39h2v1H40zM0 40h1v1H0zM2 40h3v1H2zM6 40h1v1H6zM8 40h2v1H8zM11 40h1v1H11zM13 40h3v1H13zM17 40h2v1H17zM20 40h5v1H20zM26 40h1v1H26zM28 40h3v1H28zM32 40h1v1H32zM34 40h1v1H34zM36 40h5v1H36zM42 40h1v1H42zM44,40 h1v1H44zM0 41h1v1H0zM2 41h3v1H2zM6 41h1v1H6zM10 41h1v1H10zM12 41h4v1H12zM22 41h6v1H22zM29 41h5v1H29zM37 41h1v1H37zM39 41h1v1H39zM41 41h1v1H41zM0 42h1v1H0zM2 42h3v1H2zM6 42h1v1H6zM8 42h1v1H8zM10 42h2v1H10zM16 42h3v1H16zM20 42h1v1H20zM22 42h2v1H22zM26 42h1v1H26zM28 42h2v1H28zM34 42h1v1H34zM36 42h1v1H36zM38 42h1v1H38zM42,42 h3v1H42zM0 43h1v1H0zM6 43h1v1H6zM9 43h2v1H9zM12 43h4v1H12zM19 43h1v1H19zM21 43h1v1H21zM25 43h1v1H25zM27 43h1v1H27zM29 43h1v1H29zM31 43h2v1H31zM35 43h1v1H35zM37 43h1v1H37zM39 43h1v1H39zM41 43h1v1H41zM43,43 h2v1H43zM0 44h7v1H0zM8 44h3v1H8zM12 44h1v1H12zM15 44h1v1H15zM17 44h1v1H17zM21 44h3v1H21zM28 44h1v1H28zM30 44h2v1H30zM34 44h1v1H34zM38 44h3v1H38zM42 44h1v1H42zM44,44 h1v1H44z" shape-rendering="crispEdges"></path></svg></div>
+    
+  <div class="amt">14.644.100 <small>đ</small></div>
+  <div class="amtsub">Tổng phiếu 24.644.100 − đã trả tiền mặt 10.000.000</div>
+    <div class="qrows">
+  
+  <div class="qrow"><span class="ql">Ngân hàng</span><span class="qv">Vietcombank (VCB)</span><span class="cp none"></span></div>
+  
+  <div class="qrow"><span class="ql">Số tài khoản</span><span class="qv"><b class="mono">0011004455667</b></span><span class="cp" title="Sao chép"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></span></div>
+  
+  <div class="qrow"><span class="ql">Chủ tài khoản</span><span class="qv">CONG TY TNHH CACH NHIET AN PHAT</span><span class="cp none"></span></div>
+  
+  <div class="qrow"><span class="ql">Nội dung</span><span class="qv"><b class="mono">PX00012</b></span><span class="cp" title="Sao chép"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></span></div></div>
+    <div class="fund">Quỹ nhận: TGNH-VCB — Tiền gửi Vietcombank (quỹ ngân hàng mặc định của chi nhánh)</div>
+    <div class="df"><span class="btn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Tải ảnh QR</span><span class="btn"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg>Sao chép thông tin</span><span class="btn pri" style="margin-left:auto">Đóng</span></div>
+  </div>
+    
+  <div class="pop" role="dialog" aria-label="QR chuyển khoản">
+    <div class="qrbox mid"><svg viewBox="0 0 45 45" role="img"><path fill="#FFFFFF" d="M0,0 h45v45H0z" shape-rendering="crispEdges"></path><path fill="#000000" d="M0 0h7v1H0zM12 0h1v1H12zM18 0h1v1H18zM22 0h1v1H22zM24 0h1v1H24zM27 0h1v1H27zM29 0h2v1H29zM33 0h1v1H33zM36 0h1v1H36zM38,0 h7v1H38zM0 1h1v1H0zM6 1h1v1H6zM8 1h1v1H8zM10 1h1v1H10zM12 1h1v1H12zM14 1h3v1H14zM20 1h2v1H20zM23 1h1v1H23zM25 1h2v1H25zM30 1h4v1H30zM35 1h1v1H35zM38 1h1v1H38zM44,1 h1v1H44zM0 2h1v1H0zM2 2h3v1H2zM6 2h1v1H6zM9 2h3v1H9zM13 2h3v1H13zM20 2h1v1H20zM22 2h1v1H22zM24 2h1v1H24zM26 2h1v1H26zM28 2h1v1H28zM31 2h2v1H31zM35 2h1v1H35zM38 2h1v1H38zM40 2h3v1H40zM44,2 h1v1H44zM0 3h1v1H0zM2 3h3v1H2zM6 3h1v1H6zM9 3h1v1H9zM12 3h1v1H12zM14 3h1v1H14zM19 3h1v1H19zM21 3h1v1H21zM23 3h1v1H23zM28 3h2v1H28zM31 3h3v1H31zM35 3h2v1H35zM38 3h1v1H38zM40 3h3v1H40zM44,3 h1v1H44zM0 4h1v1H0zM2 4h3v1H2zM6 4h1v1H6zM8 4h7v1H8zM16 4h2v1H16zM20 4h5v1H20zM26 4h3v1H26zM30 4h2v1H30zM33 4h4v1H33zM38 4h1v1H38zM40 4h3v1H40zM44,4 h1v1H44zM0 5h1v1H0zM6 5h1v1H6zM11 5h1v1H11zM13 5h1v1H13zM15 5h1v1H15zM17 5h1v1H17zM19 5h2v1H19zM24 5h2v1H24zM27 5h1v1H27zM29 5h2v1H29zM33 5h1v1H33zM38 5h1v1H38zM44,5 h1v1H44zM0 6h7v1H0zM8 6h1v1H8zM10 6h1v1H10zM12 6h1v1H12zM14 6h1v1H14zM16 6h1v1H16zM18 6h1v1H18zM20 6h1v1H20zM22 6h1v1H22zM24 6h1v1H24zM26 6h1v1H26zM28 6h1v1H28zM30 6h1v1H30zM32 6h1v1H32zM34 6h1v1H34zM36 6h1v1H36zM38,6 h7v1H38zM10 7h3v1H10zM14 7h3v1H14zM19 7h2v1H19zM24 7h2v1H24zM27 7h2v1H27zM30 7h1v1H30zM32 7h2v1H32zM35 7h1v1H35zM0 8h1v1H0zM2 8h1v1H2zM4 8h1v1H4zM6 8h1v1H6zM9 8h2v1H9zM12 8h3v1H12zM18 8h1v1H18zM20 8h8v1H20zM29 8h4v1H29zM36 8h1v1H36zM40 8h1v1H40zM43 8h1v1H43zM0 9h3v1H0zM4 9h1v1H4zM9 9h1v1H9zM11 9h1v1H11zM13 9h1v1H13zM16 9h1v1H16zM19 9h1v1H19zM23 9h5v1H23zM29 9h1v1H29zM33 9h1v1H33zM37 9h1v1H37zM39 9h1v1H39zM43 9h1v1H43zM0 10h2v1H0zM3 10h1v1H3zM5 10h5v1H5zM11 10h2v1H11zM15 10h1v1H15zM17 10h2v1H17zM20 10h2v1H20zM23 10h1v1H23zM26 10h1v1H26zM28 10h3v1H28zM32 10h2v1H32zM38 10h1v1H38zM40 10h1v1H40zM42 10h1v1H42zM44,10 h1v1H44zM0 11h2v1H0zM3 11h3v1H3zM7 11h2v1H7zM10 11h1v1H10zM13 11h2v1H13zM17 11h1v1H17zM20 11h2v1H20zM23 11h1v1H23zM27 11h1v1H27zM29 11h1v1H29zM35 11h2v1H35zM38 11h4v1H38zM43 11h1v1H43zM0 12h1v1H0zM2 12h3v1H2zM6 12h1v1H6zM8 12h2v1H8zM14 12h1v1H14zM16 12h1v1H16zM18 12h1v1H18zM21 12h1v1H21zM24 12h2v1H24zM28 12h1v1H28zM30 12h1v1H30zM32 12h1v1H32zM38 12h2v1H38zM41 12h2v1H41zM44,12 h1v1H44zM2 13h2v1H2zM7 13h1v1H7zM9 13h4v1H9zM14 13h3v1H14zM20 13h2v1H20zM23 13h1v1H23zM25 13h1v1H25zM27 13h2v1H27zM30 13h1v1H30zM33 13h1v1H33zM36 13h2v1H36zM39 13h1v1H39zM41 13h1v1H41zM43 13h1v1H43zM0 14h2v1H0zM3 14h1v1H3zM6 14h1v1H6zM10 14h1v1H10zM15 14h2v1H15zM18 14h1v1H18zM20 14h1v1H20zM22 14h1v1H22zM24 14h1v1H24zM26 14h3v1H26zM30 14h2v1H30zM36 14h1v1H36zM38 14h2v1H38zM41,14 h4v1H41zM2 15h3v1H2zM8 15h1v1H8zM10 15h3v1H10zM14 15h2v1H14zM17 15h1v1H17zM20 15h2v1H20zM23 15h1v1H23zM25 15h3v1H25zM29 15h1v1H29zM33 15h1v1H33zM35 15h1v1H35zM37 15h3v1H37zM41 15h1v1H41zM43,15 h2v1H43zM0 16h1v1H0zM5 16h2v1H5zM8 16h1v1H8zM12 16h1v1H12zM16 16h1v1H16zM18 16h3v1H18zM22 16h2v1H22zM25 16h2v1H25zM30 16h3v1H30zM34 16h1v1H34zM37 16h1v1H37zM40 16h1v1H40zM42 16h2v1H42zM0 17h2v1H0zM5 17h1v1H5zM8 17h2v1H8zM11 17h2v1H11zM15 17h5v1H15zM21 17h1v1H21zM23 17h1v1H23zM25 17h2v1H25zM28 17h4v1H28zM33 17h1v1H33zM36 17h1v1H36zM41 17h1v1H41zM43 17h1v1H43zM3 18h1v1H3zM5 18h3v1H5zM10 18h7v1H10zM18 18h1v1H18zM22 18h1v1H22zM24 18h1v1H24zM26 18h1v1H26zM28 18h1v1H28zM30 18h1v1H30zM32 18h7v1H32zM42 18h1v1H42zM44,18 h1v1H44zM0 19h3v1H0zM4 19h1v1H4zM8 19h3v1H8zM12 19h5v1H12zM19 19h1v1H19zM21 19h1v1H21zM23 19h1v1H23zM26 19h1v1H26zM28 19h4v1H28zM33 19h1v1H33zM37 19h1v1H37zM41 19h1v1H41zM1 20h8v1H1zM10 20h1v1H10zM13 20h2v1H13zM17 20h2v1H17zM20 20h5v1H20zM29 20h2v1H29zM32 20h1v1H32zM34 20h1v1H34zM36 20h5v1H36zM42,20 h3v1H42zM1 21h2v1H1zM4 21h1v1H4zM8 21h2v1H8zM12 21h2v1H12zM15 21h3v1H15zM20 21h1v1H20zM24 21h2v1H24zM29 21h3v1H29zM33 21h1v1H33zM35 21h2v1H35zM40 21h2v1H40zM43 21h1v1H43zM0 22h3v1H0zM4 22h1v1H4zM6 22h1v1H6zM8 22h1v1H8zM10 22h4v1H10zM15 22h3v1H15zM19 22h2v1H19zM22 22h1v1H22zM24 22h1v1H24zM32 22h1v1H32zM34 22h1v1H34zM36 22h1v1H36zM38 22h1v1H38zM40 22h1v1H40zM42 22h1v1H42zM44,22 h1v1H44zM1 23h2v1H1zM4 23h1v1H4zM8 23h1v1H8zM10 23h4v1H10zM17 23h2v1H17zM20 23h1v1H20zM24 23h1v1H24zM27 23h1v1H27zM29 23h3v1H29zM34 23h1v1H34zM36 23h1v1H36zM40 23h2v1H40zM43 23h1v1H43zM0 24h2v1H0zM4 24h7v1H4zM12 24h3v1H12zM16 24h2v1H16zM20 24h5v1H20zM26 24h1v1H26zM28 24h1v1H28zM31 24h2v1H31zM34 24h7v1H34zM42 24h1v1H42zM44,24 h1v1H44zM1 25h1v1H1zM4 25h2v1H4zM8 25h4v1H8zM13 25h1v1H13zM16 25h2v1H16zM20 25h2v1H20zM23 25h1v1H23zM25 25h1v1H25zM27 25h1v1H27zM35 25h4v1H35zM41 25h3v1H41zM3 26h4v1H3zM11 26h1v1H11zM15 26h6v1H15zM22 26h3v1H22zM26 26h1v1H26zM28 26h1v1H28zM30 26h2v1H30zM33 26h1v1H33zM35 26h1v1H35zM40 26h1v1H40zM42 26h1v1H42zM3 27h1v1H3zM8 27h1v1H8zM11 27h1v1H11zM14 27h2v1H14zM18 27h4v1H18zM23 27h1v1H23zM25 27h3v1H25zM29 27h1v1H29zM31 27h3v1H31zM39 27h1v1H39zM41 27h1v1H41zM43 27h1v1H43zM4 28h1v1H4zM6 28h3v1H6zM13 28h3v1H13zM17 28h3v1H17zM21 28h2v1H21zM25 28h1v1H25zM30 28h1v1H30zM32 28h1v1H32zM36 28h1v1H36zM40 28h1v1H40zM42,28 h3v1H42zM1 29h3v1H1zM7 29h2v1H7zM10 29h2v1H10zM13 29h1v1H13zM15 29h1v1H15zM18 29h2v1H18zM27 29h1v1H27zM29 29h1v1H29zM31 29h1v1H31zM33 29h3v1H33zM37 29h1v1H37zM41 29h1v1H41zM43 29h1v1H43zM1 30h3v1H1zM5 30h2v1H5zM8 30h1v1H8zM14 30h4v1H14zM24 30h1v1H24zM26 30h1v1H26zM28 30h1v1H28zM30 30h2v1H30zM34 30h1v1H34zM36 30h1v1H36zM38 30h1v1H38zM40 30h1v1H40zM42,30 h3v1H42zM8 31h1v1H8zM11 31h2v1H11zM18 31h2v1H18zM23 31h1v1H23zM25 31h1v1H25zM27 31h3v1H27zM31 31h1v1H31zM35 31h3v1H35zM39 31h1v1H39zM42 31h1v1H42zM44,31 h1v1H44zM0 32h1v1H0zM2 32h6v1H2zM9 32h3v1H9zM15 32h1v1H15zM17 32h1v1H17zM20 32h1v1H20zM23 32h1v1H23zM25 32h1v1H25zM27 32h1v1H27zM30 32h1v1H30zM32 32h4v1H32zM38 32h1v1H38zM40 32h1v1H40zM42 32h2v1H42zM1 33h2v1H1zM4 33h2v1H4zM7 33h1v1H7zM9 33h2v1H9zM13 33h1v1H13zM16 33h5v1H16zM23 33h1v1H23zM25 33h1v1H25zM27 33h1v1H27zM29 33h1v1H29zM31 33h1v1H31zM33 33h5v1H33zM41 33h1v1H41zM43,33 h2v1H43zM4 34h1v1H4zM6 34h1v1H6zM8 34h3v1H8zM12 34h2v1H12zM15 34h1v1H15zM17 34h5v1H17zM24 34h1v1H24zM26 34h2v1H26zM30 34h1v1H30zM32 34h1v1H32zM34 34h1v1H34zM36 34h1v1H36zM38 34h2v1H38zM42 34h2v1H42zM1 35h4v1H1zM8 35h1v1H8zM14 35h1v1H14zM16 35h2v1H16zM19 35h1v1H19zM21 35h2v1H21zM24 35h1v1H24zM26 35h4v1H26zM31 35h1v1H31zM33 35h3v1H33zM37 35h1v1H37zM39 35h3v1H39zM43 35h1v1H43zM0 36h1v1H0zM3 36h2v1H3zM6 36h1v1H6zM8 36h1v1H8zM11 36h1v1H11zM13 36h1v1H13zM15 36h1v1H15zM17 36h1v1H17zM20 36h5v1H20zM31 36h3v1H31zM36 36h5v1H36zM44,36 h1v1H44zM8 37h1v1H8zM10 37h2v1H10zM14 37h1v1H14zM19 37h2v1H19zM24 37h2v1H24zM28 37h1v1H28zM31 37h1v1H31zM33 37h4v1H33zM40 37h1v1H40zM43,37 h2v1H43zM0 38h7v1H0zM9 38h2v1H9zM12 38h1v1H12zM15 38h4v1H15zM20 38h1v1H20zM22 38h1v1H22zM24 38h1v1H24zM26 38h2v1H26zM29 38h1v1H29zM32 38h1v1H32zM34 38h3v1H34zM38 38h1v1H38zM40 38h1v1H40zM42 38h1v1H42zM0 39h1v1H0zM6 39h1v1H6zM9 39h1v1H9zM11 39h3v1H11zM17 39h4v1H17zM24 39h2v1H24zM27 39h1v1H27zM29 39h1v1H29zM35 39h2v1H35zM40 39h2v1H40zM0 40h1v1H0zM2 40h3v1H2zM6 40h1v1H6zM8 40h2v1H8zM11 40h1v1H11zM13 40h3v1H13zM17 40h2v1H17zM20 40h5v1H20zM26 40h1v1H26zM28 40h3v1H28zM32 40h1v1H32zM34 40h1v1H34zM36 40h5v1H36zM42 40h1v1H42zM44,40 h1v1H44zM0 41h1v1H0zM2 41h3v1H2zM6 41h1v1H6zM10 41h1v1H10zM12 41h4v1H12zM22 41h6v1H22zM29 41h5v1H29zM37 41h1v1H37zM39 41h1v1H39zM41 41h1v1H41zM0 42h1v1H0zM2 42h3v1H2zM6 42h1v1H6zM8 42h1v1H8zM10 42h2v1H10zM16 42h3v1H16zM20 42h1v1H20zM22 42h2v1H22zM26 42h1v1H26zM28 42h2v1H28zM34 42h1v1H34zM36 42h1v1H36zM38 42h1v1H38zM42,42 h3v1H42zM0 43h1v1H0zM6 43h1v1H6zM9 43h2v1H9zM12 43h4v1H12zM19 43h1v1H19zM21 43h1v1H21zM25 43h1v1H25zM27 43h1v1H27zM29 43h1v1H29zM31 43h2v1H31zM35 43h1v1H35zM37 43h1v1H37zM39 43h1v1H39zM41 43h1v1H41zM43,43 h2v1H43zM0 44h7v1H0zM8 44h3v1H8zM12 44h1v1H12zM15 44h1v1H15zM17 44h1v1H17zM21 44h3v1H21zM28 44h1v1H28zM30 44h2v1H30zM34 44h1v1H34zM38 44h3v1H38zM42 44h1v1H42zM44,44 h1v1H44z" shape-rendering="crispEdges"></path></svg></div>
+    <div class="amt s">14.644.100 <small>đ</small></div>
+    <div class="amtsub">Tổng 24.644.100 − tiền mặt 10.000.000</div>
+    <div class="pline">VCB · <b class="mono">0011004455667</b> <svg class="ic " xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></div>
+    <div class="pline">ND: <b class="mono">PX00012</b> <svg class="ic " xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></div>
+    <div class="df"><span class="btn sm"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Tải ảnh</span><span class="btn sm"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" x2="14" y1="3" y2="10"></line><line x1="3" x2="10" y1="21" y2="14"></line></svg>Phóng to</span></div>
+  </div>
+  </div>
+  <aside class="notes">
+    <h2>Nút "QR chuyển khoản"</h2>
+    <p>Đặt ngay sau nút In (viền cam trong mockup). Nút chỉ hiện khi phiếu đã lưu, chưa hủy, không có thay đổi chưa lưu và số cần chuyển khoản lớn hơn 0.</p>
+    <p>Chưa có quỹ ngân hàng đủ thông tin (ngân hàng, STK, chủ TK) thì nút vẫn hiện, bấm vào thì hộp thoại báo thiếu và có link sang màn Quỹ.</p>
+    <p><b>A · Hộp thoại:</b> QR 264px, đủ to để khách quét từ màn hình quầy. Có đủ thông tin để chuyển tay, sao chép STK và nội dung, tải ảnh QR.</p>
+    <p><b>B · Popover:</b> nhỏ, không che màn phiếu, nhưng QR còn khoảng 170px và ít thông tin hơn. Cần nút "Phóng to" khi khách quét từ xa.</p>
+    <p>Màn phiếu thu dùng cùng nút và nội dung, số tiền là tổng phiếu thu.</p>
+  </aside>
+</div>
+<div class="phone-wrap">
+  <div class="phone">
+    <div class="pscreen">
+      <div class="phdr"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" x2="20" y1="12" y2="12"></line><line x1="4" x2="20" y1="6" y2="6"></line><line x1="4" x2="20" y1="18" y2="18"></line></svg><b>QLBanHang</b><span style="margin-left:auto"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"></path><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"></path></svg></span></div>
+      <div class="pbar"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg><b>PX00012</b><span class="btn sm"><svg class="ic t-print" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg></span><span class="btn sm"><svg class="ic t-qr" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="5" height="5" x="3" y="3" rx="1"></rect><rect width="5" height="5" x="16" y="3" rx="1"></rect><rect width="5" height="5" x="3" y="16" rx="1"></rect><path d="M21 16h-3a2 2 0 0 0-2 2v3"></path><path d="M21 21v.01"></path><path d="M12 7v3a2 2 0 0 1-2 2H7"></path><path d="M3 12h.01"></path><path d="M12 3h.01"></path><path d="M12 16v.01"></path><path d="M16 12h1"></path><path d="M21 12v.01"></path><path d="M12 21v-1"></path></svg>QR</span></div>
+      <div class="pbody"><div class="ghost-line"></div><div class="ghost-line s"></div><div class="ghost-line"></div></div>
+      <div class="overlay"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="dh"><b>QR chuyển khoản · PX00012</b><span class="x"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></span></div>
+        <div class="qrbox big"><svg viewBox="0 0 45 45" role="img"><path fill="#FFFFFF" d="M0,0 h45v45H0z" shape-rendering="crispEdges"></path><path fill="#000000" d="M0 0h7v1H0zM12 0h1v1H12zM18 0h1v1H18zM22 0h1v1H22zM24 0h1v1H24zM27 0h1v1H27zM29 0h2v1H29zM33 0h1v1H33zM36 0h1v1H36zM38,0 h7v1H38zM0 1h1v1H0zM6 1h1v1H6zM8 1h1v1H8zM10 1h1v1H10zM12 1h1v1H12zM14 1h3v1H14zM20 1h2v1H20zM23 1h1v1H23zM25 1h2v1H25zM30 1h4v1H30zM35 1h1v1H35zM38 1h1v1H38zM44,1 h1v1H44zM0 2h1v1H0zM2 2h3v1H2zM6 2h1v1H6zM9 2h3v1H9zM13 2h3v1H13zM20 2h1v1H20zM22 2h1v1H22zM24 2h1v1H24zM26 2h1v1H26zM28 2h1v1H28zM31 2h2v1H31zM35 2h1v1H35zM38 2h1v1H38zM40 2h3v1H40zM44,2 h1v1H44zM0 3h1v1H0zM2 3h3v1H2zM6 3h1v1H6zM9 3h1v1H9zM12 3h1v1H12zM14 3h1v1H14zM19 3h1v1H19zM21 3h1v1H21zM23 3h1v1H23zM28 3h2v1H28zM31 3h3v1H31zM35 3h2v1H35zM38 3h1v1H38zM40 3h3v1H40zM44,3 h1v1H44zM0 4h1v1H0zM2 4h3v1H2zM6 4h1v1H6zM8 4h7v1H8zM16 4h2v1H16zM20 4h5v1H20zM26 4h3v1H26zM30 4h2v1H30zM33 4h4v1H33zM38 4h1v1H38zM40 4h3v1H40zM44,4 h1v1H44zM0 5h1v1H0zM6 5h1v1H6zM11 5h1v1H11zM13 5h1v1H13zM15 5h1v1H15zM17 5h1v1H17zM19 5h2v1H19zM24 5h2v1H24zM27 5h1v1H27zM29 5h2v1H29zM33 5h1v1H33zM38 5h1v1H38zM44,5 h1v1H44zM0 6h7v1H0zM8 6h1v1H8zM10 6h1v1H10zM12 6h1v1H12zM14 6h1v1H14zM16 6h1v1H16zM18 6h1v1H18zM20 6h1v1H20zM22 6h1v1H22zM24 6h1v1H24zM26 6h1v1H26zM28 6h1v1H28zM30 6h1v1H30zM32 6h1v1H32zM34 6h1v1H34zM36 6h1v1H36zM38,6 h7v1H38zM10 7h3v1H10zM14 7h3v1H14zM19 7h2v1H19zM24 7h2v1H24zM27 7h2v1H27zM30 7h1v1H30zM32 7h2v1H32zM35 7h1v1H35zM0 8h1v1H0zM2 8h1v1H2zM4 8h1v1H4zM6 8h1v1H6zM9 8h2v1H9zM12 8h3v1H12zM18 8h1v1H18zM20 8h8v1H20zM29 8h4v1H29zM36 8h1v1H36zM40 8h1v1H40zM43 8h1v1H43zM0 9h3v1H0zM4 9h1v1H4zM9 9h1v1H9zM11 9h1v1H11zM13 9h1v1H13zM16 9h1v1H16zM19 9h1v1H19zM23 9h5v1H23zM29 9h1v1H29zM33 9h1v1H33zM37 9h1v1H37zM39 9h1v1H39zM43 9h1v1H43zM0 10h2v1H0zM3 10h1v1H3zM5 10h5v1H5zM11 10h2v1H11zM15 10h1v1H15zM17 10h2v1H17zM20 10h2v1H20zM23 10h1v1H23zM26 10h1v1H26zM28 10h3v1H28zM32 10h2v1H32zM38 10h1v1H38zM40 10h1v1H40zM42 10h1v1H42zM44,10 h1v1H44zM0 11h2v1H0zM3 11h3v1H3zM7 11h2v1H7zM10 11h1v1H10zM13 11h2v1H13zM17 11h1v1H17zM20 11h2v1H20zM23 11h1v1H23zM27 11h1v1H27zM29 11h1v1H29zM35 11h2v1H35zM38 11h4v1H38zM43 11h1v1H43zM0 12h1v1H0zM2 12h3v1H2zM6 12h1v1H6zM8 12h2v1H8zM14 12h1v1H14zM16 12h1v1H16zM18 12h1v1H18zM21 12h1v1H21zM24 12h2v1H24zM28 12h1v1H28zM30 12h1v1H30zM32 12h1v1H32zM38 12h2v1H38zM41 12h2v1H41zM44,12 h1v1H44zM2 13h2v1H2zM7 13h1v1H7zM9 13h4v1H9zM14 13h3v1H14zM20 13h2v1H20zM23 13h1v1H23zM25 13h1v1H25zM27 13h2v1H27zM30 13h1v1H30zM33 13h1v1H33zM36 13h2v1H36zM39 13h1v1H39zM41 13h1v1H41zM43 13h1v1H43zM0 14h2v1H0zM3 14h1v1H3zM6 14h1v1H6zM10 14h1v1H10zM15 14h2v1H15zM18 14h1v1H18zM20 14h1v1H20zM22 14h1v1H22zM24 14h1v1H24zM26 14h3v1H26zM30 14h2v1H30zM36 14h1v1H36zM38 14h2v1H38zM41,14 h4v1H41zM2 15h3v1H2zM8 15h1v1H8zM10 15h3v1H10zM14 15h2v1H14zM17 15h1v1H17zM20 15h2v1H20zM23 15h1v1H23zM25 15h3v1H25zM29 15h1v1H29zM33 15h1v1H33zM35 15h1v1H35zM37 15h3v1H37zM41 15h1v1H41zM43,15 h2v1H43zM0 16h1v1H0zM5 16h2v1H5zM8 16h1v1H8zM12 16h1v1H12zM16 16h1v1H16zM18 16h3v1H18zM22 16h2v1H22zM25 16h2v1H25zM30 16h3v1H30zM34 16h1v1H34zM37 16h1v1H37zM40 16h1v1H40zM42 16h2v1H42zM0 17h2v1H0zM5 17h1v1H5zM8 17h2v1H8zM11 17h2v1H11zM15 17h5v1H15zM21 17h1v1H21zM23 17h1v1H23zM25 17h2v1H25zM28 17h4v1H28zM33 17h1v1H33zM36 17h1v1H36zM41 17h1v1H41zM43 17h1v1H43zM3 18h1v1H3zM5 18h3v1H5zM10 18h7v1H10zM18 18h1v1H18zM22 18h1v1H22zM24 18h1v1H24zM26 18h1v1H26zM28 18h1v1H28zM30 18h1v1H30zM32 18h7v1H32zM42 18h1v1H42zM44,18 h1v1H44zM0 19h3v1H0zM4 19h1v1H4zM8 19h3v1H8zM12 19h5v1H12zM19 19h1v1H19zM21 19h1v1H21zM23 19h1v1H23zM26 19h1v1H26zM28 19h4v1H28zM33 19h1v1H33zM37 19h1v1H37zM41 19h1v1H41zM1 20h8v1H1zM10 20h1v1H10zM13 20h2v1H13zM17 20h2v1H17zM20 20h5v1H20zM29 20h2v1H29zM32 20h1v1H32zM34 20h1v1H34zM36 20h5v1H36zM42,20 h3v1H42zM1 21h2v1H1zM4 21h1v1H4zM8 21h2v1H8zM12 21h2v1H12zM15 21h3v1H15zM20 21h1v1H20zM24 21h2v1H24zM29 21h3v1H29zM33 21h1v1H33zM35 21h2v1H35zM40 21h2v1H40zM43 21h1v1H43zM0 22h3v1H0zM4 22h1v1H4zM6 22h1v1H6zM8 22h1v1H8zM10 22h4v1H10zM15 22h3v1H15zM19 22h2v1H19zM22 22h1v1H22zM24 22h1v1H24zM32 22h1v1H32zM34 22h1v1H34zM36 22h1v1H36zM38 22h1v1H38zM40 22h1v1H40zM42 22h1v1H42zM44,22 h1v1H44zM1 23h2v1H1zM4 23h1v1H4zM8 23h1v1H8zM10 23h4v1H10zM17 23h2v1H17zM20 23h1v1H20zM24 23h1v1H24zM27 23h1v1H27zM29 23h3v1H29zM34 23h1v1H34zM36 23h1v1H36zM40 23h2v1H40zM43 23h1v1H43zM0 24h2v1H0zM4 24h7v1H4zM12 24h3v1H12zM16 24h2v1H16zM20 24h5v1H20zM26 24h1v1H26zM28 24h1v1H28zM31 24h2v1H31zM34 24h7v1H34zM42 24h1v1H42zM44,24 h1v1H44zM1 25h1v1H1zM4 25h2v1H4zM8 25h4v1H8zM13 25h1v1H13zM16 25h2v1H16zM20 25h2v1H20zM23 25h1v1H23zM25 25h1v1H25zM27 25h1v1H27zM35 25h4v1H35zM41 25h3v1H41zM3 26h4v1H3zM11 26h1v1H11zM15 26h6v1H15zM22 26h3v1H22zM26 26h1v1H26zM28 26h1v1H28zM30 26h2v1H30zM33 26h1v1H33zM35 26h1v1H35zM40 26h1v1H40zM42 26h1v1H42zM3 27h1v1H3zM8 27h1v1H8zM11 27h1v1H11zM14 27h2v1H14zM18 27h4v1H18zM23 27h1v1H23zM25 27h3v1H25zM29 27h1v1H29zM31 27h3v1H31zM39 27h1v1H39zM41 27h1v1H41zM43 27h1v1H43zM4 28h1v1H4zM6 28h3v1H6zM13 28h3v1H13zM17 28h3v1H17zM21 28h2v1H21zM25 28h1v1H25zM30 28h1v1H30zM32 28h1v1H32zM36 28h1v1H36zM40 28h1v1H40zM42,28 h3v1H42zM1 29h3v1H1zM7 29h2v1H7zM10 29h2v1H10zM13 29h1v1H13zM15 29h1v1H15zM18 29h2v1H18zM27 29h1v1H27zM29 29h1v1H29zM31 29h1v1H31zM33 29h3v1H33zM37 29h1v1H37zM41 29h1v1H41zM43 29h1v1H43zM1 30h3v1H1zM5 30h2v1H5zM8 30h1v1H8zM14 30h4v1H14zM24 30h1v1H24zM26 30h1v1H26zM28 30h1v1H28zM30 30h2v1H30zM34 30h1v1H34zM36 30h1v1H36zM38 30h1v1H38zM40 30h1v1H40zM42,30 h3v1H42zM8 31h1v1H8zM11 31h2v1H11zM18 31h2v1H18zM23 31h1v1H23zM25 31h1v1H25zM27 31h3v1H27zM31 31h1v1H31zM35 31h3v1H35zM39 31h1v1H39zM42 31h1v1H42zM44,31 h1v1H44zM0 32h1v1H0zM2 32h6v1H2zM9 32h3v1H9zM15 32h1v1H15zM17 32h1v1H17zM20 32h1v1H20zM23 32h1v1H23zM25 32h1v1H25zM27 32h1v1H27zM30 32h1v1H30zM32 32h4v1H32zM38 32h1v1H38zM40 32h1v1H40zM42 32h2v1H42zM1 33h2v1H1zM4 33h2v1H4zM7 33h1v1H7zM9 33h2v1H9zM13 33h1v1H13zM16 33h5v1H16zM23 33h1v1H23zM25 33h1v1H25zM27 33h1v1H27zM29 33h1v1H29zM31 33h1v1H31zM33 33h5v1H33zM41 33h1v1H41zM43,33 h2v1H43zM4 34h1v1H4zM6 34h1v1H6zM8 34h3v1H8zM12 34h2v1H12zM15 34h1v1H15zM17 34h5v1H17zM24 34h1v1H24zM26 34h2v1H26zM30 34h1v1H30zM32 34h1v1H32zM34 34h1v1H34zM36 34h1v1H36zM38 34h2v1H38zM42 34h2v1H42zM1 35h4v1H1zM8 35h1v1H8zM14 35h1v1H14zM16 35h2v1H16zM19 35h1v1H19zM21 35h2v1H21zM24 35h1v1H24zM26 35h4v1H26zM31 35h1v1H31zM33 35h3v1H33zM37 35h1v1H37zM39 35h3v1H39zM43 35h1v1H43zM0 36h1v1H0zM3 36h2v1H3zM6 36h1v1H6zM8 36h1v1H8zM11 36h1v1H11zM13 36h1v1H13zM15 36h1v1H15zM17 36h1v1H17zM20 36h5v1H20zM31 36h3v1H31zM36 36h5v1H36zM44,36 h1v1H44zM8 37h1v1H8zM10 37h2v1H10zM14 37h1v1H14zM19 37h2v1H19zM24 37h2v1H24zM28 37h1v1H28zM31 37h1v1H31zM33 37h4v1H33zM40 37h1v1H40zM43,37 h2v1H43zM0 38h7v1H0zM9 38h2v1H9zM12 38h1v1H12zM15 38h4v1H15zM20 38h1v1H20zM22 38h1v1H22zM24 38h1v1H24zM26 38h2v1H26zM29 38h1v1H29zM32 38h1v1H32zM34 38h3v1H34zM38 38h1v1H38zM40 38h1v1H40zM42 38h1v1H42zM0 39h1v1H0zM6 39h1v1H6zM9 39h1v1H9zM11 39h3v1H11zM17 39h4v1H17zM24 39h2v1H24zM27 39h1v1H27zM29 39h1v1H29zM35 39h2v1H35zM40 39h2v1H40zM0 40h1v1H0zM2 40h3v1H2zM6 40h1v1H6zM8 40h2v1H8zM11 40h1v1H11zM13 40h3v1H13zM17 40h2v1H17zM20 40h5v1H20zM26 40h1v1H26zM28 40h3v1H28zM32 40h1v1H32zM34 40h1v1H34zM36 40h5v1H36zM42 40h1v1H42zM44,40 h1v1H44zM0 41h1v1H0zM2 41h3v1H2zM6 41h1v1H6zM10 41h1v1H10zM12 41h4v1H12zM22 41h6v1H22zM29 41h5v1H29zM37 41h1v1H37zM39 41h1v1H39zM41 41h1v1H41zM0 42h1v1H0zM2 42h3v1H2zM6 42h1v1H6zM8 42h1v1H8zM10 42h2v1H10zM16 42h3v1H16zM20 42h1v1H20zM22 42h2v1H22zM26 42h1v1H26zM28 42h2v1H28zM34 42h1v1H34zM36 42h1v1H36zM38 42h1v1H38zM42,42 h3v1H42zM0 43h1v1H0zM6 43h1v1H6zM9 43h2v1H9zM12 43h4v1H12zM19 43h1v1H19zM21 43h1v1H21zM25 43h1v1H25zM27 43h1v1H27zM29 43h1v1H29zM31 43h2v1H31zM35 43h1v1H35zM37 43h1v1H37zM39 43h1v1H39zM41 43h1v1H41zM43,43 h2v1H43zM0 44h7v1H0zM8 44h3v1H8zM12 44h1v1H12zM15 44h1v1H15zM17 44h1v1H17zM21 44h3v1H21zM28 44h1v1H28zM30 44h2v1H30zM34 44h1v1H34zM38 44h3v1H38zM42 44h1v1H42zM44,44 h1v1H44z" shape-rendering="crispEdges"></path></svg></div>
+        
+  <div class="amt">14.644.100 <small>đ</small></div>
+  <div class="amtsub">Tổng phiếu 24.644.100 − đã trả tiền mặt 10.000.000</div>
+        <div class="qrows">
+  
+  <div class="qrow"><span class="ql">Ngân hàng</span><span class="qv">Vietcombank (VCB)</span><span class="cp none"></span></div>
+  
+  <div class="qrow"><span class="ql">Số tài khoản</span><span class="qv"><b class="mono">0011004455667</b></span><span class="cp" title="Sao chép"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></span></div>
+  
+  <div class="qrow"><span class="ql">Chủ tài khoản</span><span class="qv">CONG TY TNHH CACH NHIET AN PHAT</span><span class="cp none"></span></div>
+  
+  <div class="qrow"><span class="ql">Nội dung</span><span class="qv"><b class="mono">PX00012</b></span><span class="cp" title="Sao chép"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"></rect><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"></path></svg></span></div></div>
+        <div class="df"><span class="btn" style="flex:1;justify-content:center"><svg class="ic " xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" x2="12" y1="15" y2="3"></line></svg>Tải ảnh QR</span><span class="btn pri" style="flex:1;justify-content:center">Đóng</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="phone-note">
+    <h3>Trên điện thoại (PWA)</h3>
+    <p>Cùng nội dung với hộp thoại A, mở thành tấm trượt từ dưới lên, QR rộng gần hết màn hình để khách quét ngay trên máy nhân viên.</p>
+    <p>"Tải ảnh QR" lưu PNG có kèm số tiền và nội dung bên dưới QR, để gửi qua Zalo.</p>
+    <p>Trên điện thoại, nút In và QR chỉ còn icon.</p>
+  </div></div>
+<script>
+  document.querySelectorAll('.seg button').forEach((b) => b.addEventListener('click', () => {
+    document.body.dataset.mode = b.dataset.mode;
+    document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+  const m = new URLSearchParams(location.search).get('mode');
+  if (m) document.querySelector('.seg button[data-mode="' + m + '"]').click();
+</script>
+</body></html>

@@ -55,7 +55,12 @@ const report = (over: Partial<DebtBalanceReport> = {}): DebtBalanceReport => ({
 
 function LocationDisplay() {
   const loc = useLocation();
-  return <div data-testid="location">{loc.pathname + loc.search}</div>;
+  return (
+    <>
+      <div data-testid="location">{loc.pathname + loc.search}</div>
+      <div data-testid="state">{JSON.stringify(loc.state)}</div>
+    </>
+  );
 }
 
 function renderAt(url: string) {
@@ -130,6 +135,9 @@ describe('DebtBalancePage', () => {
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31',
+    );
+    expect(screen.getByTestId('state')).toHaveTextContent(
+      JSON.stringify({ from: '/reports/debt-balance?side=Payable&from=2026-10-01&to=2026-10-31' }),
     );
   });
 

@@ -13,6 +13,7 @@ import { toast } from '@/lib/use-toast';
 import { getErrorMessage } from '@/lib/api-client';
 import { useQuotationSystemSettings, useUpdateQuotationSystemSettings } from '@/features/quotation-settings/hooks';
 import type { RevenueReportingDateField } from '@/features/quotation-settings/types';
+import { BackLink } from '@/components/layout/back-link';
 
 const DATE_FIELD_OPTIONS: { value: RevenueReportingDateField; label: string }[] = [
   { value: 'QuotationDate', label: 'Theo ngày báo giá (mặc định)' },
@@ -43,11 +44,14 @@ export function QuotationSystemSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Cấu hình hệ thống báo giá</h1>
-        <p className="text-sm text-muted-foreground">
-          Thiết lập trường ngày dùng trong báo cáo doanh thu và dashboard.
-        </p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/settings" label="Cấu hình" />
+        <div>
+          <h1 className="text-2xl font-bold">Cấu hình hệ thống báo giá</h1>
+          <p className="text-sm text-muted-foreground">
+            Thiết lập trường ngày dùng trong báo cáo doanh thu và dashboard.
+          </p>
+        </div>
       </div>
 
       <Card className="max-w-lg">

@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useFromHere } from '@/components/layout/back-link';
 import { Can } from '@/components/auth/can';
 import { useAuthStore } from '@/stores/auth-store';
 import { useSalesRevenue } from '@/features/reports/sales-revenue/hooks';
@@ -39,6 +40,7 @@ const moneyFmt = new Intl.NumberFormat('vi-VN');
 
 export function SalesRevenuePage() {
   const navigate = useNavigate();
+  const fromHere = useFromHere();
   const isAdmin = useAuthStore((s) => s.hasPermission('quotations.view_all'));
   const currentUser = useAuthStore((s) => s.user);
   const [from, setFrom] = useState(startOfMonthIso());
@@ -135,7 +137,7 @@ export function SalesRevenuePage() {
                       onClick={() =>
                         navigate(
                           `/reports/sales-revenue/${it.saleUserId}?${new URLSearchParams({ from, to }).toString()}`,
-                          { state: { saleName: it.saleName } },
+                          { state: { saleName: it.saleName, ...fromHere } },
                         )
                       }
                     >

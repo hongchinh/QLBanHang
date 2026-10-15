@@ -11,6 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getErrorMessage } from '@/lib/api-client';
 import { formatDateOnly } from '@/lib/date-only';
 import { cn, formatCurrencyVnd } from '@/lib/utils';
+import { BackLink, useBackTarget } from '@/components/layout/back-link';
+import { useReplaceSearchParams } from '@/lib/use-search-param-state';
 import { todayYmd } from '@/lib/vn-datetime';
 import { DEBT_SOURCE_TYPE_LABELS, NUMERIC_CELL, formatSignedBalance, parseDebtSide } from './document-link';
 import { DocumentCodeLink } from './document-code-link';
@@ -21,7 +23,9 @@ const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 // Công nợ theo chứng từ: open documents per partner as at a date. Route permission: reports.debt.
 // Filters live in the URL so other screens can open it for one partner.
 export function DebtDocumentsPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const setParams = useReplaceSearchParams();
+  const back = useBackTarget();
   const side = parseDebtSide(searchParams.get('side'));
   const at = searchParams.get('at') || todayYmd();
   const partnerId = searchParams.get('partnerId') || undefined;
@@ -31,19 +35,16 @@ export function DebtDocumentsPage() {
 
   const updateParams = useCallback(
     (patch: Record<string, string | null>) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          for (const [key, value] of Object.entries(patch)) {
-            if (value) next.set(key, value);
-            else next.delete(key);
-          }
-          return next;
-        },
-        { replace: true },
-      );
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
+        return next;
+      });
     },
-    [setSearchParams],
+    [setParams],
   );
 
   const matched = partnerId ? report?.groups.find((g) => g.partnerId === partnerId) : undefined;
@@ -62,7 +63,10 @@ export function DebtDocumentsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">Công nợ theo chứng từ</h1>
+      <div className="flex items-center gap-2">
+        {back && <BackLink to={back} label="báo cáo trước" />}
+        <h1 className="text-xl font-semibold">Công nợ theo chứng từ</h1>
+      </div>
 
       <Card>
         <CardContent className="grid gap-4 pt-6 sm:grid-cols-3">

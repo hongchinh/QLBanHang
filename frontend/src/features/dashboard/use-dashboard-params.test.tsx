@@ -86,6 +86,29 @@ describe('useDashboardParams', () => {
     expect(result.current.loc.search).toContain('to=2026-01-31');
   });
 
+  // A drill-down child carries state.from; a period or sale change must not drop it.
+  it('keeps the history state when the period or the sale changes', () => {
+    function Probe() {
+      const params = useDashboardParams();
+      const loc = useLocation();
+      return { params, loc };
+    }
+    const { result } = renderHook(() => Probe(), {
+      wrapper: ({ children }: { children: React.ReactNode }) => (
+        <MemoryRouter initialEntries={[{ pathname: '/', state: { from: '/p' } }]}>{children}</MemoryRouter>
+      ),
+    });
+    act(() => {
+      result.current.params.setRange('2026-01-01', '2026-01-31');
+    });
+    expect(result.current.loc.state).toEqual({ from: '/p' });
+    act(() => {
+      result.current.params.setSaleUserId('abc');
+    });
+    expect(result.current.loc.search).toContain('saleUserId=abc');
+    expect(result.current.loc.state).toEqual({ from: '/p' });
+  });
+
   it('setSaleUserId adds and removes saleUserId param', () => {
     function Probe() {
       const params = useDashboardParams();

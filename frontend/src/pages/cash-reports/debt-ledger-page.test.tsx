@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth-store';
@@ -102,6 +102,16 @@ function LocationDisplay() {
 function renderAt(url: string) {
   return render(
     <MemoryRouter initialEntries={[url]}>
+      <DebtLedgerPage />
+      <LocationDisplay />
+    </MemoryRouter>,
+  );
+}
+
+function renderWithState(url: string, state?: unknown) {
+  const [pathname, search = ''] = url.split('?');
+  return render(
+    <MemoryRouter initialEntries={[{ pathname, search: search ? `?${search}` : '', state }]}>
       <DebtLedgerPage />
       <LocationDisplay />
     </MemoryRouter>,
@@ -290,6 +300,31 @@ describe('DebtLedgerPage', () => {
 
     expect(useDebtLedgerMock).toHaveBeenLastCalledWith(expect.objectContaining({ scope: 'Company' }), { enabled: true });
     expect(screen.getByTestId('location')).toHaveTextContent('scope=Company');
+  });
+
+  describe('back link', () => {
+    const LEDGER_URL = '/reports/debt-ledger?side=Payable&partnerId=s1&from=2026-10-01&to=2026-10-31';
+
+    it('links back to the report it was opened from', () => {
+      renderWithState(LEDGER_URL, { from: '/parent?x=1' });
+
+      expect(screen.getByRole('link', { name: 'Quay lại báo cáo trước' })).toHaveAttribute('href', '/parent?x=1');
+    });
+
+    it('has no back link without state', () => {
+      renderWithState(LEDGER_URL);
+
+      expect(screen.queryByRole('link', { name: /^Quay lại/ })).not.toBeInTheDocument();
+    });
+
+    it('keeps the back link after a filter change', () => {
+      renderWithState(LEDGER_URL, { from: '/parent?x=1' });
+
+      fireEvent.change(screen.getByLabelText('Đến ngày'), { target: { value: '2026-10-20' } });
+
+      expect(screen.getByTestId('location')).toHaveTextContent('to=2026-10-20');
+      expect(screen.getByRole('link', { name: 'Quay lại báo cáo trước' })).toHaveAttribute('href', '/parent?x=1');
+    });
   });
 
   describe('TT133 export', () => {

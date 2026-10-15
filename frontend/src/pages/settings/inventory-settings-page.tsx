@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { formatApiErrorDetails, getErrorMessage, isRequestTimeout } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
+import { BackLink } from '@/components/layout/back-link';
 
 const COSTING_METHODS = [
   { value: 'PeriodicAverage', label: 'Bình quân cuối kỳ' },
@@ -45,9 +46,12 @@ export function InventorySettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Cấu hình kho</h1>
-        <p className="text-sm text-muted-foreground">Phương pháp tính giá vốn và quy tắc nhập xuất kho</p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/settings" label="Cấu hình" />
+        <div>
+          <h1 className="text-2xl font-bold">Cấu hình kho</h1>
+          <p className="text-sm text-muted-foreground">Phương pháp tính giá vốn và quy tắc nhập xuất kho</p>
+        </div>
       </div>
 
       {isError && (

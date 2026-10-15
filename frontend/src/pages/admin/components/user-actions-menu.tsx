@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppIcon } from '@/components/icons';
+import { useFromHere } from '@/components/layout/back-link';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +25,7 @@ interface Props {
 
 export function UserActionsMenu({ user }: Props) {
   const navigate = useNavigate();
+  const fromHere = useFromHere();
   const currentUserId = useAuthStore((s) => s.user?.id);
   const hasPermission = useAuthStore((s) => s.hasPermission);
 
@@ -70,7 +72,7 @@ export function UserActionsMenu({ user }: Props) {
           description: `${err.message} Mở trang chuyển nhượng để xử lý.`,
         });
         setDeleteOpen(false);
-        if (canTransferAny) navigate(`/admin/users/${user.id}/transfer-quotations`);
+        if (canTransferAny) navigate(`/admin/users/${user.id}/transfer-quotations`, { state: fromHere });
         return;
       }
       toast({ variant: 'destructive', title: 'Xoá thất bại', description: getErrorMessage(err) });
@@ -107,7 +109,9 @@ export function UserActionsMenu({ user }: Props) {
             </DropdownMenuItem>
           )}
           {canTransferAny && (
-            <DropdownMenuItem onSelect={() => navigate(`/admin/users/${user.id}/transfer-quotations`)}>
+            <DropdownMenuItem
+              onSelect={() => navigate(`/admin/users/${user.id}/transfer-quotations`, { state: fromHere })}
+            >
               Chuyển nhượng báo giá
             </DropdownMenuItem>
           )}

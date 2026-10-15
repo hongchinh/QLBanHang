@@ -81,7 +81,12 @@ const quantitiesOnly = (over: Partial<StockSummaryReport> = {}) => {
 
 function LocationDisplay() {
   const loc = useLocation();
-  return <div data-testid="location">{loc.pathname + loc.search}</div>;
+  return (
+    <>
+      <div data-testid="location">{loc.pathname + loc.search}</div>
+      <div data-testid="state">{JSON.stringify(loc.state)}</div>
+    </>
+  );
 }
 
 function renderAt(url = '/inventory/stock-summary?from=2026-10-10&to=2026-10-31') {
@@ -280,5 +285,16 @@ describe('StockSummaryPage', () => {
     await user.click(screen.getByText('Hàng SM01'));
 
     expect(screen.getByTestId('location')).toHaveTextContent('/inventory/stock-card?productId=p1&warehouseId=w1');
+  });
+
+  it('a row passes the summary url as state.from', async () => {
+    const user = userEvent.setup();
+    renderAt('/inventory/stock-summary?from=2026-10-10&to=2026-10-31');
+
+    await user.click(screen.getByText('Hàng SM01'));
+
+    expect(screen.getByTestId('state')).toHaveTextContent(
+      JSON.stringify({ from: '/inventory/stock-summary?from=2026-10-10&to=2026-10-31' }),
+    );
   });
 });

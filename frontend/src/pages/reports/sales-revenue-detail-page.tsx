@@ -10,11 +10,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
+import { BackLink, useBackTarget } from '@/components/layout/back-link';
 import { Can } from '@/components/auth/can';
 import { useSalesRevenueDetail } from '@/features/reports/sales-revenue-detail/hooks';
 import type { SalesRevenueLineItemDto } from '@/features/reports/sales-revenue-detail/types';
-import { AppIcon } from '@/components/icons';
 
 const moneyFmt = new Intl.NumberFormat('vi-VN');
 
@@ -95,6 +94,7 @@ export function SalesRevenueDetailPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const back = useBackTarget();
   const saleName = (location.state as { saleName?: string } | null)?.saleName;
 
   const from = searchParams.get('from') ?? '';
@@ -114,10 +114,7 @@ export function SalesRevenueDetailPage() {
     >
       <div className="flex h-full min-h-0 flex-col gap-4">
         <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
-            <AppIcon name="back" tone="none" className="mr-1" />
-            Quay lại
-          </Button>
+          <BackLink to={back ?? '/reports/sales-revenue'} label={back ? 'báo cáo trước' : 'Doanh thu theo sale'} />
           <div>
             <h1 className="text-2xl font-bold">
               Chi tiết doanh thu{saleName ? ` — ${saleName}` : ''}

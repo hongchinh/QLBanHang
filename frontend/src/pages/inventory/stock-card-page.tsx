@@ -18,6 +18,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { getErrorMessage } from '@/lib/api-client';
 import { formatMoneyForDisplay } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
+import { BackLink, useBackTarget } from '@/components/layout/back-link';
+import { useReplaceSearchParams } from '@/lib/use-search-param-state';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
 import { tt133FileBase, type ExportFormat, type Tt133ExportForm } from '@/features/tt133-export/types';
 import { useTt133Download } from '@/features/tt133-export/use-tt133-download';
@@ -50,7 +52,9 @@ function voucherLink(row: StockCardRow): string | null {
 
 // Route permission: reports.inventory. Value fields come back only with inventory.view_cost (canViewCost).
 export function StockCardPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const setParams = useReplaceSearchParams();
+  const back = useBackTarget();
   const productId = searchParams.get('productId') ?? '';
   const warehouseId = searchParams.get('warehouseId') ?? ALL;
   const { data: warehouses = [], isSuccess: warehousesLoaded } = useWarehouses();
@@ -87,17 +91,14 @@ export function StockCardPage() {
 
   const setParam = useCallback(
     (key: string, value: string | null) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          if (value) next.set(key, value);
-          else next.delete(key);
-          return next;
-        },
-        { replace: true },
-      );
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (value) next.set(key, value);
+        else next.delete(key);
+        return next;
+      });
     },
-    [setSearchParams],
+    [setParams],
   );
 
   // A warehouse from another branch (old link, or the branch was switched) falls back to all warehouses.
@@ -136,6 +137,7 @@ export function StockCardPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
+          {back && <BackLink to={back} label="báo cáo trước" />}
           <h1 className="text-xl font-semibold">Thẻ kho</h1>
           {canViewCost && card?.isProvisional && <Badge variant="warning">Giá vốn tạm tính</Badge>}
         </div>

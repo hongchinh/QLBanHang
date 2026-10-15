@@ -59,7 +59,12 @@ function setPermissions(permissions: string[]) {
 
 function LocationDisplay() {
   const loc = useLocation();
-  return <div data-testid="location">{loc.pathname + loc.search}</div>;
+  return (
+    <>
+      <div data-testid="location">{loc.pathname + loc.search}</div>
+      <div data-testid="state">{JSON.stringify(loc.state)}</div>
+    </>
+  );
 }
 
 function renderAt(url: string) {
@@ -146,6 +151,9 @@ describe('DebtAgingPage', () => {
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/reports/debt-documents?side=Receivable&at=2026-10-31&partnerId=p1',
+    );
+    expect(screen.getByTestId('state')).toHaveTextContent(
+      JSON.stringify({ from: '/reports/debt-aging?at=2026-10-31' }),
     );
   });
 

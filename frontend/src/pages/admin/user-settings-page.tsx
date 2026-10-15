@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppIcon } from '@/components/icons';
+import { BackLink, useFromHere } from '@/components/layout/back-link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Can } from '@/components/auth/can';
@@ -18,6 +19,7 @@ const OPTIONS: { value: '' | NonNullable<LockAtStatus>; label: string }[] = [
 export function UserSettingsPage() {
   const { userId } = useParams<{ userId: string }>();
   const navigate = useNavigate();
+  const fromHere = useFromHere();
   const { data: settings, isLoading } = useUserSettings(userId);
   const setLockAt = useSetLockAt(userId ?? '');
   const [value, setValue] = useState<'' | NonNullable<LockAtStatus>>('');
@@ -41,11 +43,14 @@ export function UserSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Cấu hình báo giá của user</h1>
-        <p className="text-sm text-muted-foreground">
-          {settings.userFullName ?? settings.userId}
-        </p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/admin/users" label="Quản lý người dùng" />
+        <div>
+          <h1 className="text-2xl font-bold">Cấu hình báo giá của user</h1>
+          <p className="text-sm text-muted-foreground">
+            {settings.userFullName ?? settings.userId}
+          </p>
+        </div>
       </div>
 
       <Card>
@@ -105,7 +110,7 @@ export function UserSettingsPage() {
           <CardContent>
             <Button
               variant="outline"
-              onClick={() => navigate(`/admin/users/${userId}/transfer-quotations`)}
+              onClick={() => navigate(`/admin/users/${userId}/transfer-quotations`, { state: fromHere })}
             >
               <AppIcon name="transferOwnership" className="mr-2" />
               Mở trang chuyển nhượng

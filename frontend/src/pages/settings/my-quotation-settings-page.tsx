@@ -9,6 +9,7 @@ import { meSettingsApi, HandoverTemplateType } from '@/features/me-settings/api'
 import { useAuthStore } from '@/stores/auth-store';
 import { BrandingTab } from '@/features/branding/branding-tab';
 import { BankAccountsTab } from '@/features/bank-accounts/bank-accounts-tab';
+import { BackLink } from '@/components/layout/back-link';
 
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -378,11 +379,14 @@ export function MyQuotationSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Cài đặt của tôi</h1>
-        <p className="text-sm text-muted-foreground">
-          Quản lý template Excel, cấu hình khoá trạng thái{canManageBranding ? ' và logo công ty' : ''}.
-        </p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/settings" label="Cấu hình" />
+        <div>
+          <h1 className="text-2xl font-bold">Cài đặt của tôi</h1>
+          <p className="text-sm text-muted-foreground">
+            Quản lý template Excel, cấu hình khoá trạng thái{canManageBranding ? ' và logo công ty' : ''}.
+          </p>
+        </div>
       </div>
 
       <Tabs defaultValue="quotation" className="space-y-4">

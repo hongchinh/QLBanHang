@@ -6,6 +6,7 @@ using OrderMgmt.Application.Reports.Common;
 using OrderMgmt.Application.Reports.QuotationRevenue.Interfaces;
 using OrderMgmt.Application.Reports.QuotationRevenue.Models;
 using OrderMgmt.Application.Sales.Quotations.Models;
+using OrderMgmt.Domain.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Sales;
 using OrderMgmt.Domain.Enums;
@@ -282,5 +283,74 @@ public class QuotationRevenueReportService : IQuotationRevenueReportService
             .OrderByDescending(x => x.Revenue)
             .Take(limit)
             .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<QuotationSalesLeaderboardItemDto>> GetSalesLeaderboardAsync(DateOnly from, DateOnly to, int limit, CancellationToken ct)
+    {
+        if (!_currentUser.HasPermission(Permissions.Quotations.ViewAll))
+            throw new ForbiddenException("Bạn không có quyền xem bảng xếp hạng sale.");
+
+        if (limit <= 0) limit = 10;
+        if (to < from) to = from;
+        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
+
+        var rangeLen = to.DayNumber - from.DayNumber + 1;
+        var prevTo = from.AddDays(-1);
+        var prevFrom = prevTo.AddDays(-(rangeLen - 1));
+
+        var scope = _db.Quotations.AsNoTracking().Where(q => !q.IsDeleted);
+
+        var curRows = await RevenueFilterHelper.ApplyRevenueFilter(scope, dateMode, from, to)
+            .GroupBy(q => q.OwnerUserId)
+            .Select(g => new { UserId = g.Key, Revenue = g.Sum(x => x.Total), Count = g.Count() })
+            .ToListAsync(ct);
+
+        var prevRows = await RevenueFilterHelper.ApplyRevenueFilter(scope, dateMode, prevFrom, prevTo)
+            .GroupBy(q => q.OwnerUserId)
+            .Select(g => new { UserId = g.Key, Revenue = g.Sum(x => x.Total) })
+            .ToListAsync(ct);
+
+        var totalCountRows = await scope
+            .Where(q => q.QuotationDate >= from && q.QuotationDate <= to)
+            .GroupBy(q => q.OwnerUserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToListAsync(ct);
+
+        var prevRevenueMap = prevRows.ToDictionary(r => r.UserId, r => r.Revenue);
+        var totalCountMap = totalCountRows.ToDictionary(r => r.UserId, r => r.Count);
+
+        var topUserIds = curRows
+            .OrderByDescending(r => r.Revenue)
+            .Take(limit)
+            .Select(r => r.UserId)
+            .ToList();
+
+        var names = await _db.Users.IgnoreQueryFilters()
+            .AsNoTracking()
+            .Where(u => topUserIds.Contains(u.Id))
+            .Select(u => new { u.Id, u.FullName })
+            .ToListAsync(ct);
+        var nameMap = names.ToDictionary(n => n.Id, n => n.FullName);
+
+        return curRows
+            .OrderByDescending(r => r.Revenue)
+            .Take(limit)
+            .Select(r =>
+            {
+                prevRevenueMap.TryGetValue(r.UserId, out var prevRevenue);
+                totalCountMap.TryGetValue(r.UserId, out var totalCount);
+                return new QuotationSalesLeaderboardItemDto
+                {
+                    UserId = r.UserId,
+                    FullName = nameMap.GetValueOrDefault(r.UserId) ?? "—",
+                    Revenue = r.Revenue,
+                    ConfirmedCount = r.Count,
+                    ConversionRate = totalCount == 0
+                        ? null
+                        : Math.Round((decimal)r.Count / totalCount * 100m, 2, MidpointRounding.AwayFromZero),
+                    DeltaPct = DeltaOf(r.Revenue, prevRevenue),
+                };
+            })
+            .ToList();
     }
 }

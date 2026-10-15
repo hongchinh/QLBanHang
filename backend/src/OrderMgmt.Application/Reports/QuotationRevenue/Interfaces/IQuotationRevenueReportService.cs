@@ -9,4 +9,5 @@ public interface IQuotationRevenueReportService
     Task<QuotationRevenueSummaryDto> GetSummaryAsync(DateOnly? from, DateOnly? to, Guid? saleUserId, CancellationToken ct);
     Task<QuotationRevenueSeriesDto> GetSeriesAsync(DateOnly from, DateOnly to, string granularity, Guid? saleUserId, CancellationToken ct);
     Task<IReadOnlyList<QuotationTopCustomerDto>> GetTopCustomersAsync(DateOnly from, DateOnly to, int limit, Guid? saleUserId, CancellationToken ct);
+    Task<IReadOnlyList<QuotationSalesLeaderboardItemDto>> GetSalesLeaderboardAsync(DateOnly from, DateOnly to, int limit, CancellationToken ct);
 }

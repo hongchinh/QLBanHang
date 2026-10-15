@@ -32,3 +32,13 @@ public sealed class QuotationTopCustomerDto
     public decimal Revenue { get; init; }
     public int QuotationCount { get; init; }
 }
+
+public sealed class QuotationSalesLeaderboardItemDto
+{
+    public Guid UserId { get; init; }
+    public string FullName { get; init; } = default!;
+    public decimal Revenue { get; init; }
+    public int ConfirmedCount { get; init; }
+    public decimal? ConversionRate { get; init; }
+    public decimal? DeltaPct { get; init; }
+}

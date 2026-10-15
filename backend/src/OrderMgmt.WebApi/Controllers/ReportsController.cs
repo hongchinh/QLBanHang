@@ -119,4 +119,13 @@ public class ReportsController : ApiControllerBase
         [FromQuery] Guid? saleUserId = null,
         CancellationToken ct = default)
         => Success(await _quotationRevenue.GetTopCustomersAsync(from, to, limit, saleUserId, ct));
+
+    [HttpGet("revenue/sales-leaderboard")]
+    [HasPermission(Permissions.Quotations.ViewAll)]
+    public async Task<ActionResult<ApiResponse<IReadOnlyList<QuotationSalesLeaderboardItemDto>>>> QuotationSalesLeaderboard(
+        [FromQuery] DateOnly from,
+        [FromQuery] DateOnly to,
+        [FromQuery] int limit = 10,
+        CancellationToken ct = default)
+        => Success(await _quotationRevenue.GetSalesLeaderboardAsync(from, to, limit, ct));
 }

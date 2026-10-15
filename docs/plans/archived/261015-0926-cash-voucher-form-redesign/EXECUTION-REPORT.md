@@ -1,6 +1,6 @@
 # Execution report — cash voucher form redesign and one shared partner field
 
-> Executed: 2026-10-15 (one session, subagent-driven) · Plan: [SUMMARY.md](SUMMARY.md) · Branch `feat/cash-voucher-form-redesign` (not pushed) · Base `qlbanhang/main` `1a877638` (unchanged at the end) · Head ``e364c684` (last code commit; the archive commit follows)`
+> Executed: 2026-10-15 (one session, subagent-driven) · Plan: [SUMMARY.md](SUMMARY.md) · Branch `feat/cash-voucher-form-redesign` (not pushed) · Base `qlbanhang/main` `1a877638`; `qlbanhang/main` (`db546dda`, PR #21 user help panel) merged in before the push, see "After the report" · Head ``e364c684` (last code commit; the archive commit follows)`
 > Supporting files in this folder: [BASELINE.md](BASELINE.md), [BROWSER-CHECK.md](BROWSER-CHECK.md), [GO-LIVE-CHECKLIST.md](GO-LIVE-CHECKLIST.md)
 
 ## Outcome
@@ -122,3 +122,9 @@ Spec §1.2 says the reason line under Lý do "chỉ hiện tạm hoặc khi có 
 7. **Real Telex/VNI typing** is on the go-live checklist (item 4); the browser check covered composition through CDP only.
 8. **Leftover test databases** `qldonhang_integtest_cvf*` remain on the local server (the fixture drops its own copies; the base names stay).
 9. The plan's "Shared contracts" show the pre-Task-6.1 signatures (with `reasonId`/`requireReason`); a note at the top of the plan SUMMARY says so.
+
+## After the report: merge of `qlbanhang/main` and help files
+
+- Before the push, `qlbanhang/main` had moved to `db546dda` (PR #21, the user help panel: 42 commits, frontend and docs only). Merged as `9a86ddfe`. Conflicts were docs only: `docs/code-standard/conventions.md` (both new sections kept), `docs/codebase/directory-structure.md` (the new `help/` line kept, the deleted `customer-autocomplete/` line dropped), `docs/SUMMARY.md` (row descriptions joined, both brainstorms' rows kept).
+- Main's rule "a UI change updates its help file in the same PR": `c6ea2f93` updates the help of `receipts.form`, `payments.form`, `stock-in.form`, `stock-out.form` and `quotations.form` (partner field, partner before reason, quick add and catalog, auto text, Enter order, F4) and replaces the quotation's dead `customer-autocomplete` source glob. `npm run help:stale` reports nothing; the help tests pass.
+- Merged tree (`c6ea2f93`): typecheck clean; lint 2 errors (the base ones); build OK; 766 files, 2776 tests, only the 3 baseline failures. The backend is unchanged by the merge.

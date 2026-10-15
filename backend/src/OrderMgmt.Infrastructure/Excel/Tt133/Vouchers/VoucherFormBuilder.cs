@@ -15,31 +15,32 @@ public sealed record VoucherSigner(string Title, string Hint, string? Name);
 /// the plain text lines and the column widths to the wrapped Tt133FormBuilder.
 public sealed class VoucherFormBuilder
 {
-    // Page geometry of the A4 portrait PDF that LibreOffice prints, to keep the signature block on one page. A4 is
-    // 595.28 x 841.89 pt; Tt133FormBuilder.Finish sets 0.59 inch margins and no header or footer is printed.
+    // Page geometry of the PDF that LibreOffice prints: A4 is 595.28 x 841.89 pt, A5 595.28 x 419.53 pt;
+    // Tt133FormBuilder.Finish sets 0.59 inch margins and no header or footer is printed.
     private const double A4WidthPoints = 595.28;
     private const double A4HeightPoints = 841.89;
+    private const double A5HeightPoints = 419.53;
     private const double MarginPoints = 0.59 * 72;
     // ClosedXML saves a column width with 0.710625 units of padding, and LibreOffice prints a width unit as about
     // 5.56 pt (the digit width of the default Calibri 11; measured: the 01-VT table of 112.69 saved units printed
-    // 626 pt wide before scaling). LibreOffice fits the width with a zoom in whole percents.
+    // 626 pt wide before scaling, and the 02-VT columns 13 and 15 printed 61.7 and 70.6 pt at 81 %). LibreOffice fits
+    // the sheet with a zoom in whole percents.
     private const double SavedWidthPadding = 0.710625;
     private const double PointsPerWidthUnit = 5.56;
     // The estimate may be a few percent off: the block is kept whole for every page height within this share of it.
     private const double PageHeightTolerance = 0.03;
     // The sheet font size set by Tt133FormBuilder; Sheet.RowHeight is the height of a row of it.
     private const double DefaultFontSize = 11;
-    // The transfer QR beside the lines (01-TT): its side on paper, in the last QrColumns columns. The A5 landscape sheet
-    // is fitted to the page by LibreOffice; the zoom is a first guess to be measured on a real PDF.
+    // The transfer QR: its side on paper, in the last QrColumns columns.
     private const double QrPrintMillimetres = 25;
-    private const double A5LandscapeScale = 0.90;
+    // The A5 landscape receipt is fitted to one page by its height, so its zoom is known only once the whole sheet is
+    // written (measured: 71 % to 76 % on the samples, while the width alone allows 89 %). EndQrBeside reserves the rows
+    // for a picture at this zoom, and Finish draws it at the real one.
+    private const double A5ReserveScale = 0.75;
     private const int QrColumns = 2;
     private const int QrTopOffsetPixels = 2;
     private const double QrCaptionFontSize = 8;
     private const double PointsPerPixel = 0.75;
-    // A column of width w is about w * 7 + 5 pixels wide (Calibri 11).
-    private const double PixelsPerWidthUnit = 7;
-    private const double ColumnPaddingPixels = 5;
 
     private readonly Tt133FormContext _context;
     private readonly IReadOnlyList<Tt133Column> _columns;
@@ -52,6 +53,10 @@ public sealed class VoucherFormBuilder
     private VoucherPaymentQrDto? _qr;
     private int _qrFirstRow;
     private int? _textLastColumn;
+    private readonly List<QrBeside> _qrBlocks = [];
+
+    /// A QR drawn beside the lines: the picture from the top of FirstRow, the captions from CaptionRow.
+    private sealed record QrBeside(IXLPicture Picture, int FirstRow, int CaptionRow);
 
     public VoucherFormBuilder(IXLWorksheet sheet, Tt133FormContext context, IReadOnlyList<Tt133Column> columns,
         VoucherPaper paper, int? labelColumn = null)
@@ -188,7 +193,8 @@ public sealed class VoucherFormBuilder
     }
 
     /// The QR picture in the last two columns from the first line of the block, with its two captions in the last two
-    /// rows of the block. Blank rows are added after the lines until the rows above the captions hold the picture.
+    /// rows of the block. Blank rows are added after the lines until the rows above the captions hold the picture; on
+    /// A5 Finish draws it again at the zoom of the finished sheet.
     public void EndQrBeside()
     {
         var qr = _qr ?? throw new InvalidOperationException("BeginQrBeside was not called.");
@@ -198,7 +204,8 @@ public sealed class VoucherFormBuilder
         _qrFirstRow = 0;
         _textLastColumn = null;
         var count = _columns.Count;
-        var needed = QrSpanPoints;
+        var scale = InitialScale();
+        var needed = QrSpanPoints(scale);
 
         var rows = Math.Max(3, Table.Row - first);
         if (Table.Row - first < rows) Table.Skip(rows - (Table.Row - first));
@@ -209,11 +216,12 @@ public sealed class VoucherFormBuilder
         }
 
         var firstColumn = count - QrColumns + 1;
-        AddQrPicture(qr, first);
+        var picture = AddQrPicture(qr, first, scale);
 
         var last = first + rows - 1;
         PutQrCaption(last - 1, firstColumn, VoucherPrintRules.QrScanCaption, bold: true);
         PutQrCaption(last, firstColumn, VoucherPrintRules.QrBankCaption(qr), bold: false);
+        _qrBlocks.Add(new QrBeside(picture, first, last - 1));
     }
 
     /// The payment block of the stock-out voucher (02-VT), after the last text line and before the signatures: the
@@ -252,13 +260,14 @@ public sealed class VoucherFormBuilder
 
         // The rows above the caption hold the picture; the missing height is shared equally by them, and the caption
         // row keeps its own height.
+        var scale = InitialScale();
         var above = lines.Count - 1;
-        var extra = Math.Max(0, QrSpanPoints - heights.Take(above).Sum()) / above;
+        var extra = Math.Max(0, QrSpanPoints(scale) - heights.Take(above).Sum()) / above;
         for (var i = 0; i < lines.Count; i++) Sheet.Row(first + i).Height = heights[i] + (i < above ? extra : 0);
 
         var last = first + lines.Count - 1;
         Sheet.Range(first, 1, last, count).Style.Border.OutsideBorder = XLBorderStyleValues.Thin;
-        AddQrPicture(qr, first);
+        AddQrPicture(qr, first, scale);
         PutQrCaption(last, count - QrColumns + 1, VoucherPrintRules.QrScanCaption, bold: true);
 
         Table.Skip(lines.Count);
@@ -310,6 +319,32 @@ public sealed class VoucherFormBuilder
         setup.FitToPages(1, 1);
         // Fitting to one page leaves the spare width on the right: centre the voucher instead.
         setup.CenterHorizontally = true;
+        FitQrBesideToPage();
+    }
+
+    /// Draws the QR pictures beside the lines at the zoom LibreOffice fits the finished A5 sheet with. When the rows
+    /// above the captions are too short for the larger picture, the last of them is made taller, which can lower the
+    /// zoom again: repeated until it settles (it only goes down, in whole percents).
+    private void FitQrBesideToPage()
+    {
+        if (_qrBlocks.Count == 0) return;
+        while (true)
+        {
+            var scale = A5PrintScale();
+            var needed = QrSpanPoints(scale);
+            var grown = false;
+            foreach (var block in _qrBlocks)
+            {
+                var missing = needed - HeightOfRows(block.FirstRow, block.CaptionRow - 1);
+                if (missing <= 0.01) continue;
+                Sheet.Row(block.CaptionRow - 1).Height += missing;
+                grown = true;
+            }
+            if (grown) continue;
+
+            foreach (var block in _qrBlocks) PlaceQrPicture(block.Picture, block.FirstRow, QrPixels(scale));
+            return;
+        }
     }
 
     /// A4 is fitted to one page wide only, so a long voucher flows onto more pages. The end of the voucher is kept on
@@ -337,26 +372,36 @@ public sealed class VoucherFormBuilder
     }
 
     /// The zoom (0-1) that LibreOffice prints an A4 portrait voucher at: the table width fitted to the page width.
-    private double A4PrintScale()
+    private double A4PrintScale() => WholePercent((A4WidthPoints - 2 * MarginPoints) / TableWidthPoints());
+
+    /// The zoom (0-1) that LibreOffice prints an A5 landscape voucher at: the sheet, up to its last used row, fitted to
+    /// one page both ways (A5 landscape is as wide as A4 portrait).
+    private double A5PrintScale()
     {
-        var tableWidth = _columns.Sum(c => (c.Width + SavedWidthPadding) * PointsPerWidthUnit);
-        return Math.Min(1, Math.Floor(100 * (A4WidthPoints - 2 * MarginPoints) / tableWidth) / 100);
+        var height = HeightOfRows(1, Sheet.LastRowUsed()?.RowNumber() ?? 0);
+        var fit = (A4WidthPoints - 2 * MarginPoints) / TableWidthPoints();
+        if (height > 0) fit = Math.Min(fit, (A5HeightPoints - 2 * MarginPoints) / height);
+        return WholePercent(fit);
     }
+
+    /// The zoom the picture is first drawn for: A4 is fitted by its width, known from the start.
+    private double InitialScale() => _paper == VoucherPaper.A5Landscape ? A5ReserveScale : A4PrintScale();
+
+    /// LibreOffice zooms in whole percents, from 10 % to 100 %.
+    private static double WholePercent(double fit) => Math.Clamp(Math.Floor(100 * fit) / 100, 0.1, 1);
+
+    private double TableWidthPoints() => _columns.Sum(c => ColumnPoints(c.Width));
+
+    /// The printed width of a column at 100 %, as LibreOffice draws it.
+    private static double ColumnPoints(double width) => (width + SavedWidthPadding) * PointsPerWidthUnit;
 
     /// Side of the QR picture in sheet pixels. The sheet is shrunk to the page, so the picture is drawn larger in the
     /// sheet to come out at QrPrintMillimetres on paper.
-    private int QrPixels
-    {
-        get
-        {
-            var scale = _paper == VoucherPaper.A5Landscape ? A5LandscapeScale : A4PrintScale();
-            var points = QrPrintMillimetres * 72 / 25.4 / scale;
-            return (int)Math.Round(points / PointsPerPixel);
-        }
-    }
+    private static int QrPixels(double scale) =>
+        (int)Math.Round(QrPrintMillimetres * 72 / 25.4 / scale / PointsPerPixel);
 
     /// Height in points the picture takes from the top of its first row: the picture and its offset from the top.
-    private double QrSpanPoints => (QrPixels + QrTopOffsetPixels) * PointsPerPixel;
+    private static double QrSpanPoints(double scale) => (QrPixels(scale) + QrTopOffsetPixels) * PointsPerPixel;
 
     private double HeightOfRows(int firstRow, int lastRow)
     {
@@ -365,19 +410,25 @@ public sealed class VoucherFormBuilder
         return height;
     }
 
-    /// The QR picture centred over the last QrColumns columns, from the top of the given row.
-    private void AddQrPicture(VoucherPaymentQrDto qr, int row)
+    /// The QR picture for the given zoom, centred over the last QrColumns columns from the top of the given row.
+    private IXLPicture AddQrPicture(VoucherPaymentQrDto qr, int row, double scale)
     {
-        var pixels = QrPixels;
+        using var png = new MemoryStream(QrPngRenderer.Render(qr.Payload));
+        var picture = Sheet.AddPicture(png, XLPictureFormat.Png, "payment-qr");
+        PlaceQrPicture(picture, row, QrPixels(scale));
+        return picture;
+    }
+
+    /// Sizes the picture and centres it over the last QrColumns columns as LibreOffice prints them (the Excel model of
+    /// 7 pixels per width unit put it about 1 mm left of the centre in the PDF).
+    private void PlaceQrPicture(IXLPicture picture, int row, int pixels)
+    {
         var firstColumn = _columns.Count - QrColumns + 1;
         var columnsPixels = 0d;
-        for (var i = firstColumn; i <= _columns.Count; i++) columnsPixels += _columns[i - 1].Width * PixelsPerWidthUnit + ColumnPaddingPixels;
+        for (var i = firstColumn; i <= _columns.Count; i++) columnsPixels += ColumnPoints(_columns[i - 1].Width) / PointsPerPixel;
         var xOffset = Math.Max(0, (int)Math.Round((columnsPixels - pixels) / 2));
 
-        using var png = new MemoryStream(QrPngRenderer.Render(qr.Payload));
-        Sheet.AddPicture(png, XLPictureFormat.Png, "payment-qr")
-            .MoveTo(Sheet.Cell(row, firstColumn), xOffset, QrTopOffsetPixels)
-            .WithSize(pixels, pixels);
+        picture.MoveTo(Sheet.Cell(row, firstColumn), xOffset, QrTopOffsetPixels).WithSize(pixels, pixels);
     }
 
     private void PutQrCaption(int row, int firstColumn, string text, bool bold)

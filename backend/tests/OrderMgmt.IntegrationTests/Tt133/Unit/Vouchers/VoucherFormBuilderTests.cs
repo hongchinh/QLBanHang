@@ -469,6 +469,29 @@ public class VoucherFormBuilderTests
         reopen.Should().NotThrow();
     }
 
+    [Fact]
+    public void Qr_beside_the_lines_of_a_tall_A5_sheet_gets_the_height_it_needs_and_prints_25_mm()
+    {
+        var (b, ws) = NewBuilder(Context());
+        b.BeginQrBeside(Qr());
+        for (var i = 1; i <= 8; i++) b.WriteLine($"Dòng {i}:", "x");
+        b.EndQrBeside();
+        var rowsAfterBlock = b.Table.Row;
+        // A tall sheet: the page fits it at a smaller zoom, so the picture is drawn larger than the block was made for.
+        for (var i = 1; i <= 25; i++) b.WriteLine($"Sau {i}:", "x");
+
+        b.Finish();
+
+        var picture = ws.Pictures.Single();
+        LibreOfficePrint.PrintedMillimetres(picture, LibreOfficePrint.A5Zoom(ws, 10)).Should().BeApproximately(25, 0.5);
+        var captionRow = RowOf(ws, VoucherPrintRules.QrScanCaption);
+        var above = 0d;
+        for (var r = picture.TopLeftCell.Address.RowNumber; r < captionRow; r++) above += ws.Row(r).Height;
+        above.Should().BeGreaterThanOrEqualTo(picture.Height * 0.75 + 1.5);
+        // No row is added: the lines after the block stay where they were written.
+        RowOf(ws, "Sau 1: x").Should().Be(rowsAfterBlock);
+    }
+
     [Theory]
     [InlineData(VoucherPaper.A5Landscape)]
     [InlineData(VoucherPaper.A4Portrait)]

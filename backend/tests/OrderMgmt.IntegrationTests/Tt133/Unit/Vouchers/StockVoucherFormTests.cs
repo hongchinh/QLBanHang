@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using ClosedXML.Excel.Drawings;
 using FluentAssertions;
 using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Payments.Services;
@@ -431,6 +432,22 @@ public class StockVoucherFormTests
         var left = CellWith(ws, BlockTitle);
         left.MergedRange().FirstColumn().ColumnNumber().Should().Be(1);
         left.MergedRange().LastColumn().ColumnNumber().Should().Be(priceColumn - 1);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Qr_is_centred_over_the_last_two_columns(bool warehouseColumn)
+    {
+        using var wb = Render(StockOutWithQr(warehouseColumn: warehouseColumn));
+        var ws = wb.Worksheet(1);
+        var picture = ws.Pictures.First();
+        var priceColumn = ColumnOf(ws, "Đơn giá");
+
+        // Đơn giá (13) and Thành tiền (15) as LibreOffice prints them; the Excel 7w + 5 pixels put it 1.3 mm left.
+        var expected = LibreOfficePrint.CentredOffset(picture, ws.Column(priceColumn).Width, ws.Column(priceColumn + 1).Width);
+        picture.GetOffset(XLMarkerPosition.TopLeft).X.Should().BeInRange((int)expected - 1, (int)expected + 1);
+        picture.GetOffset(XLMarkerPosition.TopLeft).Y.Should().Be(2);
     }
 
     [Fact]

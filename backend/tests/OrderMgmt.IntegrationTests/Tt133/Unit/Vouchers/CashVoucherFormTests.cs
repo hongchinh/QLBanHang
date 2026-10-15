@@ -250,8 +250,29 @@ public class CashVoucherFormTests
 
         var offset = picture.GetOffset(XLMarkerPosition.TopLeft);
         offset.Y.Should().Be(2);
-        // Two columns of width 9.5: 9.5 * 7 + 5 pixels each.
-        offset.X.Should().BeInRange((int)((2 * (9.5 * 7 + 5) - picture.Width) / 2) - 1, (int)((2 * (9.5 * 7 + 5) - picture.Width) / 2) + 1);
+        // Two columns of width 9.5 as LibreOffice prints them (the Excel 7w + 5 pixels put it 0.8 mm left of centre).
+        offset.X.Should().BeInRange((int)LibreOfficePrint.CentredOffset(picture, 9.5, 9.5) - 1,
+            (int)LibreOfficePrint.CentredOffset(picture, 9.5, 9.5) + 1);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(true, true)]
+    public void Qr_prints_25_mm_at_the_zoom_that_fits_the_receipt_to_the_page(bool longReason, bool cancelled)
+    {
+        var model = ReceiptWithQr();
+        if (longReason) model.Reason = string.Join(" ", Enumerable.Repeat("Thu tiền hàng theo hợp đồng", 20))[..400];
+        model.IsCancelled = cancelled;
+        using var wb = Render(model);
+        var ws = wb.Worksheet(1);
+
+        // The sheet is fitted to one A5 page by its height, which the QR rows and the reason change; a fixed zoom
+        // printed it 21.1 mm and 19.7 mm wide.
+        var picture = ws.Pictures.First();
+        LibreOfficePrint.PrintedMillimetres(picture, LibreOfficePrint.A5Zoom(ws, 10)).Should().BeApproximately(25, 0.5);
+        AssertRowsCoverPicture(ws);
     }
 
     [Fact]

@@ -62,7 +62,7 @@ function VideoBlock({ video }: { video: HelpVideo }) {
 export function HelpDocView({ doc, video, related, onOpenRelated }: HelpDocViewProps) {
   return (
     <div className="space-y-5 text-sm">
-      {video && <VideoBlock video={video} />}
+      {video && <VideoBlock key={video.youtubeId} video={video} />}
 
       <section className="space-y-1.5">
         <h3 className={HEADING}>Màn hình này dùng để</h3>

@@ -37,6 +37,9 @@ describe('help files', () => {
   });
   it('link only to other help files', () => {
     expect(docs.flatMap((d) => d.related.filter((k) => k === d.key || !byKey.has(k)).map((k) => `${d.key} -> ${k}`))).toEqual([]);
+    expect(
+      docs.flatMap((d) => d.related.filter((k, i) => d.related.indexOf(k) !== i).map((k) => `${d.key} -> ${k} (lặp)`)),
+    ).toEqual([]);
   });
 });
 

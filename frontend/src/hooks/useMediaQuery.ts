@@ -8,8 +8,16 @@ export function useMediaQuery(query: string, fallback = false): boolean {
     (onChange: () => void) => {
       if (!hasMatchMedia()) return () => {};
       const mql = window.matchMedia(query);
-      mql.addEventListener('change', onChange);
-      return () => mql.removeEventListener('change', onChange);
+      if (typeof mql.addEventListener === 'function') {
+        mql.addEventListener('change', onChange);
+        return () => mql.removeEventListener('change', onChange);
+      }
+      // Older or stubbed matchMedia objects only have the deprecated listener methods, or none at all.
+      if (typeof mql.addListener === 'function') {
+        mql.addListener(onChange);
+        return () => mql.removeListener(onChange);
+      }
+      return () => {};
     },
     [query],
   );

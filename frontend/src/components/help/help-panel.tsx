@@ -30,7 +30,13 @@ function HelpPanelOpen() {
   const isInRole = useAuthStore((s) => s.isInRole);
   // The doc picked inside the panel only counts on the route it was picked on.
   const [picked, setPicked] = useState<{ key: string; pathname: string } | null>(null);
+  if (picked && picked.pathname !== pathname) setPicked(null); // reset during render: no flash of the old pick
   const viewKey = picked?.pathname === pathname ? picked.key : null;
+  const focusTitleAfterPick = useRef(false);
+  const pick = (next: { key: string; pathname: string } | null) => {
+    focusTitleAfterPick.current = true;
+    setPicked(next);
+  };
   const asideRef = useRef<HTMLElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
 
@@ -45,6 +51,13 @@ function HelpPanelOpen() {
       if (previous instanceof HTMLElement && previous.isConnected && focusIsFree) previous.focus();
     };
   }, []);
+
+  // The clicked button unmounts when the shown doc changes: keep the focus in the panel, on the title.
+  useEffect(() => {
+    if (!focusTitleAfterPick.current) return;
+    focusTitleAfterPick.current = false;
+    titleRef.current?.focus();
+  }, [picked]);
 
   useEffect(() => {
     const aside = asideRef.current;
@@ -80,7 +93,7 @@ function HelpPanelOpen() {
         doc={doc}
         video={videoFor(doc.key)}
         related={accessibleRelated(doc, index, canAccess)}
-        onOpenRelated={(key) => setPicked({ key, pathname })}
+        onOpenRelated={(key) => pick({ key, pathname })}
       />
     );
   } else {
@@ -95,7 +108,7 @@ function HelpPanelOpen() {
                 <li key={d.key}>
                   <button
                     type="button"
-                    onClick={() => setPicked({ key: d.key, pathname })}
+                    onClick={() => pick({ key: d.key, pathname })}
                     className="text-primary hover:underline"
                   >
                     {d.title}
@@ -114,13 +127,14 @@ function HelpPanelOpen() {
       <button
         type="button"
         aria-label="Đóng hướng dẫn"
+        tabIndex={-1}
         className="fixed inset-0 z-40 bg-black/40 md:hidden"
         onClick={closeHelp}
       />
       <aside ref={asideRef} data-testid="help-panel" aria-labelledby="help-panel-title" className={HELP_PANEL_CLASS}>
         <div className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
           {viewKey && (
-            <Button variant="ghost" size="sm" onClick={() => setPicked(null)}>
+            <Button variant="ghost" size="sm" onClick={() => pick(null)}>
               <AppIcon name="back" size={16} />
               Quay lại
             </Button>

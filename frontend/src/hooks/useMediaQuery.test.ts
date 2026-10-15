@@ -26,6 +26,22 @@ describe('useMediaQuery', () => {
     expect(result.current).toBe(false);
   });
 
+  it('does not throw on a stub without change listeners', () => {
+    setMatchMedia(vi.fn().mockReturnValue({ matches: true }));
+    const { result, unmount } = renderHook(() => useMediaQuery('(min-width: 1024px)'));
+    expect(result.current).toBe(true);
+    expect(() => unmount()).not.toThrow();
+  });
+
+  it('falls back to addListener on older matchMedia objects', () => {
+    const mql = { matches: false, addListener: vi.fn(), removeListener: vi.fn() };
+    setMatchMedia(vi.fn().mockReturnValue(mql));
+    const { unmount } = renderHook(() => useMediaQuery('(min-width: 1024px)'));
+    expect(mql.addListener).toHaveBeenCalledWith(expect.any(Function));
+    unmount();
+    expect(mql.removeListener).toHaveBeenCalledWith(mql.addListener.mock.calls[0][0]);
+  });
+
   it('follows the media query and removes its listener on unmount', () => {
     const mql = { matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() };
     setMatchMedia(vi.fn().mockReturnValue(mql));

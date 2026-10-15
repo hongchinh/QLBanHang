@@ -25,6 +25,15 @@ describe('docsInSameGroup', () => {
   it('lists the docs of the same sidebar group', () => {
     expect(docsInSameGroup('/products', groups, index, () => true)).toEqual([productGroupsDoc]);
   });
+  it('sorts the docs by title in Vietnamese order', () => {
+    const mk = (key: string, title: string, route: string): HelpDoc => ({ ...productGroupsDoc, key, title, routes: [route] });
+    const sorted = buildHelpIndex([
+      mk('a-suppliers', 'Đơn vị', '/suppliers'),
+      mk('b-warehouses', 'Ăn', '/warehouses'),
+      mk('c-groups', 'Bò', '/product-groups'),
+    ]);
+    expect(docsInSameGroup('/products', groups, sorted, () => true).map((d) => d.title)).toEqual(['Ăn', 'Bò', 'Đơn vị']);
+  });
   it('drops docs the user cannot open', () => {
     expect(docsInSameGroup('/products', groups, index, (p) => p !== '/product-groups')).toEqual([]);
   });

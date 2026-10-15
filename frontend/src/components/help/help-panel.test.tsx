@@ -22,6 +22,7 @@ function renderPanel(path = '/stock-out/new') {
       <input aria-label="ô trang" />
       <input aria-label="ô khác" />
       <Link to="/products">sang hàng hóa</Link>
+      <Link to="/stock-out/new">về xuất kho</Link>
       <HelpPanel />
     </MemoryRouter>,
   );
@@ -115,6 +116,29 @@ describe('HelpPanel', () => {
     expect(useUiStore.getState().helpOpen).toBe(true);
     expect(screen.getByText('Chưa có hướng dẫn cho màn hình này.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Quay lại' })).not.toBeInTheDocument();
+  });
+
+  it('does not bring the picked doc back when returning to the same route', () => {
+    renderPanel();
+    openPanel();
+    fireEvent.click(screen.getByRole('button', { name: 'Phiếu thu' }));
+    fireEvent.click(screen.getByRole('link', { name: 'sang hàng hóa' }));
+    fireEvent.click(screen.getByRole('link', { name: 'về xuất kho' }));
+    expect(screen.getByRole('heading', { name: 'Phiếu xuất kho' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Quay lại' })).not.toBeInTheDocument();
+  });
+
+  it('moves the focus to the title after opening a related doc and after going back', () => {
+    renderPanel();
+    openPanel();
+    const related = screen.getByRole('button', { name: 'Phiếu thu' });
+    act(() => related.focus());
+    fireEvent.click(related);
+    expect(screen.getByRole('heading', { name: 'Phiếu thu' })).toHaveFocus();
+    const back = screen.getByRole('button', { name: 'Quay lại' });
+    act(() => back.focus());
+    fireEvent.click(back);
+    expect(screen.getByRole('heading', { name: 'Phiếu xuất kho' })).toHaveFocus();
   });
 
   it('hides related docs the user cannot open', () => {

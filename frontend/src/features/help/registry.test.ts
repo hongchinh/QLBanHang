@@ -41,6 +41,12 @@ describe('buildHelpIndex', () => {
     expect(index.resolve('/reports/sales-revenue/u1')).toBe(revenue);
   });
 
+  it('prefers a static route over a :param route of another doc, whatever the key order', () => {
+    const both = buildHelpIndex([doc('a.detail', ['/x/:id']), doc('z.new', ['/x/new'])]);
+    expect(both.resolve('/x/new')?.key).toBe('z.new');
+    expect(both.resolve('/x/42')?.key).toBe('a.detail');
+  });
+
   it('returns null for an unknown path', () => {
     expect(index.resolve('/products')).toBeNull();
   });

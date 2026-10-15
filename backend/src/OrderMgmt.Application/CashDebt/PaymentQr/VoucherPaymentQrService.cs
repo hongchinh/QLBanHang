@@ -194,7 +194,7 @@ public class VoucherPaymentQrService : IVoucherPaymentQrService
                 f.Code,
                 f.Name,
                 f.Kind,
-                f.IsActive,
+                IsActive = f.IsActive && !f.IsDeleted,
                 f.AccountNumber,
                 f.AccountHolderName,
                 BankBin = f.Bank != null ? f.Bank.Bin : null,

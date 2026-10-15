@@ -52,6 +52,7 @@ public class VoucherPaymentQrTests : CashDebtTestBase
         dto.CashPaid.Should().Be(0m);
         dto.Content.Should().Be(v.Code);
         dto.FundCode.Should().Be("NH01");
+        dto.FundName.Should().Be("Ngân hàng NH01");
         dto.BankName.Should().Be(bank.Name);
         dto.BankShortName.Should().Be(bank.ShortName ?? bank.Code);
         dto.AccountNumber.Should().Be("0123456789");
@@ -292,18 +293,22 @@ public class VoucherPaymentQrTests : CashDebtTestBase
 
     // ----- access -----
 
+    // The user works in the voucher's own branch, so only the permission check can refuse them.
     [Fact]
     public async Task Cash_route_needs_the_view_permission_of_the_type()
     {
         var ctx = await NewBranchAsync();
         await CreateQrBankFundAsync("NH01", ctx.BranchId);
         var v = await CreateReceiptAsync(ctx, ctx.CashFundId, 500_000m);
-        var client = await CreateClientWithPermissionsAsync("pqr_" + Guid.NewGuid().ToString("N")[..8], null,
-            Permissions.Payments.View);
+        var denied = await UserInBranchAsync(ctx.BranchId, Permissions.Payments.View);
+        var allowed = await UserInBranchAsync(ctx.BranchId, Permissions.Receipts.View);
 
-        var response = await client.GetAsync($"/api/cash-vouchers/{v.Id}/payment-qr");
+        var (deniedStatus, _, deniedError) = await GetCashQrAsync(denied, v.Id);
+        var (allowedStatus, allowedDto, allowedError) = await GetCashQrAsync(allowed, v.Id);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        AssertPermissionDenied(deniedStatus, deniedError);
+        allowedStatus.Should().Be(HttpStatusCode.OK, allowedError?.Message);
+        allowedDto!.FundCode.Should().Be("NH01");
     }
 
     [Fact]
@@ -312,12 +317,53 @@ public class VoucherPaymentQrTests : CashDebtTestBase
         var ctx = await NewBranchAsync();
         await CreateQrBankFundAsync("NH01", ctx.BranchId);
         var v = await CreateStockOutAsync(ctx, "XBH", null, paid: null);
-        var client = await CreateClientWithPermissionsAsync("pqr_" + Guid.NewGuid().ToString("N")[..8], null,
-            Permissions.StockIn.View);
+        var denied = await UserInBranchAsync(ctx.BranchId, Permissions.StockIn.View);
+        var allowed = await UserInBranchAsync(ctx.BranchId, Permissions.StockOut.View);
 
-        var response = await client.GetAsync($"/api/stock-vouchers/{v.Id}/payment-qr");
+        var (deniedStatus, _, deniedError) = await GetStockQrAsync(denied, v.Id);
+        var (allowedStatus, allowedDto, allowedError) = await GetStockQrAsync(allowed, v.Id);
 
-        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+        AssertPermissionDenied(deniedStatus, deniedError);
+        allowedStatus.Should().Be(HttpStatusCode.OK, allowedError?.Message);
+        allowedDto!.FundCode.Should().Be("NH01");
+    }
+
+    // Lacking the permission AND working in another branch: the permission is the one reported.
+    [Fact]
+    public async Task Both_routes_check_the_permission_before_the_branch()
+    {
+        var ctx = await NewBranchAsync();
+        await CreateQrBankFundAsync("NH01", ctx.BranchId);
+        var cash = await CreateReceiptAsync(ctx, ctx.CashFundId, 500_000m);
+        var stock = await CreateStockOutAsync(ctx, "XBH", null, paid: null);
+        var denied = await CreateClientWithPermissionsAsync("pqr_" + Guid.NewGuid().ToString("N")[..8], null,
+            Permissions.Payments.View, Permissions.StockIn.View);
+
+        var (cashStatus, _, cashError) = await GetCashQrAsync(denied, cash.Id);
+        var (stockStatus, _, stockError) = await GetStockQrAsync(denied, stock.Id);
+
+        AssertPermissionDenied(cashStatus, cashError);
+        AssertPermissionDenied(stockStatus, stockError);
+    }
+
+    // A voucher that is not there is a 404 whoever asks, permission or not.
+    [Fact]
+    public async Task Both_routes_answer_404_before_checking_the_permission()
+    {
+        var ctx = await NewBranchAsync();
+        await CreateQrBankFundAsync("NH01", ctx.BranchId);
+        var cash = await CreateReceiptAsync(ctx, ctx.CashFundId, 500_000m);
+        var stock = await CreateStockOutAsync(ctx, "XBH", null, paid: null);
+        var (deleteStatus, _, deleteError) = await DeleteCashAsync(ctx.Client, cash.Id, new CashDocumentActionRequest { Version = cash.Version });
+        deleteStatus.Should().Be(HttpStatusCode.OK, deleteError?.Message);
+        (await ctx.Client.DeleteAsync($"/api/stock-vouchers/{stock.Id}?version={stock.Version}")).StatusCode
+            .Should().Be(HttpStatusCode.OK);
+        var nobody = await UserInBranchAsync(ctx.BranchId, Permissions.Products.View);
+
+        (await nobody.GetAsync($"/api/cash-vouchers/{cash.Id}/payment-qr")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await nobody.GetAsync($"/api/cash-vouchers/{Guid.NewGuid()}/payment-qr")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await nobody.GetAsync($"/api/stock-vouchers/{stock.Id}/payment-qr")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await nobody.GetAsync($"/api/stock-vouchers/{Guid.NewGuid()}/payment-qr")).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
 
     [Fact]
@@ -383,7 +429,11 @@ public class VoucherPaymentQrTests : CashDebtTestBase
         var payment = await CreateCashAsync(ctx.Client, CashRequest(CashVoucherType.Payment, await CashReasonIdAsync("CK"),
             ctx.CashFundId, "2026-10-05 09:00", null, 200_000m));
 
-        var result = await ResolveManyAsync(PaymentQrKind.Cash, ready.Id, cancelled.Id, payment.Id, Guid.NewGuid());
+        var deleted = await CreateReceiptAsync(ctx, bankFundId, 100_000m);
+        (await DeleteCashAsync(ctx.Client, deleted.Id, new CashDocumentActionRequest { Version = deleted.Version }))
+            .Status.Should().Be(HttpStatusCode.OK);
+
+        var result = await ResolveManyAsync(PaymentQrKind.Cash, ready.Id, cancelled.Id, payment.Id, deleted.Id, Guid.NewGuid());
 
         result.Keys.Should().BeEquivalentTo(new[] { ready.Id });
         result[ready.Id].Amount.Should().Be(500_000m);
@@ -398,9 +448,67 @@ public class VoucherPaymentQrTests : CashDebtTestBase
         var stockIn = await CreateStockInAsync(ctx);
         var notSale = await CreateStockOutAsync(ctx, "XKH", null, paid: null, partner: false);
 
-        var result = await ResolveManyAsync(PaymentQrKind.Stock, ready.Id, stockIn.Id, notSale.Id, Guid.NewGuid());
+        var deleted = await CreateStockOutAsync(ctx, "XBH", null, paid: null);
+        (await ctx.Client.DeleteAsync($"/api/stock-vouchers/{deleted.Id}?version={deleted.Version}")).StatusCode
+            .Should().Be(HttpStatusCode.OK);
+
+        var result = await ResolveManyAsync(PaymentQrKind.Stock, ready.Id, stockIn.Id, notSale.Id, deleted.Id, Guid.NewGuid());
 
         result.Keys.Should().BeEquivalentTo(new[] { ready.Id });
+    }
+
+    // Each voucher is given the default bank fund of its own branch.
+    [Fact]
+    public async Task ResolveMany_gives_each_voucher_the_default_bank_fund_of_its_own_branch()
+    {
+        var first = await NewBranchAsync();
+        var second = await NewBranchAsync();
+        await CreateQrBankFundAsync("NHA", first.BranchId);
+        await CreateQrBankFundAsync("NHB", second.BranchId);
+        var cashA = await CreateReceiptAsync(first, first.CashFundId, 500_000m);
+        var cashB = await CreateReceiptAsync(second, second.CashFundId, 600_000m);
+        var stockA = await CreateStockOutAsync(first, "XBH", null, paid: null);
+        var stockB = await CreateStockOutAsync(second, "XBH", null, paid: null);
+
+        var cash = await ResolveManyAsync(PaymentQrKind.Cash, cashA.Id, cashB.Id);
+        var stock = await ResolveManyAsync(PaymentQrKind.Stock, stockA.Id, stockB.Id);
+
+        cash[cashA.Id].FundCode.Should().Be("NHA");
+        cash[cashB.Id].FundCode.Should().Be("NHB");
+        stock[stockA.Id].FundCode.Should().Be("NHA");
+        stock[stockB.Id].FundCode.Should().Be("NHB");
+    }
+
+    // A ready bank fund of its own wins over the branch default.
+    [Fact]
+    public async Task Receipt_on_a_ready_bank_fund_that_is_not_the_default_uses_its_own_fund()
+    {
+        var ctx = await NewBranchAsync();
+        await CreateQrBankFundAsync("NH01", ctx.BranchId);
+        var ownFundId = await CreateQrBankFundAsync("NH02", ctx.BranchId);
+        (await InDbAsync(db => db.Funds.Where(f => f.Id == ownFundId).Select(f => f.IsDefault).SingleAsync()))
+            .Should().BeFalse("the first bank fund of the branch is its default");
+        var v = await CreateReceiptAsync(ctx, ownFundId, 500_000m);
+
+        var (status, dto, error) = await GetCashQrAsync(ctx.Client, v.Id);
+
+        status.Should().Be(HttpStatusCode.OK, error?.Message);
+        dto!.FundCode.Should().Be("NH02");
+    }
+
+    // A soft-deleted bank fund is not ready, even though its IsActive flag is still set.
+    [Fact]
+    public async Task Receipt_on_a_soft_deleted_bank_fund_is_incomplete()
+    {
+        var ctx = await NewBranchAsync();
+        var fundId = await CreateQrBankFundAsync("NH01", ctx.BranchId);
+        var v = await CreateReceiptAsync(ctx, fundId, 500_000m);
+        await InDbAsync(db => db.Funds.IgnoreQueryFilters().Where(f => f.Id == fundId)
+            .ExecuteUpdateAsync(s => s.SetProperty(f => f.IsDeleted, true)));
+
+        var (status, _, error) = await GetCashQrAsync(ctx.Client, v.Id);
+
+        AssertUnavailable(status, error, Incomplete("NH01"));
     }
 
     [Fact]
@@ -489,6 +597,18 @@ public class VoucherPaymentQrTests : CashDebtTestBase
 
     private static async Task<(HttpStatusCode Status, VoucherPaymentQrDto? Data, ApiError? Error)> GetQrAsync(HttpClient c, string url) =>
         await ReadDocumentResponseAsync<VoucherPaymentQrDto>(await c.GetAsync(url));
+
+    /// A user of the voucher's own branch with exactly these permissions.
+    private Task<HttpClient> UserInBranchAsync(Guid branchId, params string[] permissions) =>
+        CreateClientWithPermissionsAsync("pqr_" + Guid.NewGuid().ToString("N")[..8], branchId, permissions);
+
+    private static void AssertPermissionDenied(HttpStatusCode status, ApiError? error)
+    {
+        status.Should().Be(HttpStatusCode.Forbidden);
+        error.Should().NotBeNull();
+        error!.Code.Should().Be("FORBIDDEN");
+        error.Message.Should().NotBe("Phiếu thuộc chi nhánh khác.", "the permission is checked before the branch");
+    }
 
     private static void AssertUnavailable(HttpStatusCode status, ApiError? error, string message)
     {

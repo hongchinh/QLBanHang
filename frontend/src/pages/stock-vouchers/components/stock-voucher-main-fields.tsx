@@ -164,7 +164,7 @@ export function StockVoucherMainFields({
         </div>
       </div>
 
-      <div className="form-inline-grid form-cols-stock-partner">
+      <div className="form-inline-grid form-cols-stock-partner form-align-top">
         <PartnerCodeNameField
           label="Đối tượng"
           scope="partner"

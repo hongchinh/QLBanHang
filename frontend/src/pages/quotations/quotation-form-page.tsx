@@ -811,7 +811,7 @@ function QuotationFormInner({
                 )}
               </div>
 
-              <div className="form-inline-grid">
+              <div className="form-inline-grid form-align-top">
                 <PartnerCodeNameField
                   label="Khách hàng"
                   required

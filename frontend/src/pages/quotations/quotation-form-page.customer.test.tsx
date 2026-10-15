@@ -236,6 +236,8 @@ describe('QuotationFormPage — customer row on the shared partner field', () =>
 
       const row = byId('customerId').closest('.form-inline-grid');
       expect(row).not.toHaveClass('form-cols-customer');
+      // The label stays on the first line when the name input wraps below the code input.
+      expect(row).toHaveClass('form-align-top');
       expect(byId('customerId').closest('.partner-code-name')).toContainElement(byId('customerName'));
     });
 

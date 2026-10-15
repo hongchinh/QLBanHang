@@ -162,7 +162,7 @@ export function CashVoucherHeader({
           </div>
 
           {/* The field renders a fragment (label, code + name, error), so it gets its own grid row. */}
-          <div className="form-inline-grid">
+          <div className="form-inline-grid form-align-top">
             <PartnerCodeNameField
               label="Đối tượng"
               scope="partner"

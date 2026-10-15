@@ -135,6 +135,12 @@ describe('CashVoucherHeader layout (section-01 §1.1)', () => {
     expect(byId('cash-attached-docs')).toHaveAttribute('placeholder', 'Số chứng từ gốc');
   });
 
+  it('puts the partner row on form-align-top so its label stays on the first line when the name wraps', () => {
+    renderHeader();
+
+    expect(byId('cash-partner').closest('.form-inline-grid')).toHaveClass('form-align-top');
+  });
+
   it('searches active partners of the voucher type without a reason', () => {
     renderHeader();
 

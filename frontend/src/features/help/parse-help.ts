@@ -26,7 +26,7 @@ export function parseHelpDoc(raw: string, fileKey: string): { doc: HelpDoc | nul
     if (countOf(text, /`/g) % 2 !== 0) fail(`${where} has unbalanced backtick markers`);
   };
 
-  const lines = raw.replace(/\r/g, '').split('\n');
+  const lines = raw.replace(/\r/g, '').normalize('NFC').split('\n');
 
   // Frontmatter
   const fields: Record<string, string> = {};
@@ -34,7 +34,7 @@ export function parseHelpDoc(raw: string, fileKey: string): { doc: HelpDoc | nul
   if (lines[0]?.trim() !== '---') {
     fail('missing frontmatter (the file must start with a "---" line)');
   } else {
-    const close = lines.indexOf('---', 1);
+    const close = lines.findIndex((l, i) => i > 0 && l.trim() === '---');
     if (close === -1) {
       fail('frontmatter is not closed (missing the second "---" line)');
       body = [];
@@ -146,16 +146,17 @@ export function parseHelpDoc(raw: string, fileKey: string): { doc: HelpDoc | nul
       fail(`"Các bước" must have 3–7 steps (found ${stepLines.length})`);
     }
     const seen = new Set<string>();
-    stepLines.forEach((line, i) => {
+    stepLines.forEach((line) => {
       const m = /^(\d+)\.\s+(.*)$/.exec(line);
       if (!m) {
         fail(`malformed step line "${line}" (expected "N. {#id} text")`);
         return;
       }
-      if (Number(m[1]) !== i + 1) fail(`step numbering: expected ${i + 1} but found ${m[1]}`);
+      const expected = steps.length + 1; // count valid steps so far, not lines
+      if (Number(m[1]) !== expected) fail(`step numbering: expected ${expected} but found ${m[1]}`);
       const rest = /^\{#([^}\s]*)\}\s*(.*)$/.exec(m[2]);
       if (!rest) {
-        fail(`step ${i + 1} is missing its step id ("{#id}")`);
+        fail(`step ${m[1]} is missing its step id ("{#id}")`);
         return;
       }
       const [, id, text] = rest;

@@ -143,6 +143,51 @@ describe('parseHelpDoc', () => {
   it('rejects unbalanced bold markers', () => {
     expectError(VALID.replace('Chọn **Lý do xuất** và **Kho**.', 'Chọn **Lý do xuất và Kho.'), 'unbalanced');
   });
+
+  it('rejects unbalanced backticks', () => {
+    expectError(VALID.replace('(`Ctrl S`)', '(`Ctrl S)'), 'backtick');
+  });
+
+  it('tolerates trailing whitespace on the closing frontmatter line', () => {
+    expect(parseHelpDoc(VALID.replace('\n---\n## Dùng', '\n--- \n## Dùng'), 'stock-out.form')).toEqual({
+      doc: DOC,
+      errors: [],
+    });
+  });
+
+  it('recognises headings saved in NFD form', () => {
+    const raw = VALID.replace('## Dùng để', '## Du\u0300ng \u0111e\u0302\u0309');
+    expect(raw).not.toBe(VALID);
+    expect(parseHelpDoc(raw, 'stock-out.form')).toEqual({ doc: DOC, errors: [] });
+  });
+
+  it('reports a wrapped step line without a numbering cascade', () => {
+    const raw = VALID.replace('3. {#save}', 'dòng bị ngắt\n3. {#save}');
+    const result = parseHelpDoc(raw, 'stock-out.form');
+    expect(result.doc).toBeNull();
+    expect(result.errors.some((e) => e.includes('malformed step line'))).toBe(true);
+    expect(result.errors.some((e) => e.includes('numbering'))).toBe(false);
+  });
+
+  it('rejects a key that is not lowercase kebab-case', () => {
+    expectError(VALID.replace('key: stock-out.form', 'key: Stock-Out.form'), 'valid key', 'Stock-Out.form');
+  });
+
+  it('rejects a route that does not start with a slash', () => {
+    expectError(VALID.replace('/stock-out/new', 'stock-out/new'), 'must start with "/"');
+  });
+
+  it('rejects an unclosed frontmatter', () => {
+    expectError(VALID.replace('\n---\n## Dùng', '\n## Dùng'), 'not closed');
+  });
+
+  it('rejects empty sources', () => {
+    expectError(VALID.replace('sources: [frontend/src/pages/stock-vouchers/**]', 'sources: []'), '"sources"');
+  });
+
+  it('rejects a duplicate section', () => {
+    expectError(`${VALID}\n\n## Lưu ý\n- x`, 'duplicate section');
+  });
 });
 
 describe('parseInline', () => {
@@ -167,7 +212,7 @@ describe('narrationText', () => {
   });
 
   it('normalizes to NFC', () => {
-    expect(narrationText('Lúu')).toBe('Lúu');
+    expect(narrationText('Lu\u0301u')).toBe('L\u00fau');
   });
 });
 

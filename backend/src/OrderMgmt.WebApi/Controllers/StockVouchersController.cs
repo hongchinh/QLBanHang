@@ -72,8 +72,9 @@ public class StockVouchersController : ApiControllerBase
         [FromQuery] string? keyword = null,
         [FromQuery] int limit = 20,
         [FromQuery] Guid? reasonId = null,
+        [FromQuery] bool? activeOnly = null,
         CancellationToken ct = default)
-        => Success(await _service.SearchPartnersAsync(type, keyword, limit, reasonId, ct));
+        => Success(await _service.SearchPartnersAsync(type, keyword, limit, reasonId, activeOnly, ct));
 
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Get(Guid id, CancellationToken ct)

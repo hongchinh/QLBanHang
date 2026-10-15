@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { formatApiErrorDetails, getErrorMessage } from '@/lib/api-client';
 import { applyApiFieldErrors } from '@/lib/apply-api-field-errors';
 import { toast } from '@/lib/use-toast';
+import { BackLink } from '@/components/layout/back-link';
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Vui lòng nhập tên đơn vị').max(255, 'Tên đơn vị tối đa 255 ký tự'),
@@ -43,11 +44,14 @@ export function CompanyProfilePage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Thông tin đơn vị</h1>
-        <p className="text-sm text-muted-foreground">
-          Tên, địa chỉ, mã số thuế và người ký in trên các sổ theo mẫu TT133
-        </p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/settings" label="Cấu hình" />
+        <div>
+          <h1 className="text-2xl font-bold">Thông tin đơn vị</h1>
+          <p className="text-sm text-muted-foreground">
+            Tên, địa chỉ, mã số thuế và người ký in trên các sổ theo mẫu TT133
+          </p>
+        </div>
       </div>
 
       {isError && (

@@ -7,17 +7,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { formatApiErrorDetails, getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
+import { BackLink } from '@/components/layout/back-link';
 
 export function PeriodLockPage() {
   const { data, isLoading, isError, error } = useBranches();
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Khóa sổ</h1>
-        <p className="text-sm text-muted-foreground">
-          Chứng từ có ngày ≤ ngày khóa sổ không được thêm, sửa, xóa, hủy.
-        </p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/settings" label="Cấu hình" />
+        <div>
+          <h1 className="text-2xl font-bold">Khóa sổ</h1>
+          <p className="text-sm text-muted-foreground">
+            Chứng từ có ngày ≤ ngày khóa sổ không được thêm, sửa, xóa, hủy.
+          </p>
+        </div>
       </div>
 
       <Card>

@@ -269,4 +269,9 @@ describe('BranchesPage', () => {
     await user.click(row.getByRole('button', { name: 'Xóa chi nhánh' }));
     expect(await screen.findByRole('dialog', { name: 'Xóa chi nhánh?' })).toBeInTheDocument();
   });
+
+  it('links back to the settings hub', () => {
+    renderPage();
+    expect(screen.getByRole('link', { name: 'Quay lại Cấu hình' })).toHaveAttribute('href', '/settings');
+  });
 });

@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { formatApiErrorDetails, getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
+import { BackLink } from '@/components/layout/back-link';
 
 const LIMIT_POLICIES: LimitPolicy[] = ['Allow', 'Warn', 'Block'];
 
@@ -18,9 +19,12 @@ export function CashSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">Cấu hình tiền & công nợ</h1>
-        <p className="text-sm text-muted-foreground">Chính sách khi vượt hạn mức nợ và khi chi âm quỹ</p>
+      <div className="flex items-start gap-2">
+        <BackLink to="/settings" label="Cấu hình" />
+        <div>
+          <h1 className="text-2xl font-bold">Cấu hình tiền & công nợ</h1>
+          <p className="text-sm text-muted-foreground">Chính sách khi vượt hạn mức nợ và khi chi âm quỹ</p>
+        </div>
       </div>
 
       {isError && (

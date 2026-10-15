@@ -18,6 +18,7 @@ import { toast } from '@/lib/use-toast';
 import { useBranchStore } from '@/stores/branch-store';
 import { BranchFormDialog, BranchOpeningDateDialog } from './branch-form-dialog';
 import { DemoBranchDeleteDialog } from './demo-branch-delete-dialog';
+import { BackLink } from '@/components/layout/back-link';
 
 export function BranchesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -162,9 +163,12 @@ export function BranchesPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Chi nhánh</h1>
-          <p className="text-sm text-muted-foreground">Quản lý danh sách chi nhánh</p>
+        <div className="flex items-start gap-2">
+          <BackLink to="/settings" label="Cấu hình" />
+          <div>
+            <h1 className="text-2xl font-bold">Chi nhánh</h1>
+            <p className="text-sm text-muted-foreground">Quản lý danh sách chi nhánh</p>
+          </div>
         </div>
         <Button onClick={openCreate}>
           <AppIcon name="add" className="mr-2" /> Thêm chi nhánh

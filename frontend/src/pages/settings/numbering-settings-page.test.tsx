@@ -92,4 +92,9 @@ describe('NumberingSettingsPage', () => {
     for (const title of STOCK_TITLES) expect(screen.getByRole('region', { name: title })).toBeInTheDocument();
     for (const title of CASH_TITLES) expect(screen.queryByRole('region', { name: title })).not.toBeInTheDocument();
   });
+
+  it('links back to the settings hub', () => {
+    renderPage();
+    expect(screen.getByRole('link', { name: 'Quay lại Cấu hình' })).toHaveAttribute('href', '/settings');
+  });
 });

@@ -7,22 +7,29 @@ import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { usePartnerSearch } from '@/features/stock-vouchers/hooks';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 import type { PartnerType, StockDirection } from '@/features/stock-reasons/types';
+import { partnerSearchSummary, type PartnerNoun } from './search-summary';
 
 export type { PartnerNoun } from './search-summary';
 
-// A partner search hook: `useSearch(keyword, reasonId)`, e.g. the cash voucher partner search.
+// A partner search hook: `useSearch(keyword, reasonId, activeOnly)`, e.g. the cash voucher partner search.
 export type PartnerSearchHook = (
   keyword: string,
   reasonId?: string,
+  activeOnly?: boolean,
 ) => { data?: PartnerSearchItem[]; isFetching: boolean; isLoading?: boolean; isError?: boolean };
 
 // Default: GET /stock-vouchers/partners of the voucher direction.
-function useStockPartnerSearch(keyword: string, reasonId: string | undefined, type: StockDirection | undefined) {
-  return usePartnerSearch(type ?? 'In', keyword, reasonId);
+function useStockPartnerSearch(
+  keyword: string,
+  reasonId: string | undefined,
+  activeOnly: boolean | undefined,
+  type: StockDirection | undefined,
+) {
+  return usePartnerSearch(type ?? 'In', keyword, reasonId, activeOnly);
 }
 
 // `type` picks the default stock voucher search; a caller with its own `useSearch` needs no type.
-type PartnerSearchSource =
+export type PartnerSearchSource =
   | { type: StockDirection; useSearch?: undefined }
   | { type?: StockDirection; useSearch: PartnerSearchHook };
 
@@ -37,6 +44,20 @@ export type PartnerAutocompleteProps = PartnerSearchSource & {
   disabled?: boolean;
   inputId?: string;
   placeholder?: string;
+  // Only active partners (the voucher forms); the list header says "đang dùng".
+  activeOnly?: boolean;
+  // What the list calls its results.
+  noun?: PartnerNoun;
+  // h-7 input and buttons (dense forms).
+  compact?: boolean;
+  // Focus target after a pick (the partner name input).
+  nameInputId?: string;
+  // Enables the + button, F4 and the "Thêm mới" row.
+  onAddNew?: (keyword: string) => void;
+  // Enables the "Xem danh mục đầy đủ" row.
+  onOpenCatalog?: (keyword: string) => void;
+  // Reports whether text is typed but no partner is picked.
+  onUnpickedChange?: (hasUnpickedText: boolean) => void;
 };
 
 // Same interaction as CustomerAutocomplete, backed by GET /stock-vouchers/partners (D3).
@@ -51,6 +72,10 @@ export function PartnerAutocomplete({
   inputId,
   placeholder = 'Nhập mã / tên / MST đối tượng...',
   useSearch,
+  activeOnly,
+  noun = 'đối tượng',
+  compact,
+  onAddNew,
 }: PartnerAutocompleteProps) {
   const [keyword, setKeyword] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -58,9 +83,13 @@ export function PartnerAutocomplete({
 
   const debouncedKeyword = useDebouncedValue(keyword, 250);
   // Exactly one search hook call per render, so the hook order stays stable.
-  const usePartnerResults: (keyword: string, reasonId: string | undefined, type: StockDirection | undefined) =>
-    ReturnType<PartnerSearchHook> = useSearch ?? useStockPartnerSearch;
-  const search = usePartnerResults(debouncedKeyword, requireReason ? reasonId : undefined, type);
+  const usePartnerResults: (
+    keyword: string,
+    reasonId: string | undefined,
+    activeOnly: boolean | undefined,
+    type: StockDirection | undefined,
+  ) => ReturnType<PartnerSearchHook> = useSearch ?? useStockPartnerSearch;
+  const search = usePartnerResults(debouncedKeyword, requireReason ? reasonId : undefined, activeOnly, type);
   const { data } = search;
   const isLoading = search.isLoading ?? (search.isFetching && !data);
   const isError = search.isError ?? false;
@@ -88,7 +117,7 @@ export function PartnerAutocomplete({
   if (requireReason && !reasonId) {
     blocked = true;
     effectivePlaceholder = 'Chọn lý do trước';
-  } else if (requireReason && partnerType === 'None') {
+  } else if (partnerType === 'None') {
     blocked = true;
     effectivePlaceholder = 'Không cần đối tượng';
   }
@@ -153,133 +182,116 @@ export function PartnerAutocomplete({
     }
   }
 
-  const comboboxProps = {
-    id: inputId,
-    ref: inputRef,
-    onKeyDown: handleKeyDown,
-    onFocus: () => {
-      if (keyword.length > 0) setIsOpen(true);
-    },
-    role: 'combobox' as const,
-    'aria-expanded': showDropdown,
-    'aria-controls': listboxId,
-    'aria-autocomplete': 'list' as const,
-    'aria-activedescendant': activeOptionId,
-    placeholder: effectivePlaceholder,
-    disabled: isDisabled,
-    autoComplete: 'off',
-  };
-
   return (
     <div className="space-y-1" ref={containerRef}>
       <div className="relative">
-        {value ? (
-          <>
-            <Input
-              {...comboboxProps}
-              value={value.code}
-              title={value.name}
-              onChange={(e) => {
-                // Typing while a value is selected starts a new search.
-                onSelect(null);
-                setKeyword(e.target.value);
-                setIsOpen(true);
-              }}
-              className="pr-8"
-            />
-            {!isDisabled && (
-              <button
-                type="button"
-                aria-label="Bỏ chọn đối tượng"
-                onClick={handleClear}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                tabIndex={-1}
-              >
-                <AppIcon name="close" />
-              </button>
-            )}
-          </>
-        ) : (
-          <Input
-            {...comboboxProps}
-            value={keyword}
-            onChange={(e) => {
-              setKeyword(e.target.value);
-              setIsOpen(e.target.value.length > 0);
-            }}
-          />
+        <Input
+          id={inputId}
+          ref={inputRef}
+          value={value ? value.code : keyword}
+          title={value?.name}
+          onChange={(e) => {
+            // Typing while a value is selected starts a new search.
+            if (value) onSelect(null);
+            setKeyword(e.target.value);
+            setIsOpen(e.target.value.length > 0);
+          }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => {
+            if (keyword.length > 0) setIsOpen(true);
+          }}
+          role="combobox"
+          aria-expanded={showDropdown}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={activeOptionId}
+          placeholder={effectivePlaceholder}
+          disabled={isDisabled}
+          autoComplete="off"
+          className={cn(compact && 'h-7', value && 'pr-8')}
+        />
+        {value && !isDisabled && (
+          <button
+            type="button"
+            aria-label="Bỏ chọn đối tượng"
+            onClick={handleClear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            tabIndex={-1}
+          >
+            <AppIcon name="close" />
+          </button>
         )}
       </div>
 
       {showDropdown && (
         <div className="relative">
-          <div className="absolute left-0 z-50 mt-1 min-w-[min(640px,calc(100vw-80px))] max-w-[calc(100vw-40px)] max-h-80 overflow-auto rounded-md border bg-popover text-popover-foreground shadow-md">
-            {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- WAI-ARIA combobox listbox pattern */}
-            <table className="qldh-lookup-table" id={listboxId} role="listbox">
-              <thead className="qldh-lookup-table-header">
-                <tr>
-                  <th className="px-2 py-1">Mã</th>
-                  <th className="px-2 py-1">Tên</th>
-                  <th className="px-2 py-1">MST</th>
-                  <th className="px-2 py-1">Địa chỉ</th>
-                  <th className="px-2 py-1">Loại</th>
-                </tr>
-              </thead>
-              <tbody>
-                {isLoading && (
+          <div className="absolute left-0 z-50 mt-1 flex max-h-80 min-w-[min(760px,calc(100vw-80px))] max-w-[calc(100vw-40px)] flex-col overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b px-2 py-1 text-xs text-muted-foreground">
+              {isLoading ? (
+                <span>Đang tìm kiếm...</span>
+              ) : isError ? (
+                <span className="text-destructive">Không thể tải danh sách. Vui lòng thử lại.</span>
+              ) : (
+                <span>{partnerSearchSummary({ count: results.length, noun, activeOnly: !!activeOnly })}</span>
+              )}
+              <span>{onAddNew ? '↑↓ duyệt · Enter chọn · F4 thêm mới · Esc đóng' : '↑↓ duyệt · Enter chọn · Esc đóng'}</span>
+            </div>
+            <div className="overflow-auto">
+              {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-to-interactive-role -- WAI-ARIA combobox listbox pattern */}
+              <table className="qldh-lookup-table" id={listboxId} role="listbox">
+                <thead className="qldh-lookup-table-header">
                   <tr>
-                    <td colSpan={5} className="px-2 py-3 text-center text-muted-foreground">
-                      Đang tìm kiếm...
-                    </td>
+                    <th className="px-2 py-1">Mã</th>
+                    <th className="px-2 py-1">Tên</th>
+                    <th className="px-2 py-1">MST</th>
+                    <th className="px-2 py-1">Địa chỉ</th>
+                    <th className="px-2 py-1">SĐT</th>
+                    <th className="px-2 py-1">Loại</th>
                   </tr>
-                )}
-                {!isLoading && isError && (
-                  <tr>
-                    <td colSpan={5} className="px-2 py-3 text-center text-destructive">
-                      Không thể tải danh sách đối tượng. Vui lòng thử lại.
-                    </td>
-                  </tr>
-                )}
-                {!isLoading && !isError && results.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-2 py-3 text-center text-muted-foreground">
-                      Không tìm thấy đối tượng phù hợp
-                    </td>
-                  </tr>
-                )}
-                {!isLoading &&
-                  !isError &&
-                  results.map((p, i) => {
-                    const highlighted = i === highlightedIndex;
-                    return (
-                      <tr
-                        key={p.id}
-                        id={`partner-option-${p.id}`}
-                        role="option"
-                        aria-selected={highlighted}
-                        onMouseDown={(e) => {
-                          // Avoid blur before the selection runs.
-                          e.preventDefault();
-                          selectPartner(p);
-                        }}
-                        onMouseEnter={() => setHighlightedIndex(i)}
-                        className={cn('cursor-pointer border-t', highlighted && 'qldh-lookup-row-highlight')}
-                      >
-                        <td className="px-2 py-1 align-top">{p.code}</td>
-                        <td className="px-2 py-1 align-top">{p.name}</td>
-                        <td className="px-2 py-1 align-top text-muted-foreground">{p.taxCode ?? ''}</td>
-                        <td className="px-2 py-1 align-top text-muted-foreground">{p.companyAddress ?? ''}</td>
-                        <td className="px-2 py-1 align-top">
-                          <span className="flex gap-1">
-                            {p.isCustomer && <Badge variant="secondary">Khách hàng</Badge>}
-                            {p.isSupplier && <Badge variant="secondary">NCC</Badge>}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {!isLoading && !isError && results.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-2 py-3 text-center text-muted-foreground">
+                        {`Không tìm thấy ${noun} "${keyword.trim()}"`}
+                      </td>
+                    </tr>
+                  )}
+                  {!isLoading &&
+                    !isError &&
+                    results.map((p, i) => {
+                      const highlighted = i === highlightedIndex;
+                      return (
+                        <tr
+                          key={p.id}
+                          id={`partner-option-${p.id}`}
+                          role="option"
+                          aria-selected={highlighted}
+                          onMouseDown={(e) => {
+                            // Avoid blur before the selection runs.
+                            e.preventDefault();
+                            selectPartner(p);
+                          }}
+                          onMouseEnter={() => setHighlightedIndex(i)}
+                          className={cn('cursor-pointer border-t', highlighted && 'qldh-lookup-row-highlight')}
+                        >
+                          <td className="px-2 py-1 align-top">{p.code}</td>
+                          <td className="px-2 py-1 align-top">{p.name}</td>
+                          <td className="px-2 py-1 align-top text-muted-foreground">{p.taxCode ?? ''}</td>
+                          <td className="px-2 py-1 align-top text-muted-foreground">{p.companyAddress ?? ''}</td>
+                          <td className="px-2 py-1 align-top text-muted-foreground">{p.phoneNumber ?? ''}</td>
+                          <td className="px-2 py-1 align-top">
+                            <span className="flex gap-1">
+                              {p.isCustomer && <Badge variant="secondary">Khách hàng</Badge>}
+                              {p.isSupplier && <Badge variant="secondary">NCC</Badge>}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

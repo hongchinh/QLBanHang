@@ -215,6 +215,18 @@ describe('StockVoucherListPage', () => {
     expect(new URLSearchParams(search).get('partnerName')).toBe('Công ty Thép Việt');
   });
 
+  it('partner filter list: summary without "đang dùng", SĐT column, no quick add or catalog', async () => {
+    renderPage('In', '/stock-in');
+
+    fireEvent.change(screen.getByPlaceholderText('Lọc theo đối tượng...'), { target: { value: 'NCC' } });
+    const listbox = await screen.findByRole('listbox');
+    expect(screen.getByText('Tìm thấy 1 đối tượng')).toBeInTheDocument();
+    expect(within(listbox).getByRole('columnheader', { name: 'SĐT' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Thêm nhanh/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Xem danh mục đầy đủ')).not.toBeInTheDocument();
+  });
+
   it('stock-out list uses stock-out labels and path, and hides create without stock_out.create', () => {
     useStockVouchersMock.mockReturnValue({
       data: result([{ ...item, id: 'v9', type: 'Out', code: 'PX00009' }]),

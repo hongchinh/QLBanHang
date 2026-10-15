@@ -207,6 +207,34 @@ describe('OpeningDebtPage', () => {
     );
   });
 
+  it('filter list: summary without "đang dùng", SĐT column, no quick add or catalog (page filter)', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.type(screen.getByRole('combobox', { name: 'Lọc đối tượng' }), 'a');
+    await screen.findByRole('option', { name: /NCC04/ });
+    expect(screen.getByText('Tìm thấy 2 đối tượng')).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'SĐT' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Thêm nhanh/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Xem danh mục đầy đủ')).not.toBeInTheDocument();
+  });
+
+  it('filter list: same look in the create dialog (customers of the side)', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: /Thêm/ }));
+    const dialog = await screen.findByRole('dialog');
+    await user.type(within(dialog).getByRole('combobox', { name: 'Đối tượng *' }), 'cat');
+    await within(dialog).findByRole('option', { name: /KH003/ });
+    expect(within(dialog).getByText('Tìm thấy 1 đối tượng')).toBeInTheDocument();
+    expect(within(dialog).getByRole('columnheader', { name: 'SĐT' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /Thêm nhanh/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByText(/Thêm mới/)).not.toBeInTheDocument();
+    expect(within(dialog).queryByText('Xem danh mục đầy đủ')).not.toBeInTheDocument();
+  });
+
   it('creates a receivable debt with due date', async () => {
     const user = userEvent.setup();
     renderPage();

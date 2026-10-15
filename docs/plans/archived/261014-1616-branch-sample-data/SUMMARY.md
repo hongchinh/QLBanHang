@@ -1,6 +1,6 @@
 # Demo branches with sample data (Chi nhánh demo kèm dữ liệu mẫu để đào tạo)
 
-> Created: 2026-10-14 16:16:42 · Based on `qlbanhang/main` at `8135477` (PR #14 executive dashboard merged) · Source design: [brainstorm SUMMARY](../../brainstorms/261014-1601-branch-sample-data/SUMMARY.md), [section-01 dataset spec](../../brainstorms/261014-1601-branch-sample-data/section-01-dataset-spec.md)
+> Created: 2026-10-14 16:16:42 · Based on `qlbanhang/main` at `8135477` (PR #14 executive dashboard merged) · Source design: [brainstorm SUMMARY](../../../brainstorms/261014-1601-branch-sample-data/SUMMARY.md), [section-01 dataset spec](../../../brainstorms/261014-1601-branch-sample-data/section-01-dataset-spec.md)
 
 ## Goal
 
@@ -92,13 +92,15 @@ A **"Xóa chi nhánh demo"** button hard-deletes everything of that branch. When
 
 ## Phases
 
+All phases are complete (2026-10-15). Commits, measurements, deviations, the decisions awaiting the user's confirmation and the open items are in [EXECUTION-REPORT.md](EXECUTION-REPORT.md).
+
 - [x] Phase 00 — Worktree, plan commit and failure baseline (S) — `phase-00-baseline.md`
 - [x] Phase 01 — Foundation: flags, migration, acting identity, contracts, queue, create flag (M) — `phase-01-foundation.md` — done at 41a1b7f; lanes started early from earlier Phase 01 commits (A 49fe77f, B and C 4892a0e, D 7e76e50), see EXECUTION-REPORT
-- [ ] Phase 02a — Lane A: deterministic sample data generator (L) — `phase-02a-generator.md`
-- [ ] Phase 02b — Lane B: runner and background worker (L) — `phase-02b-runner.md`
-- [ ] Phase 02c — Lane C: demo branch hard delete and company scope (L) — `phase-02c-demo-delete-and-scope.md`
-- [ ] Phase 02d — Lane D: frontend (M) — `phase-02d-frontend.md`
-- [ ] Phase 03 — Merge, end-to-end verification, docs (M) — `phase-03-integration-and-verification.md`
+- [x] Phase 02a — Lane A: deterministic sample data generator (L) — `phase-02a-generator.md` — done at 5254b4a, merged as bb7fe9f
+- [x] Phase 02b — Lane B: runner and background worker (L) — `phase-02b-runner.md` — done at ccac812, merged as eacd0e5
+- [x] Phase 02c — Lane C: demo branch hard delete and company scope (L) — `phase-02c-demo-delete-and-scope.md` — done at e82850c, merged as 6793258
+- [x] Phase 02d — Lane D: frontend (M) — `phase-02d-frontend.md` — done at 6f86ec3, merged as b5c7625
+- [x] Phase 03 — Merge, end-to-end verification, docs (M) — `phase-03-integration-and-verification.md` — final verification at 0f3194a; upstream merges f97469e and 423dd0e
 
 **Order:**
 1. 00, then 01.

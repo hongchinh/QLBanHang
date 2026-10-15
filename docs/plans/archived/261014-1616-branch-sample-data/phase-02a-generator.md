@@ -1,12 +1,12 @@
 # Phase 02a — Lane A: deterministic sample data generator
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** L
 **Runs in parallel with:** 02b, 02c, 02d · **Worktree:** `.claude/worktrees/sd-gen` on `feat/branch-sample-data-gen` from `$P01` · **Test DB:** `qldonhang_integtest_sd_gen` (only pure tests run here)
 
 ## Objective
 
-Implement `SampleDataGenerator.Generate(SampleDataGeneratorInput)`. It is a pure function from (branch code, today, owner count) to a `SampleDataPlan` that follows [section-01 of the brainstorm](../../brainstorms/261014-1601-branch-sample-data/section-01-dataset-spec.md):
+Implement `SampleDataGenerator.Generate(SampleDataGeneratorInput)`. It is a pure function from (branch code, today, owner count) to a `SampleDataPlan` that follows [section-01 of the brainstorm](../../../brainstorms/261014-1601-branch-sample-data/section-01-dataset-spec.md):
 - catalog, warehouses, funds and credit limits;
 - opening balances;
 - about 3½ months of documents in strictly increasing time.

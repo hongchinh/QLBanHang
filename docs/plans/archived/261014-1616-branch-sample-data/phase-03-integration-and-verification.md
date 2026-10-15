@@ -1,6 +1,6 @@
 # Phase 03 — Merge, end-to-end verification, docs
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 
 ## Objective
@@ -146,7 +146,7 @@ Never point the app at `qldonhang_test` (the dev DB).
    - **`directory-structure.md`:** `Application/Organization/SampleData/{Models,Interfaces,Services,Generation}`, `WebApi/BackgroundJobs/`, the new frontend files.
    - **`product-goals.md`:** the demo branch feature and its limits (no sample quotations, the S17 cost price limit).
    - **`docs/SUMMARY.md`:** refresh the descriptions of those four docs; mark the plan row "(executed)".
-   - **Brainstorm SUMMARY:** add "Plan: [261014-1616-branch-sample-data](../../plans/261014-1616-branch-sample-data/SUMMARY.md)" under "Next steps".
+   - **Brainstorm SUMMARY:** add `Plan: [261014-1616-branch-sample-data](../../plans/261014-1616-branch-sample-data/SUMMARY.md)` under "Next steps".
 2. Commit: `git add docs && git commit -m "docs: demo branches with sample data"` (check `git status` first: only `docs/` files).
 
 ### Task 3.5 — Final verification and report

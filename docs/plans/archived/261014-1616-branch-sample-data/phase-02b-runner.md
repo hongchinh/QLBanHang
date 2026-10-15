@@ -1,6 +1,6 @@
 # Phase 02b — Lane B: runner and background worker
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** L
 **Runs in parallel with:** 02a, 02c, 02d · **Worktree:** `.claude/worktrees/sd-run` on `feat/branch-sample-data-run` from `$P01` · **Test DB:** `qldonhang_integtest_sd_run`
 

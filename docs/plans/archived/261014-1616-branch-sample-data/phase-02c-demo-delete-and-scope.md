@@ -1,6 +1,6 @@
 # Phase 02c — Lane C: demo branch hard delete and company scope
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** L
 **Runs in parallel with:** 02a, 02b, 02d · **Worktree:** `.claude/worktrees/sd-clean` on `feat/branch-sample-data-clean` from `$P01` · **Test DB:** `qldonhang_integtest_sd_clean`
 

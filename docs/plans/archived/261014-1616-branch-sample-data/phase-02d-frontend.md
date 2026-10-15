@@ -1,6 +1,6 @@
 # Phase 02d — Lane D: frontend
 
-**Status:** [ ] pending
+**Status:** [x] done
 **Complexity:** M
 **Runs in parallel with:** 02a, 02b, 02c · **Worktree:** `.claude/worktrees/sd-fe` on `feat/branch-sample-data-fe` from `$P01` (run `npm ci` in `frontend/` first)
 

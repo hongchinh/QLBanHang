@@ -8,15 +8,15 @@ import type {
   CashVoucherFormParsed,
   CashVoucherFormValues,
 } from '@/features/cash-vouchers/schema';
+import { focusById } from '@/lib/enter-focus';
 import { roundAwayFromZero } from '@/lib/round';
 import { toNumberOrZero } from '@/lib/to-number';
+import { cashLineCellId, cashLineEnterTarget, type CashLineField } from '@/pages/cash-vouchers/utils/cash-navigation';
 import '@/pages/quotations/components/line-items-grid.css';
 
 const fmt = new Intl.NumberFormat('vi-VN');
 
-function cellId(field: 'description' | 'amount' | 'note', idx: number): string {
-  return `cash-line-${field}-${idx}`;
-}
+const CELL_ID = /^cash-line-(description|amount|note)-(\d+)$/;
 
 export interface CashLineGridProps {
   form: UseFormReturn<CashVoucherFormValues, unknown, CashVoucherFormParsed>;
@@ -43,10 +43,11 @@ export function CashLineGrid({ form, readOnly }: CashLineGridProps) {
     form.setValue(`lines.${idx}.${field}` as const, value as never, { shouldDirty: true });
   };
 
+  // A new row starts with the header description (section-01 §2.2).
   const addLine = () => {
-    append(createEmptyCashLine());
+    append(createEmptyCashLine(form.getValues('description') ?? ''));
     const next = fields.length;
-    setTimeout(() => document.getElementById(cellId('description', next))?.focus(), 0);
+    setTimeout(() => focusById(cashLineCellId('description', next), 'select'), 0);
   };
 
   function handleGridKeyDown(e: KeyboardEvent<HTMLDivElement>) {
@@ -54,7 +55,16 @@ export function CashLineGrid({ form, readOnly }: CashLineGridProps) {
     if (e.key === 'Insert' && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
       e.preventDefault();
       addLine();
+      return;
     }
+    if (e.key !== 'Enter' || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
+    const match = CELL_ID.exec((e.target as HTMLElement).id);
+    if (!match) return;
+    e.preventDefault();
+    const target = cashLineEnterTarget(match[1] as CashLineField, Number(match[2]), rows.length, e.shiftKey);
+    if (target.kind === 'cell') focusById(cashLineCellId(target.field, target.index), 'select');
+    else if (target.kind === 'append') addLine();
+    else if (target.kind === 'header-note') focusById('cash-voucher-note');
   }
 
   // "Phiếu phải có ít nhất 1 dòng" sits on the array itself.
@@ -92,33 +102,33 @@ export function CashLineGrid({ form, readOnly }: CashLineGridProps) {
                   <td className="row-no">{idx + 1}</td>
                   <td>
                     <input
-                      id={cellId('description', idx)}
+                      id={cashLineCellId('description', idx)}
                       className="cell-input"
                       aria-label={`Diễn giải dòng ${idx + 1}`}
                       aria-invalid={descriptionError ? true : undefined}
-                      aria-describedby={descriptionError ? `${cellId('description', idx)}-error` : undefined}
+                      aria-describedby={descriptionError ? `${cashLineCellId('description', idx)}-error` : undefined}
                       title={descriptionError}
                       disabled={readOnly}
                       value={line.description ?? ''}
                       onChange={(e) => setLineField(idx, 'description', e.target.value)}
                     />
-                    <CellError id={`${cellId('description', idx)}-error`} message={descriptionError} />
+                    <CellError id={`${cashLineCellId('description', idx)}-error`} message={descriptionError} />
                   </td>
                   <td className="cell-number">
                     <MoneyCell
-                      id={cellId('amount', idx)}
+                      id={cashLineCellId('amount', idx)}
                       label={`Số tiền dòng ${idx + 1}`}
                       value={line.amount === undefined ? undefined : toNumberOrZero(line.amount)}
                       onCommit={(v) => setLineField(idx, 'amount', v ?? 0)}
                       disabled={readOnly}
                       error={amountError}
-                      errorId={`${cellId('amount', idx)}-error`}
+                      errorId={`${cashLineCellId('amount', idx)}-error`}
                     />
-                    <CellError id={`${cellId('amount', idx)}-error`} message={amountError} />
+                    <CellError id={`${cashLineCellId('amount', idx)}-error`} message={amountError} />
                   </td>
                   <td>
                     <input
-                      id={cellId('note', idx)}
+                      id={cashLineCellId('note', idx)}
                       className="cell-input"
                       aria-label={`Ghi chú dòng ${idx + 1}`}
                       aria-invalid={noteError ? true : undefined}
@@ -127,7 +137,7 @@ export function CashLineGrid({ form, readOnly }: CashLineGridProps) {
                       value={line.note ?? ''}
                       onChange={(e) => setLineField(idx, 'note', e.target.value)}
                     />
-                    <CellError id={`${cellId('note', idx)}-error`} message={noteError} />
+                    <CellError id={`${cashLineCellId('note', idx)}-error`} message={noteError} />
                   </td>
                   {!readOnly && (
                     <td className="cell-action">

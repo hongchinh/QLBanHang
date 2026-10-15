@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { CASH_HEADER_FIELD_IDS, cashLineEnterTarget } from './cash-navigation';
+import { CASH_HEADER_FIELD_IDS, cashLineCellId, cashLineEnterTarget } from './cash-navigation';
+
+describe('cashLineCellId', () => {
+  it('is the DOM id of a grid cell', () => expect(cashLineCellId('amount', 3)).toBe('cash-line-amount-3'));
+});
 
 describe('CASH_HEADER_FIELD_IDS (section-01 §2.1)', () => {
   it('is the ten header fields in Enter and DOM order', () =>

@@ -22,7 +22,12 @@ export type CashLineTarget =
   | { kind: 'append' }
   | { kind: 'none' };
 
-const FIELD_ORDER: readonly CashLineField[] = ['description', 'amount', 'note'];
+/** DOM id of a cell of the line grid (lives here, not in the grid file, so the page can import it). */
+export function cashLineCellId(field: CashLineField, index: number): string {
+  return `cash-line-${field}-${index}`;
+}
+
+const FIELD_ORDER:readonly CashLineField[] = ['description', 'amount', 'note'];
 
 /** Where Enter (or Shift+Enter) goes from a cell of the line grid. */
 export function cashLineEnterTarget(

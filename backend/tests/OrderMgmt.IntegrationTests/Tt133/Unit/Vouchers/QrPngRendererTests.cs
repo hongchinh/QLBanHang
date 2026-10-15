@@ -4,7 +4,7 @@ using OrderMgmt.Infrastructure.Qr;
 using SkiaSharp;
 using Xunit;
 using ZXing;
-using ZXing.SkiaSharp;
+using ZXing.Common;
 
 namespace OrderMgmt.IntegrationTests.Tt133.Unit.Vouchers;
 
@@ -16,8 +16,20 @@ public class QrPngRendererTests
     private static Result Decode(byte[] png)
     {
         using var bitmap = SKBitmap.Decode(png);
-        var reader = new BarcodeReader { AutoRotate = false, Options = { TryHarder = true, PossibleFormats = [BarcodeFormat.QR_CODE] } };
-        return reader.Decode(bitmap);
+        var gray = new byte[bitmap.Width * bitmap.Height];
+        for (var y = 0; y < bitmap.Height; y++)
+            for (var x = 0; x < bitmap.Width; x++)
+            {
+                var pixel = bitmap.GetPixel(x, y);
+                gray[y * bitmap.Width + x] = (byte)((pixel.Red * 299 + pixel.Green * 587 + pixel.Blue * 114) / 1000);
+            }
+        var source = new RGBLuminanceSource(gray, bitmap.Width, bitmap.Height, RGBLuminanceSource.BitmapFormat.Gray8);
+        var reader = new BarcodeReaderGeneric
+        {
+            AutoRotate = false,
+            Options = new DecodingOptions { TryHarder = true, PossibleFormats = [BarcodeFormat.QR_CODE] },
+        };
+        return reader.Decode(source);
     }
 
     [Fact]

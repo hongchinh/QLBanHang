@@ -74,4 +74,23 @@ public class DashboardEndpointsTests : DashboardTestBase
         cancelledRow!.Code.Should().Be("BG-RA-X");
         cancelledRow.Amount.Should().Be(300m);
     }
+
+    [Fact]
+    public async Task TotalCount_spark_counts_quotations_by_date()
+    {
+        await CreateTestUserAsync("dash_sp", "Sales@123", RoleCodes.Sales);
+        var sale = await GetUserIdAsync("dash_sp");
+        var today = DateOnly.FromDateTime(DateTime.Now);
+
+        // Drafts: the spark counts quotations by QuotationDate, not only those that pass the revenue rule.
+        await SeedQuotationAsync("BG-SP-1", sale, QuotationStatus.Draft, today, 100m);
+        await SeedQuotationAsync("BG-SP-2", sale, QuotationStatus.Draft, today, 100m);
+        await SeedQuotationAsync("BG-SP-3", sale, QuotationStatus.Draft, today.AddDays(-2), 100m);
+
+        await AuthenticateAsync("dash_sp", "Sales@123");
+        var resp = await _client.GetAsync($"/api/dashboard/summary?from={today:yyyy-MM-dd}&to={today:yyyy-MM-dd}");
+        var body = await resp.Content.ReadFromJsonAsync<ApiResponse<DashboardSummaryDto>>(TestJson.Options);
+
+        body!.Data!.TotalCount.Spark.Should().Equal(0m, 0m, 0m, 0m, 1m, 0m, 2m);
+    }
 }

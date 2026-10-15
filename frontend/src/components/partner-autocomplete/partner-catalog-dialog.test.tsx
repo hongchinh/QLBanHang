@@ -309,6 +309,22 @@ describe('PartnerCatalogDialog', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('after a failed detail load a second click loads and selects', async () => {
+    const user = userEvent.setup();
+    customerGet.mockRejectedValueOnce(new Error('boom'));
+    const { p } = renderDialog();
+
+    await user.click(screen.getByText('KH-001').closest('tr')!);
+    await waitFor(() => expect(toastMock).toHaveBeenCalledTimes(1));
+    expect(p.onSelect).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText('KH-001').closest('tr')!);
+
+    await waitFor(() => expect(p.onSelect).toHaveBeenCalledTimes(1));
+    expect(customerGet).toHaveBeenCalledTimes(2);
+    expect(p.onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it('Escape closes the dialog', async () => {
     const { p } = renderDialog();
 

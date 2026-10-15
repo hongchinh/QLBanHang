@@ -243,7 +243,8 @@ describe('CustomerFormFields quick add mode', () => {
     const { onSubmit } = renderFields({ ...FREE, submitting: true, enterNavigation: true, initialName: 'A' });
     screen.getByLabelText('Mã').focus();
     await user.keyboard('{Control>}{Enter}{/Control}');
-    screen.getByLabelText('Ghi chú').focus();
+    // The role boxes are the last fields in this mode: Enter on the last one is the "submit" step.
+    screen.getByLabelText('Là nhà cung cấp').focus();
     await user.keyboard('{Enter}');
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(onSubmit).not.toHaveBeenCalled();

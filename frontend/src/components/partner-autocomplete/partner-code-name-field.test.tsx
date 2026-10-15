@@ -413,6 +413,72 @@ describe('quick add and catalog', () => {
     expect(codeInput()).toHaveValue('Công ty An Phát');
   });
 
+  it('a save that finishes after the dialog was cancelled and reopened is not picked into the second open', async () => {
+    const user = userEvent.setup();
+    let resolve!: (c: Customer) => void;
+    createCustomerFn.mockReturnValue(new Promise<Customer>((r) => (resolve = r)));
+    const { onSelect } = renderHarness();
+
+    typeInCode('Công ty An Phát');
+    fireEvent.keyDown(codeInput(), { key: 'F4' });
+    await user.click(await screen.findByRole('button', { name: 'Tạo mới' }));
+    await waitFor(() => expect(createCustomerFn).toHaveBeenCalledTimes(1));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(codeInput()).toHaveFocus());
+
+    fireEvent.keyDown(codeInput(), { key: 'F4' });
+    await screen.findByRole('dialog');
+    await waitFor(() => expect(dialog().getByLabelText('Tên *')).toHaveFocus());
+    await act(async () => {
+      resolve(record());
+    });
+
+    expect(onSelect).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toContainElement(document.activeElement as HTMLElement);
+  });
+
+  it('ignores a catalog row whose details finish loading after the user cancelled the catalog', async () => {
+    const user = userEvent.setup();
+    let resolve!: (c: Customer) => void;
+    customerGet.mockReturnValue(new Promise<Customer>((r) => (resolve = r)));
+    const { onSelect } = renderHarness();
+
+    typeInCode('abc');
+    await user.click(await screen.findByText('Xem danh mục đầy đủ'));
+    await user.click(await dialog().findByText('Công ty ABC'));
+    await waitFor(() => expect(customerGet).toHaveBeenCalledTimes(1));
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await act(async () => {
+      resolve(record({ id: 'id-1', code: 'KH-001', name: 'Công ty ABC' }));
+    });
+
+    expect(onSelect).not.toHaveBeenCalled();
+    await waitFor(() => expect(codeInput()).toHaveFocus());
+    expect(codeInput()).toHaveValue('abc');
+  });
+
+  it('a pick from the catalog does not leak its focus choice into a later cancelled quick add', async () => {
+    const user = userEvent.setup();
+    renderHarness();
+
+    typeInCode('abc');
+    await user.click(await screen.findByText('Xem danh mục đầy đủ'));
+    await user.click(await dialog().findByText('Công ty ABC'));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(nameInput()).toHaveFocus());
+
+    codeInput().focus();
+    fireEvent.keyDown(codeInput(), { key: 'F4' });
+    await screen.findByRole('dialog');
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(codeInput()).toHaveFocus());
+  });
+
   it.each([
     ['Esc', async (user: ReturnType<typeof userEvent.setup>) => user.keyboard('{Escape}')],
     ['Hủy', async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Hủy' }))],
@@ -502,6 +568,24 @@ describe('quick add and catalog', () => {
     await user.keyboard('{Enter}{Enter}{Enter}');
     fireEvent.keyDown(document.activeElement as Element, { key: 's', ctrlKey: true });
     await user.keyboard('{Control>}{Enter}{/Control}');
+
+    await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
+    expect(outerSubmit).not.toHaveBeenCalled();
+    expect(outerKey).not.toHaveBeenCalled();
+  });
+
+  it('Enter and Ctrl+S in the catalog search box never submit the voucher form nor reach its key handler', async () => {
+    const user = userEvent.setup();
+    const { onSelect, outerSubmit, outerKey } = renderHarness({}, true);
+
+    typeInCode('abc');
+    await user.click(await screen.findByText('Xem danh mục đầy đủ'));
+    const search = await dialog().findByRole('textbox');
+    await dialog().findByText('Công ty ABC');
+    outerKey.mockClear();
+
+    fireEvent.keyDown(search, { key: 's', ctrlKey: true });
+    fireEvent.keyDown(search, { key: 'Enter' });
 
     await waitFor(() => expect(onSelect).toHaveBeenCalledTimes(1));
     expect(outerSubmit).not.toHaveBeenCalled();

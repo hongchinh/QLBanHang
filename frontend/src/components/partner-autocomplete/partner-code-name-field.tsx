@@ -43,6 +43,29 @@ export interface PartnerCodeNameFieldProps {
 
 const CUSTOMER_CODE_PLACEHOLDER = 'Nhập mã / tên / MST / địa chỉ / SĐT...';
 
+// Open state of a dialog plus a token per opening. Closing retires the token, so the callbacks a dialog handed out
+// during an earlier opening (a save or a detail load that finishes after Esc, even after reopening) become no-ops.
+function useDialogOpening() {
+  const current = useRef(0);
+  const [state, setState] = useState({ open: false, seed: '', token: 0 });
+  const renderToken = state.token;
+  return {
+    open: state.open,
+    seed: state.seed,
+    show(seed: string) {
+      current.current += 1;
+      setState({ open: true, seed, token: current.current });
+    },
+    onOpenChange(open: boolean) {
+      if (renderToken !== current.current) return;
+      if (!open) current.current += 1;
+      setState((s) => ({ ...s, open }));
+    },
+    // Only for the callbacks of this render; true while its opening is still the current one.
+    isCurrent: () => renderToken === current.current,
+  };
+}
+
 // Label, partner code combobox and partner name input in one inline row. The code combobox only picks active
 // partners and never needs a reason; the name input belongs to the caller (it may differ from the partner's name).
 export function PartnerCodeNameField({
@@ -72,17 +95,12 @@ export function PartnerCodeNameField({
   const { canCreateCustomer, canCreateSupplier, canViewCustomer, canViewSupplier } = usePartnerPermissions();
   const canAdd = !disabled && (isCustomer ? canCreateCustomer : canCreateCustomer || canCreateSupplier);
   const canOpenCatalog = !disabled && (isCustomer ? canViewCustomer : canViewCustomer || canViewSupplier);
-  const [quickAdd, setQuickAdd] = useState({ open: false, seed: '' });
-  const [catalog, setCatalog] = useState({ open: false, seed: '' });
+  const quickAdd = useDialogOpening();
+  const catalog = useDialogOpening();
   // A pick from a dialog keeps the focus on the name input; a cancel returns it to the code input.
   const skipRestoreFocus = useRef(false);
   const pickTimer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(pickTimer.current), []);
-  // The quick add can finish after the user cancelled it while saving: that late result is not picked.
-  const quickAddOpenRef = useRef(false);
-  useEffect(() => {
-    quickAddOpenRef.current = quickAdd.open;
-  }, [quickAdd.open]);
 
   function pick(item: PartnerSearchItem) {
     skipRestoreFocus.current = true;
@@ -95,6 +113,8 @@ export function PartnerCodeNameField({
     e.preventDefault();
     if (skipRestoreFocus.current) {
       skipRestoreFocus.current = false;
+      // The timer set by pick may have run before this close; Radix's trap would then have taken the focus back.
+      focusById(nameInputId, 'end');
       return;
     }
     focusById(codeInputId);
@@ -125,7 +145,7 @@ export function PartnerCodeNameField({
             canAdd
               ? (seed) => {
                   skipRestoreFocus.current = false;
-                  setQuickAdd({ open: true, seed });
+                  quickAdd.show(seed);
                 }
               : undefined
           }
@@ -133,7 +153,7 @@ export function PartnerCodeNameField({
             canOpenCatalog
               ? (seed) => {
                   skipRestoreFocus.current = false;
-                  setCatalog({ open: true, seed });
+                  catalog.show(seed);
                 }
               : undefined
           }
@@ -155,12 +175,12 @@ export function PartnerCodeNameField({
       <StopFormEvents>
         <PartnerQuickAddDialog
           open={quickAdd.open}
-          onOpenChange={(open) => setQuickAdd((q) => ({ ...q, open }))}
+          onOpenChange={quickAdd.onOpenChange}
           initialName={quickAdd.seed}
           scope={scope}
           preferredRole={preferredRole}
           onCreated={(created) => {
-            if (quickAddOpenRef.current) pick(created);
+            if (quickAdd.isCurrent()) pick(created);
           }}
           onCloseAutoFocus={handleCloseAutoFocus}
         />
@@ -168,11 +188,13 @@ export function PartnerCodeNameField({
       <StopFormEvents>
         <PartnerCatalogDialog
           open={catalog.open}
-          onOpenChange={(open) => setCatalog((c) => ({ ...c, open }))}
+          onOpenChange={catalog.onOpenChange}
           initialQuery={catalog.seed}
           scope={scope}
           preferredRole={preferredRole}
-          onSelect={pick}
+          onSelect={(partner) => {
+            if (catalog.isCurrent()) pick(partner);
+          }}
           onCloseAutoFocus={handleCloseAutoFocus}
         />
       </StopFormEvents>

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getErrorMessage } from '@/lib/api-client';
+import { useReplaceSearchParams } from '@/lib/use-search-param-state';
 import { formatDateOnly } from '@/lib/date-only';
 import { cn, formatCurrencyVnd } from '@/lib/utils';
 import { todayYmd } from '@/lib/vn-datetime';
@@ -21,7 +22,8 @@ const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 // Công nợ theo chứng từ: open documents per partner as at a date. Route permission: reports.debt.
 // Filters live in the URL so other screens can open it for one partner.
 export function DebtDocumentsPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const setParams = useReplaceSearchParams();
   const side = parseDebtSide(searchParams.get('side'));
   const at = searchParams.get('at') || todayYmd();
   const partnerId = searchParams.get('partnerId') || undefined;
@@ -31,19 +33,16 @@ export function DebtDocumentsPage() {
 
   const updateParams = useCallback(
     (patch: Record<string, string | null>) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          for (const [key, value] of Object.entries(patch)) {
-            if (value) next.set(key, value);
-            else next.delete(key);
-          }
-          return next;
-        },
-        { replace: true },
-      );
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
+        return next;
+      });
     },
-    [setSearchParams],
+    [setParams],
   );
 
   const matched = partnerId ? report?.groups.find((g) => g.partnerId === partnerId) : undefined;

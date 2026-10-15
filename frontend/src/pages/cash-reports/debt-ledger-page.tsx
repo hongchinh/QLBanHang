@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { tt133FileBase, type ExportFormat, type Tt133ExportForm } from '@/features/tt133-export/types';
 import { useTt133Download } from '@/features/tt133-export/use-tt133-download';
 import { getErrorMessage } from '@/lib/api-client';
+import { useReplaceSearchParams } from '@/lib/use-search-param-state';
 import { firstDayOfMonthYmd, todayYmd } from '@/lib/vn-datetime';
 import { parseDebtSide } from './document-link';
 import { DebtLedgerTable } from './debt-ledger-table';
@@ -26,7 +27,8 @@ const SIDES: DebtSide[] = ['Receivable', 'Payable'];
 // Sổ chi tiết công nợ of one partner and side. Route permission: reports.debt. Filters live in the URL,
 // so the balance report can open it for a partner.
 export function DebtLedgerPage() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
+  const setParams = useReplaceSearchParams();
   const side = parseDebtSide(searchParams.get('side'));
   const partnerId = searchParams.get('partnerId') ?? '';
   const from = searchParams.get('from') || firstDayOfMonthYmd();
@@ -45,19 +47,16 @@ export function DebtLedgerPage() {
 
   const updateParams = useCallback(
     (patch: Record<string, string | null>) => {
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          for (const [key, value] of Object.entries(patch)) {
-            if (value) next.set(key, value);
-            else next.delete(key);
-          }
-          return next;
-        },
-        { replace: true },
-      );
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(patch)) {
+          if (value) next.set(key, value);
+          else next.delete(key);
+        }
+        return next;
+      });
     },
-    [setSearchParams],
+    [setParams],
   );
 
   const selectedLabel =

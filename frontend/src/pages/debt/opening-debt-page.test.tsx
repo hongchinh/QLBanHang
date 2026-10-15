@@ -235,6 +235,24 @@ describe('OpeningDebtPage', () => {
     expect(within(dialog).queryByText('Xem danh mục đầy đủ')).not.toBeInTheDocument();
   });
 
+  it('Enter on typed but unpicked partner text reopens the list instead of submitting the dialog form', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(screen.getByRole('button', { name: /Thêm/ }));
+    const dialog = await screen.findByRole('dialog');
+    const input = within(dialog).getByRole('combobox', { name: 'Đối tượng *' });
+    await user.type(input, 'cat');
+    await within(dialog).findByRole('listbox');
+
+    // Close the list without Escape (Radix would close the whole dialog).
+    fireEvent.mouseDown(within(dialog).getByText('Thêm nợ đầu kỳ'));
+    expect(within(dialog).queryByRole('listbox')).not.toBeInTheDocument();
+
+    expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+    expect(await within(dialog).findByRole('listbox')).toBeInTheDocument();
+  });
+
   it('creates a receivable debt with due date', async () => {
     const user = userEvent.setup();
     renderPage();

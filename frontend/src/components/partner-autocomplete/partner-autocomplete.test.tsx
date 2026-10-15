@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { PartnerAutocomplete } from './partner-autocomplete';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 
@@ -402,5 +402,293 @@ describe('PartnerAutocomplete footer rows', () => {
     await typeAndOpen('zzz');
     expect(screen.queryByText(/Thêm mới/)).not.toBeInTheDocument();
     expect(screen.queryByText('Xem danh mục đầy đủ')).not.toBeInTheDocument();
+  });
+});
+
+describe('PartnerAutocomplete keyboard', () => {
+  type HookResult = { data?: PartnerSearchItem[]; isLoading?: boolean; isFetching?: boolean; isError?: boolean };
+  let hookResult: HookResult;
+  const picked = { id: partners[0].id, code: 'NCC01', name: 'Công ty Thép Việt' };
+
+  function renderField(overrides: Partial<Props> = {}) {
+    const props = {
+      type: 'In',
+      requireReason: false,
+      value: null,
+      onSelect: vi.fn(),
+      onUnpickedChange: vi.fn(),
+      inputId: 'partner',
+      ...overrides,
+    } as Props;
+    const view = render(<PartnerAutocomplete {...props} />);
+    return {
+      props,
+      input: screen.getByRole('combobox') as HTMLInputElement,
+      rerenderWith: (next: Partial<Props>) => view.rerender(<PartnerAutocomplete {...props} {...next} />),
+    };
+  }
+
+  function lastUnpicked(props: Props) {
+    return vi.mocked(props.onUnpickedChange!).mock.lastCall?.[0];
+  }
+
+  async function waitDebounced(keyword: string) {
+    await waitFor(() => expect(usePartnerSearchMock.mock.lastCall?.[1]).toBe(keyword));
+  }
+
+  const settle = () => act(async () => { await new Promise((r) => setTimeout(r, 400)); });
+
+  beforeEach(() => {
+    hookResult = { data: partners, isLoading: false, isError: false };
+    usePartnerSearchMock.mockReset();
+    usePartnerSearchMock.mockImplementation(() => hookResult);
+  });
+
+  it('Enter selects the highlighted result and prevents the default', async () => {
+    const { props, input } = renderField();
+    await typeAndOpen('abc');
+    expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+    expect(props.onSelect).toHaveBeenCalledWith(partners[0]);
+  });
+
+  it('an exact code wins over the highlighted row', async () => {
+    const { props, input } = renderField();
+    await typeAndOpen('kh01');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(props.onSelect).toHaveBeenCalledWith(partners[1]);
+  });
+
+  it('Enter before the debounce waits, then selects the exact match when results arrive', async () => {
+    const { props, input } = renderField();
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+    expect(props.onSelect).not.toHaveBeenCalled();
+    await waitFor(() => expect(props.onSelect).toHaveBeenCalledWith(partners[1]));
+  });
+
+  it('stale results (still fetching) are not used by Enter', async () => {
+    hookResult = { data: [partners[0]], isLoading: false, isFetching: true, isError: false };
+    const { props, input, rerenderWith } = renderField();
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    await waitDebounced('KH01');
+    expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+    expect(props.onSelect).not.toHaveBeenCalled();
+
+    hookResult = { data: [partners[1]], isLoading: false, isFetching: false, isError: false };
+    rerenderWith({});
+    await waitFor(() => expect(props.onSelect).toHaveBeenCalledTimes(1));
+    expect(props.onSelect).toHaveBeenCalledWith(partners[1]);
+  });
+
+  it('a waiting Enter with results but no exact match selects the first result', async () => {
+    const { props, input } = renderField();
+    fireEvent.change(input, { target: { value: 'cong' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => expect(props.onSelect).toHaveBeenCalledWith(partners[0]));
+  });
+
+  it('a waiting Enter with 0 results shows the add row selected and never opens the dialog', async () => {
+    hookResult = { data: [], isLoading: false, isError: false };
+    const onAddNew = vi.fn();
+    const { input } = renderField({ onAddNew });
+    fireEvent.change(input, { target: { value: 'zzz' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    const addRow = await screen.findByRole('option', { name: /Thêm mới đối tượng "zzz"/ });
+    expect(addRow).toHaveAttribute('aria-selected', 'true');
+    await settle();
+    expect(onAddNew).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onAddNew).toHaveBeenCalledWith('zzz');
+  });
+
+  it('typing after Enter cancels the waiting', async () => {
+    hookResult = { data: [partners[0]], isLoading: false, isFetching: true, isError: false };
+    const { props, input, rerenderWith } = renderField();
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    await waitDebounced('KH01');
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.change(input, { target: { value: 'KH0' } });
+
+    hookResult = { data: [partners[1]], isLoading: false, isFetching: false, isError: false };
+    rerenderWith({});
+    await waitDebounced('KH0');
+    await settle();
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('Enter with the list closed and text typed prevents the default and reopens the list', async () => {
+    const { input } = renderField();
+    await typeAndOpen('abc');
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+    expect(fireEvent.keyDown(input, { key: 'Enter' })).toBe(false);
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+  });
+
+  it('Enter on an empty input or with a picked value is left to the form', () => {
+    const empty = renderField();
+    expect(fireEvent.keyDown(empty.input, { key: 'Enter' })).toBe(true);
+    cleanup();
+
+    const withValue = renderField({ value: picked });
+    expect(fireEvent.keyDown(withValue.input, { key: 'Enter' })).toBe(true);
+  });
+
+  it('Shift+Enter, Ctrl+Enter and composing Enter are not handled', async () => {
+    const { props, input } = renderField();
+    await typeAndOpen('abc');
+    expect(fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })).toBe(true);
+    expect(fireEvent.keyDown(input, { key: 'Enter', ctrlKey: true })).toBe(true);
+    expect(fireEvent.keyDown(input, { key: 'Enter', isComposing: true })).toBe(true);
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('F4 opens the quick add with the typed text, prevents the default and closes the list', async () => {
+    const onAddNew = vi.fn();
+    const { input } = renderField({ onAddNew });
+    await typeAndOpen('abc');
+    expect(fireEvent.keyDown(input, { key: 'F4' })).toBe(false);
+    expect(onAddNew).toHaveBeenCalledWith('abc');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('F4 with a picked value opens the quick add with an empty name', () => {
+    const onAddNew = vi.fn();
+    const { input } = renderField({ onAddNew, value: picked });
+    fireEvent.keyDown(input, { key: 'F4' });
+    expect(onAddNew).toHaveBeenCalledWith('');
+  });
+
+  it('F4 does nothing without onAddNew or on a disabled field', () => {
+    const plain = renderField();
+    expect(fireEvent.keyDown(plain.input, { key: 'F4' })).toBe(true);
+    cleanup();
+
+    const onAddNew = vi.fn();
+    const locked = renderField({ onAddNew, disabled: true });
+    expect(fireEvent.keyDown(locked.input, { key: 'F4' })).toBe(true);
+    expect(onAddNew).not.toHaveBeenCalled();
+  });
+
+  it('F4 cancels a waiting Enter', async () => {
+    const onAddNew = vi.fn();
+    const { props, input } = renderField({ onAddNew });
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.keyDown(input, { key: 'F4' });
+    await settle();
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it('the + button exists only with onAddNew', () => {
+    renderField();
+    expect(screen.queryByRole('button', { name: /Thêm nhanh/ })).not.toBeInTheDocument();
+  });
+
+  it('the + button is labelled, reachable by Tab, and opens the quick add with the typed text', async () => {
+    const onAddNew = vi.fn();
+    renderField({ onAddNew });
+    await typeAndOpen('abc');
+
+    const button = screen.getByRole('button', { name: 'Thêm nhanh đối tượng (F4)' });
+    expect(button).toHaveAttribute('aria-keyshortcuts', 'F4');
+    expect(button).not.toHaveAttribute('tabindex', '-1');
+    fireEvent.click(button);
+    expect(onAddNew).toHaveBeenCalledWith('abc');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('the + button names customers and is disabled with the field', () => {
+    renderField({ onAddNew: vi.fn(), noun: 'khách hàng', disabled: true });
+    expect(screen.getByRole('button', { name: 'Thêm nhanh khách hàng (F4)' })).toBeDisabled();
+  });
+
+  it('a value set from outside closes the list; clearing it later leaves an empty input and nothing unpicked', async () => {
+    const { props, input, rerenderWith } = renderField();
+    await typeAndOpen('abc');
+    expect(lastUnpicked(props)).toBe(true);
+
+    rerenderWith({ value: picked });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(input).toHaveValue('NCC01');
+
+    rerenderWith({ value: null });
+    expect(input).toHaveValue('');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(lastUnpicked(props)).toBe(false);
+  });
+
+  it('a value set from outside cancels a waiting Enter', async () => {
+    const { props, input, rerenderWith } = renderField();
+    fireEvent.change(input, { target: { value: 'KH01' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    rerenderWith({ value: picked });
+    await settle();
+    expect(props.onSelect).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['partnerType None', { partnerType: 'None' as const }],
+    ['disabled', { disabled: true }],
+  ])('a blocked field (%s) drops its typed text', async (_name, blocked) => {
+    const { props, input, rerenderWith } = renderField();
+    await typeAndOpen('zzz');
+    expect(lastUnpicked(props)).toBe(true);
+
+    rerenderWith(blocked);
+    expect(input).toHaveValue('');
+    expect(lastUnpicked(props)).toBe(false);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['Enter', (input: HTMLElement) => fireEvent.keyDown(input, { key: 'Enter' })],
+    ['mouse', () => fireEvent.mouseDown(screen.getAllByRole('option')[0])],
+  ])('focuses the name input after a pick by %s', async (_name, pick) => {
+    render(
+      <>
+        <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} nameInputId="name" />
+        <input id="name" />
+      </>,
+    );
+    const input = await typeAndOpen('abc');
+    pick(input);
+    await waitFor(() => expect(document.activeElement).toBe(document.getElementById('name')));
+  });
+
+  it('leaves the focus alone after a pick without nameInputId', async () => {
+    render(
+      <>
+        <PartnerAutocomplete type="In" requireReason={false} value={null} onSelect={vi.fn()} />
+        <input id="name" />
+      </>,
+    );
+    const input = await typeAndOpen('abc');
+    input.focus();
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await settle();
+    expect(document.activeElement).toBe(input);
+  });
+
+  it('reports unpicked text: true after typing, false after a pick or after clearing the text', async () => {
+    const { props, input } = renderField();
+    await typeAndOpen('abc');
+    expect(lastUnpicked(props)).toBe(true);
+
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(lastUnpicked(props)).toBe(false);
+
+    fireEvent.change(input, { target: { value: 'x' } });
+    expect(lastUnpicked(props)).toBe(true);
+    fireEvent.change(input, { target: { value: '' } });
+    expect(lastUnpicked(props)).toBe(false);
+  });
+
+  it('reports false for a field that starts with a value', () => {
+    const { props } = renderField({ value: picked });
+    expect(lastUnpicked(props)).toBe(false);
   });
 });

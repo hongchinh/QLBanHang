@@ -2,7 +2,9 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { AppIcon } from '@/components/icons';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { focusById } from '@/lib/enter-focus';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { usePartnerSearch } from '@/features/stock-vouchers/hooks';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
@@ -78,12 +80,16 @@ export function PartnerAutocomplete({
   activeOnly,
   noun = 'đối tượng',
   compact,
+  nameInputId,
   onAddNew,
   onOpenCatalog,
+  onUnpickedChange,
 }: PartnerAutocompleteProps) {
   const [keyword, setKeyword] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
+  // Enter pressed while the results were not yet those of the typed keyword.
+  const [enterWaiting, setEnterWaiting] = useState(false);
 
   const debouncedKeyword = useDebouncedValue(keyword, 250);
   // Exactly one search hook call per render, so the hook order stays stable.
@@ -110,7 +116,10 @@ export function PartnerAutocomplete({
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false);
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setEnterWaiting(false);
+      }
     }
     document.addEventListener('mousedown', onDocClick);
     return () => document.removeEventListener('mousedown', onDocClick);
@@ -145,16 +154,86 @@ export function PartnerAutocomplete({
   }
   const activeOptionId = showDropdown && activeRow ? rowId(activeRow) : undefined;
 
+  // A value from outside (list, quick add, catalog, parent) or a blocked field leaves no typed text behind.
+  const valueId = value?.id;
+  useEffect(() => {
+    if (valueId !== undefined || isDisabled) {
+      setKeyword('');
+      setIsOpen(false);
+      setEnterWaiting(false);
+    }
+  }, [valueId, isDisabled]);
+
+  const hasUnpickedText = !isDisabled && !value && keyword.trim() !== '';
+  const onUnpickedChangeRef = useRef(onUnpickedChange);
+  useEffect(() => {
+    onUnpickedChangeRef.current = onUnpickedChange;
+  });
+  useEffect(() => {
+    onUnpickedChangeRef.current?.(hasUnpickedText);
+  }, [hasUnpickedText]);
+
+  function exactMatch() {
+    const upper = keyword.trim().toUpperCase();
+    return upper.length > 0 ? results.find((r) => r.code.toUpperCase() === upper) : undefined;
+  }
+
   function selectPartner(p: PartnerSearchItem) {
     onSelect(p);
     setKeyword('');
     setIsOpen(false);
+    setEnterWaiting(false);
+    if (nameInputId) setTimeout(() => focusById(nameInputId, 'end'), 0);
+  }
+
+  // The + button, F4 and the add-new row. With a value picked the new partner starts with an empty name.
+  function openQuickAdd() {
+    setIsOpen(false);
+    setEnterWaiting(false);
+    onAddNew?.(value ? '' : keyword.trim());
   }
 
   function activateFooter(kind: 'addNew' | 'catalog') {
+    if (kind === 'addNew') {
+      openQuickAdd();
+      return;
+    }
     setIsOpen(false);
-    (kind === 'addNew' ? onAddNew : onOpenCatalog)?.(keyword.trim());
+    setEnterWaiting(false);
+    onOpenCatalog?.(keyword.trim());
   }
+
+  // Enter with results of the typed keyword: an exact code wins, else the highlighted row.
+  function applyEnter() {
+    const exact = exactMatch();
+    if (exact) {
+      selectPartner(exact);
+      return;
+    }
+    if (!activeRow) return;
+    if (activeRow.kind === 'result') selectPartner(activeRow.item);
+    else activateFooter(activeRow.kind);
+  }
+
+  // The results of a waiting Enter arrived: exact code, else the first result, else just show the add row.
+  function settleWaitingEnter() {
+    setEnterWaiting(false);
+    if (!hasList) return;
+    const pick = exactMatch() ?? results[0];
+    if (pick) {
+      selectPartner(pick);
+    } else {
+      setIsOpen(true);
+      setHighlightedIndex(0);
+    }
+  }
+  const settleWaitingEnterRef = useRef(settleWaitingEnter);
+  useEffect(() => {
+    settleWaitingEnterRef.current = settleWaitingEnter;
+  });
+  useEffect(() => {
+    if (enterWaiting && !pending) settleWaitingEnterRef.current();
+  }, [enterWaiting, pending, data]);
 
   function moveHighlight(step: 1 | -1) {
     if (rows.length === 0) return;
@@ -168,7 +247,28 @@ export function PartnerAutocomplete({
     setTimeout(() => inputRef.current?.focus(), 0);
   }
 
+  function handleEnter(e: KeyboardEvent<HTMLInputElement>) {
+    // Modified or composing Enter belongs to the form / the input method.
+    if (e.shiftKey || e.ctrlKey || e.altKey || e.metaKey || e.nativeEvent.isComposing) return;
+    // Picked or empty: the form walks on.
+    if (isDisabled || value || keyword.trim() === '') return;
+    e.preventDefault();
+    if (!isOpen) setIsOpen(true);
+    else if (pending) setEnterWaiting(true);
+    else applyEnter();
+  }
+
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'F4') {
+      if (!onAddNew || isDisabled) return;
+      e.preventDefault();
+      openQuickAdd();
+      return;
+    }
+    if (e.key === 'Enter') {
+      handleEnter(e);
+      return;
+    }
     if (!isOpen) {
       if (e.key === 'ArrowDown' && keyword.length > 0) {
         e.preventDefault();
@@ -190,60 +290,70 @@ export function PartnerAutocomplete({
         e.preventDefault();
         moveHighlight(e.shiftKey ? -1 : 1);
         break;
-      case 'Enter': {
-        e.preventDefault();
-        if (results.length === 0) return;
-        const upper = keyword.trim().toUpperCase();
-        const exact = upper.length > 0 ? results.find((r) => r.code.toUpperCase() === upper) : undefined;
-        const pick = exact ?? (activeRow?.kind === 'result' ? activeRow.item : undefined);
-        if (pick) selectPartner(pick);
-        break;
-      }
       case 'Escape':
         e.preventDefault();
         setIsOpen(false);
+        setEnterWaiting(false);
         break;
     }
   }
 
   return (
     <div className="space-y-1" ref={containerRef}>
-      <div className="relative">
-        <Input
-          id={inputId}
-          ref={inputRef}
-          value={value ? value.code : keyword}
-          title={value?.name}
-          onChange={(e) => {
-            // Typing while a value is selected starts a new search.
-            if (value) onSelect(null);
-            setKeyword(e.target.value);
-            setIsOpen(e.target.value.length > 0);
-          }}
-          onKeyDown={handleKeyDown}
-          onFocus={() => {
-            if (keyword.length > 0) setIsOpen(true);
-          }}
-          role="combobox"
-          aria-expanded={showDropdown}
-          aria-controls={listboxId}
-          aria-autocomplete="list"
-          aria-activedescendant={activeOptionId}
-          placeholder={effectivePlaceholder}
-          disabled={isDisabled}
-          autoComplete="off"
-          className={cn(compact && 'h-7', value && 'pr-8')}
-        />
-        {value && !isDisabled && (
-          <button
+      <div className="flex items-center gap-1">
+        <div className="relative min-w-0 flex-1">
+          <Input
+            id={inputId}
+            ref={inputRef}
+            value={value ? value.code : keyword}
+            title={value?.name}
+            onChange={(e) => {
+              // Typing while a value is selected starts a new search.
+              if (value) onSelect(null);
+              setEnterWaiting(false);
+              setKeyword(e.target.value);
+              setIsOpen(e.target.value.length > 0);
+            }}
+            onKeyDown={handleKeyDown}
+            onFocus={() => {
+              if (keyword.length > 0) setIsOpen(true);
+            }}
+            role="combobox"
+            aria-expanded={showDropdown}
+            aria-controls={listboxId}
+            aria-autocomplete="list"
+            aria-activedescendant={activeOptionId}
+            placeholder={effectivePlaceholder}
+            disabled={isDisabled}
+            autoComplete="off"
+            className={cn(compact && 'h-7', value && 'pr-8')}
+          />
+          {value && !isDisabled && (
+            <button
+              type="button"
+              aria-label="Bỏ chọn đối tượng"
+              onClick={handleClear}
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              tabIndex={-1}
+            >
+              <AppIcon name="close" />
+            </button>
+          )}
+        </div>
+        {onAddNew && (
+          <Button
             type="button"
-            aria-label="Bỏ chọn đối tượng"
-            onClick={handleClear}
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            tabIndex={-1}
+            variant="outline"
+            size="icon"
+            className={compact ? 'h-7 w-7 shrink-0' : 'shrink-0'}
+            aria-label={`Thêm nhanh ${noun} (F4)`}
+            title={`Thêm nhanh ${noun} (F4)`}
+            aria-keyshortcuts="F4"
+            disabled={isDisabled}
+            onClick={openQuickAdd}
           >
-            <AppIcon name="close" />
-          </button>
+            <AppIcon name="add" />
+          </Button>
         )}
       </div>
 

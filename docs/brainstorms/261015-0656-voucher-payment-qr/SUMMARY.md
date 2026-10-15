@@ -1,6 +1,6 @@
 # QR chuyển khoản trên phiếu thu và phiếu xuất kho
 
-> Brainstorm: 2026-10-15 06:56:58 · Tiếp nối [mẫu in chứng từ TT133](../261013-2042-tt133-voucher-print-forms/SUMMARY.md) (đã hiện thực, PR #15) · Review đối chiếu code: 2026-10-15, đã sửa theo mục [Review đối chiếu code](#review-đối-chiếu-code-2026-10-15) · Trạng thái: **thiết kế đã duyệt**, chưa có plan · Mockup: [vị trí QR trên bản in](mockup-01-print-placement.html), [hộp thoại QR trên màn phiếu](mockup-02-screen-dialog.html). Mockup-01 vẽ trước khi chốt quy tắc số tiền và trước review, nên có hai chỗ khác bản hiện thực: chữ "Còn phải thu" đổi thành "Cần chuyển khoản"; QR trong khung của 02-VT chuyển sang bên phải (R3)
+> Brainstorm: 2026-10-15 06:56:58 · Tiếp nối [mẫu in chứng từ TT133](../261013-2042-tt133-voucher-print-forms/SUMMARY.md) (đã hiện thực, PR #15) · Review đối chiếu code: 2026-10-15, đã sửa theo mục [Review đối chiếu code](#review-đối-chiếu-code-2026-10-15) · Trạng thái: **đã hiện thực** (2026-10-15; [kế hoạch](../../plans/261015-0919-voucher-payment-qr/SUMMARY.md), [kết quả đo và chỗ lệch so với thiết kế](#kết-quả-hiện-thực-2026-10-15), [danh sách kiểm tra trước go-live](../../plans/261015-0919-voucher-payment-qr/GO-LIVE-CHECKLIST.md)) · Mockup: [vị trí QR trên bản in](mockup-01-print-placement.html), [hộp thoại QR trên màn phiếu](mockup-02-screen-dialog.html). Mockup-01 vẽ trước khi chốt quy tắc số tiền và trước review, nên có hai chỗ khác bản hiện thực: chữ "Còn phải thu" đổi thành "Cần chuyển khoản"; QR trong khung của 02-VT chuyển sang bên phải (R3)
 
 ## Problem framing
 
@@ -42,7 +42,7 @@ Còn thiếu một thứ: quỹ ngân hàng (`Fund`) chỉ có `BankName` dạng
 - Phiếu xuất có hình thức thanh toán gắn quỹ thì `PaidAmount` mặc định bằng tổng phiếu. Đây là quy tắc P9 của backend (`StockVoucherService`, khi request không gửi `PaidAmount`); form phiếu xuất cũng tự điền theo quy tắc này. Phiếu có `PaidAmount > 0` thì `FundId` là quỹ của HTTT (quỹ được chọn, hoặc quỹ mặc định cùng loại của chi nhánh), và `AutoCashVoucherService` tự tạo phiếu thu vào quỹ đó với `Total = PaidAmount`. `PaidAmount = 0` thì `FundId = null`. Vì vậy số tiền QR không thể là `Total − PaidAmount`, xem quy tắc dưới.
 - `BankName` của quỹ đang được in ở dòng "Nơi mở tài khoản giao dịch" của sổ S04 (`CashBookForm`), nên giữ nguyên.
 - Brainstorm [thiết kế lại form phiếu thu/chi](../261015-0644-cash-voucher-form-redesign/SUMMARY.md), viết cùng ngày, cũng sửa `cash-voucher-form-page.tsx`. Feature này chỉ thêm `PaymentQrButton` vào hàng nút của trang đó. Plan làm sau phải rebase lên plan làm trước.
-- Thêm một NuGet cho mã nguồn: **QRCoder** (MIT, thuần .NET, `PngByteQRCode` không cần System.Drawing). Thêm hai NuGet chỉ dùng trong test: **ZXing.Net** và **ZXing.Net.Bindings.SkiaSharp**, để đọc PNG và giải mã ngược, kiểm tra mã quét được. SkiaSharp đã có trong Infrastructure.
+- Thêm một NuGet cho mã nguồn: **QRCoder** (MIT, thuần .NET, `PngByteQRCode` không cần System.Drawing). Thêm hai NuGet chỉ dùng trong test: **ZXing.Net** và **ZXing.Net.Bindings.SkiaSharp**, để đọc PNG và giải mã ngược, kiểm tra mã quét được. SkiaSharp đã có trong Infrastructure. *(Khi hiện thực chỉ dùng **ZXing.Net**; xem [kết quả hiện thực](#kết-quả-hiện-thực-2026-10-15).)*
 - `api/cash-vouchers/{id}/payment-qr` và `api/stock-vouchers/{id}/payment-qr` trả dữ liệu theo chi nhánh và quyền, nên **không** được thêm vào `CACHEABLE_API_PREFIXES` của service worker (quy tắc trong [pwa-mobile.md](../../architecture/pwa-mobile.md)).
 
 ## Approaches considered
@@ -277,7 +277,7 @@ Những điểm đã sửa:
 | R8 | P9 được dẫn từ frontend, nhưng đây là quy tắc backend; tài liệu chưa nói `FundId = null` khi `PaidAmount = 0` | Sửa Constraints |
 | R9 | Câu hỏi mở về đường dẫn và quyền của màn Quỹ trả lời được từ code | Link `/funds`, chỉ hiện khi có `cash.catalogs.manage`; bỏ khỏi Open questions |
 | R10 | Radix đóng menu khi bấm `DropdownMenuCheckboxItem` | `onSelect` gọi `preventDefault`; thêm test |
-| R11 | ZXing.Net không tự đọc được PNG trên .NET | Thêm `ZXing.Net.Bindings.SkiaSharp` vào gói chỉ dùng trong test |
+| R11 | ZXing.Net không tự đọc được PNG trên .NET | ~~Thêm `ZXing.Net.Bindings.SkiaSharp` vào gói chỉ dùng trong test~~ Đã làm khác: gói đó phụ thuộc SkiaSharp 4.x trong khi ứng dụng dùng 3.119.x, nên test chỉ thêm `ZXing.Net`, tự đổi PNG sang byte xám bằng SkiaSharp (đã có trong Infrastructure) và đưa cho `RGBLuminanceSource` |
 | R12 | Codebase chưa dùng `navigator.clipboard` ở đâu; API này cần HTTPS | Sao chép lỗi thì báo toast; thêm test |
 | R13 | `payment-qr` trả dữ liệu theo chi nhánh và quyền | Ghi rõ không thêm vào `CACHEABLE_API_PREFIXES` |
 | R14 | Query dùng `qr`, body dùng `includeQr` | Dùng `includeQr` ở cả hai, như `priceMode` |
@@ -285,6 +285,27 @@ Những điểm đã sửa:
 
 ## Next steps
 
-1. `write-plan` theo 5 phase ở trên.
-2. Gửi kế toán các câu hỏi Kế toán/PO ở trên trước go-live.
-3. Cập nhật `docs/project-pdr/product-goals.md` khi hiện thực xong (P5).
+- [x] `write-plan` theo 5 phase ở trên ([kế hoạch](../../plans/261015-0919-voucher-payment-qr/SUMMARY.md)).
+- [ ] Gửi kế toán các câu hỏi Kế toán/PO ở trên trước go-live. Các câu hỏi, cách thiết lập quỹ, bảng quét thử và rủi ro đã được soạn trong [GO-LIVE-CHECKLIST.md](../../plans/261015-0919-voucher-payment-qr/GO-LIVE-CHECKLIST.md); việc gửi và nhận câu trả lời chưa làm.
+- [x] Cập nhật `docs/project-pdr/product-goals.md` khi hiện thực xong (P5), cùng `conventions.md`, `system-architecture.md`, `directory-structure.md` và `pwa-mobile.md`.
+
+## Kết quả hiện thực (2026-10-15)
+
+**Đo trên PDF thật** (LibreOffice, mẫu in thử của plan, Task 3.6):
+
+| Mục | Kết quả |
+|---|---|
+| Bề rộng QR in trên 01-TT (A5 ngang) | 24,9 đến 25,07 mm, ≈ 25 mm như thiết kế |
+| Bề rộng QR in trên 02-VT (A4 dọc) | 24,9 đến 25,07 mm |
+| Khổ trang PDF | 01-TT: A5 ngang 595,3 × 419,6 pt. 02-VT: A4 dọc 595,3 × 841,9 pt |
+| Tỉ lệ co của 01-TT có QR | 71 đến 73 %, nhỏ hơn bản không QR (≈ 81 %) và nhỏ hơn dự đoán "khoảng 0,9" ở trên; nguyên nhân: khổ A5 được co theo chiều cao, mà QR cùng chú thích làm tờ cao hơn |
+| Ảnh QR nhúng | PNG không nén mất dữ liệu, 295 điểm ảnh mỗi cạnh (≈ 6 điểm ảnh mỗi module, QR phiên bản 6, tức 41 module + vùng yên tĩnh 2 × 4 = 49 module, mỗi module ≈ 0,5 mm) |
+| Giải mã | OpenCV giải mã được cả 8 trang mẫu, nội dung trùng payload |
+| 02-VT 40 dòng hàng | 2 trang A4, khối thông tin chuyển khoản và chữ ký cùng nằm ở trang 2 |
+
+Chưa đo bằng giấy in thật và app ngân hàng: đó là bảng quét ở phần 3 của danh sách kiểm tra. Phần chênh lệch tỉ lệ co của A5 là một quyết định của PO (chấp nhận, thu QR còn ≈ 22 mm, hoặc rút ngắn các dòng chú thích), ghi ở phần 5 của danh sách kiểm tra.
+
+**Chỗ khác thiết kế**:
+- Mỗi module khoảng 0,5 mm (QR phiên bản 6), không phải 0,47 mm (phiên bản 7) như dự tính ở trên.
+- Ảnh trong sheet được tính theo tỉ lệ co đo từ chính sheet đã hoàn chỉnh (A5 co theo chiều cao nên chỉ biết sau khi viết xong), không dùng con số 0,9 / 0,81 dự đoán; `VoucherFormBuilder` vẽ lại ảnh ở tỉ lệ thật. Các phương thức là `BeginQrBeside` / `EndQrBeside` (01-TT) và `WritePaymentBlock` (02-VT), không phải `WriteLinesWithQr`.
+- Test dùng `ZXing.Net` thuần, không dùng gói bindings SkiaSharp (R11).

@@ -8,8 +8,8 @@ System design, component interactions, data flows, deployment, and external inte
 
 | File | Description |
 | ---- | ----------- |
-| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile), the executive dashboard (metrics services, scope, routes and permissions, which figures are tested against which report, the real-time `DashboardChanged` SignalR signal), demo branches and sample data (create flow through the queue, worker, runner and business services, acting identity, status and start-up recovery, hard delete order and sample catalog cleanup, company scope excluding demo branches, one dashboard signal per seed), API response, soft-delete/audit, migration/seed, logging and frontend layering |
-| [architecture/pwa-mobile.md](architecture/pwa-mobile.md) | PWA platform matrix (Android, desktop, iOS before and after install), iOS limits and safe-area rules, web push flow from NotificationService to the service worker and the NAVIGATE message, push prompt states, API cache allow-list, hosting (Caddy no-cache, API-origin icons, VAPID) and the manual test checklist |
+| [architecture/system-architecture.md](architecture/system-architecture.md) | Clean Architecture layering, auth/refresh-token flow, RBAC/permission matrix, quotation ownership, dashboard/report/export flow (including the TT133 report form exports, branch/company report scope and the company profile, and the payment QR on receipts and stock-outs: the screen and print flow through `VoucherPaymentQrService`, the access rules and the bank fields of a fund), the executive dashboard (metrics services, scope, routes and permissions, which figures are tested against which report, the real-time `DashboardChanged` SignalR signal), demo branches and sample data (create flow through the queue, worker, runner and business services, acting identity, status and start-up recovery, hard delete order and sample catalog cleanup, company scope excluding demo branches, one dashboard signal per seed), API response, soft-delete/audit, migration/seed, logging and frontend layering |
+| [architecture/pwa-mobile.md](architecture/pwa-mobile.md) | PWA platform matrix (Android, desktop, iOS before and after install), iOS limits and safe-area rules, web push flow from NotificationService to the service worker and the NAVIGATE message, push prompt states, API cache allow-list (the voucher `payment-qr` routes are never cached), hosting (Caddy no-cache, API-origin icons, VAPID) and the manual test checklist |
 
 ## Codebase
 
@@ -17,7 +17,7 @@ Directory structure, entry points, API patterns, and key modules.
 
 | File | Description |
 | ---- | ----------- |
-| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms and voucher prints, the executive dashboard, the real-time signal and the demo branches with `Application/Organization/SampleData` and `WebApi/BackgroundJobs`), API controllers, entry points, runtime artifacts and production configuration keys |
+| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms and voucher prints, the payment QR (`Application/CashDebt/PaymentQr`, `Infrastructure/Qr`, `components/payment-qr`), the executive dashboard, the real-time signal and the demo branches with `Application/Organization/SampleData` and `WebApi/BackgroundJobs`), API controllers, entry points, runtime artifacts and production configuration keys |
 
 ## Code Standard
 
@@ -25,7 +25,7 @@ Conventions, naming rules, tech stack versions, and development workflows.
 
 | File | Description |
 | ---- | ----------- |
-| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and voucher print (`IVoucherPrintService`, `Tt133ExportSupport`, nullable list bodies, selection through table meta) and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets), demo branch and background job patterns (`IActingIdentity` only in background work, `Channel` queue + `BackgroundService` with start-up recovery, the demo hard delete as the soft-delete exception, company-wide queries skip `IsDemo` branches), test doubles through `WithWebHostBuilder` + `ConfigureTestServices`, and the frontend icon registry (`AppIcon`, tones, the lucide import ban) |
+| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and voucher print (`IVoucherPrintService`, `Tt133ExportSupport`, nullable list bodies, selection through table meta), payment QR patterns (pure `VoucherPaymentQrRules`, one resolver for screen and print, `includeQr` default false, the picture sized for paper with the zoom measured from the finished sheet, PNG tests decoded with ZXing.Net, `qrcode.react` at level M, `staleTime: 0` queries, `qr-pref-storage`) and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets), demo branch and background job patterns (`IActingIdentity` only in background work, `Channel` queue + `BackgroundService` with start-up recovery, the demo hard delete as the soft-delete exception, company-wide queries skip `IsDemo` branches), test doubles through `WithWebHostBuilder` + `ConfigureTestServices`, and the frontend icon registry (`AppIcon`, tones, the lucide import ban) |
 
 ## Project PDR
 
@@ -33,7 +33,7 @@ Product goals, use cases, business rules, and constraints.
 
 | File | Description |
 | ---- | ----------- |
-| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms, the TT133 voucher print forms, the executive dashboard and demo branches with sample data, with their limits), planned Round 3 scope and role dashboards, and non-goals |
+| [project-pdr/product-goals.md](project-pdr/product-goals.md) | Product scope around quotation lifecycle, target users, business rules, current modules (inventory, cash & debt, debt reports, the TT133 report forms, the TT133 voucher print forms, the transfer QR on receipts and stock-out vouchers, the executive dashboard and demo branches with sample data, with their limits), planned Round 3 scope and role dashboards, and non-goals |
 
 ## Other
 

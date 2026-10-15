@@ -54,7 +54,7 @@ All service worker logic lives in pure modules (`sw-routes.ts`, `sw-push.ts`) wi
 
 ## API Cache Allow-List
 
-The service worker's `NetworkFirst` cache keys on the URL only; `X-Branch-Id` and `Authorization` are not part of the key. A cached branch-, user- or permission-scoped response would be served to another branch or user on a slow network. So only reference data that is the same for every signed-in user is cached, through the allow-list `CACHEABLE_API_PREFIXES` in `src/lib/sw-routes.ts`. Never add a branch- or user-scoped path there.
+The service worker's `NetworkFirst` cache keys on the URL only; `X-Branch-Id` and `Authorization` are not part of the key. A cached branch-, user- or permission-scoped response would be served to another branch or user on a slow network. So only reference data that is the same for every signed-in user is cached, through the allow-list `CACHEABLE_API_PREFIXES` in `src/lib/sw-routes.ts`. Never add a branch- or user-scoped path there. The transfer QR routes `api/cash-vouchers/{id}/payment-qr` and `api/stock-vouchers/{id}/payment-qr` are branch- and permission-scoped and read from the live fund, so they are never cached (`lib/sw-routes.test.ts` asserts it).
 
 ## Hosting
 

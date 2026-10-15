@@ -125,7 +125,7 @@ Quyết định cho dòng 11: ☐ giữ nguyên (máy tính có thể hiện b�
 
 ### Chữ nhỏ trên giấy
 
-QR in rộng khoảng **25 mm**, mỗi ô vuông của QR chỉ khoảng 0,47 mm. Kiểm thử tự động chỉ chứng minh được file ảnh QR đúng; việc quét được từ **giấy in thật** (dòng 1 đến 3) mới chứng minh được cỡ này đủ lớn với máy in của đơn vị và camera điện thoại. Nếu một app không quét được:
+QR in rộng khoảng **25 mm**, mỗi ô vuông của QR chỉ khoảng 0,5 mm (kết quả đo ở phần 5). Kiểm thử tự động chỉ chứng minh được file ảnh QR đúng; việc quét được từ **giấy in thật** (dòng 1 đến 3) mới chứng minh được cỡ này đủ lớn với máy in của đơn vị và camera điện thoại. Nếu một app không quét được:
 
 - Ghi lại: app nào, khoảng cách quét, máy in nào, giấy in sắc nét hay mờ.
 - Thử in lại ở chất lượng cao hơn. Nếu vẫn không quét được thì báo cho nhóm phát triển, vì lúc đó phải chọn: tăng cỡ QR (tốn thêm chỗ trên giấy) hoặc đổi cách vẽ QR. Không tự sửa.
@@ -150,13 +150,13 @@ Phần này do người thực hiện kế hoạch điền sau khi in thử mẫ
 
 | Mục | Kết quả |
 |---|---|
-| Bề rộng QR in trên **01-TT A5** | (điền sau khi đo) mm |
-| Bề rộng QR in trên **02-VT A4** | (điền sau khi đo) mm |
-| Khổ trang PDF của **01-TT** (kể cả khi có QR) | (điền sau khi đo) |
-| Khổ trang PDF của **02-VT** (có và không có cột Kho) | (điền sau khi đo) |
-| Tỉ lệ co thật của A5 ngang sau khi thêm dòng cho QR | (điền sau khi đo) |
-| Ảnh QR nhúng trong PDF (kích thước điểm ảnh, có bị nén mờ không) | (điền sau khi đo) |
-| Bản in 01-TT có "Lý do nộp" dài vẫn nằm trên **một trang** A5 | (điền sau khi đo) |
+| Bề rộng QR in trên **01-TT A5** | **24,9 đến 25,07 mm** (đo trên PDF do LibreOffice dựng), đúng mục tiêu 25 mm |
+| Bề rộng QR in trên **02-VT A4** | **24,9 đến 25,07 mm** |
+| Khổ trang PDF của **01-TT** (kể cả khi có QR) | A5 ngang, **595,3 × 419,6 pt**. Có QR vẫn là một trang |
+| Khổ trang PDF của **02-VT** (có và không có cột Kho) | A4 dọc, **595,3 × 841,9 pt**. Chưa ghi riêng hai trường hợp có và không có cột Kho. Phiếu 40 dòng hàng in ra 2 trang, khối "Thông tin chuyển khoản" và chữ ký cùng nằm ở trang 2 |
+| Tỉ lệ co thật của A5 ngang sau khi thêm dòng cho QR | **71 đến 73 %**. Phiếu thu **không** có QR co khoảng 81 %, nên phiếu có QR in chữ nhỏ hơn khoảng 8 đến 10 điểm phần trăm. **PO quyết định**: (a) chấp nhận; (b) thu QR còn khoảng 22 mm để tờ bớt cao; (c) rút ngắn các dòng chú thích dưới QR. Phần mềm đang làm theo (a) |
+| Ảnh QR nhúng trong PDF (kích thước điểm ảnh, có bị nén mờ không) | PNG **không nén mất dữ liệu**, 295 × 295 điểm ảnh, khoảng 6 điểm ảnh mỗi module (QR phiên bản 6), không bị nén mờ. OpenCV giải mã được cả **8 trang mẫu** và nội dung khớp từng ký tự với payload. Đây là đo bằng máy, chưa thay thế bảng quét bằng giấy in thật và app ngân hàng ở phần 3 |
+| Bản in 01-TT có "Lý do nộp" dài vẫn nằm trên **một trang** A5 | Chưa đo riêng với lý do dài. Theo thiết kế tờ A5 luôn được co để vừa một trang (`FitToPages(1, 1)`), nên lý do dài làm tỉ lệ co thấp hơn 71 % chứ không sinh trang thứ hai; chữ nhỏ hơn nữa là điều cần nhìn khi in thử |
 
 ## 6. Xác nhận
 

@@ -17,7 +17,7 @@ Directory structure, entry points, API patterns, and key modules.
 
 | File | Description |
 | ---- | ----------- |
-| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms and voucher prints, the executive dashboard, the real-time signal and the demo branches with `Application/Organization/SampleData` and `WebApi/BackgroundJobs`), API controllers, entry points, runtime artifacts and production configuration keys |
+| [codebase/directory-structure.md](codebase/directory-structure.md) | Current backend/frontend tree, feature modules (including inventory, cash & debt, the company profile, the TT133 report forms and voucher prints, the executive dashboard, the real-time signal and the demo branches with `Application/Organization/SampleData` and `WebApi/BackgroundJobs`), API controllers, entry points, runtime artifacts, production configuration keys, the route tree file and the help module |
 
 ## Code Standard
 
@@ -25,7 +25,7 @@ Conventions, naming rules, tech stack versions, and development workflows.
 
 | File | Description |
 | ---- | ----------- |
-| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and voucher print (`IVoucherPrintService`, `Tt133ExportSupport`, nullable list bodies, selection through table meta) and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets), demo branch and background job patterns (`IActingIdentity` only in background work, `Channel` queue + `BackgroundService` with start-up recovery, the demo hard delete as the soft-delete exception, company-wide queries skip `IsDemo` branches), test doubles through `WithWebHostBuilder` + `ConfigureTestServices`, and the frontend icon registry (`AppIcon`, tones, the lucide import ban) |
+| [code-standard/conventions.md](code-standard/conventions.md) | Backend and frontend coding conventions, module patterns, validation, permission guards, migrations, tests, deployment notes, and the inventory (Round 1), cash & debt (Round 2A), TT133 report form and voucher print (`IVoucherPrintService`, `Tt133ExportSupport`, nullable list bodies, selection through table meta) and executive dashboard patterns (metrics services, report comparison tests, `[DashboardSignal]` on write controllers, executive query keys, tile kit, range presets), demo branch and background job patterns (`IActingIdentity` only in background work, `Channel` queue + `BackgroundService` with start-up recovery, the demo hard delete as the soft-delete exception, company-wide queries skip `IsDemo` branches), test doubles through `WithWebHostBuilder` + `ConfigureTestServices`, the frontend icon registry (`AppIcon`, tones, the lucide import ban), and the user help rules (help file per route, `HELP_PENDING`, `help:stale`) |
 
 ## Project PDR
 

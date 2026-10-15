@@ -147,7 +147,35 @@ describe('VoucherPrintButton', () => {
       vouchers: VOUCHERS,
       format: 'xlsx',
       priceMode: 'None',
+      includeQr: false,
     });
+  });
+
+  it('stock-out: the dialog offers the QR and print carries the choice', async () => {
+    const user = userEvent.setup();
+    renderButton({ kind: 'stock', type: 'Out' });
+    await user.click(screen.getByRole('button', { name: 'In' }));
+    await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('checkbox', { name: 'Kèm QR chuyển khoản' })).toBeChecked();
+    await user.click(within(dialog).getByRole('button', { name: 'In' }));
+    expect(printMock).toHaveBeenCalledWith({
+      kind: 'stock',
+      type: 'Out',
+      vouchers: VOUCHERS,
+      format: 'pdf',
+      priceMode: 'Voucher',
+      includeQr: true,
+    });
+  });
+
+  it('stock-in: the dialog has no QR checkbox', async () => {
+    const user = userEvent.setup();
+    renderButton({ kind: 'stock', type: 'In' });
+    await user.click(screen.getByRole('button', { name: 'In' }));
+    await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).queryByRole('checkbox', { name: 'Kèm QR chuyển khoản' })).not.toBeInTheDocument();
   });
 
   it('stock: cancelling the dialog prints nothing', async () => {

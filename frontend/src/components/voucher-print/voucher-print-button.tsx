@@ -71,8 +71,8 @@ export function VoucherPrintButton({
     else void print({ kind, type, vouchers, format, ...(qrEnabled ? { includeQr } : {}) });
   };
   // Runs inside the dialog's "In" click, so a PDF tab can still open in that user gesture.
-  const confirmPriceMode = (priceMode: StockPrintPriceMode) => {
-    if (pendingFormat) void print({ kind, type, vouchers, format: pendingFormat, priceMode });
+  const confirmPriceMode = (priceMode: StockPrintPriceMode, includeQr: boolean) => {
+    if (pendingFormat) void print({ kind, type, vouchers, format: pendingFormat, priceMode, includeQr });
   };
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const title = disabled ? disabledReason : undefined;
@@ -132,6 +132,7 @@ export function VoucherPrintButton({
           open={pendingFormat !== null}
           onOpenChange={(open) => !open && setPendingFormat(null)}
           onConfirm={confirmPriceMode}
+          showQr={type === 'Out'}
           onCloseAutoFocus={returnFocus}
         />
       )}

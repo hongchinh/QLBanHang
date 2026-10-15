@@ -16,7 +16,7 @@ export function BackLink({ to, label }: { to: string; label: string }) {
 /** Parent URL passed by a drill-down through `state.from`, else the fallback. */
 export function useBackTarget(fallback?: string): string | undefined {
   const from = (useLocation().state as { from?: unknown } | null)?.from;
-  return typeof from === 'string' && from.startsWith('/') && !from.startsWith('//') ? from : fallback;
+  return typeof from === 'string' && /^\/(?![/\\])/.test(from) ? from : fallback;
 }
 
 /** State a drill-down parent passes so the child can link back with the same filters. */

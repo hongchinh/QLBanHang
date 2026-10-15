@@ -38,6 +38,7 @@ describe('useBackTarget', () => {
   it.each([
     ['an external url', 'https://evil.example'],
     ['a protocol-relative url', '//evil.example'],
+    ['a backslash url', '/\\evil.example'],
     ['a non-string', 42],
   ])('returns the fallback for %s', (_name, from) => {
     renderAt(<BackTargetProbe fallback="/fallback" />, { pathname: '/x', state: { from } });

@@ -59,6 +59,18 @@ describe('useHelpShortcut', () => {
     expect(useUiStore.getState().helpOpen).toBe(true);
   });
 
+  it('still toggles when a focused element stops the keydown from bubbling', () => {
+    renderHook(() => useHelpShortcut());
+    const child = document.createElement('div');
+    child.addEventListener('keydown', (e) => e.stopPropagation());
+    document.body.appendChild(child);
+    added.push(child);
+    act(() => {
+      child.dispatchEvent(new KeyboardEvent('keydown', { key: 'F1', bubbles: true, cancelable: true }));
+    });
+    expect(useUiStore.getState().helpOpen).toBe(true);
+  });
+
   it('ignores other keys and stops after unmount', () => {
     const { unmount } = renderHook(() => useHelpShortcut());
     press({ key: 'F2' });

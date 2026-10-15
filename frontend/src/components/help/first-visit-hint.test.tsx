@@ -118,6 +118,16 @@ describe('FirstVisitHint', () => {
     expect(useUiStore.getState().helpHintSeen.u1).toContain('stock-out.form');
   });
 
+  it('an open panel counts the screen as seen, and closing it does not bring the hint back', () => {
+    renderHint();
+    expect(screen.getByText(TITLE)).toBeInTheDocument();
+    act(() => useUiStore.getState().openHelp());
+    expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
+    expect(useUiStore.getState().helpHintSeen.u1).toEqual(['stock-out.form']);
+    act(() => useUiStore.getState().closeHelp());
+    expect(screen.queryByText(TITLE)).not.toBeInTheDocument();
+  });
+
   it('shows nothing on a screen without help', () => {
     renderHint('/products');
     expect(screen.queryByText(/Lần đầu dùng/)).not.toBeInTheDocument();

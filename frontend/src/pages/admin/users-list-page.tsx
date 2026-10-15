@@ -6,6 +6,7 @@ import {
   type ColumnDef,
 } from '@tanstack/react-table';
 import { AppIcon } from '@/components/icons';
+import { BackLink } from '@/components/layout/back-link';
 import { useAdminUsers } from '@/features/admin-users/hooks';
 import type { AdminUserListItem } from '@/features/admin-users/types';
 import { useSearchParamString } from '@/lib/use-search-param-state';
@@ -84,11 +85,14 @@ export function UsersListPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">Quản lý người dùng</h1>
-          <p className="text-sm text-muted-foreground">
-            Tạo, sửa, đặt lại mật khẩu, khoá/mở khoá và chuyển nhượng báo giá theo từng user.
-          </p>
+        <div className="flex items-start gap-2">
+          <BackLink to="/settings" label="Cấu hình" />
+          <div>
+            <h1 className="text-2xl font-bold">Quản lý người dùng</h1>
+            <p className="text-sm text-muted-foreground">
+              Tạo, sửa, đặt lại mật khẩu, khoá/mở khoá và chuyển nhượng báo giá theo từng user.
+            </p>
+          </div>
         </div>
         <Can permission="users.create">
           <Button onClick={() => setCreateOpen(true)}>

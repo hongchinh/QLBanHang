@@ -1,6 +1,6 @@
 # Phase 02 — Shared product form
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** M
 
 ## Objective

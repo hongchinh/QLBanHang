@@ -42,10 +42,10 @@ Let users add a missing product from the **Mã hàng** cell of the stock-in, sto
 
 ## Phases
 
-- [ ] Phase 01 — Seed grant (S) — `phase-01-seed-grant.md`
-- [ ] Phase 02 — Shared product form (M) — `phase-02-shared-product-form.md`
-- [ ] Phase 03 — Quick add in the product cell (M) — `phase-03-cell-quick-add.md`
-- [ ] Phase 04 — Wire screens, help and docs (S) — `phase-04-wire-help-docs.md`
+- [x] Phase 01 — Seed grant (S) — `phase-01-seed-grant.md`
+- [x] Phase 02 — Shared product form (M) — `phase-02-shared-product-form.md`
+- [x] Phase 03 — Quick add in the product cell (M) — `phase-03-cell-quick-add.md`
+- [x] Phase 04 — Wire screens, help and docs (S) — `phase-04-wire-help-docs.md`
 
 Phase 01 and Phase 02 are independent of each other. Phase 03 needs Phase 02, and Phase 04 needs Phase 03.
 

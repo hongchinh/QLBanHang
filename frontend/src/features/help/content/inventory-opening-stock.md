@@ -2,7 +2,7 @@
 key: inventory-opening-stock
 title: Tồn đầu kỳ
 routes: [/inventory/opening-stock]
-sources: [frontend/src/pages/inventory/opening-stock-page.tsx, frontend/src/features/opening-stock/**, backend/src/OrderMgmt.Application/Inventory/OpeningStocks/**, frontend/src/pages/stock-vouchers/components/negative-stock-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/lib/use-dialog-opening.ts, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx]
+sources: [frontend/src/pages/inventory/opening-stock-page.tsx, frontend/src/features/opening-stock/**, backend/src/OrderMgmt.Application/Inventory/OpeningStocks/**, frontend/src/pages/stock-vouchers/components/negative-stock-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/lib/use-dialog-opening.ts, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/features/products/split-typed-text.ts]
 related: [stock-in.form, stock-out.form]
 updated: 2026-10-15
 ---

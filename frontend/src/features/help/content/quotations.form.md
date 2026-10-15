@@ -2,7 +2,7 @@
 key: quotations.form
 title: Báo giá
 routes: [/quotations/new, /quotations/:id]
-sources: [frontend/src/pages/quotations/quotation-form-page.tsx, frontend/src/components/partner-autocomplete/**, frontend/src/features/customers/use-quotation-customer-search.ts, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/pages/quotations/components/**, frontend/src/pages/quotations/utils/**, frontend/src/features/quotations/**, backend/src/OrderMgmt.Application/Sales/Quotations/**, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/lib/use-dialog-opening.ts]
+sources: [frontend/src/pages/quotations/quotation-form-page.tsx, frontend/src/components/partner-autocomplete/**, frontend/src/features/customers/use-quotation-customer-search.ts, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/pages/quotations/components/**, frontend/src/pages/quotations/utils/**, frontend/src/features/quotations/**, backend/src/OrderMgmt.Application/Sales/Quotations/**, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/features/products/split-typed-text.ts, frontend/src/lib/use-dialog-opening.ts]
 related: [customers.list]
 updated: 2026-10-15
 ---

@@ -2,7 +2,7 @@
 key: stock-in.form
 title: Phiếu nhập kho
 routes: [/stock-in/new, /stock-in/:id]
-sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/voucher-print/stock-price-mode-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/lib/use-dialog-opening.ts]
+sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/voucher-print/stock-price-mode-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/features/products/split-typed-text.ts, frontend/src/lib/use-dialog-opening.ts]
 related: [stock-out.form]
 updated: 2026-10-15
 ---

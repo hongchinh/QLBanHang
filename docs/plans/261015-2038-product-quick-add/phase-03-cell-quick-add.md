@@ -1,6 +1,6 @@
 # Phase 03 — Quick add in the product cell
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** M
 
 ## Objective

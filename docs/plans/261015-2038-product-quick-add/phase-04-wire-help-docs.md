@@ -1,6 +1,6 @@
 # Phase 04 — Wire screens, help and docs
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** S
 
 ## Objective

@@ -1,6 +1,6 @@
 # Phase 01 — Seed grant
 
-**Status:** [ ] pending
+**Status:** [x] done (2026-10-15)
 **Complexity:** S
 
 ## Objective

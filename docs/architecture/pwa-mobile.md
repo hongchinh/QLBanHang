@@ -21,7 +21,7 @@ How the installable web app behaves on each platform, how a push notification tr
   - Utilities `pt-safe` / `pb-safe` / `pl-safe` / `pr-safe` in `src/index.css` (`env(safe-area-inset-*)`, 0 on desktop and Android).
   - `AppShell` pads left, right and bottom, which covers the header, the push banner, the sticky form bars and every page.
   - The mobile drawer (`fixed`, outside the shell) uses `pt-safe pb-safe pl-safe`.
-  - Elements with their own spacing keep it as a minimum with `max(<spacing>, env(safe-area-inset-*))`: the mobile search sheet, the "Có phiên bản mới" popup and the phone toast viewport.
+  - Elements with their own spacing keep it as a minimum with `max(<spacing>, env(safe-area-inset-*))`: the mobile search sheet, the "Có phiên bản mới" popup and the toast viewport (bottom center on every screen size).
 - The home screen icon is `apple-touch-icon` 180×180 from `GET /api/settings/branding/icon/180`. The renderer paints a solid background (white behind a logo, blue for the placeholder), so iOS never fills transparent pixels with black.
 
 ## Push Flow

@@ -5,8 +5,8 @@ import { dismissToast, useToasts, type ToastVariant } from '@/lib/use-toast';
 
 const variantClasses: Record<ToastVariant, string> = {
   default: 'border bg-background text-foreground',
-  success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-900 dark:text-emerald-100',
-  destructive: 'border-destructive/30 bg-destructive/10 text-destructive',
+  success: 'border-emerald-500/30 bg-emerald-50 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-100',
+  destructive: 'border-destructive/30 bg-red-50 text-destructive dark:border-red-900 dark:bg-red-950 dark:text-red-200',
 };
 
 export function Toaster() {
@@ -24,7 +24,7 @@ export function Toaster() {
           className={cn(
             'group pointer-events-auto relative flex w-full items-start gap-3 overflow-hidden rounded-md p-4 pr-8 shadow-lg',
             'data-[state=open]:animate-in data-[state=closed]:animate-out data-[swipe=end]:animate-out',
-            'data-[state=closed]:fade-out-80 data-[state=open]:slide-in-from-top-full',
+            'data-[state=closed]:fade-out-80 data-[state=open]:slide-in-from-bottom-full',
             variantClasses[t.variant ?? 'default'],
           )}
         >
@@ -53,7 +53,7 @@ export function Toaster() {
           </ToastPrimitive.Close>
         </ToastPrimitive.Root>
       ))}
-      <ToastPrimitive.Viewport className="fixed bottom-0 right-0 z-[100] flex max-h-screen w-full flex-col-reverse gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-4 sm:bottom-auto sm:right-4 sm:top-[72px] sm:flex-col sm:max-w-[420px]" />
+      <ToastPrimitive.Viewport className="pointer-events-none fixed bottom-0 left-1/2 z-[100] flex max-h-screen w-full max-w-[420px] -translate-x-1/2 flex-col-reverse gap-2 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]" />
     </ToastPrimitive.Provider>
   );
 }

@@ -181,9 +181,9 @@ public class VoucherPrintService : IVoucherPrintService
             await EnsureAccessAsync(distinct, rows.ToDictionary(r => r.Id), nameof(StockVoucher),
                 r => StockVoucherPermissions.View(r.Type), r => r.BranchId, token);
 
-            // After the access check. A stock-in or a voucher that gets no QR is simply absent; only the voucher-price
-            // form has the payment block (see ToStockModel).
-            var qrs = includeQr
+            // After the access check. A stock-in or a voucher that gets no QR is simply absent. Only the voucher-price
+            // form has the payment block; a cancelled voucher can turn Cost into None but never into Voucher.
+            var qrs = includeQr && priceMode == StockPrintPriceMode.Voucher
                 ? await _paymentQr.ResolveManyAsync(PaymentQrKind.Stock, rows.Select(r => r.Id).ToList(), token)
                 : new Dictionary<Guid, VoucherPaymentQrDto>();
 

@@ -169,7 +169,7 @@ public class VoucherPrintQrTests : CashDebtTestBase
     {
         var ctx = await NewBranchAsync();
         await CreateQrBankFundAsync("NH01", ctx.BranchId);
-        var v = await CreateStockOutAsync(ctx, "XBH", null, paid: null);
+        var v = await CreateStockOutAsync(ctx, "XBH", null, paid: null, track: true);
 
         var response = await ctx.Client.GetAsync(
             $"/api/stock-vouchers/{v.Id}/print?format=xlsx&priceMode={mode}&includeQr=true");
@@ -177,6 +177,7 @@ public class VoucherPrintQrTests : CashDebtTestBase
         response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
         using var wb = await Tt133Sheet.OpenAsync(response);
         var ws = wb.Worksheets.Single();
+        Tt133Sheet.Contains(ws, "Phiếu không có hàng theo dõi tồn kho.").Should().BeFalse("the form prints a line, so the early return is not what hides the QR");
         ws.Pictures.Count.Should().Be(0, mode);
         Tt133Sheet.Contains(ws, TransferTitle).Should().BeFalse(mode);
     }
@@ -200,8 +201,8 @@ public class VoucherPrintQrTests : CashDebtTestBase
     {
         var ctx = await NewBranchAsync();
         await CreateQrBankFundAsync("NH01", ctx.BranchId);
-        var credit = await CreateStockOutAsync(ctx, "XBH", null, paid: null);
-        var transfer = await CreateStockOutAsync(ctx, "XBH", "CK", paid: null);
+        var credit = await CreateStockOutAsync(ctx, "XBH", null, paid: null, track: true);
+        var transfer = await CreateStockOutAsync(ctx, "XBH", "CK", paid: null, track: true);
         var stockIn = await CreateStockInAsync(ctx);
         var notSale = await CreateStockOutAsync(ctx, "XKH", null, paid: null, partner: false);
         var ids = new List<Guid> { credit.Id, transfer.Id, stockIn.Id, notSale.Id };
@@ -227,7 +228,11 @@ public class VoucherPrintQrTests : CashDebtTestBase
             wb.Worksheets.Should().OnlyContain(w => w.Pictures.Count == 0);
         atCost.StatusCode.Should().Be(HttpStatusCode.OK, await atCost.Content.ReadAsStringAsync());
         using (var wb = await Tt133Sheet.OpenAsync(atCost))
+        {
             wb.Worksheets.Should().OnlyContain(w => w.Pictures.Count == 0);
+            Tt133Sheet.Contains(wb.Worksheets.Single(w => w.Name == credit.Code), "Phiếu không có hàng theo dõi tồn kho.")
+                .Should().BeFalse("the tracked stock-out prints a line at cost");
+        }
     }
 
     // ----- access still wins -----
@@ -312,11 +317,20 @@ public class VoucherPrintQrTests : CashDebtTestBase
         await CreateCashAsync(ctx.Client, CashRequest(CashVoucherType.Receipt, await CashReasonIdAsync("TK"), fundId,
             "2026-10-05 09:00", null, amount));
 
-    /// One untracked line of 1 × 1,000,000. `method` is the payment method code (TM, CK); `paid` null = the default.
+    /// One line of 1 × 1,000,000, untracked unless `track`: then the product is stocked first (10 on 10-04), so the cost
+    /// and no-money forms print a line. `method` is the payment method code (TM, CK); `paid` null = the default.
     private async Task<StockVoucherDto> CreateStockOutAsync(BranchCtx ctx, string reasonCode, string? method, decimal? paid,
-        bool partner = true)
+        bool partner = true, bool track = false)
     {
-        var product = await CreateInventoryProductAsync("SP-" + Guid.NewGuid().ToString("N")[..8], track: false);
+        var product = await CreateInventoryProductAsync("SP-" + Guid.NewGuid().ToString("N")[..8], track: track);
+        if (track)
+        {
+            var stockIn = VoucherRequest(StockDirection.In, await ReasonIdAsync("NKH"), "2026-10-04 09:00",
+                LineRequest(product, 10, 500_000m));
+            stockIn.WarehouseId = ctx.WarehouseId;
+            var (inStatus, _, inError) = await PostVoucherAsync(ctx.Client, stockIn);
+            inStatus.Should().Be(HttpStatusCode.OK, inError?.Message);
+        }
         var request = VoucherRequest(StockDirection.Out, await ReasonIdAsync(reasonCode), "2026-10-05 09:00",
             LineRequest(product, 1, 1_000_000m));
         request.WarehouseId = ctx.WarehouseId;

@@ -24,6 +24,7 @@ Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng 
 - Chọn khách sẽ tự điền Địa chỉ giao, Người nhận, Điện thoại nếu các ô này đang trống. Danh sách gợi ý chỉ hiện khách đang dùng, gồm Mã, Tên, MST, Địa chỉ, SĐT, Loại; Enter chọn dòng đang sáng (mã gõ khớp hoàn toàn được ưu tiên), chọn xong con trỏ sang ô tên; báo giá cũ của khách đã Ngừng sử dụng vẫn mở được, kèm dòng cảnh báo.
 - `F4` hoặc nút **+** (cũng là dòng Thêm mới trong danh sách) mở **Thêm nhanh khách hàng**: Enter đi qua từng ô, `Ctrl Enter` lưu khách mới (không lưu báo giá), `Esc` hủy và về ô mã. Cần quyền tạo khách hàng.
 - `F4` trong ô **Mã hàng**, hoặc dòng **Thêm mới hàng hóa** ở cuối danh sách gợi ý (gõ mã chưa có rồi Enter là chọn dòng này), mở **Thêm nhanh hàng hóa**: chữ đã gõ điền sẵn vào Mã nếu không có dấu cách và không dấu, nếu không thì vào Tên; Enter đi qua từng ô, `Ctrl Enter` hoặc **Lưu và chọn** lưu hàng mới và điền vào dòng (không lưu báo giá), `Esc` hủy và về ô mã. Cần quyền tạo hàng hóa.
+- Lưu hàng mới trong **Thêm nhanh hàng hóa** không được (ví dụ Mã hàng '…' đã tồn tại.) thì lỗi hiện ở đầu hộp thoại và hộp thoại vẫn mở để bạn sửa.
 - Muốn nhập dòng hàng chưa có trong danh mục, gõ mã rồi bấm `Esc` để đóng danh sách; Enter sẽ sang **Tên hàng**.
 - **Xem danh mục đầy đủ** (dòng cuối danh sách) mở danh mục khách hàng; ↑↓ rồi Enter để chọn. Cần quyền xem khách hàng.
 - Hàng tính theo m, m² hoặc m³: **SL** tự tính từ **D × R × Dày × Tấm**, các ô không dùng bị khóa.

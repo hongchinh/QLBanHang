@@ -11,7 +11,7 @@ Tick each item on the day the change reaches a running database.
   - **Kế toán**
   - **Nhân viên kinh doanh**
 
-  The seeder grants it only to new databases (the permission row already exists, so it grants nothing to existing roles). Without it the "Thêm mới hàng hóa" row and F4 are hidden for that role.
+  The seeder grants it only to new databases (the permission row already exists, so it grants nothing to existing roles). Without it the row and the F4 hint are not shown and F4 does nothing for that role.
 - [ ] 2. Note for the admin: with `products.create` these roles can also create products on `/products/new` and create product groups, not only from the Mã hàng cell.
 
 ## Check after deploy

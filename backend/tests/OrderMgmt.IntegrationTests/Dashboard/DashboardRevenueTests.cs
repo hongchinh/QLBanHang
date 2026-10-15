@@ -108,6 +108,37 @@ public class DashboardRevenueTests : ExecutiveDashboardTestBase
         series.Points.Should().ContainSingle().Which.Total.Should().Be(750m);
     }
 
+    [Fact]
+    public async Task Top_customers_by_voucher_revenue()
+    {
+        var data = await SeedAsync();
+
+        var top = await ReadDataAsync<List<TopCustomerDto>>(await data.Branch.Client.GetAsync(
+            "/api/dashboard/top-customers?from=2026-10-01&to=2026-10-31"));
+
+        var customer = top.Should().ContainSingle(c => c.CustomerId == data.CustomerId).Subject;
+        customer.Revenue.Should().Be(750m);
+        // The two sales; the return lowers the revenue but is not a sale.
+        customer.VoucherCount.Should().Be(2);
+        customer.CustomerName.Should().Be(await InDbAsync(db =>
+            db.Customers.Where(c => c.Id == data.CustomerId).Select(c => c.Name).SingleAsync()));
+        top.Should().NotContain(c => c.CustomerId == data.Other.CustomerId);
+    }
+
+    [Fact]
+    public async Task Top_products_signed_quantity()
+    {
+        var data = await SeedAsync();
+
+        var top = await ReadDataAsync<List<TopProductDto>>(await data.Branch.Client.GetAsync(
+            "/api/dashboard/top-products?from=2026-10-01&to=2026-10-31"));
+
+        var product = top.Should().ContainSingle(p => p.ProductId == data.ProductId).Subject;
+        product.Revenue.Should().Be(750m);
+        // 4 + 2 sold, 1 returned.
+        product.Quantity.Should().Be(5m);
+    }
+
     private sealed record SeedData(FreshBranch Branch, Guid ProductId, Guid CustomerId, Guid AdminId, Guid SalesId,
         HttpClient SalesClient, Guid SaleVoucherId, uint SaleVoucherVersion, FreshBranch Other);
 

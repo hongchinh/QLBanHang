@@ -47,7 +47,7 @@ public sealed class TopCustomerDto
     public Guid CustomerId { get; init; }
     public string CustomerName { get; init; } = default!;
     public decimal Revenue { get; init; }
-    public int QuotationCount { get; init; }
+    public int VoucherCount { get; init; }
 }
 
 public sealed class TopProductDto

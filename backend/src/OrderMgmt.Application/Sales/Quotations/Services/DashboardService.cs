@@ -272,45 +272,55 @@ public class DashboardService : IDashboardService
     {
         if (limit <= 0) limit = 5;
         if (to < from) to = from;
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
 
-        return await RevenueFilterHelper.ApplyRevenueFilter(ApplyScope(saleUserId), dateMode, from, to)
-            .GroupBy(q => new { q.CustomerId, q.CustomerName })
-            .Select(g => new TopCustomerDto
+        var counted = await CountedAsync(from, to, saleUserId, ct);
+        var rows = await counted.VoucherRevenues()
+            .Where(v => v.PartnerId != null)
+            .GroupBy(v => v.PartnerId!.Value)
+            // A return lowers the revenue but is not a sale, so it is not counted.
+            .Select(g => new { PartnerId = g.Key, Revenue = g.Sum(v => v.Revenue), Count = g.Count(v => !v.IsReturn) })
+            .ToListAsync(ct);
+        var names = await _lookups.PartnersAsync(rows.Select(r => r.PartnerId).ToList(), ct);
+
+        return rows
+            .Select(r => new TopCustomerDto
             {
-                CustomerId = g.Key.CustomerId,
-                CustomerName = g.Key.CustomerName,
-                Revenue = g.Sum(x => x.Total),
-                QuotationCount = g.Count(),
+                CustomerId = r.PartnerId,
+                CustomerName = names.TryGetValue(r.PartnerId, out var partner) ? partner.Name : string.Empty,
+                Revenue = r.Revenue,
+                VoucherCount = r.Count,
             })
             .OrderByDescending(x => x.Revenue)
+            .ThenBy(x => x.CustomerName, StringComparer.Ordinal)
             .Take(limit)
-            .ToListAsync(ct);
+            .ToList();
     }
 
     public async Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(DateOnly from, DateOnly to, int limit, Guid? saleUserId, CancellationToken ct)
     {
         if (limit <= 0) limit = 5;
         if (to < from) to = from;
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
 
-        var quotationIds = RevenueFilterHelper.ApplyRevenueFilter(ApplyScope(saleUserId), dateMode, from, to)
-            .Select(q => q.Id);
-
-        return await _db.QuotationLines
-            .AsNoTracking()
-            .Where(l => quotationIds.Contains(l.QuotationId))
-            .GroupBy(l => new { l.ProductId, l.ProductName })
-            .Select(g => new TopProductDto
-            {
-                ProductId = g.Key.ProductId,
-                ProductName = g.Key.ProductName,
-                Revenue = g.Sum(l => l.LineTotal),
-                Quantity = g.Sum(l => l.Quantity),
-            })
-            .OrderByDescending(x => x.Revenue)
+        var counted = await CountedAsync(from, to, saleUserId, ct);
+        // Quantity is signed: a return takes its goods off the total.
+        var rows = await counted.LineRevenues(_db.StockVoucherLines)
+            .GroupBy(l => l.ProductId)
+            .Select(g => new { ProductId = g.Key, Revenue = g.Sum(l => l.Revenue), Quantity = g.Sum(l => l.Quantity) })
+            .OrderByDescending(r => r.Revenue)
+            .ThenBy(r => r.ProductId)
             .Take(limit)
             .ToListAsync(ct);
+        var names = await _lookups.ProductsAsync(rows.Select(r => r.ProductId).ToList(), ct);
+
+        return rows
+            .Select(r => new TopProductDto
+            {
+                ProductId = r.ProductId,
+                ProductName = names.TryGetValue(r.ProductId, out var product) ? product.Name : string.Empty,
+                Revenue = r.Revenue,
+                Quantity = r.Quantity,
+            })
+            .ToList();
     }
 
     public async Task<IReadOnlyList<ActivityItemDto>> GetRecentActivityAsync(int limit, CancellationToken ct)

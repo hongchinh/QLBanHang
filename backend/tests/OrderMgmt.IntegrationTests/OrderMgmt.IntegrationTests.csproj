@@ -17,6 +17,8 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="$(EfCoreVersion)" />
     <PackageReference Include="Testcontainers.PostgreSql" Version="3.10.0" />
     <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
+    <PackageReference Include="ZXing.Net.Bindings.SkiaSharp" Version="0.16.24" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\OrderMgmt.WebApi\OrderMgmt.WebApi.csproj" />

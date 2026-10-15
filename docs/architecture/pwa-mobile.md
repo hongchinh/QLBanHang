@@ -1,6 +1,6 @@
 # PWA And Mobile
 
-How the installable web app behaves on each platform, how a push notification travels from the backend to a screen, and what the hosting must provide. Written for round 1 of the manager mobile hub ([brainstorm](../brainstorms/261014-0618-mobile-manager-hub/SUMMARY.md), [plan](../plans/261014-2227-pwa-push-ios-foundation/SUMMARY.md)).
+How the installable web app behaves on each platform, how a push notification travels from the backend to a screen, and what the hosting must provide. Written for round 1 of the manager mobile hub ([brainstorm](../brainstorms/261014-0618-mobile-manager-hub/SUMMARY.md), [plan](../plans/archived/261014-2227-pwa-push-ios-foundation/SUMMARY.md)).
 
 ## Platform Matrix
 

@@ -19,5 +19,5 @@ Xem, tìm, thêm, sửa và xóa danh mục khách hàng. Khách trong danh mụ
 
 ## Lưu ý
 - Nút thêm, sửa, xóa chỉ hiện khi tài khoản của bạn có quyền tương ứng.
-- Khách đã có phiếu nhập/xuất kho, phiếu thu/chi hoặc công nợ không xóa được: hệ thống báo Không thể xóa kèm lý do. Muốn ngưng giao dịch, đặt Trạng thái Ngừng sử dụng trong form sửa khách.
+- Khách đã có phiếu nhập/xuất kho, phiếu thu/chi hoặc công nợ không xóa được: hệ thống báo Không thể xóa kèm lý do. Muốn ngưng giao dịch, đặt Trạng thái Ngừng sử dụng trong màn hình sửa khách.
 - Khách đồng thời là nhà cung cấp chỉ xóa được khi bạn cũng có quyền xóa nhà cung cấp.

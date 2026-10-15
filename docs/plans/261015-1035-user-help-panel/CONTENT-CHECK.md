@@ -69,6 +69,7 @@ Base: qlbanhang/main 1a877638 (unchanged by Task 4.0)
 | Tiền hàng | frontend/src/pages/quotations/components/list-footer.tsx:73 |
 | CK | frontend/src/pages/quotations/components/list-footer.tsx:74 |
 | VC | frontend/src/pages/quotations/components/list-footer.tsx:75 |
+| Tổng | frontend/src/pages/quotations/components/list-footer.tsx:84 (the bold grand total of the footer) |
 | Tạm ứng | frontend/src/pages/quotations/components/list-footer.tsx:86 |
 | Trước | frontend/src/pages/quotations/components/list-footer.tsx:110 |
 | Sau | frontend/src/pages/quotations/components/list-footer.tsx:118 |

@@ -72,7 +72,13 @@ describe('VoucherPrintButton', () => {
     renderButton();
     await user.click(screen.getByRole('button', { name: 'In' }));
     await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
-    expect(printMock).toHaveBeenCalledWith({ kind: 'cash', type: 'Receipt', vouchers: VOUCHERS, format: 'pdf' });
+    expect(printMock).toHaveBeenCalledWith({
+      kind: 'cash',
+      type: 'Receipt',
+      vouchers: VOUCHERS,
+      format: 'pdf',
+      includeQr: true,
+    });
   });
 
   it('prints Excel', async () => {
@@ -80,7 +86,13 @@ describe('VoucherPrintButton', () => {
     renderButton();
     await user.click(screen.getByRole('button', { name: 'In' }));
     await user.click(screen.getByRole('menuitem', { name: 'Excel' }));
-    expect(printMock).toHaveBeenCalledWith({ kind: 'cash', type: 'Receipt', vouchers: VOUCHERS, format: 'xlsx' });
+    expect(printMock).toHaveBeenCalledWith({
+      kind: 'cash',
+      type: 'Receipt',
+      vouchers: VOUCHERS,
+      format: 'xlsx',
+      includeQr: true,
+    });
   });
 
   it('is disabled with a reason', () => {
@@ -110,7 +122,13 @@ describe('VoucherPrintButton', () => {
     renderButton({ variant: 'icon' }, parentClick);
     await user.click(screen.getByRole('button', { name: 'In PT00001' }));
     await user.click(screen.getByRole('menuitem', { name: 'Excel' }));
-    expect(printMock).toHaveBeenCalledWith({ kind: 'cash', type: 'Receipt', vouchers: VOUCHERS, format: 'xlsx' });
+    expect(printMock).toHaveBeenCalledWith({
+      kind: 'cash',
+      type: 'Receipt',
+      vouchers: VOUCHERS,
+      format: 'xlsx',
+      includeQr: true,
+    });
     expect(parentClick).not.toHaveBeenCalled();
   });
 
@@ -181,6 +199,83 @@ describe('VoucherPrintButton', () => {
     await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
     await user.click(await screen.findByRole('button', { name: 'Hủy' }));
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  describe('QR switch in the menu', () => {
+    const QR = 'Kèm QR chuyển khoản';
+    const QR_KEY = 'qldh:voucher-print-qr:u1';
+
+    it.each([
+      ['cash', 'Receipt', true],
+      ['cash', 'Payment', false],
+      ['stock', 'In', false],
+      ['stock', 'Out', false],
+    ] as const)('shows the QR item for receipts only: %s %s', async (kind, type, shown) => {
+      const user = userEvent.setup();
+      renderButton({ kind, type });
+      await user.click(screen.getByRole('button', { name: 'In' }));
+      const item = screen.queryByRole('menuitemcheckbox', { name: QR });
+      if (shown) expect(item).toBeInTheDocument();
+      else expect(item).not.toBeInTheDocument();
+    });
+
+    it('defaults to on and remembers', async () => {
+      const user = userEvent.setup();
+      const { unmount } = renderButton();
+      await user.click(screen.getByRole('button', { name: 'In' }));
+      expect(screen.getByRole('menuitemcheckbox', { name: QR })).toBeChecked();
+      await user.click(screen.getByRole('menuitemcheckbox', { name: QR }));
+      expect(screen.getByRole('menuitemcheckbox', { name: QR })).not.toBeChecked();
+      expect(localStorage.getItem(QR_KEY)).toBe('0');
+      unmount();
+
+      renderButton();
+      await user.click(screen.getByRole('button', { name: 'In' }));
+      expect(screen.getByRole('menuitemcheckbox', { name: QR })).not.toBeChecked();
+    });
+
+    it('menu stays open after the tick', async () => {
+      const user = userEvent.setup();
+      renderButton();
+      await user.click(screen.getByRole('button', { name: 'In' }));
+      await user.click(screen.getByRole('menuitemcheckbox', { name: QR }));
+      expect(screen.getByRole('menu')).toBeInTheDocument();
+      expect(screen.getByRole('menuitem', { name: 'In (PDF)' })).toBeInTheDocument();
+    });
+
+    it('print carries the switch', async () => {
+      const user = userEvent.setup();
+      renderButton();
+      await user.click(screen.getByRole('button', { name: 'In' }));
+      await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
+      expect(printMock).toHaveBeenLastCalledWith({
+        kind: 'cash',
+        type: 'Receipt',
+        vouchers: VOUCHERS,
+        format: 'pdf',
+        includeQr: true,
+      });
+
+      await user.click(screen.getByRole('button', { name: 'In' }));
+      await user.click(screen.getByRole('menuitemcheckbox', { name: QR }));
+      await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
+      expect(printMock).toHaveBeenLastCalledWith({
+        kind: 'cash',
+        type: 'Receipt',
+        vouchers: VOUCHERS,
+        format: 'pdf',
+        includeQr: false,
+      });
+    });
+
+    it('a payment voucher sends no includeQr', async () => {
+      const user = userEvent.setup();
+      renderButton({ type: 'Payment' });
+      await user.click(screen.getByRole('button', { name: 'In' }));
+      await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
+      expect(Object.keys(printMock.mock.calls[0][0])).not.toContain('includeQr');
+      expect(printMock).toHaveBeenCalledWith({ kind: 'cash', type: 'Payment', vouchers: VOUCHERS, format: 'pdf' });
+    });
   });
 
   describe('focus after a print', () => {

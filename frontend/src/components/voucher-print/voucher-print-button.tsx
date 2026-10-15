@@ -4,18 +4,22 @@ import { ButtonLoader } from '@/components/ui/button-loader';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { CompanyProfileHint } from '@/components/tt133-export/company-profile-hint';
 import { StockPriceModeDialog } from './stock-price-mode-dialog';
 import { canTakeFocus, giveFocusBack, isFocusLost } from '@/lib/focus';
+import { readQrPref, writeQrPref } from '@/features/voucher-print/qr-pref-storage';
 import { useVoucherPrint } from '@/features/voucher-print/use-voucher-print';
 import type { StockPrintPriceMode, VoucherPrintKind, VoucherPrintTarget } from '@/features/voucher-print/types';
 import type { ExportFormat } from '@/features/tt133-export/types';
 import type { CashVoucherType } from '@/features/cash-common/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
+import { useAuthStore } from '@/stores/auth-store';
 
 export interface VoucherPrintButtonProps {
   kind: VoucherPrintKind;
@@ -38,6 +42,10 @@ export function VoucherPrintButton({
   disabledReason,
 }: VoucherPrintButtonProps) {
   const { print, isPending } = useVoucherPrint();
+  const userId = useAuthStore((s) => s.user?.id);
+  // Receipts can carry the transfer QR; the menu remembers the switch per user.
+  const qrEnabled = kind === 'cash' && type === 'Receipt';
+  const [includeQr, setIncludeQr] = useState(() => readQrPref(userId));
   const isDisabled = disabled || vouchers.length === 0 || isPending;
   // Stock vouchers ask for the price mode first; the format waits here while the dialog is open.
   const [pendingFormat, setPendingFormat] = useState<ExportFormat | null>(null);
@@ -60,7 +68,7 @@ export function VoucherPrintButton({
   const choose = (format: ExportFormat) => {
     refocusWhenEnabled.current = false; // a stale wish from an earlier dialog must not fire on this print
     if (kind === 'stock') setPendingFormat(format);
-    else void print({ kind, type, vouchers, format });
+    else void print({ kind, type, vouchers, format, ...(qrEnabled ? { includeQr } : {}) });
   };
   // Runs inside the dialog's "In" click, so a PDF tab can still open in that user gesture.
   const confirmPriceMode = (priceMode: StockPrintPriceMode) => {
@@ -103,6 +111,20 @@ export function VoucherPrintButton({
             <AppIcon name="exportExcel" className="mr-2" />
             Excel
           </DropdownMenuItem>
+          {qrEnabled && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuCheckboxItem
+                checked={includeQr}
+                onCheckedChange={(on) => {
+                  setIncludeQr(on);
+                  writeQrPref(userId, on);
+                }}
+                onSelect={(e) => e.preventDefault()}>
+                Kèm QR chuyển khoản
+              </DropdownMenuCheckboxItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
       {kind === 'stock' && (

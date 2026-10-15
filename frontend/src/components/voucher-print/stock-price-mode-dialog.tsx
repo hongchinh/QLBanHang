@@ -12,6 +12,8 @@ import { readQrPref, writeQrPref } from '@/features/voucher-print/qr-pref-storag
 import type { StockPrintPriceMode } from '@/features/voucher-print/types';
 import { useAuthStore } from '@/stores/auth-store';
 
+const QR_DISABLED_REASON = 'Chỉ dùng với Giá trên phiếu';
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -40,6 +42,8 @@ function Body({
     { value: 'None', label: 'Không in tiền' },
   ];
 
+  const qrDisabled = mode !== 'Voucher';
+
   const confirm = () => {
     writePriceMode(userId, mode);
     if (showQr) writeQrPref(userId, includeQr);
@@ -63,17 +67,19 @@ function Body({
         ))}
       </div>
       {showQr && (
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm" title={qrDisabled ? QR_DISABLED_REASON : undefined}>
           <input
             type="checkbox"
             id="stock-print-qr"
             className="h-4 w-4"
             checked={includeQr}
-            disabled={mode !== 'Voucher'}
-            title={mode !== 'Voucher' ? 'Chỉ dùng với Giá trên phiếu' : undefined}
+            disabled={qrDisabled}
+            title={qrDisabled ? QR_DISABLED_REASON : undefined}
             onChange={(e) => setIncludeQr(e.target.checked)}
           />
-          <label htmlFor="stock-print-qr">Kèm QR chuyển khoản</label>
+          <label htmlFor="stock-print-qr" className={qrDisabled ? 'text-muted-foreground' : undefined}>
+            Kèm QR chuyển khoản
+          </label>
         </div>
       )}
       <DialogFooter>

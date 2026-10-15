@@ -95,16 +95,23 @@ describe('StockPriceModeDialog', () => {
 
     it('is disabled for Giá vốn and Không in tiền, keeping the stored choice', async () => {
       setPermissions(['inventory.view_cost']);
+      localStorage.setItem(QR_KEY, '0');
       const user = userEvent.setup();
       const { onConfirm } = setup(true, true);
       await user.click(screen.getByRole('radio', { name: 'Giá vốn' }));
       const box = screen.getByRole('checkbox', { name: QR });
       expect(box).toBeDisabled();
-      expect(box).toBeChecked();
+      expect(box).not.toBeChecked();
       expect(box).toHaveAttribute('title', 'Chỉ dùng với Giá trên phiếu');
+
+      await user.click(screen.getByRole('radio', { name: 'Giá trên phiếu' }));
+      expect(screen.getByRole('checkbox', { name: QR })).toBeEnabled();
+      expect(screen.getByRole('checkbox', { name: QR })).not.toBeChecked();
+
+      await user.click(screen.getByRole('radio', { name: 'Giá vốn' }));
       await user.click(screen.getByRole('button', { name: 'In' }));
       expect(onConfirm).toHaveBeenCalledWith('Cost', false);
-      expect(localStorage.getItem(QR_KEY)).toBe('1');
+      expect(localStorage.getItem(QR_KEY)).toBe('0');
     });
 
     it('Không in tiền disables it and confirms without the QR', async () => {

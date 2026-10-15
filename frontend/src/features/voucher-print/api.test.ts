@@ -109,5 +109,20 @@ describe('fetchVoucherPrint', () => {
       params: { format: 'pdf' },
       body: { ids: ['a', 'b'] },
     });
+    requestBlob.mockClear();
+    await fetchVoucherPrint({
+      kind: 'stock',
+      type: 'Out',
+      vouchers: [a, b],
+      format: 'pdf',
+      priceMode: 'Voucher',
+      includeQr: false,
+    });
+    expect(requestBlob).toHaveBeenCalledWith({
+      method: 'post',
+      url: '/stock-vouchers/print',
+      params: { format: 'pdf' },
+      body: { ids: ['a', 'b'], priceMode: 'Voucher' },
+    });
   });
 });

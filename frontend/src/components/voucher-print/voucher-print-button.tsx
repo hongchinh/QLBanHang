@@ -71,8 +71,8 @@ export function VoucherPrintButton({
     else void print({ kind, type, vouchers, format, ...(qrEnabled ? { includeQr } : {}) });
   };
   // Runs inside the dialog's "In" click, so a PDF tab can still open in that user gesture.
-  const confirmPriceMode = (priceMode: StockPrintPriceMode, includeQr: boolean) => {
-    if (pendingFormat) void print({ kind, type, vouchers, format: pendingFormat, priceMode, includeQr });
+  const confirmPriceMode = (priceMode: StockPrintPriceMode, withQr: boolean) => {
+    if (pendingFormat) void print({ kind, type, vouchers, format: pendingFormat, priceMode, includeQr: withQr });
   };
   const stop = (e: React.SyntheticEvent) => e.stopPropagation();
   const title = disabled ? disabledReason : undefined;
@@ -80,7 +80,11 @@ export function VoucherPrintButton({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <DropdownMenu>
+      {/* Other buttons on the page (rows, bulk) may have changed the stored switch since this one mounted. */}
+      <DropdownMenu
+        onOpenChange={(open) => {
+          if (open && qrEnabled) setIncludeQr(readQrPref(userId));
+        }}>
         <DropdownMenuTrigger asChild>
           {variant === 'icon' ? (
             <Button

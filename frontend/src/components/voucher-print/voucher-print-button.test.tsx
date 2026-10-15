@@ -296,6 +296,31 @@ describe('VoucherPrintButton', () => {
       });
     });
 
+    it('buttons mounted together stay in sync', async () => {
+      const user = userEvent.setup();
+      render(
+        <MemoryRouter>
+          <VoucherPrintButton kind="cash" type="Receipt" vouchers={VOUCHERS} />
+          <VoucherPrintButton kind="cash" type="Receipt" vouchers={VOUCHERS} />
+        </MemoryRouter>,
+      );
+      const [first, second] = screen.getAllByRole('button', { name: 'In' });
+      await user.click(first);
+      await user.click(screen.getByRole('menuitemcheckbox', { name: QR }));
+      await user.keyboard('{Escape}');
+
+      await user.click(second);
+      expect(screen.getByRole('menuitemcheckbox', { name: QR })).not.toBeChecked();
+      await user.click(screen.getByRole('menuitem', { name: 'In (PDF)' }));
+      expect(printMock).toHaveBeenLastCalledWith({
+        kind: 'cash',
+        type: 'Receipt',
+        vouchers: VOUCHERS,
+        format: 'pdf',
+        includeQr: false,
+      });
+    });
+
     it('a payment voucher sends no includeQr', async () => {
       const user = userEvent.setup();
       renderButton({ type: 'Payment' });

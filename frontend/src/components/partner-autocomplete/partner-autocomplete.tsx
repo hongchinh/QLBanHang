@@ -8,6 +8,8 @@ import { usePartnerSearch } from '@/features/stock-vouchers/hooks';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 import type { PartnerType, StockDirection } from '@/features/stock-reasons/types';
 
+export type { PartnerNoun } from './search-summary';
+
 // A partner search hook: `useSearch(keyword, reasonId)`, e.g. the cash voucher partner search.
 export type PartnerSearchHook = (
   keyword: string,

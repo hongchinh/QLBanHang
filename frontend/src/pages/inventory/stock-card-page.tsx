@@ -33,6 +33,7 @@ function ExportProductPicker({ onAdd }: { onAdd: (item: { id: string; label: str
   return (
     <ProductTypeaheadCell
       inputId="stock-card-export-product"
+      openOnFocus={false}
       value={text}
       onChange={setText}
       onSelect={(s) => {
@@ -154,6 +155,7 @@ export function StockCardPage() {
             <Label htmlFor="stock-card-product">Hàng hóa</Label>
             <ProductTypeaheadCell
               inputId="stock-card-product"
+              openOnFocus={false}
               value={productText}
               onChange={setProductText}
               onSelect={selectProduct}

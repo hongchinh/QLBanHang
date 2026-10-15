@@ -3,7 +3,8 @@
 - Date: 2026-10-15
 - Commit under test: `23f8c1fb` (branch `fix/toast-bottom-center`, worktree `toast-bottom-center`). No source file was edited.
 - Browser: Microsoft Edge (`playwright-core`, `channel: 'msedge'`), `serviceWorkers: 'block'`, locale `vi-VN`, `Asia/Ho_Chi_Minh`. Desktop 1280x768; phone 390x844 with `isMobile` and `hasTouch`.
-- Scripts and raw results (including the full request log of each run) are in `browser-check/`: `lib.js`, `setup.js`, `s12.js` (S1+S2), `s3.js`, `s45.js` (S4+S5), `results-*.json`.
+- Layout was measured at `23f8c1fb`; later commits changed only toast colors, not layout.
+- The scripts (`lib.js`, `setup.js`, `s12.js`, `s3.js`, `s45.js`) and the raw results with the full request logs were run and kept outside the repo. `browser-check/` holds only the six screenshots.
 
 ## Summary
 
@@ -30,7 +31,7 @@ Receipt form `/receipts/new`, typed "Khách Mới Thử" in the partner field, F
 
 ## Observations (not defects of this change)
 
-- Toasts are translucent (`bg-emerald-500/10`, `bg-destructive/10`); at the bottom center they sit over table text and the red banner, so the text underneath shows through (`s2-two-toasts.png`, `s3-dialog.png`, `s5-phone.png`). Readable, but busy.
+- Toasts are translucent (`bg-emerald-500/10`, `bg-destructive/10`); at the bottom center they sit over table text and the red banner, so the text underneath shows through (`s2-two-toasts.png`, `s3-dialog.png`, `s5-phone.png`). Readable, but busy. Fixed after the check: opaque `bg-emerald-50` / `bg-red-50` (dark `-950`, dark error text `red-200`), approved by the user.
 - On the phone, the floating round button at the bottom right visually overlaps the toast's right edge; the toast close button (342..366, 760..784) is still reachable.
 - On the phone a first-visit help hint popover (`data-help-hint`) blocked taps on "Lưu tạm" until its "Ẩn" button was tapped. Unrelated to the toast; the S5 script dismisses it first.
 
@@ -48,9 +49,9 @@ Receipt form `/receipts/new`, typed "Khách Mới Thử" in the partner field, F
 - API: `dotnet run --no-launch-profile` from the worktree's `backend/src/OrderMgmt.WebApi` with `ConnectionStrings__Default` and `ConnectionStrings__DefaultConnection` set to the scratch DB, `ASPNETCORE_URLS=http://localhost:5056`, `ASPNETCORE_ENVIRONMENT=Development`, `Database__AutoMigrateAndSeed=true`. The process (`OrderMgmt.WebApi.exe`, path inside the worktree) listened on 5056.
 - Vite: `npx vite --port 5182 --strictPort` from the worktree's `frontend` (`vite.config.ts` unchanged). Port 5050 was never used.
 - Browser routing: `/api/**` rewritten to `http://localhost:5056`; `/hubs/**` aborted and the hub WebSocket closed (`routeWebSocket`), so the notification hub was offline (SignalR error lines in the console are expected).
-- Request logs: every request URL of every context is stored in `results-s12.json` (1133 entries), `results-s3.json` (1109) and `results-s45.json` (2822). Occurrences of `:5050`: 0 in all three; the only hosts are `http://localhost:5182` (page) and the rewritten API calls to 5056 (made by the browser's network stack after the route, not logged as separate URLs). Each script ends with an `assertNo5050()` check that passed.
+- Request logs: every request URL of every context was logged (kept outside the repo) in three result files: S1+S2 (1133 entries), S3 (1109) and S4+S5 (2822). Occurrences of `:5050`: 0 in all three; the only hosts are `http://localhost:5182` (page) and the rewritten API calls to 5056 (made by the browser's network stack after the route, not logged as separate URLs). Each script ends with an `assertNo5050()` check that passed.
 - Cleanup: stopped my API (`OrderMgmt.WebApi.exe` PID 26428, its `dotnet run` PID 6412), my Vite (node PID 29156 and its cmd PID 26592). Nothing listens on 5056 or 5182 (only TIME_WAIT sockets on 5182). `drop database qldonhang_toast_browser with (force)` returned `DROP DATABASE`; `pg_database` has 0 rows with that name.
 
 ## User's look
 
-pending
+2026-10-15 — the user looked at the change on their own screen and approved the bottom-center position, asking for opaque toast backgrounds so the text stays readable over tables (done in the follow-up commits).

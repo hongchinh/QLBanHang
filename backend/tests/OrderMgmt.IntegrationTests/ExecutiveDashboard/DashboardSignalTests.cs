@@ -18,6 +18,7 @@ using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Inventory.StockVouchers.Models;
 using OrderMgmt.Application.Notifications.Interfaces;
+using OrderMgmt.Application.Sales.Quotations.Models;
 using OrderMgmt.Domain.Enums;
 using OrderMgmt.IntegrationTests.Fixtures;
 using OrderMgmt.WebApi.Controllers;
@@ -140,6 +141,78 @@ public class DashboardSignalTests : ExecutiveDashboardTestBase
 
         status.Should().Be(HttpStatusCode.OK, error?.Message);
         (await GetCashAsync(branch.Client, voucher!.Id)).Status.Should().Be(HttpStatusCode.OK, "the receipt is saved");
+    }
+
+    [Fact]
+    public async Task Quotation_create_signals_quotations()
+    {
+        var recorder = new RecordingRealtimeNotifier();
+
+        var response = await RecorderClient(recorder, MainBranchId).PostAsJsonAsync("/api/quotations", BuildRequest());
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        recorder.QuotationSignals.Should().Be(1);
+        recorder.DashboardSignals.Should().BeEmpty("a quotation write names no branch and no domain");
+    }
+
+    [Fact]
+    public async Task Quotation_transition_signals_quotations()
+    {
+        var id = await CreateQuotationAsync();
+        var recorder = new RecordingRealtimeNotifier();
+
+        var response = await RecorderClient(recorder, MainBranchId).PostAsJsonAsync(
+            $"/api/quotations/{id}/transition", new TransitionQuotationRequest { Action = QuotationAction.Send });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        recorder.QuotationSignals.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Quotation_reads_and_exports_send_nothing()
+    {
+        var id = await CreateQuotationAsync();
+        var recorder = new RecordingRealtimeNotifier();
+        var client = RecorderClient(recorder, MainBranchId);
+
+        var list = await client.GetAsync("/api/quotations");
+        var one = await client.GetAsync($"/api/quotations/{id}");
+        var excel = await client.GetAsync($"/api/quotations/{id}/excel");
+
+        list.StatusCode.Should().Be(HttpStatusCode.OK, await list.Content.ReadAsStringAsync());
+        one.StatusCode.Should().Be(HttpStatusCode.OK, await one.Content.ReadAsStringAsync());
+        excel.StatusCode.Should().Be(HttpStatusCode.OK);
+        recorder.QuotationSignals.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Failed_quotation_write_sends_nothing()
+    {
+        var recorder = new RecordingRealtimeNotifier();
+
+        var response = await RecorderClient(recorder, MainBranchId).PutAsJsonAsync(
+            $"/api/quotations/{Guid.NewGuid()}", BuildRequest());
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        recorder.QuotationSignals.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Quotation_notifier_failure_does_not_fail_the_write()
+    {
+        var recorder = new RecordingRealtimeNotifier { ThrowOnQuotationSignal = true };
+
+        var response = await RecorderClient(recorder, MainBranchId).PostAsJsonAsync("/api/quotations", BuildRequest());
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+    }
+
+    /// A draft quotation made through the ordinary host, so that its write is not recorded.
+    private async Task<Guid> CreateQuotationAsync()
+    {
+        var response = await _client.PostAsJsonAsync("/api/quotations", BuildRequest());
+        response.EnsureSuccessStatusCode();
+        return (await ReadDataAsync<QuotationDto>(response)).Id;
     }
 
     /// An admin client working in the branch, on a host of this test's database whose notifier is `recorder`.

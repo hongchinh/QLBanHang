@@ -6,9 +6,11 @@ using OrderMgmt.Application.Sales.Quotations.Interfaces;
 using OrderMgmt.Application.Sales.Quotations.Models;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.WebApi.Authorization;
+using OrderMgmt.WebApi.Filters;
 
 namespace OrderMgmt.WebApi.Controllers;
 
+[QuotationSignal]
 public class QuotationsController : ApiControllerBase
 {
     private readonly IQuotationService _quotations;

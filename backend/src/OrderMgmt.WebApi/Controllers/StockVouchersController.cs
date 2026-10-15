@@ -82,22 +82,25 @@ public class StockVouchersController : ApiControllerBase
     public async Task<ActionResult<ApiResponse<StockVoucherDto>>> Get(Guid id, CancellationToken ct)
         => Success(await _service.GetAsync(id, ct));
 
-    /// 01-VT / 02-VT of one voucher as Excel or PDF, at the voucher's prices, at cost or without money.
+    /// 01-VT / 02-VT of one voucher as Excel or PDF, at the voucher's prices, at cost or without money; `includeQr`
+    /// adds the payment block with the transfer QR to a stock-out printed at the voucher's prices.
     [HttpGet("{id:guid}/print")]
     public async Task<IActionResult> Print(Guid id, [FromQuery] ExportFormat format,
-        [FromQuery] StockPrintPriceMode priceMode = StockPrintPriceMode.Voucher, CancellationToken ct = default)
+        [FromQuery] StockPrintPriceMode priceMode = StockPrintPriceMode.Voucher, [FromQuery] bool includeQr = false,
+        CancellationToken ct = default)
     {
-        var file = await _print.PrintStockVouchersAsync(new[] { id }, priceMode, format, ct);
+        var file = await _print.PrintStockVouchersAsync(new[] { id }, priceMode, format, includeQr, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 
-    /// Several vouchers, one sheet each. A POST because a list of ids does not fit a URL; it changes nothing.
+    /// Several vouchers, one sheet each (`includeQr` in the body adds the QR to each stock-out that gets one). A POST
+    /// because a list of ids does not fit a URL; it changes nothing.
     [HttpPost("print")]
     [SkipDashboardSignal]
     public async Task<IActionResult> PrintMany(
         [FromBody] StockVoucherPrintRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
     {
-        var file = await _print.PrintStockVouchersAsync(request.Ids ?? [], request.PriceMode, format, ct);
+        var file = await _print.PrintStockVouchersAsync(request.Ids ?? [], request.PriceMode, format, request.IncludeQr, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 

@@ -45,21 +45,23 @@ public class CashVouchersController : ApiControllerBase
         return Success(await _service.ListAsync(request, ct));
     }
 
-    /// 01-TT / 02-TT of one voucher as Excel or PDF.
+    /// 01-TT / 02-TT of one voucher as Excel or PDF; `includeQr` adds the transfer QR to a receipt that gets one.
     [HttpGet("{id:guid}/print")]
-    public async Task<IActionResult> Print(Guid id, [FromQuery] ExportFormat format, CancellationToken ct)
+    public async Task<IActionResult> Print(Guid id, [FromQuery] ExportFormat format, [FromQuery] bool includeQr = false,
+        CancellationToken ct = default)
     {
-        var file = await _print.PrintCashVouchersAsync(new[] { id }, format, ct);
+        var file = await _print.PrintCashVouchersAsync(new[] { id }, format, includeQr, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 
-    /// Several vouchers, one sheet each. A POST because a list of ids does not fit a URL; it changes nothing.
+    /// Several vouchers, one sheet each (`includeQr` in the body adds the QR to each receipt that gets one). A POST
+    /// because a list of ids does not fit a URL; it changes nothing.
     [HttpPost("print")]
     [SkipDashboardSignal]
     public async Task<IActionResult> PrintMany(
         [FromBody] CashVoucherPrintRequest request, [FromQuery] ExportFormat format, CancellationToken ct)
     {
-        var file = await _print.PrintCashVouchersAsync(request.Ids ?? [], format, ct);
+        var file = await _print.PrintCashVouchersAsync(request.Ids ?? [], format, request.IncludeQr, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
 

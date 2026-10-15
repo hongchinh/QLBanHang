@@ -1046,6 +1046,20 @@ describe('StockVoucherFormPage', () => {
       expect(screen.getByText('Đã đổi lý do cho hợp với KH01 (khách hàng).')).toHaveAttribute('role', 'status');
     });
 
+    it('a successful update (the form is reset to the saved voucher) removes the notice', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher({ reasonId: R_IN_CUSTOMER, reasonDebtEffect: 'ReceivableDecrease' });
+      updateMock.mockResolvedValue(voucher({ version: 8 }));
+      renderPage('In');
+      await pickPartner(supplier);
+      await screen.findByText('Đã đổi lý do cho hợp với NCC01 (nhà cung cấp).');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+      await waitFor(() => expect(updateMock).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(screen.queryByText(/Đã đổi lý do/)).toBeNull());
+    });
+
     it('changing the reason by hand removes the notice', async () => {
       renderPage('Out');
       await pickPartner(supplier);

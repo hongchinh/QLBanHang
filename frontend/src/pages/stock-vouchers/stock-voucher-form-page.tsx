@@ -458,6 +458,8 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
     dueDateTouchedRef.current = !!values.dueDate;
     form.reset(values);
     setSelectedPartner(partnerOf(fresh));
+    // The notice named a partner of the form before the reset.
+    switchNotice.clear();
   }
 
   const { busy, run: runAction, confirmDialogProps } = useDocumentActions<PendingAction>({

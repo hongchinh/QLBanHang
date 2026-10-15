@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseHelpDoc } from './parse-help';
+import { narrationText, parseHelpDoc, parseInline, stepHash } from './parse-help';
 
 const VALID = [
   '---',
@@ -142,5 +142,46 @@ describe('parseHelpDoc', () => {
 
   it('rejects unbalanced bold markers', () => {
     expectError(VALID.replace('Chọn **Lý do xuất** và **Kho**.', 'Chọn **Lý do xuất và Kho.'), 'unbalanced');
+  });
+});
+
+describe('parseInline', () => {
+  it('splits bold and key runs', () => {
+    expect(parseInline('Chọn **Lý do xuất** rồi `Ctrl S`.')).toEqual([
+      { kind: 'text', text: 'Chọn ' },
+      { kind: 'strong', text: 'Lý do xuất' },
+      { kind: 'text', text: ' rồi ' },
+      { kind: 'kbd', text: 'Ctrl S' },
+      { kind: 'text', text: '.' },
+    ]);
+  });
+
+  it('keeps an unterminated marker as text', () => {
+    expect(parseInline('a ** b')).toEqual([{ kind: 'text', text: 'a ** b' }]);
+  });
+});
+
+describe('narrationText', () => {
+  it('drops the id and the markers and collapses spaces', () => {
+    expect(narrationText('{#save}  Bấm **Lưu**   (`Ctrl S`) ')).toBe('Bấm Lưu (Ctrl S)');
+  });
+
+  it('normalizes to NFC', () => {
+    expect(narrationText('Lúu')).toBe('Lúu');
+  });
+});
+
+describe('stepHash', () => {
+  it('is FNV-1a 32-bit of the narration text', () => {
+    expect(stepHash('a')).toBe('e40c292c');
+    expect(stepHash('**a**')).toBe('e40c292c');
+  });
+
+  it('changes when the wording changes', () => {
+    expect(stepHash('Bấm Lưu')).not.toBe(stepHash('Bấm Lưu.'));
+  });
+
+  it('is 8 lowercase hex characters', () => {
+    expect(stepHash('x')).toMatch(/^[0-9a-f]{8}$/);
   });
 });

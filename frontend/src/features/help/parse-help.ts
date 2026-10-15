@@ -1,4 +1,4 @@
-import type { HelpDoc, HelpStep, HelpShortcut } from './types';
+import type { HelpDoc, HelpStep, HelpShortcut, InlineNode } from './types';
 
 // This file is also run by Node directly (type stripping): keep it erasable
 // TypeScript with `import type` only.
@@ -205,4 +205,50 @@ export function parseHelpDoc(raw: string, fileKey: string): { doc: HelpDoc | nul
     doc: { key, title, routes, sources, related, updated, purpose, steps, notes, shortcuts },
     errors,
   };
+}
+
+export function parseInline(text: string): InlineNode[] {
+  const nodes: InlineNode[] = [];
+  let plain = '';
+  const flush = () => {
+    if (plain !== '') nodes.push({ kind: 'text', text: plain });
+    plain = '';
+  };
+  let i = 0;
+  while (i < text.length) {
+    const marker = text.startsWith('**', i) ? '**' : text[i] === '`' ? '`' : null;
+    const end = marker === null ? -1 : text.indexOf(marker, i + marker.length);
+    if (marker === null) {
+      plain += text[i];
+      i += 1;
+    } else if (end === -1) {
+      plain += marker; // an opener without its closer stays literal text
+      i += marker.length;
+    } else {
+      flush();
+      nodes.push({ kind: marker === '**' ? 'strong' : 'kbd', text: text.slice(i + marker.length, end) });
+      i = end + marker.length;
+    }
+  }
+  flush();
+  return nodes;
+}
+
+// The words that are spoken for a step: no id, no markers, one space between words.
+export function narrationText(text: string): string {
+  return text
+    .replace(/^\s*\{#[^}]*\}/, '')
+    .replace(/\*\*|`/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .normalize('NFC');
+}
+
+// FNV-1a 32-bit over the UTF-8 narration text, as 8 lowercase hex characters.
+export function stepHash(text: string): string {
+  let hash = 0x811c9dc5;
+  for (const byte of new TextEncoder().encode(narrationText(text))) {
+    hash = Math.imul(hash ^ byte, 0x01000193) >>> 0;
+  }
+  return hash.toString(16).padStart(8, '0');
 }

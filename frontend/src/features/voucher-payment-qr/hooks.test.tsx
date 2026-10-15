@@ -56,7 +56,8 @@ describe('useVoucherPaymentQr', () => {
   });
 
   it('asks the API again on every mount', async () => {
-    const client = new QueryClient();
+    // A client that would keep an answer fresh and cached: only the hook's own options force the second request.
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: 30_000, gcTime: Infinity } } });
     const shared = ({ children }: { children: ReactNode }) => (
       <QueryClientProvider client={client}>{children}</QueryClientProvider>
     );
@@ -66,6 +67,20 @@ describe('useVoucherPaymentQr', () => {
     const second = renderHook(() => useVoucherPaymentQr('cash', 'c1', { enabled: true }), { wrapper: shared });
     await waitFor(() => expect(second.result.current.isSuccess).toBe(true));
     expect(apiGet).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('useVoucherPaymentQr failure', () => {
+  it('does not retry a failed request', async () => {
+    apiGet.mockReset();
+    apiGet.mockRejectedValue(new Error('boom'));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: 3, retryDelay: 1 } } });
+    const shared = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    const { result } = renderHook(() => useVoucherPaymentQr('cash', 'c1', { enabled: true }), { wrapper: shared });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(apiGet).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -23,6 +23,8 @@ export function composeQrImage(qrCanvas: HTMLCanvasElement, text: QrImageText): 
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
   const qrSize = WIDTH - MARGIN * 2;
+  // 264px of modules scaled up to 552px: keep their edges sharp so the QR still scans.
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(qrCanvas, MARGIN, MARGIN, qrSize, qrSize);
 
   ctx.fillStyle = '#111827';

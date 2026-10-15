@@ -14,6 +14,7 @@ function stubMatchMedia(matches: boolean) {
   const matchMedia = vi.fn(() => list);
   vi.stubGlobal('matchMedia', matchMedia);
   return {
+    list,
     matchMedia,
     change(next: boolean) {
       list.matches = next;
@@ -45,6 +46,14 @@ describe('useMinWidth', () => {
     const { result } = renderHook(() => useMinWidth(640));
     act(() => stub.change(false));
     expect(result.current).toBe(false);
+  });
+
+  it('stops listening when it unmounts', () => {
+    const stub = stubMatchMedia(true);
+    const { unmount } = renderHook(() => useMinWidth(640));
+    const added = stub.list.addEventListener.mock.calls[0][1];
+    unmount();
+    expect(stub.list.removeEventListener).toHaveBeenCalledWith('change', added);
   });
 
   it('assumes desktop without matchMedia', () => {

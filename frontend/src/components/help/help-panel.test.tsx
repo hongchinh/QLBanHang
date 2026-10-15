@@ -23,6 +23,7 @@ function renderPanel(path = '/stock-out/new') {
       <input aria-label="ô khác" />
       <Link to="/products">sang hàng hóa</Link>
       <Link to="/stock-out/new">về xuất kho</Link>
+      <button type="button" data-help-button>?</button>
       <HelpPanel />
     </MemoryRouter>,
   );
@@ -39,6 +40,19 @@ function setUser(perms: string[]) {
 }
 
 const openPanel = () => act(() => useUiStore.getState().openHelp());
+const closePanel = () => act(() => useUiStore.getState().closeHelp());
+
+// A screen of the given width: answers min-width / max-width queries and the reduced-motion one.
+function stubScreen(width: number, reducedMotion = false) {
+  vi.stubGlobal('matchMedia', (query: string) => {
+    const min = /min-width:\s*([\d.]+)px/.exec(query);
+    const max = /max-width:\s*([\d.]+)px/.exec(query);
+    const matches = query.includes('prefers-reduced-motion')
+      ? reducedMotion
+      : (!min || width >= Number(min[1])) && (!max || width <= Number(max[1]));
+    return { matches, media: query, addEventListener: () => {}, removeEventListener: () => {} };
+  });
+}
 
 describe('HelpPanel', () => {
   beforeEach(() => {
@@ -182,5 +196,110 @@ describe('HelpPanel', () => {
     expect(screen.getByTestId('help-panel-body')).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
     const backdrop = screen.getAllByRole('button', { name: 'Đóng hướng dẫn' }).find((b) => b.className.includes('fixed'));
     expect(backdrop).toHaveClass('md:hidden');
+  });
+});
+
+describe('HelpPanel closing', () => {
+  beforeEach(() => {
+    vi.mocked(useHelpIndex).mockReturnValue(buildHelpIndex(fixtureDocs));
+    vi.mocked(useHelpLoadFailed).mockReturnValue(false);
+    setUser(permissions);
+    act(() => useUiStore.setState({ helpOpen: false }));
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+    act(() => {
+      useAuthStore.getState().logout();
+      useUiStore.setState({ helpOpen: false });
+    });
+  });
+
+  it('closes on a press outside the panel on a laptop screen', () => {
+    stubScreen(1280, true);
+    renderPanel();
+    openPanel();
+    fireEvent.pointerDown(screen.getByTestId('help-panel-body'));
+    expect(useUiStore.getState().helpOpen).toBe(true);
+    fireEvent.pointerDown(screen.getByRole('button', { name: '?' }));
+    expect(useUiStore.getState().helpOpen).toBe(true);
+    fireEvent.pointerDown(screen.getByLabelText('ô trang'));
+    expect(useUiStore.getState().helpOpen).toBe(false);
+  });
+
+  it('ignores presses inside a dialog over the page', () => {
+    stubScreen(1280, true);
+    renderPanel();
+    openPanel();
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    document.body.append(dialog);
+    fireEvent.pointerDown(dialog);
+    expect(useUiStore.getState().helpOpen).toBe(true);
+    dialog.remove();
+  });
+
+  it('stays open on a press outside on a wide screen, where it is a column', () => {
+    stubScreen(1600);
+    renderPanel();
+    openPanel();
+    fireEvent.pointerDown(screen.getByLabelText('ô trang'));
+    expect(useUiStore.getState().helpOpen).toBe(true);
+  });
+
+  it('shrinks toward the help button, then leaves and pings the button', () => {
+    stubScreen(1280);
+    renderPanel();
+    openPanel();
+    const panel = screen.getByTestId('help-panel');
+    expect(panel).toHaveClass('animate-in', 'zoom-in-[0.04]');
+    closePanel();
+    expect(panel).toBeInTheDocument();
+    expect(panel).toHaveClass('animate-out', 'zoom-out-[0.04]', 'pointer-events-none');
+    expect(panel.style.transformOrigin).not.toBe('');
+    fireEvent.animationEnd(panel);
+    expect(screen.queryByTestId('help-panel')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '?' })).toHaveClass('help-ping');
+  });
+
+  it('leaves after a timeout when the animation end never comes', () => {
+    vi.useFakeTimers();
+    stubScreen(1280);
+    renderPanel();
+    openPanel();
+    closePanel();
+    expect(screen.getByTestId('help-panel')).toBeInTheDocument();
+    act(() => vi.advanceTimersByTime(1000));
+    expect(screen.queryByTestId('help-panel')).not.toBeInTheDocument();
+  });
+
+  it('opens again fresh when reopened while shrinking', () => {
+    stubScreen(1280);
+    renderPanel();
+    openPanel();
+    closePanel();
+    openPanel();
+    const panel = screen.getByTestId('help-panel');
+    expect(panel).toHaveClass('animate-in');
+    expect(panel).not.toHaveClass('pointer-events-none');
+    expect(screen.getByRole('heading', { name: 'Phiếu xuất kho' })).toHaveFocus();
+  });
+
+  it('slides down on a phone', () => {
+    stubScreen(390);
+    renderPanel();
+    openPanel();
+    closePanel();
+    expect(screen.getByTestId('help-panel')).toHaveClass('animate-out', 'slide-out-to-bottom');
+  });
+
+  it('leaves at once when the user asks for reduced motion', () => {
+    stubScreen(1280, true);
+    renderPanel();
+    openPanel();
+    expect(screen.getByTestId('help-panel')).not.toHaveClass('animate-in');
+    closePanel();
+    expect(screen.queryByTestId('help-panel')).not.toBeInTheDocument();
   });
 });

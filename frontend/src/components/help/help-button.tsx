@@ -15,6 +15,7 @@ export const HelpButton = forwardRef<HTMLButtonElement, { showDot: boolean }>(fu
     <button
       ref={ref}
       type="button"
+      data-help-button
       aria-label={LABEL}
       title={LABEL}
       aria-expanded={helpOpen}

@@ -2,7 +2,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Common.Options;
-using OrderMgmt.Application.Reports.Common;
+using OrderMgmt.Application.Dashboards.Common;
+using OrderMgmt.Application.Dashboards.Executive.Common;
+using OrderMgmt.Application.Dashboards.Executive.Services;
+using OrderMgmt.Application.Inventory.Common;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
 using OrderMgmt.Application.Sales.Quotations.Models;
 using OrderMgmt.Domain.Common;
@@ -18,17 +21,26 @@ public class DashboardService : IDashboardService
     private readonly ICurrentUser _currentUser;
     private readonly IDateTime _clock;
     private readonly IOptionsMonitor<FeatureOptions> _features;
+    private readonly SalesRevenueSource _source;
+    private readonly ICurrentBranch _currentBranch;
+    private readonly ExecutiveLookups _lookups;
 
     public DashboardService(
         IAppDbContext db,
         ICurrentUser currentUser,
         IDateTime clock,
-        IOptionsMonitor<FeatureOptions> features)
+        IOptionsMonitor<FeatureOptions> features,
+        SalesRevenueSource source,
+        ICurrentBranch currentBranch,
+        ExecutiveLookups lookups)
     {
         _db = db;
         _currentUser = currentUser;
         _clock = clock;
         _features = features;
+        _source = source;
+        _currentBranch = currentBranch;
+        _lookups = lookups;
     }
 
     private IQueryable<Quotation> ApplyScope(Guid? requestedSaleUserId)
@@ -49,103 +61,33 @@ public class DashboardService : IDashboardService
     private static decimal? DeltaOf(decimal cur, decimal prev)
         => prev == 0m ? null : Math.Round((cur - prev) / prev * 100m, 2, MidpointRounding.AwayFromZero);
 
-    private static async Task<List<(DateOnly Date, decimal Total, int Count)>> GroupByRevenueDateAsync(
-        IQueryable<Quotation> q, string dateMode, CancellationToken ct)
+    /// The working branch, and the owner the revenue is limited to: the requested one, or the current user when the
+    /// owner scope is on and the user cannot view all quotations (the same rule as ApplyScope).
+    private async Task<(Guid BranchId, Guid? OwnerUserId)> RevenueScopeAsync(Guid? requestedSaleUserId, CancellationToken ct)
     {
-        if (dateMode == RevenueDateField.AccountingConfirmedAt)
-            return (await q
-                .GroupBy(x => DateOnly.FromDateTime(x.AccountingConfirmedAt!.Value))
-                .Select(g => new { Date = g.Key, Total = g.Sum(x => x.Total), Count = g.Count() })
-                .ToListAsync(ct))
-                .Select(r => (r.Date, r.Total, r.Count)).ToList();
-
-        if (dateMode == RevenueDateField.ConfirmedAt)
-            return (await q
-                .GroupBy(x => DateOnly.FromDateTime(x.ConfirmedAt!.Value))
-                .Select(g => new { Date = g.Key, Total = g.Sum(x => x.Total), Count = g.Count() })
-                .ToListAsync(ct))
-                .Select(r => (r.Date, r.Total, r.Count)).ToList();
-
-        return (await q
-            .GroupBy(x => x.QuotationDate)
-            .Select(g => new { Date = g.Key, Total = g.Sum(x => x.Total), Count = g.Count() })
-            .ToListAsync(ct))
-            .Select(r => (r.Date, r.Total, r.Count)).ToList();
+        var branchId = await _currentBranch.GetIdAsync(ct);
+        var viewsAll = !_features.CurrentValue.QuotationOwnerScope
+            || _currentUser.HasPermission(Permissions.Quotations.ViewAll);
+        return (branchId, viewsAll ? requestedSaleUserId : _currentUser.UserId ?? Guid.Empty);
     }
 
-    private static async Task<(decimal Cur, decimal Prev)> GetPeriodRevenuesAsync(
-        IQueryable<Quotation> scope, string dateMode,
-        DateOnly curFrom, DateOnly curTo, DateOnly prevFrom, DateOnly prevTo,
-        CancellationToken ct)
+    /// The counted stock-outs of the working branch on the Vietnam days [from, to].
+    private async Task<CountedSales> CountedAsync(DateOnly from, DateOnly to, Guid? saleUserId, CancellationToken ct)
     {
-        var curFromDt = curFrom.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var curToDt = curTo.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var prevFromDt = prevFrom.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-        var prevToDt = prevTo.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
-
-        if (dateMode == RevenueDateField.AccountingConfirmedAt)
-        {
-            var row = await scope
-                .Where(q => q.Status == QuotationStatus.AccountingConfirmed
-                    && q.CancelledAt == null
-                    && q.AccountingConfirmedAt >= prevFromDt
-                    && q.AccountingConfirmedAt < curToDt)
-                .GroupBy(_ => 1)
-                .Select(g => new
-                {
-                    Cur = g.Sum(x => x.AccountingConfirmedAt >= curFromDt && x.AccountingConfirmedAt < curToDt ? x.Total : 0m),
-                    Prev = g.Sum(x => x.AccountingConfirmedAt >= prevFromDt && x.AccountingConfirmedAt < prevToDt ? x.Total : 0m),
-                })
-                .FirstOrDefaultAsync(ct);
-            return (row?.Cur ?? 0m, row?.Prev ?? 0m);
-        }
-
-        if (dateMode == RevenueDateField.ConfirmedAt)
-        {
-            var row = await scope
-                .Where(q => (q.Status == QuotationStatus.Confirmed || q.Status == QuotationStatus.AccountingConfirmed)
-                    && q.CancelledAt == null
-                    && q.ConfirmedAt >= prevFromDt
-                    && q.ConfirmedAt < curToDt)
-                .GroupBy(_ => 1)
-                .Select(g => new
-                {
-                    Cur = g.Sum(x => x.ConfirmedAt >= curFromDt && x.ConfirmedAt < curToDt ? x.Total : 0m),
-                    Prev = g.Sum(x => x.ConfirmedAt >= prevFromDt && x.ConfirmedAt < prevToDt ? x.Total : 0m),
-                })
-                .FirstOrDefaultAsync(ct);
-            return (row?.Cur ?? 0m, row?.Prev ?? 0m);
-        }
-
-        // QuotationDate
-        {
-            var row = await scope
-                .Where(q => (q.Status == QuotationStatus.Confirmed || q.Status == QuotationStatus.AccountingConfirmed)
-                    && q.CancelledAt == null
-                    && q.QuotationDate >= prevFrom
-                    && q.QuotationDate <= curTo)
-                .GroupBy(_ => 1)
-                .Select(g => new
-                {
-                    Cur = g.Sum(x => x.QuotationDate >= curFrom && x.QuotationDate <= curTo ? x.Total : 0m),
-                    Prev = g.Sum(x => x.QuotationDate >= prevFrom && x.QuotationDate <= prevTo ? x.Total : 0m),
-                })
-                .FirstOrDefaultAsync(ct);
-            return (row?.Cur ?? 0m, row?.Prev ?? 0m);
-        }
+        var (branchId, ownerUserId) = await RevenueScopeAsync(saleUserId, ct);
+        return await _source.BuildAsync([branchId], ownerUserId,
+            VnTime.StartOfDay(from), VnTime.StartOfNextDay(to), ct);
     }
 
     public async Task<DashboardSummaryDto> GetSummaryAsync(DateOnly? from, DateOnly? to, Guid? saleUserId, CancellationToken ct)
     {
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
-
-        var today = DateOnly.FromDateTime(_clock.Now.DateTime);
+        var today = VnTime.ToVnDate(_clock.UtcNow);
         var rangeFrom = from ?? new DateOnly(today.Year, today.Month, 1);
         var rangeTo = to ?? today;
         if (rangeTo < rangeFrom) rangeTo = rangeFrom;
-        var rangeLen = rangeTo.DayNumber - rangeFrom.DayNumber + 1;
-        var prevTo = rangeFrom.AddDays(-1);
-        var prevFrom = prevTo.AddDays(-(rangeLen - 1));
+        var period = ExecutivePeriod.Create(rangeFrom, rangeTo, today);
+        var prevFrom = period.PrevFrom;
+        var prevTo = period.PrevTo;
 
         var curFromDt = rangeFrom.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var curToDt = rangeTo.AddDays(1).ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
@@ -154,10 +96,10 @@ public class DashboardService : IDashboardService
 
         var scope = ApplyScope(saleUserId);
 
-        // Revenue metrics — cur+prev in one query, today separate
-        var (curRevenue, prevRevenue) = await GetPeriodRevenuesAsync(scope, dateMode, rangeFrom, rangeTo, prevFrom, prevTo, ct);
-        var todayRevenue = await RevenueFilterHelper.ApplyRevenueFilter(scope, dateMode, today, today)
-            .SumAsync(q => (decimal?)q.Total, ct) ?? 0m;
+        // Revenue — the current and the previous period in one read, told apart by their instant
+        var vouchers = await (await CountedAsync(prevFrom, rangeTo, saleUserId, ct)).VoucherRevenues().ToListAsync(ct);
+        var curRevenue = vouchers.Where(v => v.VoucherAt >= period.Start).Sum(v => v.Revenue);
+        var prevRevenue = vouchers.Where(v => v.VoucherAt < period.Start).Sum(v => v.Revenue);
 
         // Total quotation count — always by QuotationDate (pipeline metric); cur+prev in one query
         var totalCountRow = await scope
@@ -186,22 +128,27 @@ public class DashboardService : IDashboardService
         var curCancelled = cancelledRow?.Cur ?? 0;
         var prevCancelled = cancelledRow?.Prev ?? 0;
 
-        // Spark — last 7 days, mode-aware date grouping
+        // Revenue spark and today — the last 7 Vietnam days, and today's figure from the same read
         var sparkFrom = today.AddDays(-6);
-        var sparkRows = await GroupByRevenueDateAsync(
-            RevenueFilterHelper.ApplyRevenueFilter(scope, dateMode, sparkFrom, today), dateMode, ct);
-        var sparkByDay = sparkRows.ToDictionary(r => r.Date, r => (r.Total, r.Count));
+        var sparkVouchers = await (await CountedAsync(sparkFrom, today, saleUserId, ct)).VoucherRevenues().ToListAsync(ct);
+        var revenueByDay = sparkVouchers
+            .GroupBy(v => VnTime.ToVnDate(v.VoucherAt))
+            .ToDictionary(g => g.Key, g => g.Sum(v => v.Revenue));
         var sparkRevenue = new decimal[7];
+        for (var i = 0; i < 7; i++)
+            sparkRevenue[i] = revenueByDay.GetValueOrDefault(sparkFrom.AddDays(i));
+        var todayRevenue = revenueByDay.GetValueOrDefault(today);
+
+        // Count spark — quotations by QuotationDate over the 7 days ending today, like TotalCount
+        var countFrom = today.AddDays(-6);
+        var countByDay = await scope
+            .Where(q => q.QuotationDate >= countFrom && q.QuotationDate <= today)
+            .GroupBy(q => q.QuotationDate)
+            .Select(g => new { Date = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(r => r.Date, r => r.Count, ct);
         var sparkCount = new decimal[7];
         for (var i = 0; i < 7; i++)
-        {
-            var d = today.AddDays(-6 + i);
-            if (sparkByDay.TryGetValue(d, out var v))
-            {
-                sparkRevenue[i] = v.Total;
-                sparkCount[i] = v.Count;
-            }
-        }
+            sparkCount[i] = countByDay.GetValueOrDefault(countFrom.AddDays(i));
 
         // Funnel — always by QuotationDate (pipeline, not revenue)
         var funnelRows = await scope
@@ -248,12 +195,12 @@ public class DashboardService : IDashboardService
     public async Task<RevenueSeriesDto> GetRevenueSeriesAsync(DateOnly from, DateOnly to, string granularity, Guid? saleUserId, CancellationToken ct)
     {
         if (to < from) to = from;
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
 
-        var dayRows = await GroupByRevenueDateAsync(
-            RevenueFilterHelper.ApplyRevenueFilter(ApplyScope(saleUserId), dateMode, from, to), dateMode, ct);
-
-        var byDay = dayRows.ToDictionary(r => r.Date, r => (r.Total, r.Count));
+        var vouchers = await (await CountedAsync(from, to, saleUserId, ct)).VoucherRevenues().ToListAsync(ct);
+        // A return lowers the day's total but is not a sale, so it is not counted.
+        var byDay = vouchers
+            .GroupBy(v => VnTime.ToVnDate(v.VoucherAt))
+            .ToDictionary(g => g.Key, g => (Total: g.Sum(v => v.Revenue), Count: g.Count(v => !v.IsReturn)));
         var points = new List<RevenuePointDto>();
 
         if (string.Equals(granularity, "month", StringComparison.OrdinalIgnoreCase))
@@ -267,7 +214,7 @@ public class DashboardService : IDashboardService
                 months[key] = (cur.Total + v.Total, cur.Count + v.Count);
             }
             foreach (var kv in months)
-                points.Add(new RevenuePointDto { Date = kv.Key, Total = kv.Value.Total, ConfirmedCount = kv.Value.Count });
+                points.Add(new RevenuePointDto { Date = kv.Key, Total = kv.Value.Total, VoucherCount = kv.Value.Count });
         }
         else if (string.Equals(granularity, "week", StringComparison.OrdinalIgnoreCase))
         {
@@ -281,14 +228,14 @@ public class DashboardService : IDashboardService
                 weeks[key] = (cur.Total + v.Total, cur.Count + v.Count);
             }
             foreach (var kv in weeks)
-                points.Add(new RevenuePointDto { Date = kv.Key, Total = kv.Value.Total, ConfirmedCount = kv.Value.Count });
+                points.Add(new RevenuePointDto { Date = kv.Key, Total = kv.Value.Total, VoucherCount = kv.Value.Count });
         }
         else
         {
             for (var d = from; d <= to; d = d.AddDays(1))
             {
                 byDay.TryGetValue(d, out var v);
-                points.Add(new RevenuePointDto { Date = d, Total = v.Total, ConfirmedCount = v.Count });
+                points.Add(new RevenuePointDto { Date = d, Total = v.Total, VoucherCount = v.Count });
             }
         }
 
@@ -299,45 +246,55 @@ public class DashboardService : IDashboardService
     {
         if (limit <= 0) limit = 5;
         if (to < from) to = from;
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
 
-        return await RevenueFilterHelper.ApplyRevenueFilter(ApplyScope(saleUserId), dateMode, from, to)
-            .GroupBy(q => new { q.CustomerId, q.CustomerName })
-            .Select(g => new TopCustomerDto
+        var counted = await CountedAsync(from, to, saleUserId, ct);
+        var rows = await counted.VoucherRevenues()
+            .Where(v => v.PartnerId != null)
+            .GroupBy(v => v.PartnerId!.Value)
+            // A return lowers the revenue but is not a sale, so it is not counted.
+            .Select(g => new { PartnerId = g.Key, Revenue = g.Sum(v => v.Revenue), Count = g.Count(v => !v.IsReturn) })
+            .ToListAsync(ct);
+        var names = await _lookups.PartnersAsync(rows.Select(r => r.PartnerId).ToList(), ct);
+
+        return rows
+            .Select(r => new TopCustomerDto
             {
-                CustomerId = g.Key.CustomerId,
-                CustomerName = g.Key.CustomerName,
-                Revenue = g.Sum(x => x.Total),
-                QuotationCount = g.Count(),
+                CustomerId = r.PartnerId,
+                CustomerName = names.TryGetValue(r.PartnerId, out var partner) ? partner.Name : string.Empty,
+                Revenue = r.Revenue,
+                VoucherCount = r.Count,
             })
             .OrderByDescending(x => x.Revenue)
+            .ThenBy(x => x.CustomerName, StringComparer.Ordinal)
             .Take(limit)
-            .ToListAsync(ct);
+            .ToList();
     }
 
     public async Task<IReadOnlyList<TopProductDto>> GetTopProductsAsync(DateOnly from, DateOnly to, int limit, Guid? saleUserId, CancellationToken ct)
     {
         if (limit <= 0) limit = 5;
         if (to < from) to = from;
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
 
-        var quotationIds = RevenueFilterHelper.ApplyRevenueFilter(ApplyScope(saleUserId), dateMode, from, to)
-            .Select(q => q.Id);
-
-        return await _db.QuotationLines
-            .AsNoTracking()
-            .Where(l => quotationIds.Contains(l.QuotationId))
-            .GroupBy(l => new { l.ProductId, l.ProductName })
-            .Select(g => new TopProductDto
-            {
-                ProductId = g.Key.ProductId,
-                ProductName = g.Key.ProductName,
-                Revenue = g.Sum(l => l.LineTotal),
-                Quantity = g.Sum(l => l.Quantity),
-            })
-            .OrderByDescending(x => x.Revenue)
+        var counted = await CountedAsync(from, to, saleUserId, ct);
+        // Quantity is signed: a return takes its goods off the total.
+        var rows = await counted.LineRevenues(_db.StockVoucherLines)
+            .GroupBy(l => l.ProductId)
+            .Select(g => new { ProductId = g.Key, Revenue = g.Sum(l => l.Revenue), Quantity = g.Sum(l => l.Quantity) })
+            .OrderByDescending(r => r.Revenue)
+            .ThenBy(r => r.ProductId)
             .Take(limit)
             .ToListAsync(ct);
+        var names = await _lookups.ProductsAsync(rows.Select(r => r.ProductId).ToList(), ct);
+
+        return rows
+            .Select(r => new TopProductDto
+            {
+                ProductId = r.ProductId,
+                ProductName = names.TryGetValue(r.ProductId, out var product) ? product.Name : string.Empty,
+                Revenue = r.Revenue,
+                Quantity = r.Quantity,
+            })
+            .ToList();
     }
 
     public async Task<IReadOnlyList<ActivityItemDto>> GetRecentActivityAsync(int limit, CancellationToken ct)
@@ -453,64 +410,35 @@ public class DashboardService : IDashboardService
 
         if (limit <= 0) limit = 10;
         if (to < from) to = from;
-        var dateMode = await RevenueFilterHelper.GetDateModeAsync(_db, ct);
 
-        var rangeLen = to.DayNumber - from.DayNumber + 1;
-        var prevTo = from.AddDays(-1);
-        var prevFrom = prevTo.AddDays(-(rangeLen - 1));
+        var period = ExecutivePeriod.Create(from, to, VnTime.ToVnDate(_clock.UtcNow));
 
-        var scope = _db.Quotations.AsNoTracking().Where(q => !q.IsDeleted);
-
-        var curRows = await RevenueFilterHelper.ApplyRevenueFilter(scope, dateMode, from, to)
-            .GroupBy(q => q.OwnerUserId)
-            .Select(g => new { UserId = g.Key, Revenue = g.Sum(x => x.Total), Count = g.Count() })
-            .ToListAsync(ct);
-
-        var prevRows = await RevenueFilterHelper.ApplyRevenueFilter(scope, dateMode, prevFrom, prevTo)
-            .GroupBy(q => q.OwnerUserId)
-            .Select(g => new { UserId = g.Key, Revenue = g.Sum(x => x.Total) })
-            .ToListAsync(ct);
-
-        var totalCountRows = await scope
-            .Where(q => q.QuotationDate >= from && q.QuotationDate <= to)
-            .GroupBy(q => q.OwnerUserId)
-            .Select(g => new { UserId = g.Key, Count = g.Count() })
-            .ToListAsync(ct);
-
-        var prevRevenueMap = prevRows.ToDictionary(r => r.UserId, r => r.Revenue);
-        var totalCountMap = totalCountRows.ToDictionary(r => r.UserId, r => r.Count);
-
-        var topUserIds = curRows
-            .OrderByDescending(r => r.Revenue)
-            .Take(limit)
-            .Select(r => r.UserId)
+        // The current and the previous period in one read, told apart by their instant; grouped by the voucher's owner.
+        var vouchers = await (await CountedAsync(period.PrevFrom, to, null, ct)).VoucherRevenues().ToListAsync(ct);
+        var current = vouchers.Where(v => v.VoucherAt >= period.Start)
+            .GroupBy(v => v.OwnerUserId)
+            // A return lowers the revenue but is not a sale, so it is not counted.
+            .Select(g => new { UserId = g.Key, Revenue = g.Sum(v => v.Revenue), Count = g.Count(v => !v.IsReturn) })
             .ToList();
+        var prevRevenueMap = vouchers.Where(v => v.VoucherAt < period.Start)
+            .GroupBy(v => v.OwnerUserId)
+            .ToDictionary(g => g.Key, g => g.Sum(v => v.Revenue));
 
-        var names = await _db.Users.IgnoreQueryFilters()
-            .AsNoTracking()
-            .Where(u => topUserIds.Contains(u.Id))
-            .Select(u => new { u.Id, u.FullName })
-            .ToListAsync(ct);
-        var nameMap = names.ToDictionary(n => n.Id, n => n.FullName);
-
-        return curRows
+        var top = current
             .OrderByDescending(r => r.Revenue)
+            .ThenBy(r => r.UserId)
             .Take(limit)
-            .Select(r =>
+            .ToList();
+        var nameMap = await _lookups.UserNamesAsync(top.Select(r => r.UserId).ToList(), ct);
+
+        return top
+            .Select(r => new SalesLeaderboardItemDto
             {
-                prevRevenueMap.TryGetValue(r.UserId, out var prevRevenue);
-                totalCountMap.TryGetValue(r.UserId, out var totalCount);
-                return new SalesLeaderboardItemDto
-                {
-                    UserId = r.UserId,
-                    FullName = nameMap.GetValueOrDefault(r.UserId) ?? "—",
-                    Revenue = r.Revenue,
-                    ConfirmedCount = r.Count,
-                    ConversionRate = totalCount == 0
-                        ? null
-                        : Math.Round((decimal)r.Count / totalCount * 100m, 2, MidpointRounding.AwayFromZero),
-                    DeltaPct = DeltaOf(r.Revenue, prevRevenue),
-                };
+                UserId = r.UserId,
+                FullName = nameMap.GetValueOrDefault(r.UserId) ?? "—",
+                Revenue = r.Revenue,
+                VoucherCount = r.Count,
+                DeltaPct = DeltaOf(r.Revenue, prevRevenueMap.GetValueOrDefault(r.UserId)),
             })
             .ToList();
     }

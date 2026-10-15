@@ -51,7 +51,7 @@ public sealed class DashboardSignalFilter : IAsyncActionFilter
     {
         // The action runs first: when it returns, the service has committed.
         var executed = await next();
-        if (!IsSuccessfulWrite(context, executed))
+        if (!IsSuccessfulWrite(context, executed, typeof(SkipDashboardSignalAttribute)))
             return;
 
         try
@@ -73,13 +73,15 @@ public sealed class DashboardSignalFilter : IAsyncActionFilter
         }
     }
 
-    private static bool IsSuccessfulWrite(ActionExecutingContext context, ActionExecutedContext executed)
+    /// Whether the action was a write that succeeded. An action marked with `skipAttribute` (when given) is not one.
+    internal static bool IsSuccessfulWrite(ActionExecutingContext context, ActionExecutedContext executed,
+        Type? skipAttribute)
     {
         var method = context.HttpContext.Request.Method;
         if (HttpMethods.IsGet(method) || HttpMethods.IsHead(method) || HttpMethods.IsOptions(method))
             return false;
 
-        if (context.ActionDescriptor.EndpointMetadata.OfType<SkipDashboardSignalAttribute>().Any())
+        if (skipAttribute is not null && context.ActionDescriptor.EndpointMetadata.Any(skipAttribute.IsInstanceOfType))
             return false;
 
         // Canceled: another filter answered in place of the action, which never ran.

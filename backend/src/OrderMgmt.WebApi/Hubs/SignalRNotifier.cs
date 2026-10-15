@@ -24,4 +24,9 @@ public class SignalRNotifier : IRealtimeNotifier
         return _hub.Clients.Groups(DashboardGroups.All, DashboardGroups.ForBranch(branchId))
             .SendAsync(DashboardGroups.EventName, new { branchId, domains = DashboardGroups.DomainNames(domains) }, ct);
     }
+
+    /// Branch-free: every overview dashboard open on a quotation user refetches its quotation counts.
+    public Task NotifyQuotationsChangedAsync(CancellationToken ct = default)
+        => _hub.Clients.Group(DashboardGroups.Quotations)
+               .SendAsync(DashboardGroups.QuotationsEventName, ct);
 }

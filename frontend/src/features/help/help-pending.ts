@@ -2,8 +2,6 @@
 // gets a help file, and when a new route has neither a file nor an entry here. Never add a route: a new screen
 // ships with its help file, and a screen listed here gets one when it changes (AGENTS.md "User Guide Rule").
 export const HELP_PENDING: readonly string[] = [
-  '/',
-  '/admin/dashboard',
   '/admin/roles',
   '/cash-reasons',
   '/credit-limits',

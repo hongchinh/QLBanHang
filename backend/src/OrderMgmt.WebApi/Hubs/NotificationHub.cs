@@ -24,22 +24,25 @@ public class NotificationHub : Hub
         if (await DashboardGroupAsync(userId) is { } dashboardGroup)
             await Groups.AddToGroupAsync(Context.ConnectionId, dashboardGroup);
 
+        if (HasPermission(Permissions.Quotations.View))
+            await Groups.AddToGroupAsync(Context.ConnectionId, DashboardGroups.Quotations);
+
         await base.OnConnectedAsync();
     }
 
     /// The group whose dashboard signals this connection gets; null when it gets none.
     private async Task<string?> DashboardGroupAsync(string? userId)
     {
-        var hasDashboard = HasPermission(Permissions.Dashboard.Executive);
+        var canSeeDashboard = HasPermission(Permissions.Dashboard.Executive) || HasPermission(Permissions.Quotations.View);
         var accessAll = HasPermission(Permissions.Branches.AccessAll);
 
         // Only a dashboard user limited to one branch has a group that depends on the default branch; nobody else
         // costs a query.
         Guid? defaultBranchId = null;
-        if (hasDashboard && !accessAll && Guid.TryParse(userId, out var id))
+        if (canSeeDashboard && !accessAll && Guid.TryParse(userId, out var id))
             defaultBranchId = await DefaultBranchIdAsync(id);
 
-        return DashboardGroups.GroupFor(hasDashboard, accessAll, defaultBranchId);
+        return DashboardGroups.GroupFor(canSeeDashboard, accessAll, defaultBranchId);
     }
 
     /// The user's default branch; null when the user is not found or the client has gone away.

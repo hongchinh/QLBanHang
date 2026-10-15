@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { HubConnectionBuilder, HubConnectionState } from '@microsoft/signalr'
 import { useQueryClient } from '@tanstack/react-query'
+import { dashboardKeys } from '@/features/dashboard/keys'
 import { executiveKeys } from '@/features/executive-dashboard/keys'
 import { realtimeBus } from '@/lib/realtime-bus'
 import type { DashboardChangedSignal, RealtimeStatus } from '@/lib/realtime-bus'
@@ -49,6 +50,12 @@ export function useNotificationHub() {
       // An open dashboard refetches through the bus. One that is not open only gets its queries
       // marked stale, so it refetches when it is opened again.
       queryClient.invalidateQueries({ queryKey: executiveKeys.all, refetchType: 'none' })
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all, refetchType: 'none' })
+    })
+
+    connection.on('QuotationsChanged', () => {
+      realtimeBus.emitQuotationsChanged()
+      queryClient.invalidateQueries({ queryKey: dashboardKeys.all, refetchType: 'none' })
     })
 
     // Automatic reconnect covers neither a start() that fails nor a connection that closed for good

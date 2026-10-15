@@ -243,6 +243,25 @@ public class DashboardHubTests : ExecutiveDashboardTestBase
         }
 
         [Fact]
+        public async Task Quotation_viewer_joins_the_branch_group()
+        {
+            var connect = () => ConnectAsync(Permissions.Quotations.View);
+
+            // Only the lookup of the default branch fails here: it proves the quotation viewer now has one.
+            await connect.Should().ThrowExactlyAsync<InvalidOperationException>().WithMessage("The database is down.");
+        }
+
+        [Fact]
+        public async Task Quotation_viewer_with_access_all_joins_the_all_group()
+        {
+            var connect = await ConnectAsync(Permissions.Quotations.View, Permissions.Branches.AccessAll);
+
+            connect.Groups.Should().Equal(
+                (ConnectionId, UserGroup), (ConnectionId, "dashboard-all"), (ConnectionId, "quotations"));
+            connect.DatabaseCalls.Should().Be(0);
+        }
+
+        [Fact]
         public async Task User_without_the_permission_joins_no_dashboard_group_without_reading_the_database()
         {
             var permissionSets = new[]

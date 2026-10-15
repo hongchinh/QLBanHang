@@ -4,10 +4,10 @@ title: Báo giá
 routes: [/quotations/new, /quotations/:id]
 sources: [frontend/src/pages/quotations/quotation-form-page.tsx, frontend/src/components/partner-autocomplete/**, frontend/src/features/customers/use-quotation-customer-search.ts, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/pages/quotations/components/**, frontend/src/pages/quotations/utils/**, frontend/src/features/quotations/**, backend/src/OrderMgmt.Application/Sales/Quotations/**, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/features/products/split-typed-text.ts, frontend/src/lib/use-dialog-opening.ts]
 related: [customers.list]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 ## Dùng để
-Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng tiền rồi lưu, gửi, xác nhận hoặc in. Doanh thu của sale được ghi nhận khi báo giá được xác nhận.
+Lập và sửa báo giá gửi khách: chọn khách, nhập hàng, xem tổng tiền rồi lưu, gửi, xác nhận hoặc in. Trong báo cáo Doanh thu, doanh thu của sale được ghi nhận khi báo giá được xác nhận.
 
 ## Các bước
 1. {#customer} Gõ mã, tên, MST, địa chỉ hoặc SĐT ở **Khách hàng**, Enter để chọn; chưa có khách thì `F4` hoặc nút **+** để thêm nhanh.

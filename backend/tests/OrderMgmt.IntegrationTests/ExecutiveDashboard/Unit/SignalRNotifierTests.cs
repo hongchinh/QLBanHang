@@ -43,6 +43,21 @@ public class SignalRNotifierTests
         hub.Sends.Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task Quotations_signal_goes_to_the_quotations_group_without_payload()
+    {
+        var hub = new FakeHubContext();
+        using var cancellation = new CancellationTokenSource();
+
+        await new SignalRNotifier(hub).NotifyQuotationsChangedAsync(cancellation.Token);
+
+        var send = hub.Sends.Should().ContainSingle().Subject;
+        send.Groups.Should().Equal("quotations");
+        send.Method.Should().Be("QuotationsChanged");
+        send.Arguments.Should().BeEmpty();
+        send.CancellationToken.Should().Be(cancellation.Token);
+    }
+
     private sealed record Send(
         IReadOnlyList<string> Groups, string Method, object?[] Arguments, CancellationToken CancellationToken);
 

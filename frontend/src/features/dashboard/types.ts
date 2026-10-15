@@ -41,7 +41,7 @@ export interface DashboardSummary {
 export interface RevenuePoint {
   date: string;
   total: number;
-  confirmedCount: number;
+  voucherCount: number;
 }
 
 export interface RevenueSeries {
@@ -52,7 +52,7 @@ export interface TopCustomer {
   customerId: string;
   customerName: string;
   revenue: number;
-  quotationCount: number;
+  voucherCount: number;
 }
 
 export interface TopProduct {
@@ -76,8 +76,7 @@ export interface SalesLeaderboardItem {
   userId: string;
   fullName: string;
   revenue: number;
-  confirmedCount: number;
-  conversionRate: number | null;
+  voucherCount: number;
   deltaPct: number | null;
 }
 

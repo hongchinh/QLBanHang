@@ -16,9 +16,9 @@ import { Button } from '@/components/ui/button';
 import { AppIcon } from '@/components/icons';
 import { cn } from '@/lib/utils';
 import { RangePicker } from '@/features/dashboard/components/range-picker';
-import { useLeaderboard } from '@/features/dashboard/hooks';
+import { useRevenueReportLeaderboard } from '@/features/reports/revenue/hooks';
 import { useDashboardParams } from '@/features/dashboard/use-dashboard-params';
-import type { SalesLeaderboardItem } from '@/features/dashboard/types';
+import type { QuotationSalesLeaderboardItem } from '@/features/reports/revenue/types';
 import { DeltaArrow } from '@/features/dashboard/components/delta-arrow';
 import { formatDelta, formatNumber, formatVnd, formatVndShort } from '@/features/dashboard/format';
 
@@ -31,7 +31,7 @@ export function SalesPerformancePage() {
   const navigate = useNavigate();
   const fromHere = useFromHere();
 
-  const leaderboard = useLeaderboard({ from, to, limit: 50 });
+  const leaderboard = useRevenueReportLeaderboard({ from, to, limit: 50 });
 
   const sorted = useMemo(() => {
     const items = [...(leaderboard.data ?? [])];
@@ -177,7 +177,7 @@ function SalesBarChart({
   formatter,
   tooltipFormatter,
 }: {
-  data: SalesLeaderboardItem[];
+  data: QuotationSalesLeaderboardItem[];
   dataKey: 'revenue' | 'conversionRate';
   formatter: (v: number) => string;
   tooltipFormatter: (v: number) => string;
@@ -201,7 +201,7 @@ function SalesBarChart({
   );
 }
 
-function compareLeaderboard(a: SalesLeaderboardItem, b: SalesLeaderboardItem, key: SortKey): number {
+function compareLeaderboard(a: QuotationSalesLeaderboardItem, b: QuotationSalesLeaderboardItem, key: SortKey): number {
   switch (key) {
     case 'revenue':
       return b.revenue - a.revenue;

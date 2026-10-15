@@ -4,7 +4,7 @@ import type { Granularity, RevenuePoint } from '../types';
 import { formatVnd, formatVndShort } from '../format';
 
 interface RevenueAreaChartProps {
-  points: RevenuePoint[];
+  points: Pick<RevenuePoint, 'date' | 'total'>[];
   granularity: Granularity;
   onGranularityChange: (g: Granularity) => void;
   loading?: boolean;
@@ -18,7 +18,7 @@ const GRAN_TABS: { key: Granularity; label: string }[] = [
 
 export function RevenueAreaChart({ points, granularity, onGranularityChange, loading }: RevenueAreaChartProps) {
   const empty = !loading && (points.length === 0 || points.every((p) => p.total === 0));
-  const data = points.map((p) => ({ date: p.date, total: p.total, count: p.confirmedCount }));
+  const data = points.map((p) => ({ date: p.date, total: p.total }));
 
   return (
     <div className="space-y-3">

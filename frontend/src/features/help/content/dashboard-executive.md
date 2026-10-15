@@ -2,9 +2,9 @@
 key: dashboard-executive
 title: Điều hành
 routes: [/dashboard/executive]
-sources: [frontend/src/pages/executive-dashboard/**, frontend/src/features/executive-dashboard/**, frontend/src/features/dashboard/components/range-picker.tsx, frontend/src/features/dashboard/components/live-status.tsx, backend/src/OrderMgmt.Application/Dashboards/Executive/**]
-related: []
-updated: 2026-10-15
+sources: [frontend/src/pages/executive-dashboard/**, frontend/src/features/executive-dashboard/**, frontend/src/features/dashboard/components/range-picker.tsx, frontend/src/features/dashboard/components/live-status.tsx, frontend/src/hooks/use-dashboard-signal.ts, backend/src/OrderMgmt.Application/Dashboards/Executive/**]
+related: [home, admin-dashboard]
+updated: 2026-10-16
 ---
 ## Dùng để
 Xem nhanh doanh thu, tiền, công nợ và tồn kho của cả công ty hoặc một chi nhánh trong một kỳ, so với kỳ trước có cùng độ dài. Số liệu tự cập nhật khi có chứng từ mới.
@@ -20,6 +20,6 @@ Xem nhanh doanh thu, tiền, công nợ và tồn kho của cả công ty hoặc
 - Mặc định là kỳ Tháng này; dòng So với kỳ trước dưới tiêu đề cho biết kỳ dùng để so sánh. Kỳ chọn dài tối đa 3 năm.
 - Tab nào hiện còn tùy quyền xem báo cáo của bạn; giá vốn, lãi gộp và giá trị tồn cần thêm quyền xem giá vốn. Không có quyền xem mọi chi nhánh thì bạn chỉ thấy chi nhánh của mình.
 - Chọn một chi nhánh ở đây cũng đổi chi nhánh làm việc của bạn, nên các màn hình khác cũng chuyển theo.
-- **Doanh thu xuất bán** tính từ phiếu xuất kho (xuất bán trừ khách trả hàng), trước VAT, không gồm phí vận chuyển; khác báo cáo Doanh thu tính theo báo giá đã chốt.
+- **Doanh thu xuất bán** tính từ phiếu xuất kho (xuất bán trừ khách trả hàng), trước VAT, không gồm phí vận chuyển; khác báo cáo Doanh thu tính theo báo giá đã chốt. Các ô Doanh thu ở Tổng quan của tôi và Tổng quan hệ thống dùng cùng cách tính này, nhưng theo chi nhánh đang làm việc.
 - **Trực tiếp** ở đầu trang nghĩa là số liệu cập nhật ngay khi có chứng từ mới; khi **Mất kết nối**, số liệu chỉ được làm mới mỗi phút, giờ bên cạnh là lần cập nhật cuối.
 - Khi không tải được danh sách chi nhánh, màn hình báo chưa xác định được phạm vi số liệu; bấm **Thử lại**.

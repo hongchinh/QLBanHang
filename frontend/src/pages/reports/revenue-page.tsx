@@ -20,10 +20,10 @@ import { RangePicker } from '@/features/dashboard/components/range-picker';
 import { RevenueAreaChart } from '@/features/dashboard/components/revenue-area-chart';
 import { TopListCard } from '@/features/dashboard/components/top-list-card';
 import {
-  useDashboardSummary,
-  useRevenueSeries,
-  useTopCustomers,
-} from '@/features/dashboard/hooks';
+  useRevenueReportSummary,
+  useRevenueReportSeries,
+  useRevenueReportTopCustomers,
+} from '@/features/reports/revenue/hooks';
 import { useDashboardParams } from '@/features/dashboard/use-dashboard-params';
 import { useQuotationOwners } from '@/features/quotations/hooks';
 import { salesRevenueDetailApi } from '@/features/reports/sales-revenue-detail/api';
@@ -100,9 +100,9 @@ export function RevenuePage() {
     }
   }
 
-  const summary = useDashboardSummary({ from, to, saleUserId });
-  const revenue = useRevenueSeries({ from, to, granularity, saleUserId });
-  const topCustomers = useTopCustomers({ from, to, limit: 5, saleUserId });
+  const summary = useRevenueReportSummary({ from, to, saleUserId });
+  const revenue = useRevenueReportSeries({ from, to, granularity, saleUserId });
+  const topCustomers = useRevenueReportTopCustomers({ from, to, limit: 5, saleUserId });
   const detailLines = useRevenueLineItems({ from, to, saleUserId });
   const ownersQuery = useQuotationOwners({ enabled: isAdmin });
 

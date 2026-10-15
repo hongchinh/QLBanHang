@@ -24,12 +24,18 @@ import { useDashboardParams } from '@/features/dashboard/use-dashboard-params';
 import { useAdminUsers } from '@/features/admin-users/hooks';
 import type { Granularity } from '@/features/dashboard/types';
 import { formatNumber } from '@/features/dashboard/format';
+import { LiveStatus } from '@/features/dashboard/components/live-status';
+import { useOverviewLive } from '@/features/dashboard/use-overview-live';
+import { revenueSubtitle } from '@/features/dashboard/revenue-subtitle';
+import { useBranchContext } from '@/features/branches/use-branch-context';
 
 const ALL_SALES = '__all__';
 
 export function AdminDashboardPage() {
   const { from, to, saleUserId, setRange, setSaleUserId, setPreset } = useDashboardParams();
   const [granularity, setGranularity] = useState<Granularity>('day');
+  const { workingBranch } = useBranchContext();
+  const live = useOverviewLive(workingBranch?.id);
 
   const summary = useDashboardSummary({ from, to, saleUserId });
   const revenue = useRevenueSeries({ from, to, granularity, saleUserId });
@@ -49,10 +55,16 @@ export function AdminDashboardPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Tổng quan hệ thống</h1>
           <p className="text-sm text-muted-foreground">
-            {summary.data ? `Từ ${summary.data.from} đến ${summary.data.to}` : 'Báo giá trong khoảng đang xem.'}
+            {revenueSubtitle({
+              branchName: workingBranch?.name ?? null,
+              ownOnly: false,
+              from: summary.data?.from,
+              to: summary.data?.to,
+            })}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          <LiveStatus status={live.status} updatedAt={live.updatedAt} />
           <Select
             value={saleUserId ?? ALL_SALES}
             onValueChange={(v) => setSaleUserId(v === ALL_SALES ? undefined : v)}
@@ -153,7 +165,7 @@ export function AdminDashboardPage() {
                 id: c.customerId,
                 name: c.customerName,
                 primary: c.revenue,
-                secondary: `${formatNumber(c.quotationCount)} BG`,
+                secondary: `${formatNumber(c.voucherCount)} phiếu`,
               }))}
             />
           </CardContent>

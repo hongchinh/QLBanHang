@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.Catalog.Customers.Models;
+using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Inventory.StockVouchers.Interfaces;
@@ -25,16 +26,18 @@ public class StockVouchersController : ApiControllerBase
     private readonly IValidator<StockVoucherListRequest> _listValidator;
     private readonly IValidator<StockAtRequest> _stockAtValidator;
     private readonly IVoucherPrintService _print;
+    private readonly IVoucherPaymentQrService _paymentQr;
 
     public StockVouchersController(IStockVoucherService service, IValidator<UpsertStockVoucherRequest> upsertValidator,
         IValidator<StockVoucherListRequest> listValidator, IValidator<StockAtRequest> stockAtValidator,
-        IVoucherPrintService print)
+        IVoucherPrintService print, IVoucherPaymentQrService paymentQr)
     {
         _service = service;
         _upsertValidator = upsertValidator;
         _listValidator = listValidator;
         _stockAtValidator = stockAtValidator;
         _print = print;
+        _paymentQr = paymentQr;
     }
 
     [HttpGet]
@@ -97,6 +100,11 @@ public class StockVouchersController : ApiControllerBase
         var file = await _print.PrintStockVouchersAsync(request.Ids ?? [], request.PriceMode, format, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
+
+    /// Transfer QR of a stock-out: the data the screen draws and the print uses (422 PAYMENT_QR_UNAVAILABLE says why not).
+    [HttpGet("{id:guid}/payment-qr")]
+    public async Task<ActionResult<ApiResponse<VoucherPaymentQrDto>>> PaymentQr(Guid id, CancellationToken ct)
+        => Success(await _paymentQr.GetForStockVoucherAsync(id, ct));
 
     [HttpGet("{id:guid}/activities")]
     public async Task<ActionResult<ApiResponse<IReadOnlyList<StockVoucherActivityDto>>>> ListActivities(

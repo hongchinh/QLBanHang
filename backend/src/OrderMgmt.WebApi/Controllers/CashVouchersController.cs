@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using OrderMgmt.Application.Catalog.Customers.Models;
 using OrderMgmt.Application.CashDebt.CashVouchers.Interfaces;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
+using OrderMgmt.Application.CashDebt.PaymentQr;
 using OrderMgmt.Application.Common.Models;
 using OrderMgmt.Application.Dashboards.Executive.Realtime;
 using OrderMgmt.Application.Tt133.Models;
@@ -24,14 +25,16 @@ public class CashVouchersController : ApiControllerBase
     private readonly IValidator<UpsertCashVoucherRequest> _upsertValidator;
     private readonly IValidator<CashVoucherListRequest> _listValidator;
     private readonly IVoucherPrintService _print;
+    private readonly IVoucherPaymentQrService _paymentQr;
 
     public CashVouchersController(ICashVoucherService service, IValidator<UpsertCashVoucherRequest> upsertValidator,
-        IValidator<CashVoucherListRequest> listValidator, IVoucherPrintService print)
+        IValidator<CashVoucherListRequest> listValidator, IVoucherPrintService print, IVoucherPaymentQrService paymentQr)
     {
         _service = service;
         _upsertValidator = upsertValidator;
         _listValidator = listValidator;
         _print = print;
+        _paymentQr = paymentQr;
     }
 
     [HttpGet]
@@ -59,6 +62,11 @@ public class CashVouchersController : ApiControllerBase
         var file = await _print.PrintCashVouchersAsync(request.Ids ?? [], format, ct);
         return File(file.Bytes, file.ContentType, file.FileName);
     }
+
+    /// Transfer QR of a receipt: the data the screen draws and the print uses (422 PAYMENT_QR_UNAVAILABLE says why not).
+    [HttpGet("{id:guid}/payment-qr")]
+    public async Task<ActionResult<ApiResponse<VoucherPaymentQrDto>>> PaymentQr(Guid id, CancellationToken ct)
+        => Success(await _paymentQr.GetForCashVoucherAsync(id, ct));
 
     [HttpGet("defaults")]
     public async Task<ActionResult<ApiResponse<CashVoucherDefaultsDto>>> GetDefaults(

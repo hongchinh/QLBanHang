@@ -42,3 +42,15 @@ Guidelines:
   - Document timestamp: `` `date "+%Y-%m-%d %H:%M:%S"` ``
 
 <!-- END agent-skills rules -->
+
+## User Guide Rule
+
+Every feature change ships its user guide (in-app help, `frontend/src/features/help/content/<key>.md`) in the same task and the same PR. This is part of "done", not a follow-up.
+
+- **New screen or route:** create its help file. Do not add a new route to `HELP_PENDING`.
+- **Changed screen** (labels, buttons, fields, steps, rules, messages, shortcuts, permissions): update its help file so every sentence matches the new code, and set `updated` to today.
+- **Changed screen whose route is still in `HELP_PENDING`:** write its help file now and remove the route from `HELP_PENDING`.
+- **Shared code** (components, services, validators): run `npm run help:stale` (from `frontend/`) and update every help file it lists.
+- Use the `help-content` skill. Every bold label must be real on-screen text. Details are in `docs/code-standard/conventions.md` "User Help".
+- Before finishing, `npm run test -- src/features/help` passes and `npm run help:stale` prints `Không có cảnh báo.`
+- Backend-only or refactor changes that the user cannot see need no help change. Say so in the PR.

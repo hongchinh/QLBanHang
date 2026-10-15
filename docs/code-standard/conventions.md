@@ -212,6 +212,13 @@
 - Every app route (`frontend/src/app-routes.tsx`, leaf routes except `/login`, `/403`, `/404`, redirects and `*`) has exactly one help file in `frontend/src/features/help/content/<key>.md`, or is listed in `HELP_PENDING` (`features/help/help-pending.ts`), which only shrinks. `help-guard.test.ts` enforces it, plus valid files, existing `related` keys and `videos.json` steps. A new route goes into `app-routes.tsx`, never back into `App.tsx`.
 - Key: the route without `/` and without `:param` segments, joined with `-`; `/` is `home`; a list/form pair gets `.list` / `.form`. One file may own several routes (a detail page with its parent).
 - File format and writing rules (section 2 of `docs/brainstorms/261015-1001-user-help-guide/SUMMARY.md`, restated): frontmatter `key`, `title`, `routes`, `sources` (repo-relative globs, backend allowed), `related`, `updated`; sections `Dùng để` (at most 2 sentences), `Các bước` (3-7 one-line steps `N. {#id} text`, verbs first, stable ids), `Lưu ý`, `Phím tắt`; inline only `**label**` and `` `key` ``; no links.
-- A change to a screen's UI or behaviour updates its help file in the same PR (the PR template asks). Run `npm run help:stale` before a release (it needs Node 22.18 or newer, which runs the TypeScript script by type stripping). Use the `help-content` skill to draft.
+- Every feature change ships its user guide in the same task and PR (rule in `AGENTS.md` "User Guide Rule"):
+  - A new screen gets a new help file. `HELP_PENDING` is only for the routes that existed before round 1, and a new route never goes there.
+  - A changed screen gets its help file updated to match the code, with `updated` set to today.
+  - A changed screen still in `HELP_PENDING` gets its help file written and leaves the list.
+  - A change to shared code updates every file `npm run help:stale` lists.
+  - Only changes the user cannot see are exempt, and the PR says so.
+
+  Run `npm run help:stale` before a release (it needs Node 22.18 or newer, which runs the TypeScript script by type stripping). Use the `help-content` skill to draft.
 - UI: `HelpPanel` (rendered by `AppLayout`), `HelpButton` and `FirstVisitHint` (rendered by `AppHeader`), F1 through `useHelpShortcut`; state in `ui-store` (`helpOpen`, `helpHintSeen`, `helpHintsOff`). The content is one lazy chunk (`content-index.ts`); import it only through `load-help.ts`. F1 does nothing while a modal dialog is open (`DIALOG_SELECTOR` outside `POPPER_WRAPPER_SELECTOR`, `lib/focus.ts`); popovers never block it.
 - `videos.json` is written by the round-3 video tool, never by hand; a step's hash is `stepHash` from `parse-help.ts`.

@@ -204,6 +204,41 @@ describe('PartnerCatalogList', () => {
       expect(onSelect).toHaveBeenLastCalledWith('id-2');
     });
 
+    it('Enter ignores text typed but not yet searched; once its results arrive it picks their first row', async () => {
+      const fresh: CustomerListItem[] = [
+        { id: 'id-9', code: 'KH-009', name: 'Kết quả mới', group: 'Company', status: 'Active' },
+      ];
+      useCustomersMock.mockImplementation((params: { search?: string }) => ({
+        data: params.search === 'zz' ? paged({ items: fresh, totalItems: 1 }) : paged(),
+        isLoading: false,
+      }));
+      const onSelect = vi.fn();
+      render(<Harness onSelect={onSelect} />);
+
+      fireEvent.change(searchInput(), { target: { value: 'zz' } });
+      fireEvent.keyDown(searchInput(), { key: 'Enter' });
+      expect(onSelect).not.toHaveBeenCalled();
+
+      await waitFor(() => expect(screen.getByText('KH-009')).toBeInTheDocument());
+      fireEvent.keyDown(searchInput(), { key: 'Enter' });
+      expect(onSelect).toHaveBeenCalledTimes(1);
+      expect(onSelect).toHaveBeenCalledWith('id-9');
+    });
+
+    it('Enter ignores rows that are only placeholder data of the previous query', () => {
+      useCustomersMock.mockReturnValue({ data: paged(), isLoading: false, isPlaceholderData: true });
+      const onSelect = vi.fn();
+      const { rerender } = render(<Harness onSelect={onSelect} />);
+
+      fireEvent.keyDown(searchInput(), { key: 'Enter' });
+      expect(onSelect).not.toHaveBeenCalled();
+
+      useCustomersMock.mockReturnValue({ data: paged(), isLoading: false, isPlaceholderData: false });
+      rerender(<Harness onSelect={onSelect} />);
+      fireEvent.keyDown(searchInput(), { key: 'Enter' });
+      expect(onSelect).toHaveBeenCalledWith('id-1');
+    });
+
     it('Enter does nothing when there are no rows', () => {
       useCustomersMock.mockReturnValue({ data: paged({ items: [], totalItems: 0 }), isLoading: false });
       const onSelect = vi.fn();

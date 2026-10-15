@@ -13,17 +13,13 @@ import {
 } from '@/features/products/hooks';
 import { lookupsApi } from '@/features/products/api';
 import { lookupKeys } from '@/features/products/keys';
+import { UUID_RE, toCreatePayload, toUpdatePayload } from '@/features/products/use-save-product';
 import {
   productSchema,
   type ProductFormParsed,
   type ProductFormValues,
 } from '@/features/products/schema';
-import type {
-  CreateProductRequest,
-  LookupItem,
-  Product,
-  UpdateProductRequest,
-} from '@/features/products/types';
+import type { LookupItem, Product } from '@/features/products/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -39,8 +35,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatApiErrorDetails, getErrorMessage } from '@/lib/api-client';
 import { toast } from '@/lib/use-toast';
 import { cn } from '@/lib/utils';
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const statuses = [
   { value: 'Active', label: 'Đang bán' },
@@ -305,55 +299,6 @@ function toFormDefaults(p?: Product): ProductFormValues {
     priceIncludesVat: p?.priceIncludesVat ?? false,
     purchaseDiscountRate: p?.purchaseDiscountRate ?? '',
     salesDiscountRate: p?.salesDiscountRate ?? '',
-  };
-}
-
-function toInventoryPayload(parsed: ProductFormParsed) {
-  return {
-    trackInventory: parsed.trackInventory,
-    priceIncludesVat: parsed.priceIncludesVat,
-    purchaseDiscountRate: parsed.purchaseDiscountRate ?? 0,
-    salesDiscountRate: parsed.salesDiscountRate ?? 0,
-  };
-}
-
-function toCreatePayload(parsed: ProductFormParsed): CreateProductRequest {
-  return {
-    code: parsed.code,
-    name: parsed.name,
-    productGroupId: parsed.productGroupId,
-    unitId: parsed.unitId,
-    specification: parsed.specification,
-    length: parsed.length,
-    width: parsed.width,
-    thickness: parsed.thickness,
-    density: parsed.density,
-    defaultPrice: parsed.defaultPrice,
-    costPrice: parsed.costPrice,
-    defaultTaxRate: parsed.defaultTaxRate,
-    note: parsed.note,
-    pricingMode: parsed.pricingMode,
-    ...toInventoryPayload(parsed),
-  };
-}
-
-function toUpdatePayload(parsed: ProductFormParsed): UpdateProductRequest {
-  return {
-    name: parsed.name,
-    productGroupId: parsed.productGroupId,
-    unitId: parsed.unitId,
-    specification: parsed.specification,
-    length: parsed.length,
-    width: parsed.width,
-    thickness: parsed.thickness,
-    density: parsed.density,
-    defaultPrice: parsed.defaultPrice,
-    costPrice: parsed.costPrice,
-    defaultTaxRate: parsed.defaultTaxRate,
-    note: parsed.note,
-    status: parsed.status ?? 'Active',
-    pricingMode: parsed.pricingMode,
-    ...toInventoryPayload(parsed),
   };
 }
 

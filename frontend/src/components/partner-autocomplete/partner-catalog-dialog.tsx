@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { customersApi } from '@/features/customers/api';
@@ -73,13 +73,30 @@ function CatalogBody({
   const [query, setQuery] = useState(initialQuery);
   const [role, setRole] = useState<PartnerRole>(roles.includes(preferredRole) ? preferredRole : roles[0]);
 
+  // One detail load at a time (a double click, or Enter during the load); a result that arrives after this body
+  // unmounted (the dialog was closed meanwhile) is dropped.
+  const loadingRef = useRef(false);
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
   async function handleSelectId(id: string) {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
       const record = await (role === 'customer' ? customersApi.get(id) : suppliersApi.get(id));
+      if (!mountedRef.current) return;
       onSelect(toPartnerSearchItem(record));
       onOpenChange(false);
     } catch {
+      if (!mountedRef.current) return;
       toast({ variant: 'destructive', title: `Không thể tải thông tin ${NOUN[role]}. Vui lòng thử lại.` });
+    } finally {
+      loadingRef.current = false;
     }
   }
 

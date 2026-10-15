@@ -1,7 +1,9 @@
-import type { ComponentProps } from 'react';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
+import { focusById } from '@/lib/enter-focus';
+import { usePartnerPermissions } from '@/features/customers/use-partner-permissions';
 import type { PartnerSearchItem } from '@/features/stock-vouchers/types';
 import type { PartnerType, StockDirection } from '@/features/stock-reasons/types';
 import {
@@ -10,6 +12,9 @@ import {
   type PartnerSearchHook,
   type PartnerSearchSource,
 } from './partner-autocomplete';
+import { PartnerCatalogDialog } from './partner-catalog-dialog';
+import { PartnerQuickAddDialog } from './partner-quick-add-dialog';
+import { StopFormEvents } from './stop-form-events';
 
 export interface PartnerCodeNameFieldProps {
   // 'Đối tượng' | 'Khách hàng'
@@ -17,7 +22,7 @@ export interface PartnerCodeNameFieldProps {
   required?: boolean;
   // 'customer' = quotation: customers only.
   scope: 'partner' | 'customer';
-  // From the reason; default 'customer'. Used by the quick add dialog (Phase 03).
+  // From the reason; default 'customer'. Picks the quick add's checked role and the catalog's start tab.
   preferredRole?: 'customer' | 'supplier';
   codeInputId: string;
   nameInputId: string;
@@ -38,12 +43,36 @@ export interface PartnerCodeNameFieldProps {
 
 const CUSTOMER_CODE_PLACEHOLDER = 'Nhập mã / tên / MST / địa chỉ / SĐT...';
 
+// Open state of a dialog plus a token per opening. Closing retires the token, so the callbacks a dialog handed out
+// during an earlier opening (a save or a detail load that finishes after Esc, even after reopening) become no-ops.
+function useDialogOpening() {
+  const current = useRef(0);
+  const [state, setState] = useState({ open: false, seed: '', token: 0 });
+  const renderToken = state.token;
+  return {
+    open: state.open,
+    seed: state.seed,
+    show(seed: string) {
+      current.current += 1;
+      setState({ open: true, seed, token: current.current });
+    },
+    onOpenChange(open: boolean) {
+      if (renderToken !== current.current) return;
+      if (!open) current.current += 1;
+      setState((s) => ({ ...s, open }));
+    },
+    // Only for the callbacks of this render; true while its opening is still the current one.
+    isCurrent: () => renderToken === current.current,
+  };
+}
+
 // Label, partner code combobox and partner name input in one inline row. The code combobox only picks active
 // partners and never needs a reason; the name input belongs to the caller (it may differ from the partner's name).
 export function PartnerCodeNameField({
   label,
   required,
   scope,
+  preferredRole = 'customer',
   codeInputId,
   nameInputId,
   nameInputProps,
@@ -62,6 +91,34 @@ export function PartnerCodeNameField({
   const source: PartnerSearchSource = useSearch ? { useSearch, type } : { type: type ?? 'In' };
   const errorId = `${codeInputId}-error`;
   const effectiveNamePlaceholder = namePlaceholder ?? (isCustomer ? 'Tên khách hàng' : 'Tên đối tượng');
+
+  const { canCreateCustomer, canCreateSupplier, canViewCustomer, canViewSupplier } = usePartnerPermissions();
+  const canAdd = !disabled && (isCustomer ? canCreateCustomer : canCreateCustomer || canCreateSupplier);
+  const canOpenCatalog = !disabled && (isCustomer ? canViewCustomer : canViewCustomer || canViewSupplier);
+  const quickAdd = useDialogOpening();
+  const catalog = useDialogOpening();
+  // A pick from a dialog keeps the focus on the name input; a cancel returns it to the code input.
+  const skipRestoreFocus = useRef(false);
+  const pickTimer = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => () => clearTimeout(pickTimer.current), []);
+
+  function pick(item: PartnerSearchItem) {
+    skipRestoreFocus.current = true;
+    onSelect(item);
+    clearTimeout(pickTimer.current);
+    pickTimer.current = setTimeout(() => focusById(nameInputId, 'end'), 0);
+  }
+
+  function handleCloseAutoFocus(e: Event) {
+    e.preventDefault();
+    if (skipRestoreFocus.current) {
+      skipRestoreFocus.current = false;
+      // The timer set by pick may have run before this close; Radix's trap would then have taken the focus back.
+      focusById(nameInputId, 'end');
+      return;
+    }
+    focusById(codeInputId);
+  }
 
   return (
     <>
@@ -84,6 +141,22 @@ export function PartnerCodeNameField({
           onSelect={onSelect}
           disabled={disabled}
           onUnpickedChange={onUnpickedChange}
+          onAddNew={
+            canAdd
+              ? (seed) => {
+                  skipRestoreFocus.current = false;
+                  quickAdd.show(seed);
+                }
+              : undefined
+          }
+          onOpenCatalog={
+            canOpenCatalog
+              ? (seed) => {
+                  skipRestoreFocus.current = false;
+                  catalog.show(seed);
+                }
+              : undefined
+          }
         />
         <Input
           id={nameInputId}
@@ -98,6 +171,33 @@ export function PartnerCodeNameField({
           {error}
         </p>
       )}
+      {/* After the row: the CSS needs the name input to stay the last child of .partner-code-name. */}
+      <StopFormEvents>
+        <PartnerQuickAddDialog
+          open={quickAdd.open}
+          onOpenChange={quickAdd.onOpenChange}
+          initialName={quickAdd.seed}
+          scope={scope}
+          preferredRole={preferredRole}
+          onCreated={(created) => {
+            if (quickAdd.isCurrent()) pick(created);
+          }}
+          onCloseAutoFocus={handleCloseAutoFocus}
+        />
+      </StopFormEvents>
+      <StopFormEvents>
+        <PartnerCatalogDialog
+          open={catalog.open}
+          onOpenChange={catalog.onOpenChange}
+          initialQuery={catalog.seed}
+          scope={scope}
+          preferredRole={preferredRole}
+          onSelect={(partner) => {
+            if (catalog.isCurrent()) pick(partner);
+          }}
+          onCloseAutoFocus={handleCloseAutoFocus}
+        />
+      </StopFormEvents>
     </>
   );
 }

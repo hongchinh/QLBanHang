@@ -187,6 +187,18 @@ describe('OpeningStockPage', () => {
     });
   });
 
+  it('focusing a filled Mã hàng cell does not open the list; typing does', async () => {
+    searchItems.data = [suggestion({})];
+    render(<OpeningStockPage />);
+
+    const input = byId('opening-product-code-0'); // holds TON01
+    act(() => input.focus());
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'TON0' } });
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+  });
+
   describe('product quick add', () => {
     const before = useAuthStore.getState();
     afterEach(() => useAuthStore.setState(before, true));

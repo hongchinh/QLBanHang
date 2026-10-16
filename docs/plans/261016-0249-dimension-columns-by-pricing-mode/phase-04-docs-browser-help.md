@@ -1,6 +1,6 @@
 # Phase 04 — Docs, real-browser check and help
 
-**Status:** [ ] pending
+**Status:** [-] in progress
 **Complexity:** M
 
 ## Objective

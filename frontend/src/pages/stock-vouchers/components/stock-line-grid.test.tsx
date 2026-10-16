@@ -37,7 +37,7 @@ vi.mock('@/features/products/components/product-quick-add-dialog', async () => {
           <button
             type="button"
             onClick={() => {
-              onCreated(quickAdded);
+              onCreated(quickAddResult);
               onOpenChange(false);
             }}
           >
@@ -91,6 +91,8 @@ const quickAdded: ProductSuggestion = {
   name: 'Tôn lạnh 0.50',
   pricingMode: 'PerUnit',
 };
+// What the mocked quick add dialog hands back; reset to quickAdded before each test.
+let quickAddResult: ProductSuggestion = quickAdded;
 
 const listItem: ProductListItem = {
   id: P2,
@@ -216,6 +218,7 @@ describe('StockLineGrid', () => {
   beforeEach(() => {
     localStorage.clear();
     permissions = ['products.create'];
+    quickAddResult = quickAdded;
     useProductSearchMock.mockReset();
     useProductSearchMock.mockImplementation((text: string) => ({
       data: [sheet],

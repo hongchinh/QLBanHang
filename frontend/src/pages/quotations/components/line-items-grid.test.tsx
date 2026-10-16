@@ -565,4 +565,44 @@ describe('LineItemsGrid', () => {
       expect(screen.getByDisplayValue('Name b')).toBeInTheDocument();
     });
   });
+
+  describe('the cell being edited stays with its row when the row above it goes', () => {
+    it('SL: the row that moves up keeps its raw text and takes the next digit; the row below shows its own value', () => {
+      const { form } = renderGrid([
+        line('a', { quantity: 2 }),
+        line('b', { quantity: 1234.5 }),
+        line('c', { quantity: 5678 }),
+      ]);
+
+      ctrlDelete('line-quantity-0');
+
+      expect(focused()).toBe('line-quantity-0');
+      expect(byId('line-quantity-0')).toHaveValue('1234.5');
+      expect(byId('line-quantity-1')).toHaveValue('5,678');
+
+      fireEvent.change(byId('line-quantity-0'), { target: { value: '9' } });
+      act(() => byId('line-quantity-0').blur());
+
+      expect(form().getValues('lines.0.quantity')).toBe(9);
+      expect(form().getValues('lines.1.quantity')).toBe(5678);
+    });
+
+    it('Đơn giá bán: the row that moves up keeps its raw value; the row below shows its own formatted value', () => {
+      renderGrid([
+        line('a', { unitPrice: 100 }),
+        line('b', { unitPrice: 1_234_500 }),
+        line('c', { unitPrice: 5_678_000 }),
+      ]);
+
+      ctrlDelete('line-unit-price-0');
+
+      expect(focused()).toBe('line-unit-price-0');
+      expect(byId('line-unit-price-0')).toHaveValue('1234500');
+      expect(byId('line-unit-price-1')).toHaveValue('5.678.000');
+
+      fireEvent.change(byId('line-unit-price-0'), { target: { value: '9' } });
+      expect(byId('line-unit-price-0')).toHaveValue('9');
+      expect(byId('line-unit-price-1')).toHaveValue('5.678.000');
+    });
+  });
 });

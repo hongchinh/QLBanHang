@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 
@@ -19,7 +20,7 @@ public sealed class ExecutiveLookups
     public Task<Dictionary<Guid, string>> BranchCodesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
         ids.Count == 0
             ? Task.FromResult(new Dictionary<Guid, string>())
-            : _db.Branches.IgnoreQueryFilters().AsNoTracking()
+            : _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(b => ids.Contains(b.Id))
                 .Select(b => new { b.Id, b.Code })
                 .ToDictionaryAsync(b => b.Id, b => b.Code, ct);
@@ -28,7 +29,7 @@ public sealed class ExecutiveLookups
         IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
         ids.Count == 0
             ? Task.FromResult(new Dictionary<Guid, (string Code, string Name)>())
-            : _db.Branches.IgnoreQueryFilters().AsNoTracking()
+            : _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(b => ids.Contains(b.Id))
                 .Select(b => new { b.Id, b.Code, b.Name })
                 .ToDictionaryAsync(b => b.Id, b => (b.Code, b.Name), ct);
@@ -38,7 +39,7 @@ public sealed class ExecutiveLookups
         IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
         ids.Count == 0
             ? Task.FromResult(new Dictionary<Guid, (string Code, string Name)>())
-            : _db.Customers.IgnoreQueryFilters().AsNoTracking()
+            : _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(c => ids.Contains(c.Id))
                 .Select(c => new { c.Id, c.Code, c.Name })
                 .ToDictionaryAsync(c => c.Id, c => (c.Code, c.Name), ct);
@@ -47,7 +48,7 @@ public sealed class ExecutiveLookups
         IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
         ids.Count == 0
             ? Task.FromResult(new Dictionary<Guid, (string Code, string Name)>())
-            : _db.Products.IgnoreQueryFilters().AsNoTracking()
+            : _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(p => ids.Contains(p.Id))
                 .Select(p => new { p.Id, p.Code, p.Name })
                 .ToDictionaryAsync(p => p.Id, p => (p.Code, p.Name), ct);
@@ -55,7 +56,7 @@ public sealed class ExecutiveLookups
     public Task<Dictionary<Guid, string>> UserNamesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
         ids.Count == 0
             ? Task.FromResult(new Dictionary<Guid, string>())
-            : _db.Users.IgnoreQueryFilters().AsNoTracking()
+            : _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(u => ids.Contains(u.Id))
                 .Select(u => new { u.Id, u.FullName })
                 .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);

@@ -47,7 +47,7 @@ public class CashDebtReportService : ICashDebtReportService
         var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.To));
 
         // Soft-deleted partners keep their ledger rows, so they stay in the report.
-        var partners = _db.Customers.IgnoreQueryFilters().AsNoTracking();
+        var partners = _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking();
         var entries = _db.DebtEntries.AsNoTracking().Where(e => e.Side == request.Side);
         if (request.Scope == ReportScope.Branch)
         {
@@ -56,7 +56,7 @@ public class CashDebtReportService : ICashDebtReportService
         else
         {
             // S15: company scope skips demo branches, soft-deleted ones included.
-            entries = entries.Where(e => !_db.Branches.IgnoreQueryFilters().Any(b => b.Id == e.BranchId && b.IsDemo));
+            entries = entries.Where(e => !_db.Branches.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(b => b.Id == e.BranchId && b.IsDemo));
         }
         if (request.PartnerId is { } partnerId)
             entries = entries.Where(e => e.PartnerId == partnerId);
@@ -153,7 +153,7 @@ public class CashDebtReportService : ICashDebtReportService
         var end = VnTime.ToUtc(VnTime.StartOfNextDay(request.To));
 
         // Soft-deleted partners keep their ledger rows, so their ledger can still be read.
-        var partner = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+        var partner = await _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(c => c.Id == request.PartnerId)
             .Select(c => new { c.Code, c.Name })
             .SingleOrDefaultAsync(ct)
@@ -168,7 +168,7 @@ public class CashDebtReportService : ICashDebtReportService
         else
         {
             // S15: company scope skips demo branches, soft-deleted ones included.
-            entries = entries.Where(e => !_db.Branches.IgnoreQueryFilters().Any(b => b.Id == e.BranchId && b.IsDemo));
+            entries = entries.Where(e => !_db.Branches.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(b => b.Id == e.BranchId && b.IsDemo));
         }
 
         // Same window rule as the balance report (P29): Opening entries are opening balance in every window.
@@ -243,7 +243,7 @@ public class CashDebtReportService : ICashDebtReportService
         var branchIds = entries.Select(e => e.BranchId).Distinct().ToList();
         if (branchIds.Count == 0)
             return new Dictionary<Guid, string>();
-        return await _db.Branches.IgnoreQueryFilters().AsNoTracking()
+        return await _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(b => branchIds.Contains(b.Id))
             .ToDictionaryAsync(b => b.Id, b => b.Code, ct);
     }
@@ -261,12 +261,12 @@ public class CashDebtReportService : ICashDebtReportService
             .Select(e => e.SourceId).Distinct().ToList();
         if (stockIds.Count > 0)
         {
-            var stock = await _db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+            var stock = await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(v => stockIds.Contains(v.Id))
                 .Select(v => new
                 {
                     v.Id,
-                    Name = _db.StockReasons.IgnoreQueryFilters()
+                    Name = _db.StockReasons.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                         .Where(r => r.Id == v.ReasonId).Select(r => r.Name).FirstOrDefault(),
                 })
                 .ToListAsync(ct);
@@ -282,12 +282,12 @@ public class CashDebtReportService : ICashDebtReportService
             .Select(e => e.SourceId).Distinct().ToList();
         if (cashIds.Count > 0)
         {
-            var cash = await _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+            var cash = await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(v => cashIds.Contains(v.Id))
                 .Select(v => new
                 {
                     v.Id,
-                    Name = _db.CashReasons.IgnoreQueryFilters()
+                    Name = _db.CashReasons.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                         .Where(r => r.Id == v.ReasonId).Select(r => r.Name).FirstOrDefault(),
                 })
                 .ToListAsync(ct);
@@ -309,7 +309,7 @@ public class CashDebtReportService : ICashDebtReportService
     {
         ReportScopeGuard.EnsureAllowed(_currentUser, request.Scope);
         var branchId = await _currentBranch.GetIdAsync(ct);
-        var partner = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+        var partner = await _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(c => c.Id == request.PartnerId)
             .Select(c => new { c.Code, c.Name, c.TaxCode, c.CompanyAddress, c.IsCustomer, c.IsSupplier })
             .SingleOrDefaultAsync(ct)
@@ -329,7 +329,7 @@ public class CashDebtReportService : ICashDebtReportService
         {
             // S15: company scope skips demo branches, soft-deleted ones included.
             partnerEntries = partnerEntries.Where(
-                e => !_db.Branches.IgnoreQueryFilters().Any(b => b.Id == e.BranchId && b.IsDemo));
+                e => !_db.Branches.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(b => b.Id == e.BranchId && b.IsDemo));
         }
         var sidesWithEntries = await partnerEntries
             .Select(e => e.Side)

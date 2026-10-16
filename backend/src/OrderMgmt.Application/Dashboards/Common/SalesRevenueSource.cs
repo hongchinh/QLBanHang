@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Domain.Constants;
@@ -23,7 +24,7 @@ public sealed class SalesRevenueSource
         DateTimeOffset from, DateTimeOffset to, CancellationToken ct)
     {
         // The reason ids come from their own query: IgnoreQueryFilters would also reveal deleted vouchers here.
-        var reasons = await _db.StockReasons.IgnoreQueryFilters().AsNoTracking()
+        var reasons = await _db.StockReasons.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(r => r.IsSystem && (r.Code == StockReasonCodes.Sale || r.Code == StockReasonCodes.SaleReturn))
             .Select(r => new { r.Id, r.Code })
             .ToListAsync(ct);

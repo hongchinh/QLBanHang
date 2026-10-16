@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Interfaces;
@@ -39,7 +40,7 @@ internal static class SampleCatalogWriter
         IReadOnlyCollection<SampleProductSpec> specs, CancellationToken ct)
     {
         var codes = specs.Select(s => s.Code).ToList();
-        var ids = await db.Products.IgnoreQueryFilters().Where(p => p.IsSample && codes.Contains(p.Code))
+        var ids = await db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(p => p.IsSample && codes.Contains(p.Code))
             .Select(p => p.Id).ToListAsync(ct);
         if (ids.Count > 0)
             await inventoryLock.AcquireProductsAsync(ids, ct);
@@ -48,7 +49,7 @@ internal static class SampleCatalogWriter
     /// A DM group is the sample group only when it carries the sample name; any other DM group is real data.
     private static async Task<Guid> GroupIdAsync(IAppDbContext db, CancellationToken ct)
     {
-        var rows = await db.ProductGroups.IgnoreQueryFilters().Where(g => g.Code == GroupCode).ToListAsync(ct);
+        var rows = await db.ProductGroups.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(g => g.Code == GroupCode).ToListAsync(ct);
         var group = ReuseSample(rows, g => g.Name == GroupName, $"Mã nhóm {GroupCode} đã được dùng cho dữ liệu thật.");
         if (group is null)
         {
@@ -63,7 +64,7 @@ internal static class SampleCatalogWriter
         IReadOnlyCollection<SampleProductSpec> specs, Guid groupId, CancellationToken ct)
     {
         var codes = specs.Select(s => s.Code).ToList();
-        var existing = (await db.Products.IgnoreQueryFilters().Where(p => codes.Contains(p.Code)).ToListAsync(ct))
+        var existing = (await db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(p => codes.Contains(p.Code)).ToListAsync(ct))
             .ToLookup(p => p.Code);
         var unitCodes = specs.Select(s => s.UnitCode).Distinct().ToList();
         var units = await db.Units.Where(u => unitCodes.Contains(u.Code)).ToDictionaryAsync(u => u.Code, u => u.Id, ct);
@@ -144,7 +145,7 @@ internal static class SampleCatalogWriter
         IReadOnlyCollection<SamplePartnerSpec> specs, CancellationToken ct)
     {
         var codes = specs.Select(s => s.Code).ToList();
-        var existing = (await db.Customers.IgnoreQueryFilters().Where(c => codes.Contains(c.Code)).ToListAsync(ct))
+        var existing = (await db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(c => codes.Contains(c.Code)).ToListAsync(ct))
             .ToLookup(c => c.Code);
 
         var ids = new Dictionary<string, Guid>();

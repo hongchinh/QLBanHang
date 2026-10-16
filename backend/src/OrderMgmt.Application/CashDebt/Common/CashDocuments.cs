@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.CashVouchers.Models;
 using OrderMgmt.Application.Common.Interfaces;
@@ -44,7 +45,7 @@ public static class CashDocuments
                 ActorUserId = a.ActorUserId,
                 ActorName = a.ActorUserId == null
                     ? "Hệ thống"
-                    : db.Users.IgnoreQueryFilters()
+                    : db.Users.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                         .Where(u => u.Id == a.ActorUserId)
                         .Select(u => u.FullName)
                         .FirstOrDefault() ?? "Người dùng không xác định",

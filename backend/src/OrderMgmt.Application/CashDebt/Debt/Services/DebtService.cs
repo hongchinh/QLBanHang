@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Debt.Interfaces;
@@ -318,7 +319,7 @@ public class DebtService : IDebtService
                    CreatedAt = s.CreatedAt,
                    CreatedByName = s.CreatedBy == null
                        ? null
-                       : _db.Users.IgnoreQueryFilters()
+                       : _db.Users.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                            .Where(u => u.Id == s.CreatedBy)
                            .Select(u => u.FullName)
                            .FirstOrDefault(),

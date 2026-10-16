@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Dashboards.Executive.Common;
@@ -241,7 +242,7 @@ public class InventoryMetricsService : IInventoryMetricsService
 
     /// Code, name and branch of each warehouse; a deleted warehouse keeps them (a lookup by id with the filters off).
     private Task<Dictionary<Guid, WarehouseInfo>> LoadWarehousesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
-        _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+        _db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(w => ids.Contains(w.Id))
             .Select(w => new { w.Id, w.Code, w.Name, w.BranchId })
             .ToDictionaryAsync(w => w.Id, w => new WarehouseInfo(w.Code, w.Name, w.BranchId), ct);
@@ -251,7 +252,7 @@ public class InventoryMetricsService : IInventoryMetricsService
     private async Task<Dictionary<Guid, ProductInfo>> LoadProductsAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
         var names = await _lookups.ProductsAsync(ids, ct);
-        var details = await _db.Products.IgnoreQueryFilters().AsNoTracking()
+        var details = await _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(p => ids.Contains(p.Id))
             .Select(p => new { p.Id, p.ProductGroupId, p.PricingMode, UnitName = p.Unit != null ? p.Unit.Name : null })
             .ToListAsync(ct);
@@ -264,7 +265,7 @@ public class InventoryMetricsService : IInventoryMetricsService
 
     /// The name of each product group; a deleted group keeps it.
     private Task<Dictionary<Guid, string>> LoadGroupNamesAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct) =>
-        _db.ProductGroups.IgnoreQueryFilters().AsNoTracking()
+        _db.ProductGroups.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(g => ids.Contains(g.Id))
             .Select(g => new { g.Id, g.Name })
             .ToDictionaryAsync(g => g.Id, g => g.Name, ct);

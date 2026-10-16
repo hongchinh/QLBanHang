@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -337,11 +338,11 @@ public static class DbSeeder
         }
 
         // The blocks below run only on an empty table (soft-deleted rows count, so deleted defaults stay deleted).
-        if (!await db.Warehouses.IgnoreQueryFilters().AnyAsync(ct))
+        if (!await db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).AnyAsync(ct))
             db.Warehouses.Add(new Warehouse { Code = "KHO01", Name = "Kho chính", BranchId = BranchDefaults.MainBranchId });
 
         // System stock reasons: each is inserted only when its code is missing (soft-deleted rows count).
-        var stockReasonCodes = await db.StockReasons.IgnoreQueryFilters().Select(r => r.Code).ToListAsync(ct);
+        var stockReasonCodes = await db.StockReasons.IgnoreQueryFilters([QueryFilters.SoftDelete]).Select(r => r.Code).ToListAsync(ct);
         var stockReasonSeeds = new[]
         {
             NewStockReason("NMH", "Nhập mua hàng", StockDirection.In, PartnerType.Supplier, DebtEffect.PayableIncrease),
@@ -353,7 +354,7 @@ public static class DbSeeder
         };
         db.StockReasons.AddRange(stockReasonSeeds.Where(r => !stockReasonCodes.Contains(r.Code)));
 
-        if (!await db.PaymentMethods.IgnoreQueryFilters().AnyAsync(ct))
+        if (!await db.PaymentMethods.IgnoreQueryFilters([QueryFilters.SoftDelete]).AnyAsync(ct))
         {
             db.PaymentMethods.AddRange(
                 new PaymentMethod { Code = "TM", Name = "Tiền mặt", FundKind = FundKind.Cash },
@@ -361,7 +362,7 @@ public static class DbSeeder
         }
 
         // System cash reasons: each is inserted only when its code is missing (soft-deleted rows count).
-        var cashReasonCodes = await db.CashReasons.IgnoreQueryFilters().Select(r => r.Code).ToListAsync(ct);
+        var cashReasonCodes = await db.CashReasons.IgnoreQueryFilters([QueryFilters.SoftDelete]).Select(r => r.Code).ToListAsync(ct);
         var cashReasonSeeds = new[]
         {
             NewCashReason("TKH", "Thu tiền khách hàng", CashVoucherType.Receipt, PartnerType.Customer, DebtEffect.ReceivableDecrease, false),
@@ -376,7 +377,7 @@ public static class DbSeeder
         db.CashReasons.AddRange(cashReasonSeeds.Where(r => !cashReasonCodes.Contains(r.Code)));
 
         // Every branch without any fund (soft-deleted ones count) gets the default cash fund QTM (P18).
-        var branchesWithFund = await db.Funds.IgnoreQueryFilters().Select(f => f.BranchId).Distinct().ToListAsync(ct);
+        var branchesWithFund = await db.Funds.IgnoreQueryFilters([QueryFilters.SoftDelete]).Select(f => f.BranchId).Distinct().ToListAsync(ct);
         foreach (var branchId in branchIds.Except(branchesWithFund))
             db.Funds.Add(new Fund { BranchId = branchId, Code = "QTM", Name = "Quỹ tiền mặt", Kind = FundKind.Cash, IsDefault = true });
 

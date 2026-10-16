@@ -147,7 +147,7 @@ public class Tt133ExportService : ITt133ExportService
             var label = "Tất cả kho";
             if (request.WarehouseId is { } warehouseId)
             {
-                var warehouse = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+                var warehouse = await _db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                     .Where(w => w.Id == warehouseId)
                     .Select(w => new { w.Code, w.Name })
                     .SingleAsync(token);
@@ -156,7 +156,7 @@ public class Tt133ExportService : ITt133ExportService
 
             string? group = null;
             if (request.ProductGroupId is { } groupId)
-                group = await _db.ProductGroups.IgnoreQueryFilters().AsNoTracking()
+                group = await _db.ProductGroups.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                     .Where(g => g.Id == groupId)
                     .Select(g => g.Name)
                     .SingleOrDefaultAsync(token);
@@ -231,7 +231,7 @@ public class Tt133ExportService : ITt133ExportService
         else if (request.WarehouseId is { } warehouseId)
         {
             // An explicit product with a warehouse is always a sheet; GetStockCardAsync answers 404 / 403 for a bad id.
-            var warehouse = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+            var warehouse = await _db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(w => w.Id == warehouseId)
                 .Select(w => new { w.Code, w.Name })
                 .FirstOrDefaultAsync(ct)

@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Sales.Quotations.Interfaces;
@@ -47,7 +48,7 @@ public class QuotationSystemSettingsService : IQuotationSystemSettingsService
     private async Task<string?> ResolveUserNameAsync(Guid? userId, CancellationToken ct)
     {
         if (!userId.HasValue) return null;
-        return await _db.Users.IgnoreQueryFilters()
+        return await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => u.Id == userId.Value)
             .Select(u => u.FullName)

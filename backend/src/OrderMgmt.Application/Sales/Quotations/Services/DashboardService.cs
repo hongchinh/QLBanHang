@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderMgmt.Application.Common.Interfaces;
@@ -355,7 +356,7 @@ public class DashboardService : IDashboardService
 
         var nameMap = actorIds.Count == 0
             ? new Dictionary<Guid, string>()
-            : await _db.Users.IgnoreQueryFilters()
+            : await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AsNoTracking()
                 .Where(u => actorIds.Contains(u.Id))
                 .Select(u => new { u.Id, u.FullName })

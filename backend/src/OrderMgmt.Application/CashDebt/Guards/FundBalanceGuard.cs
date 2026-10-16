@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
@@ -54,7 +55,7 @@ public class FundBalanceGuard : IFundBalanceGuard
             return;
 
         var fundIds = worse.Select(w => w.FundId).ToList();
-        var codes = await _db.Funds.IgnoreQueryFilters().AsNoTracking()
+        var codes = await _db.Funds.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(f => fundIds.Contains(f.Id))
             .ToDictionaryAsync(f => f.Id, f => f.Code, ct);
         var details = worse.ToDictionary(

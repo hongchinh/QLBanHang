@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderMgmt.Application.Common.Interfaces;
@@ -325,7 +326,7 @@ public class QuotationRevenueReportService : IQuotationRevenueReportService
             .Select(r => r.UserId)
             .ToList();
 
-        var names = await _db.Users.IgnoreQueryFilters()
+        var names = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => topUserIds.Contains(u.Id))
             .Select(u => new { u.Id, u.FullName })

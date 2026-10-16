@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
@@ -109,7 +110,7 @@ public class QuotationService : IQuotationService
         if (q.Status == QuotationStatus.Cancelled)
             throw new DomainException("CONFLICT", "Báo giá đã hủy không thể chỉnh sửa.");
 
-        var isOwnerDeleted = await _db.Users.IgnoreQueryFilters()
+        var isOwnerDeleted = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(u => u.Id == q.OwnerUserId)
             .Select(u => (bool?)u.IsDeleted)
             .FirstOrDefaultAsync(ct) ?? false;
@@ -258,17 +259,17 @@ public class QuotationService : IQuotationService
                 ConfirmedAt = q.ConfirmedAt,
                 AccountingConfirmedAt = q.AccountingConfirmedAt,
                 OwnerUserId = q.OwnerUserId,
-                OwnerFullName = _db.Users.IgnoreQueryFilters()
+                OwnerFullName = _db.Users.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                     .Where(u => u.Id == q.OwnerUserId)
                     .Select(u => u.FullName)
                     .FirstOrDefault(),
-                IsOwnerDeleted = _db.Users.IgnoreQueryFilters()
+                IsOwnerDeleted = _db.Users.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                     .Where(u => u.Id == q.OwnerUserId)
                     .Select(u => (bool?)u.IsDeleted)
                     .FirstOrDefault() ?? false,
                 CanClone = true,
                 CreatedByName = q.CreatedBy.HasValue
-                    ? _db.Users.IgnoreQueryFilters()
+                    ? _db.Users.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                         .Where(u => u.Id == q.CreatedBy)
                         .Select(u => u.FullName)
                         .FirstOrDefault()
@@ -314,7 +315,7 @@ public class QuotationService : IQuotationService
         if (ownerStats.Count == 0) return Array.Empty<QuotationOwnerOptionDto>();
 
         var ownerIds = ownerStats.Select(s => s.OwnerUserId).ToList();
-        var usersQuery = _db.Users.IgnoreQueryFilters()
+        var usersQuery = _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => ownerIds.Contains(u.Id));
         if (!includeDeleted)
@@ -350,7 +351,7 @@ public class QuotationService : IQuotationService
 
         EnsureCanAccess(quotation);
 
-        var owner = await _db.Users.IgnoreQueryFilters()
+        var owner = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => u.Id == quotation.OwnerUserId)
             .Select(u => new { u.FullName, u.IsDeleted })
@@ -359,7 +360,7 @@ public class QuotationService : IQuotationService
         string? confirmedByName = null;
         if (quotation.ConfirmedByUserId.HasValue)
         {
-            confirmedByName = await _db.Users.IgnoreQueryFilters()
+            confirmedByName = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AsNoTracking()
                 .Where(u => u.Id == quotation.ConfirmedByUserId.Value)
                 .Select(u => u.FullName)
@@ -369,7 +370,7 @@ public class QuotationService : IQuotationService
         string? accountingConfirmedByName = null;
         if (quotation.AccountingConfirmedByUserId.HasValue)
         {
-            accountingConfirmedByName = await _db.Users.IgnoreQueryFilters()
+            accountingConfirmedByName = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AsNoTracking()
                 .Where(u => u.Id == quotation.AccountingConfirmedByUserId.Value)
                 .Select(u => u.FullName)
@@ -413,7 +414,7 @@ public class QuotationService : IQuotationService
 
         var actors = actorIds.Count == 0
             ? new Dictionary<Guid, string>()
-            : await _db.Users.IgnoreQueryFilters()
+            : await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AsNoTracking()
                 .Where(u => actorIds.Contains(u.Id))
                 .Select(u => new { u.Id, u.FullName })
@@ -701,7 +702,7 @@ public class QuotationService : IQuotationService
             .FirstOrDefaultAsync(q => q.Id == id && !q.IsDeleted, ct)
             ?? throw new NotFoundException(nameof(Quotation), id);
 
-        var ownerInfo = await _db.Users.IgnoreQueryFilters()
+        var ownerInfo = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => u.Id == source.OwnerUserId)
             .Select(u => new { u.IsDeleted })
@@ -814,7 +815,7 @@ public class QuotationService : IQuotationService
         if (!_currentUser.HasPermission(permRequired))
             throw new ForbiddenException("Bạn không có quyền chuyển nhượng báo giá này.");
 
-        var currentOwner = await _db.Users.IgnoreQueryFilters()
+        var currentOwner = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => u.Id == quotation.OwnerUserId)
             .Select(u => new { u.IsDeleted })
@@ -856,7 +857,7 @@ public class QuotationService : IQuotationService
             .AsNoTracking()
             .Include(q => q.Lines.OrderBy(l => l.SortOrder))
             .FirstAsync(q => q.Id == quotation.Id, ct);
-        var ownerAfter = await _db.Users.IgnoreQueryFilters()
+        var ownerAfter = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => u.Id == refreshed.OwnerUserId)
             .Select(u => new { u.FullName, u.IsDeleted })

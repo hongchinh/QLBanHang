@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Entities.Sales;
 
 namespace OrderMgmt.Infrastructure.Persistence.Configurations;
@@ -69,7 +70,7 @@ public class QuotationConfiguration : IEntityTypeConfiguration<Quotation>
             .HasDatabaseName("ix_quotations_owner_status_date");
         b.HasIndex(x => new { x.OwnerUserId, x.IsDeleted, x.Status, x.ConfirmedAt })
             .HasDatabaseName("ix_quotations_owner_status_confirmed_at");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -106,7 +107,7 @@ public class QuotationLineConfiguration : IEntityTypeConfiguration<QuotationLine
             .HasForeignKey(x => x.ProductId)
             .OnDelete(DeleteBehavior.SetNull);
 
-        b.HasQueryFilter(x => !x.IsDeleted && !x.Quotation!.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted && !x.Quotation!.IsDeleted);
     }
 }
 
@@ -146,6 +147,6 @@ public class QuotationActivityConfiguration : IEntityTypeConfiguration<Quotation
             .HasDatabaseName("ix_quotation_activities_quotation_occurred");
         b.HasIndex(x => x.ActorUserId);
 
-        b.HasQueryFilter(x => !x.IsDeleted && !x.Quotation!.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted && !x.Quotation!.IsDeleted);
     }
 }

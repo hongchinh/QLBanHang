@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using System.Data.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
@@ -44,11 +45,11 @@ public sealed class DemoBranchService : IDemoBranchService
 
         // Automatic, cancelled and soft-deleted vouchers count too: all of them go with the branch.
         var documentCount =
-            await _db.StockVouchers.IgnoreQueryFilters().CountAsync(v => v.BranchId == branchId, ct)
-            + await _db.CashVouchers.IgnoreQueryFilters().CountAsync(v => v.BranchId == branchId, ct)
-            + await _db.FundTransfers.IgnoreQueryFilters().CountAsync(v => v.BranchId == branchId, ct)
-            + await _db.DebtOffsetVouchers.IgnoreQueryFilters().CountAsync(v => v.BranchId == branchId, ct);
-        var reassignedUserCount = await _db.Users.IgnoreQueryFilters()
+            await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).CountAsync(v => v.BranchId == branchId, ct)
+            + await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).CountAsync(v => v.BranchId == branchId, ct)
+            + await _db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).CountAsync(v => v.BranchId == branchId, ct)
+            + await _db.DebtOffsetVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).CountAsync(v => v.BranchId == branchId, ct);
+        var reassignedUserCount = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .CountAsync(u => u.DefaultBranchId == branchId, ct);
         return new DemoBranchDeletionPreviewDto
         {
@@ -76,7 +77,7 @@ public sealed class DemoBranchService : IDemoBranchService
             // user's default branch) may have landed since its table was cleared. One of the two places a race hits
             // (with the sample partner delete), so one of the two foreign key errors mapped to "busy": nothing is
             // deleted, the transaction rolls back.
-            await MapBusyAsync(() => _db.Branches.IgnoreQueryFilters().Where(b => b.Id == branchId).ExecuteDeleteAsync(c));
+            await MapBusyAsync(() => _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(b => b.Id == branchId).ExecuteDeleteAsync(c));
 
             // 16. The products priced by the branch's stock-ins follow their latest remaining stock-in.
             await ProductCostPrices.RecomputeAsync(_db, stockInProducts, c);
@@ -122,12 +123,12 @@ public sealed class DemoBranchService : IDemoBranchService
         await _inventoryLock.AcquireBranchGateAsync(new[] { branchId }, exclusive: true, ct);
         await LoadDeletableBranchAsync(branchId, ct);
 
-        var stockInProducts = await _db.StockVoucherLines.IgnoreQueryFilters()
+        var stockInProducts = await _db.StockVoucherLines.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(l => l.StockVoucher!.BranchId == branchId && l.StockVoucher.Type == StockDirection.In)
             .Select(l => l.ProductId)
             .Distinct()
             .ToListAsync(ct);
-        var sampleProducts = await _db.Products.IgnoreQueryFilters()
+        var sampleProducts = await _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(p => p.IsSample)
             .Select(p => p.Id)
             .ToListAsync(ct);
@@ -137,12 +138,12 @@ public sealed class DemoBranchService : IDemoBranchService
 
     private async Task EnsureWarehousesNotSharedAsync(Guid branchId, CancellationToken ct)
     {
-        var warehouses = _db.Warehouses.IgnoreQueryFilters().Where(w => w.BranchId == branchId).Select(w => w.Id);
-        if (await _db.StockVouchers.IgnoreQueryFilters()
+        var warehouses = _db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(w => w.BranchId == branchId).Select(w => w.Id);
+        if (await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AnyAsync(v => v.BranchId != branchId && warehouses.Contains(v.WarehouseId), ct)
-            || await _db.StockVoucherLines.IgnoreQueryFilters()
+            || await _db.StockVoucherLines.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AnyAsync(l => l.StockVoucher!.BranchId != branchId && warehouses.Contains(l.WarehouseId), ct)
-            || await _db.OpeningStocks.IgnoreQueryFilters()
+            || await _db.OpeningStocks.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .AnyAsync(o => o.BranchId != branchId && warehouses.Contains(o.WarehouseId), ct))
             throw new ConflictException("DEMO_WAREHOUSE_IN_USE", "Kho của chi nhánh demo đang được chi nhánh khác dùng.");
     }
@@ -151,65 +152,65 @@ public sealed class DemoBranchService : IDemoBranchService
     /// id sets are subqueries, read by each statement before its parents go.
     private async Task DeleteBranchRowsAsync(Guid branchId, CancellationToken c)
     {
-        var entries = _db.DebtEntries.IgnoreQueryFilters().Where(e => e.BranchId == branchId).Select(e => e.Id);
-        var cashVouchers = _db.CashVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).Select(v => v.Id);
-        var fundTransfers = _db.FundTransfers.IgnoreQueryFilters().Where(t => t.BranchId == branchId).Select(t => t.Id);
-        var debtOffsets = _db.DebtOffsetVouchers.IgnoreQueryFilters()
+        var entries = _db.DebtEntries.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(e => e.BranchId == branchId).Select(e => e.Id);
+        var cashVouchers = _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(v => v.BranchId == branchId).Select(v => v.Id);
+        var fundTransfers = _db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(t => t.BranchId == branchId).Select(t => t.Id);
+        var debtOffsets = _db.DebtOffsetVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(o => o.BranchId == branchId).Select(o => o.Id);
-        var stockVouchers = _db.StockVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).Select(v => v.Id);
+        var stockVouchers = _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(v => v.BranchId == branchId).Select(v => v.Id);
 
         // 1–2. Settlements, then the debt entries they join.
-        await _db.DebtSettlements.IgnoreQueryFilters()
+        await _db.DebtSettlements.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(s => entries.Contains(s.IncreaseEntryId) || entries.Contains(s.DecreaseEntryId))
             .ExecuteDeleteAsync(c);
-        await _db.DebtEntries.IgnoreQueryFilters().Where(e => e.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.DebtEntries.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(e => e.BranchId == branchId).ExecuteDeleteAsync(c);
 
         // 3–6. Cash documents after their activities (no foreign key) and lines. Cash vouchers go before the stock
         // vouchers that automatic ones follow (source_stock_voucher_id).
-        await _db.CashDocumentActivities.IgnoreQueryFilters()
+        await _db.CashDocumentActivities.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(a => cashVouchers.Contains(a.DocumentId) || fundTransfers.Contains(a.DocumentId)
                         || debtOffsets.Contains(a.DocumentId))
             .ExecuteDeleteAsync(c);
-        await _db.CashVoucherLines.IgnoreQueryFilters()
+        await _db.CashVoucherLines.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(l => cashVouchers.Contains(l.CashVoucherId))
             .ExecuteDeleteAsync(c);
-        await _db.CashVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).ExecuteDeleteAsync(c);
-        await _db.FundTransfers.IgnoreQueryFilters().Where(t => t.BranchId == branchId).ExecuteDeleteAsync(c);
-        await _db.DebtOffsetVouchers.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(v => v.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(t => t.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.DebtOffsetVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
 
         // 7–8. Stock vouchers after their activities and lines.
-        await _db.StockVoucherActivities.IgnoreQueryFilters()
+        await _db.StockVoucherActivities.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(a => stockVouchers.Contains(a.StockVoucherId))
             .ExecuteDeleteAsync(c);
-        await _db.StockVoucherLines.IgnoreQueryFilters()
+        await _db.StockVoucherLines.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(l => stockVouchers.Contains(l.StockVoucherId))
             .ExecuteDeleteAsync(c);
-        await _db.StockVouchers.IgnoreQueryFilters().Where(v => v.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(v => v.BranchId == branchId).ExecuteDeleteAsync(c);
 
         // 9. Derived stock data (no foreign keys).
-        await _db.InventoryLedger.IgnoreQueryFilters().Where(e => e.BranchId == branchId).ExecuteDeleteAsync(c);
-        await _db.InventoryCostPeriods.IgnoreQueryFilters().Where(p => p.BranchId == branchId).ExecuteDeleteAsync(c);
-        await _db.StockBalances.IgnoreQueryFilters().Where(b => b.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.InventoryLedger.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(e => e.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.InventoryCostPeriods.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(p => p.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.StockBalances.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(b => b.BranchId == branchId).ExecuteDeleteAsync(c);
 
         // 10. Opening data and credit limits.
-        await _db.OpeningStocks.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
-        await _db.OpeningDebts.IgnoreQueryFilters().Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
-        await _db.CreditLimits.IgnoreQueryFilters().Where(l => l.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.OpeningStocks.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.OpeningDebts.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(o => o.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.CreditLimits.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(l => l.BranchId == branchId).ExecuteDeleteAsync(c);
 
         // 11–12. Funds and warehouses, once no document or opening row uses them.
-        await _db.Funds.IgnoreQueryFilters().Where(f => f.BranchId == branchId).ExecuteDeleteAsync(c);
-        await _db.Warehouses.IgnoreQueryFilters().Where(w => w.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.Funds.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(f => f.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(w => w.BranchId == branchId).ExecuteDeleteAsync(c);
 
         // 13. Numbering.
-        await _db.DocumentCounters.IgnoreQueryFilters().Where(n => n.BranchId == branchId).ExecuteDeleteAsync(c);
-        await _db.DocumentNumberings.IgnoreQueryFilters().Where(n => n.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.DocumentCounters.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(n => n.BranchId == branchId).ExecuteDeleteAsync(c);
+        await _db.DocumentNumberings.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(n => n.BranchId == branchId).ExecuteDeleteAsync(c);
     }
 
     private Task<int> ReassignUsersAsync(Guid branchId, CancellationToken ct)
     {
         var now = _clock.UtcNow;
         var userId = _currentUser.UserId;
-        return _db.Users.IgnoreQueryFilters()
+        return _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(u => u.DefaultBranchId == branchId)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(u => u.DefaultBranchId, BranchDefaults.MainBranchId)
@@ -221,45 +222,45 @@ public sealed class DemoBranchService : IDemoBranchService
     /// left in it. Returns how many sample products and partners remain. Every check ignores the query filters.
     private async Task<(int KeptProducts, int KeptPartners)> CleanSampleCatalogAsync(CancellationToken ct)
     {
-        await _db.Products.IgnoreQueryFilters()
+        await _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(p => p.IsSample
-                        && !_db.StockVoucherLines.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
-                        && !_db.OpeningStocks.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
-                        && !_db.QuotationLines.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
-                        && !_db.InventoryLedger.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
-                        && !_db.StockBalances.IgnoreQueryFilters().Any(x => x.ProductId == p.Id)
-                        && !_db.InventoryCostPeriods.IgnoreQueryFilters().Any(x => x.ProductId == p.Id))
+                        && !_db.StockVoucherLines.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.ProductId == p.Id)
+                        && !_db.OpeningStocks.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.ProductId == p.Id)
+                        && !_db.QuotationLines.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.ProductId == p.Id)
+                        && !_db.InventoryLedger.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.ProductId == p.Id)
+                        && !_db.StockBalances.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.ProductId == p.Id)
+                        && !_db.InventoryCostPeriods.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.ProductId == p.Id))
             .ExecuteDeleteAsync(ct);
 
         // The partners nothing refers to; their addresses belong to them alone and go first.
-        var unusedPartnerIds = await _db.Customers.IgnoreQueryFilters()
+        var unusedPartnerIds = await _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(p => p.IsSample
-                        && !_db.StockVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
-                        && !_db.CashVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
-                        && !_db.DebtEntries.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
-                        && !_db.DebtOffsetVouchers.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
-                        && !_db.OpeningDebts.IgnoreQueryFilters().Any(x => x.PartnerId == p.Id)
-                        && !_db.CreditLimits.IgnoreQueryFilters().Any(x => x.CustomerId == p.Id)
-                        && !_db.Quotations.IgnoreQueryFilters().Any(x => x.CustomerId == p.Id))
+                        && !_db.StockVouchers.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.PartnerId == p.Id)
+                        && !_db.CashVouchers.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.PartnerId == p.Id)
+                        && !_db.DebtEntries.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.PartnerId == p.Id)
+                        && !_db.DebtOffsetVouchers.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.PartnerId == p.Id)
+                        && !_db.OpeningDebts.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.PartnerId == p.Id)
+                        && !_db.CreditLimits.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.CustomerId == p.Id)
+                        && !_db.Quotations.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(x => x.CustomerId == p.Id))
             .Select(p => p.Id)
             .ToListAsync(ct);
-        await _db.CustomerAddresses.IgnoreQueryFilters()
+        await _db.CustomerAddresses.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(a => unusedPartnerIds.Contains(a.CustomerId))
             .ExecuteDeleteAsync(ct);
         // A real-branch document naming one of these partners since the list was read (it takes no branch gate) fails
         // here: the same retryable 409.
-        await MapBusyAsync(() => _db.Customers.IgnoreQueryFilters()
+        await MapBusyAsync(() => _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(p => unusedPartnerIds.Contains(p.Id))
             .ExecuteDeleteAsync(ct));
 
         // Only the sample group: a real group may use the code DM too.
-        await _db.ProductGroups.IgnoreQueryFilters()
+        await _db.ProductGroups.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(g => g.Code == SampleGroupCode && g.Name == SampleGroupName
-                        && !_db.Products.IgnoreQueryFilters().Any(p => p.ProductGroupId == g.Id))
+                        && !_db.Products.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(p => p.ProductGroupId == g.Id))
             .ExecuteDeleteAsync(ct);
 
-        return (await _db.Products.IgnoreQueryFilters().CountAsync(p => p.IsSample, ct),
-            await _db.Customers.IgnoreQueryFilters().CountAsync(p => p.IsSample, ct));
+        return (await _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).CountAsync(p => p.IsSample, ct),
+            await _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).CountAsync(p => p.IsSample, ct));
     }
 
     /// A property of the provider's exception (PostgresException: ConstraintName, TableName), read by reflection like the

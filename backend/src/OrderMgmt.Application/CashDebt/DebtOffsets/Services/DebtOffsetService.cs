@@ -58,7 +58,7 @@ public class DebtOffsetService : IDebtOffsetService
         var branchId = await _currentBranch.GetIdAsync(ct);
         // IgnoreQueryFilters keeps offsets whose partner or owner was soft-deleted later (as in LoadDtoAsync); the
         // offsets' own soft-delete filter is applied by hand.
-        var query = _db.DebtOffsetVouchers.IgnoreQueryFilters().AsNoTracking()
+        var query = _db.DebtOffsetVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(o => !o.IsDeleted && o.BranchId == branchId);
 
         // VN dates as UTC ranges (D27).
@@ -272,7 +272,7 @@ public class DebtOffsetService : IDebtOffsetService
     {
         // IgnoreQueryFilters keeps the offset visible when its partner or owner was soft-deleted later; the offset's
         // own soft-delete filter is applied by hand.
-        var row = await _db.DebtOffsetVouchers.IgnoreQueryFilters().AsNoTracking()
+        var row = await _db.DebtOffsetVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(o => o.Id == id && !o.IsDeleted)
             .Select(o => new
             {
@@ -444,7 +444,7 @@ public class DebtOffsetService : IDebtOffsetService
         _codes.NextAsync(DocumentType.DebtOffset, branchId, voucherAt, peek, async (codes, c) =>
             // Soft-deleted rows count too: a deleted document's number is never issued again, even when a reset-policy
             // change restarts the counter on codes of the old period (the unique index only covers live rows).
-            (await _db.DebtOffsetVouchers.IgnoreQueryFilters()
+            (await _db.DebtOffsetVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .Where(o => o.BranchId == branchId && codes.Contains(o.Code))
                 .Select(o => o.Code)
                 .ToListAsync(c)).ToHashSet(), ct);

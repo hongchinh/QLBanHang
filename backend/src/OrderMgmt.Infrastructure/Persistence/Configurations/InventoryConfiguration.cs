@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Entities.Inventory;
 using OrderMgmt.Domain.Enums;
 
@@ -17,7 +18,7 @@ public class WarehouseConfiguration : IEntityTypeConfiguration<Warehouse>
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => x.BranchId);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
 
         b.HasOne(x => x.Branch)
             .WithMany()
@@ -75,7 +76,7 @@ public class PaymentMethodConfiguration : IEntityTypeConfiguration<PaymentMethod
         b.Property(x => x.Name).IsRequired().HasMaxLength(255);
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -90,7 +91,7 @@ public class StockReasonConfiguration : IEntityTypeConfiguration<StockReason>
         b.Property(x => x.DebtEffect).HasDefaultValue(DebtEffect.None);
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -143,7 +144,7 @@ public class StockVoucherConfiguration : IEntityTypeConfiguration<StockVoucher>
 
         b.HasIndex(x => new { x.Type, x.BranchId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.BranchId, x.Type, x.VoucherAt });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -180,7 +181,7 @@ public class StockVoucherLineConfiguration : IEntityTypeConfiguration<StockVouch
         b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Warehouse).WithMany().HasForeignKey(x => x.WarehouseId).OnDelete(DeleteBehavior.Restrict);
 
-        b.HasQueryFilter(x => !x.IsDeleted && !x.StockVoucher!.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted && !x.StockVoucher!.IsDeleted);
     }
 }
 
@@ -200,7 +201,7 @@ public class StockVoucherActivityConfiguration : IEntityTypeConfiguration<StockV
             .HasDatabaseName("ix_stock_voucher_activities_voucher_occurred");
         b.HasIndex(x => x.ActorUserId);
 
-        b.HasQueryFilter(x => !x.IsDeleted && !x.StockVoucher!.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted && !x.StockVoucher!.IsDeleted);
     }
 }
 
@@ -219,7 +220,7 @@ public class OpeningStockConfiguration : IEntityTypeConfiguration<OpeningStock>
         b.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
 
         b.HasIndex(x => new { x.WarehouseId, x.ProductId }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 

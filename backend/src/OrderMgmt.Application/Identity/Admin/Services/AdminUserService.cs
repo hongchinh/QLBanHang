@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Identity.Admin.Interfaces;
@@ -32,7 +33,7 @@ public class AdminUserService : IAdminUserService
     public async Task<IReadOnlyList<AdminUserListItemDto>> ListAsync(AdminUserListQuery query, CancellationToken ct = default)
     {
         var queryable = _db.Users
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
             .AsQueryable();
@@ -70,7 +71,7 @@ public class AdminUserService : IAdminUserService
     public async Task<AdminUserDetailDto> GetAsync(Guid id, CancellationToken ct = default)
     {
         var user = await _db.Users
-            .IgnoreQueryFilters()
+            .IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Include(u => u.UserRoles)
                 .ThenInclude(ur => ur.Role)
             .Include(u => u.DefaultBranch)
@@ -82,10 +83,10 @@ public class AdminUserService : IAdminUserService
 
     public async Task<AdminUserDetailDto> CreateAsync(CreateUserRequest req, CancellationToken ct = default)
     {
-        if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.Username == req.Username, ct))
+        if (await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete]).AnyAsync(u => u.Username == req.Username, ct))
             throw new ConflictException($"Username '{req.Username}' đã tồn tại.");
 
-        if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.Email == req.Email, ct))
+        if (await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete]).AnyAsync(u => u.Email == req.Email, ct))
             throw new ConflictException($"Email '{req.Email}' đã tồn tại.");
 
         var role = await _db.Roles.FirstOrDefaultAsync(r => r.Code == req.RoleCode, ct)

@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.CashDebt.Ledger;
@@ -190,7 +191,7 @@ public class AutoCashVoucherService : IAutoCashVoucherService
         // the exclusive gate (RecomputeReopenedAsync), and these vouchers are in the caller's branch (a settlement joins
         // entries of one branch).
         var branchIds = vouchers.Select(v => v.BranchId).Distinct().ToList();
-        var lockedUntil = await _db.Branches.IgnoreQueryFilters()
+        var lockedUntil = await _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(b => branchIds.Contains(b.Id))
             .ToDictionaryAsync(b => b.Id, b => b.LockedUntil, ct);
         foreach (var voucher in vouchers)
@@ -293,7 +294,7 @@ public class AutoCashVoucherService : IAutoCashVoucherService
         _codes.NextAsync(DocTypeOf(type), branchId, voucherAt, peek: false, async (codes, c) =>
             // Soft-deleted rows count too: a deleted document's number is never issued again, even when a reset-policy
             // change restarts the counter on codes of the old period (the unique index only covers live rows).
-            (await _db.CashVouchers.IgnoreQueryFilters()
+            (await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .Where(v => v.Type == type && v.BranchId == branchId && codes.Contains(v.Code))
                 .Select(v => v.Code)
                 .ToListAsync(c)).ToHashSet(), ct);

@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using System.Data.Common;
 using System.Diagnostics;
 using FluentValidation;
@@ -89,7 +90,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
     public async Task RecoverInterruptedAsync(CancellationToken ct = default)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        var count = await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
+        var count = await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(b => b.IsDemo && b.SampleDataStatus == SampleDataStatus.Running)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(b => b.SampleDataStatus, SampleDataStatus.Failed)
@@ -262,7 +263,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
         await using var scope = _scopeFactory.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<IAppDbContext>();
 
-        run.BranchCode = await db.Branches.IgnoreQueryFilters().Where(b => b.Id == run.BranchId)
+        run.BranchCode = await db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(b => b.Id == run.BranchId)
             .Select(b => b.Code).SingleAsync(ct);
         Fill(run.Funds, await db.Funds.Where(f => f.BranchId == run.BranchId)
             .Select(f => new { f.Code, f.Id }).ToDictionaryAsync(f => f.Code, f => f.Id, ct));
@@ -276,7 +277,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
         run.RequestedBy = requestedBy;
         run.Owners = owners ?? await ResolveOwnersAsync(db, requestedBy, ct);
         var userIds = run.Owners.Append(requestedBy).Distinct().ToList();
-        var users = await db.Users.IgnoreQueryFilters().Where(u => userIds.Contains(u.Id))
+        var users = await db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete]).Where(u => userIds.Contains(u.Id))
             .Select(u => new { u.Id, u.Username, u.FullName }).ToListAsync(ct);
         if (users.All(u => u.Id != requestedBy))
             throw new SampleDataPlanException("Không tìm thấy người tạo chi nhánh demo.");
@@ -458,7 +459,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
     /// Every read that starts a run and every status write target the branch only while it is a demo branch in
     /// Running: a real branch is never touched, and a final state is never overwritten.
     private static IQueryable<Branch> RunningDemoBranch(IAppDbContext db, Guid branchId) =>
-        db.Branches.IgnoreQueryFilters()
+        db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(b => b.Id == branchId && b.IsDemo && b.SampleDataStatus == SampleDataStatus.Running);
 
     private static IQueryable<Branch> RunningDemoBranch(AsyncServiceScope scope, Guid branchId) =>
@@ -523,7 +524,7 @@ public sealed class SampleDataRunner : ISampleDataRunner
     private async Task<bool> IsDemoAsync(Guid branchId, CancellationToken ct)
     {
         await using var scope = _scopeFactory.CreateAsyncScope();
-        return await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters()
+        return await scope.ServiceProvider.GetRequiredService<IAppDbContext>().Branches.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AnyAsync(b => b.Id == branchId && b.IsDemo, ct);
     }
 

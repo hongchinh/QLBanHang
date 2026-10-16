@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Entities.Catalog;
 using OrderMgmt.Domain.Enums;
 
@@ -30,7 +31,7 @@ public class CustomerConfiguration : IEntityTypeConfiguration<Customer>
         b.HasIndex(x => x.PhoneNumber);
         b.HasIndex(x => x.TaxCode);
         b.HasIndex(x => x.Name);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
 
         // Physical cascade is misleading because Customer uses soft-delete; the AppDbContext
         // cascade-propagates IsDeleted through this navigation instead.
@@ -51,7 +52,7 @@ public class CustomerAddressConfiguration : IEntityTypeConfiguration<CustomerAdd
         b.Property(x => x.Address).IsRequired().HasMaxLength(1000);
         b.Property(x => x.DefaultRecipient).HasMaxLength(255);
         b.Property(x => x.RecipientPhone).HasMaxLength(30);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -64,7 +65,7 @@ public class ProductGroupConfiguration : IEntityTypeConfiguration<ProductGroup>
         b.Property(x => x.Code).IsRequired().HasMaxLength(50);
         b.Property(x => x.Name).IsRequired().HasMaxLength(255);
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -77,7 +78,7 @@ public class UnitConfiguration : IEntityTypeConfiguration<Unit>
         b.Property(x => x.Code).IsRequired().HasMaxLength(50);
         b.Property(x => x.Name).IsRequired().HasMaxLength(100);
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -108,6 +109,6 @@ public class ProductConfiguration : IEntityTypeConfiguration<Product>
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.HasOne(x => x.ProductGroup).WithMany().HasForeignKey(x => x.ProductGroupId).OnDelete(DeleteBehavior.SetNull);
         b.HasOne(x => x.Unit).WithMany().HasForeignKey(x => x.UnitId).OnDelete(DeleteBehavior.SetNull);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }

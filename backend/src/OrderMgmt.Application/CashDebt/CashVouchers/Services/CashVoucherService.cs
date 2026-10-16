@@ -62,7 +62,7 @@ public class CashVoucherService : ICashVoucherService
         var branchId = await _currentBranch.GetIdAsync(ct);
         // IgnoreQueryFilters keeps vouchers whose fund, reason, partner or owner was soft-deleted later (as in
         // LoadDtoAsync); the vouchers' own soft-delete filter is applied by hand.
-        var query = _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+        var query = _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => !v.IsDeleted && v.BranchId == branchId && v.Type == request.Type);
 
         // VN dates as UTC ranges (D27).
@@ -416,7 +416,7 @@ public class CashVoucherService : ICashVoucherService
     {
         // IgnoreQueryFilters keeps the voucher visible when its fund, reason or partner was soft-deleted later;
         // the voucher's own and its lines' soft-delete filters are applied by hand.
-        var row = await _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+        var row = await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => v.Id == id && !v.IsDeleted)
             .Select(v => new
             {
@@ -667,7 +667,7 @@ public class CashVoucherService : ICashVoucherService
         _codes.NextAsync(DocTypeOf(type), branchId, voucherAt, peek, async (codes, c) =>
             // Soft-deleted rows count too: a deleted document's number is never issued again, even when a reset-policy
             // change restarts the counter on codes of the old period (the unique index only covers live rows).
-            (await _db.CashVouchers.IgnoreQueryFilters()
+            (await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .Where(v => v.Type == type && v.BranchId == branchId && codes.Contains(v.Code))
                 .Select(v => v.Code)
                 .ToListAsync(c)).ToHashSet(), ct);

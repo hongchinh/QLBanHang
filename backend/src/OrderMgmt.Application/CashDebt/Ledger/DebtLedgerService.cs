@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.Common.Interfaces;
@@ -205,7 +206,7 @@ public class DebtLedgerService : IDebtLedgerService
 
         // 2. Period lock on EffectiveAt; LockedUntil is read once for the branches involved.
         var branchIds = entries.Values.Select(e => e.BranchId).Distinct().ToList();
-        var lockedUntil = await _db.Branches.IgnoreQueryFilters()
+        var lockedUntil = await _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(b => branchIds.Contains(b.Id))
             .ToDictionaryAsync(b => b.Id, b => b.LockedUntil, ct);
         foreach (var group in added.GroupBy(s => entries[s.IncreaseEntryId].BranchId))

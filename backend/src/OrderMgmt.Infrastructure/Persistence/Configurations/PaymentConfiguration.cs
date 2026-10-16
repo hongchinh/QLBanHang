@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Entities.Payments;
 
 namespace OrderMgmt.Infrastructure.Persistence.Configurations;
@@ -16,7 +17,7 @@ public class BankConfiguration : IEntityTypeConfiguration<Bank>
         b.Property(x => x.Bin).IsRequired().HasMaxLength(10);
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => x.Bin).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -30,6 +31,6 @@ public class UserBankAccountConfiguration : IEntityTypeConfiguration<UserBankAcc
         b.Property(x => x.AccountName).IsRequired().HasMaxLength(255);
         b.HasIndex(x => x.UserId);
         b.HasOne(x => x.Bank).WithMany().HasForeignKey(x => x.BankId).OnDelete(DeleteBehavior.Restrict);
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }

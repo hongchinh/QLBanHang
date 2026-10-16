@@ -1,6 +1,6 @@
 # Phase 00 — Worktree, branch, baseline
 
-**Status:** [-] in progress
+**Status:** [x] done (2026-10-16)
 **Complexity:** S
 
 ## Objective

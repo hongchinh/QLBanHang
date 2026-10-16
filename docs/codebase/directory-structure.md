@@ -251,7 +251,9 @@ frontend/src/
 │                                # and quotation range presets), realtime-bus.ts (hub status and dashboard signal),
 │                                # blob-download.ts (requestBlob, saveBlob), pdf-tab.ts (openPdfTab), use-row-selection.ts,
 │                                # enter-focus.ts (focusNextInOrder, focusById),
-│                                # use-dialog-opening.ts (token per dialog opening)
+│                                # use-dialog-opening.ts (token per dialog opening),
+│                                # dimension-columns.ts (pricing-mode rank, shown dimension columns),
+│                                # use-appeared-keys.ts (flash of newly shown keys)
 ├── styles/
 └── test/
 

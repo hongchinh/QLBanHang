@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { PricingMode } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
-import { PRICING_MODES } from '@/lib/dimension-columns';
+import { PRICING_MODES, type DimensionField } from '@/lib/dimension-columns';
 import {
   DEFAULT_ENTER_STOPS,
   ENTER_STOP_FIELDS,
@@ -9,7 +9,8 @@ import {
   type EnterStopField,
 } from './line-navigation';
 
-// Columns the user may hide (brainstorm §2); the rest are always shown.
+// Columns the user may hide (brainstorm §2). Số tấm/Dài/Rộng/Dày follow the pricing-mode rule (`shownDimensions`);
+// the rest are always shown.
 export const OPTIONAL_COLUMNS = [
   'warehouse', 'stock-at', 'amount', 'discount-rate', 'discount-amount', 'vat-rate', 'vat-amount', 'note',
 ] as const;
@@ -116,23 +117,45 @@ const ERROR_COLUMNS: Partial<Record<string, OptionalColumn>> = {
   note: 'note',
 };
 
+// The line form fields that have an error on any line. `form.formState.errors.lines` is an array of per-line errors,
+// but an object when the array itself is rejected (for example no line), so it is checked here instead of trusting
+// the type.
+function lineErrorKeys(lineErrors: unknown): string[] {
+  if (!Array.isArray(lineErrors)) return [];
+  return (lineErrors as (Record<string, unknown> | undefined)[]).flatMap((lineError) => Object.keys(lineError ?? {}));
+}
+
 // Hidden columns that must still show: Kho when a line leaves the header warehouse, and any column with an error.
 export function forcedColumns(
   lines: readonly { warehouseId?: string }[],
   headerWarehouseId: string,
-  // `form.formState.errors.lines`: an array of per-line errors, but an object when the array itself is
-  // rejected (for example no line), so it is checked here instead of trusting the type.
+  // `form.formState.errors.lines`; `lineErrorKeys` handles the array-level error.
   lineErrors: unknown,
 ): Set<OptionalColumn> {
   const forced = new Set<OptionalColumn>();
   if (lines.some((l) => !!l.warehouseId && l.warehouseId !== headerWarehouseId)) forced.add('warehouse');
-  if (Array.isArray(lineErrors)) {
-    for (const lineError of lineErrors as (Record<string, unknown> | undefined)[]) {
-      for (const key of Object.keys(lineError ?? {})) {
-        const column = ERROR_COLUMNS[key];
-        if (column) forced.add(column);
-      }
-    }
+  for (const key of lineErrorKeys(lineErrors)) {
+    const column = ERROR_COLUMNS[key];
+    if (column) forced.add(column);
   }
   return forced;
+}
+
+// Line form fields of the four dimension columns.
+const DIMENSION_ERROR_FIELDS: Partial<Record<string, DimensionField>> = {
+  sheetCount: 'sheet-count',
+  length: 'length',
+  width: 'width',
+  thickness: 'thickness',
+};
+
+// Dimension columns with an error on any line. The grid shows them even where the highest pricing mode would hide
+// them: the server can reject a dimension that the line's mode on screen does not use.
+export function dimensionErrorFields(lineErrors: unknown): Set<DimensionField> {
+  const fields = new Set<DimensionField>();
+  for (const key of lineErrorKeys(lineErrors)) {
+    const field = DIMENSION_ERROR_FIELDS[key];
+    if (field) fields.add(field);
+  }
+  return fields;
 }

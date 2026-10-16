@@ -1,6 +1,6 @@
 # Phase 02 — Stock grid and stock form page
 
-**Status:** [-] in progress
+**Status:** [x] done (2026-10-16)
 **Complexity:** L
 
 ## Objective

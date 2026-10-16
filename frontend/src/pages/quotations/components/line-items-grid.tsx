@@ -7,7 +7,7 @@ import type {
   QuotationFormValues,
   QuotationLineFormValues,
 } from '@/features/quotations/schema';
-import { DIMENSION_FIELDS, isDimensionField, type DimensionField } from '@/lib/dimension-columns';
+import { isDimensionField, shownDimensions, type DimensionField } from '@/lib/dimension-columns';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
@@ -69,6 +69,9 @@ const COLUMNS: readonly GridColumn[] = [
   { key: 'line-profit', header: 'Lợi nhuận', width: 122, cost: true },
   { key: 'action', header: '', width: 42 },
 ];
+
+// Tên hàng has no fixed width; the table's min-width keeps this much for it.
+const NAME_MIN_WIDTH = 200;
 
 const DIMENSION_INPUTS: Record<DimensionField, { name: 'sheetCount' | 'length' | 'width' | 'thickness'; label: string }> = {
   'sheet-count': { name: 'sheetCount', label: 'Số tấm' },
@@ -147,8 +150,10 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
   const [editingQuantityText, setEditingQuantityText] = useState('');
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const canViewCost = useAuthStore((s) => s.hasPermission('quotations.view_cost'));
-  const dims: readonly DimensionField[] = DIMENSION_FIELDS;
+  // Số tấm, Dài, Rộng, Dày follow the highest pricing mode of the lines: one pass over the rows on every render.
+  const dims = shownDimensions(rows);
   const columns = COLUMNS.filter((c) => (isDimensionField(c.key) ? dims.includes(c.key) : !c.cost || canViewCost));
+  const minWidth = columns.reduce((sum, c) => sum + (c.width ?? NAME_MIN_WIDTH), 0);
 
   useImperativeHandle(ref, () => ({
     ensureFirstLineAndFocusProductCode() {
@@ -281,7 +286,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
 
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
       <div ref={wrapRef} className="accounting-grid-wrap" tabIndex={-1} onKeyDown={handleGridKeyDown}>
-        <table className="accounting-grid">
+        <table className="accounting-grid" style={{ minWidth }}>
           <colgroup>
             {columns.map((c) => (
               <col key={c.key} style={c.width ? { width: c.width } : undefined} />

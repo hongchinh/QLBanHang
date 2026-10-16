@@ -1,12 +1,13 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm, type UseFormReturn } from 'react-hook-form';
-import { LineItemsGrid } from './line-items-grid';
+import { createEmptyLine, LineItemsGrid } from './line-items-grid';
 import type {
   QuotationFormParsed,
   QuotationFormValues,
   QuotationLineFormValues,
 } from '@/features/quotations/schema';
+import type { ProductSuggestion } from '@/features/products/types';
 import { useAuthStore } from '@/stores/auth-store';
 
 // `last`: the props of the last product cell rendered. `byId`: the props of each product cell, by its input id.
@@ -69,6 +70,20 @@ function line(uiKey: string, overrides: Partial<QuotationLineFormValues> = {}): 
   };
 }
 
+const md = (uiKey: string, overrides: Partial<QuotationLineFormValues> = {}) =>
+  line(uiKey, { pricingMode: 'PerLinearMeter', unitName: 'm', sheetCount: 4, length: 6000, quantity: 0, ...overrides });
+// Its thickness is stored (from an earlier product) but unused.
+const m2 = (uiKey: string, overrides: Partial<QuotationLineFormValues> = {}) =>
+  line(uiKey, {
+    pricingMode: 'PerSquareMeter',
+    unitName: 'm²',
+    sheetCount: 3,
+    length: 2400,
+    width: 1200,
+    thickness: 5,
+    quantity: 0,
+    ...overrides,
+  });
 const m3 = (uiKey: string, overrides: Partial<QuotationLineFormValues> = {}) =>
   line(uiKey, {
     pricingMode: 'PerCubicMeter',
@@ -80,6 +95,24 @@ const m3 = (uiKey: string, overrides: Partial<QuotationLineFormValues> = {}) =>
     quantity: 0,
     ...overrides,
   });
+
+const sheetProduct: ProductSuggestion = {
+  id: '33333333-3333-3333-3333-333333333333',
+  code: 'TON01',
+  name: 'Tôn lạnh',
+  unitName: 'm²',
+  pricingMode: 'PerSquareMeter',
+  defaultPrice: 120_000,
+  costPrice: 90_000,
+  defaultTaxRate: 8,
+  length: 2000,
+  width: 1200,
+  thickness: undefined,
+  trackInventory: true,
+  purchaseDiscountRate: 0,
+  salesDiscountRate: 0,
+  priceIncludesVat: false,
+};
 
 function setCostPermission(enabled: boolean) {
   useAuthStore.setState({
@@ -144,6 +177,18 @@ function enter(id: string, shift = false) {
   act(() => el.focus());
   fireEvent.keyDown(el, { key: 'Enter', shiftKey: shift });
 }
+
+// Picks a product in a row's code cell, as the real typeahead's commit() does.
+function pick(rowIndex: number, product: ProductSuggestion) {
+  const onSelect = cellProps.byId[`line-product-code-${rowIndex}`]?.onSelect as
+    | ((s: ProductSuggestion) => void)
+    | undefined;
+  if (!onSelect) throw new Error(`no product cell in row ${rowIndex}`);
+  act(() => onSelect(product));
+}
+
+const DIMENSION_HEADERS = ['Số tấm', 'Dài', 'Rộng', 'Dày'];
+const shownDimensionHeaders = () => headers().filter((h) => DIMENSION_HEADERS.includes(h ?? ''));
 
 describe('LineItemsGrid', () => {
   beforeEach(() => {
@@ -304,5 +349,78 @@ describe('LineItemsGrid', () => {
     expect(focused()).toBe('line-thickness-0');
     enter('line-thickness-0');
     expect(focused()).toBe('line-unit-price-0');
+  });
+
+  describe('dimension columns follow the highest pricing mode', () => {
+    it('shows none for a blank line or unit lines, also while a code is typed', () => {
+      renderGrid([createEmptyLine(0), line('b')]);
+      // The exact row: main has only the one combined dimension header, none of the four.
+      expect(headers()).toEqual(['#', 'Mã hàng', 'Tên hàng', 'ĐVT', 'SL', 'Đơn giá bán', 'Thành tiền bán', '']);
+      for (const id of ['line-sheet-count-0', 'line-length-0', 'line-width-0', 'line-thickness-0']) {
+        expect(document.getElementById(id)).toBeNull();
+      }
+
+      fireEvent.change(byId('line-product-code-1'), { target: { value: 'TON' } });
+      expect(shownDimensionHeaders()).toEqual([]);
+    });
+
+    it('shows Số tấm, Dài and Rộng for an md line next to an m² line', () => {
+      renderGrid([md('a'), m2('b')]);
+      expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+    });
+
+    it('spans the empty row over the shown columns', () => {
+      renderGrid([]);
+      expect(screen.getByText(/Chưa có dòng nào/).closest('td')).toHaveAttribute('colspan', '8');
+    });
+
+    it('spans the empty row over the cost columns too with quotations.view_cost', () => {
+      setCostPermission(true);
+      renderGrid([]);
+      expect(screen.getByText(/Chưa có dòng nào/).closest('td')).toHaveAttribute('colspan', '11');
+    });
+
+    it.each([
+      ['unit lines', false, [line('a')], '780px'],
+      ['unit lines with view_cost', true, [line('a')], '1136px'],
+      ['an m³ line', false, [m3('a')], '1066px'],
+      ['an m³ line with view_cost', true, [m3('a')], '1422px'],
+    ])('sizes the table to its columns plus 200px for Tên hàng: %s', (_name, cost, lines, minWidth) => {
+      setCostPermission(cost);
+      const { container } = renderGrid(lines);
+      expect((container.querySelector('table.accounting-grid') as HTMLTableElement).style.minWidth).toBe(minWidth);
+    });
+
+    it('shows the m² columns at once when a unit-only quotation picks an m² product, and Enter walks them', () => {
+      renderGrid([line('a')]);
+      expect(shownDimensionHeaders()).toEqual([]);
+
+      pick(0, sheetProduct);
+
+      expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+      enter('line-name-0');
+      expect(focused()).toBe('line-unit-0');
+      enter('line-unit-0');
+      expect(focused()).toBe('line-sheet-count-0');
+      enter('line-sheet-count-0');
+      expect(focused()).toBe('line-length-0');
+      enter('line-length-0');
+      expect(focused()).toBe('line-width-0');
+      enter('line-width-0');
+      expect(focused()).toBe('line-unit-price-0');
+    });
+
+    it('hides Dày at once when the only m³ line is re-picked as an m² product, and keeps its value', () => {
+      const { form } = renderGrid([m3('a')]);
+      fireEvent.change(byId('line-thickness-0'), { target: { value: '8' } });
+      fireEvent.change(byId('line-product-code-0'), { target: { value: 'TON' } });
+      expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng', 'Dày']);
+
+      pick(0, sheetProduct);
+
+      expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+      expect(document.getElementById('line-thickness-0')).toBeNull();
+      expect(form().getValues('lines.0.thickness')).toBe(8);
+    });
   });
 });

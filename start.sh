@@ -6,7 +6,7 @@ echo "Khoi dong he thong QL Don Hang..."
 
 # Kiem tra dotnet
 if ! command -v dotnet &> /dev/null; then
-    echo "LÔII: .NET SDK chua duoc cai dat. Vui long cai dat .NET 9 SDK"
+    echo "LÔII: .NET SDK chua duoc cai dat. Vui long cai dat .NET 10 SDK"
     exit 1
 fi
 

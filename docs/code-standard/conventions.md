@@ -2,8 +2,9 @@
 
 ## Backend
 
-- Target framework is `net9.0`; versions for EF Core, ASP.NET Core and Npgsql are pinned in `backend/Directory.Build.props`.
+- Target framework is `net10.0`; versions for EF Core, ASP.NET Core and Npgsql are pinned in `backend/Directory.Build.props`.
 - Nullable reference types and implicit usings are enabled.
+- EF tooling: `dotnet-ef` 10.x as a global tool.
 - Keep Clean Architecture dependencies one-way: Domain -> none, Application -> Domain, Infrastructure -> Application/Domain, WebApi -> all for composition.
 - Put business entities in `OrderMgmt.Domain`; do not place EF or HTTP concerns there.
 - Application services own use-case logic and receive dependencies through interfaces in `Application/Common/Interfaces` or feature-specific `Interfaces` folders.

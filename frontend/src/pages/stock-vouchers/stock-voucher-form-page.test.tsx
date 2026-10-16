@@ -2591,6 +2591,96 @@ describe('StockVoucherFormPage', () => {
     await waitFor(() => expect(document.activeElement).toBe(byId(focusedId)));
   });
 
+  // The server checks a new or changed line against the catalog's current mode, so it can reject a dimension that the
+  // line's mode on screen does not use. That cell is a disabled "—": the caret goes to the line's Mã hàng to re-pick.
+  describe('a server error on a dimension', () => {
+    function openWithSecondLine(overrides: Partial<StockVoucherLine>, details: Record<string, string[]>) {
+      routeParams.id = V1;
+      const first = voucher().lines[0];
+      voucherState.data = voucher({ lines: [first, { ...first, id: L2, sortOrder: 1, ...overrides }] });
+      updateMock.mockRejectedValueOnce(apiError(400, 'VALIDATION', details));
+      renderPage('In');
+    }
+
+    // Mã hàng is pinned, so the focus scrolls nothing: the "—" cell of the error is scrolled into view by the page.
+    it('that the line does not use shows its column, scrolls its cell into view and focuses Mã hàng of that line', async () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        openWithSecondLine(
+          { pricingMode: 'PerLinearMeter', unitName: 'm', sheetCount: 2, length: 3000, quantity: 6 },
+          { 'lines[1].width': ['Chiều rộng phải lớn hơn 0'] },
+        );
+        expect(screen.queryByRole('columnheader', { name: 'Rộng' })).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+        await waitFor(() => expect(byId('stock-line-width-1')).toHaveAttribute('aria-invalid', 'true'));
+        expect(screen.getByRole('columnheader', { name: 'Rộng' })).toBeInTheDocument();
+        await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-1')));
+        expect(scroll.mock.contexts).toContain(byId('stock-line-width-1'));
+      } finally {
+        scroll.mockRestore();
+      }
+    });
+
+    it('that the first line does not use focuses its Mã hàng, and the other errors of the save stay', async () => {
+      openWithSecondLine({}, {
+        'lines[0].width': ['Chiều rộng phải lớn hơn 0'],
+        'lines[1].unitPrice': ['Đơn giá không hợp lệ'],
+      });
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-0')));
+      expect(byId('stock-line-width-0')).toHaveAttribute('aria-invalid', 'true');
+      expect(byId('stock-line-unit-price-1')).toHaveAttribute('aria-invalid', 'true');
+    });
+
+    // What the server sends when a unit line's product became md: Số tấm first. Its form key is sheetCount, its cell
+    // sheet-count, so a check on the form key would miss it.
+    it('Số tấm and Dài on a unit line focus its Mã hàng', async () => {
+      routeParams.id = V1;
+      voucherState.data = voucher();
+      updateMock.mockRejectedValueOnce(
+        apiError(400, 'VALIDATION', {
+          'lines[0].sheetCount': ['Số tấm phải lớn hơn 0'],
+          'lines[0].length': ['Chiều dài phải lớn hơn 0'],
+        }),
+      );
+      renderPage('In');
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+      await waitFor(() => expect(byId('stock-line-sheet-count-0')).toHaveAttribute('aria-invalid', 'true'));
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-0')));
+    });
+
+    // Rộng is shown by the m² line, not forced: the remap follows the mode of the line with the error.
+    it('on a column that another line shows focuses Mã hàng of the line that does not use it', async () => {
+      openWithSecondLine(
+        { pricingMode: 'PerSquareMeter', unitName: 'm²', sheetCount: 2, length: 3000, width: 1000, quantity: 6 },
+        { 'lines[0].width': ['Chiều rộng phải lớn hơn 0'] },
+      );
+      expect(screen.getByRole('columnheader', { name: 'Rộng' })).toBeInTheDocument();
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+      await waitFor(() => expect(byId('stock-line-width-0')).toHaveAttribute('aria-invalid', 'true'));
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-product-code-0')));
+    });
+
+    it('that the line uses still focuses that cell', async () => {
+      openWithSecondLine(
+        { pricingMode: 'PerSquareMeter', unitName: 'm²', sheetCount: 2, length: 3000, width: 1000, quantity: 6 },
+        { 'lines[1].width': ['Chiều rộng quá lớn.'] },
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Cập nhật' }));
+
+      await waitFor(() => expect(document.activeElement).toBe(byId('stock-line-width-1')));
+    });
+  });
+
   it('a cancelled voucher keeps the fund and due date disabled', () => {
     routeParams.id = V1;
     voucherState.data = voucher({ type: 'Out', status: 'Cancelled', canEdit: false, reasonId: R_OUT, reasonDebtEffect: 'ReceivableIncrease' });

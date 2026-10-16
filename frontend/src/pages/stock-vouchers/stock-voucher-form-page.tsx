@@ -61,6 +61,7 @@ import { useDocumentActions } from '@/hooks/useDocumentActions';
 import { getErrorMessage } from '@/lib/api-client';
 import { DIALOG_SELECTOR, PAGE_AREA_SELECTOR } from '@/lib/focus';
 import type { ConfirmFlags } from '@/lib/confirm-required';
+import { isDimensionField, usesDimension } from '@/lib/dimension-columns';
 import { toOptionalNumber } from '@/lib/to-number';
 import { toast } from '@/lib/use-toast';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
@@ -187,16 +188,26 @@ function errorKeysOf(errors: FieldErrors<StockVoucherFormValues>): string[] {
 }
 
 // The ids of the controls that correct the error of a key, best first. Accepts form keys and server keys
-// (`lines[3].width`).
-function focusIdsOf(key: string): string[] {
+// (`lines[3].width`). Given the lines, a dimension that the line's mode does not use maps to the line's Mã hàng: its
+// cell is a disabled "—", and only a re-pick fixes the line.
+function focusIdsOf(key: string, lines?: readonly { pricingMode?: unknown }[]): string[] {
   const line = /^lines(?:\.|\[)(\d+)(?:\]\.|\.)(\w+)$/.exec(key);
   if (line) {
+    if (lines && unusedDimensionCellId(key, lines)) return [`stock-line-product-code-${line[1]}`];
     // SL of a line priced by size is computed, and disabled: the cells it is computed from correct its error.
     const fields = line[2] === 'quantity' ? ['quantity', ...QUANTITY_SOURCES] : [line[2]];
     return fields.filter((field) => LINE_CELL_IDS[field]).map((field) => `stock-line-${LINE_CELL_IDS[field]}-${line[1]}`);
   }
   const id = key === 'lines' ? 'stock-line-product-code-0' : FIELD_FOCUS_IDS[key];
   return id ? [id] : [];
+}
+
+// The "—" cell of a dimension error on a line whose mode does not use that dimension, or null.
+function unusedDimensionCellId(key: string, lines: readonly { pricingMode?: unknown }[]): string | null {
+  const line = /^lines(?:\.|\[)(\d+)(?:\]\.|\.)(\w+)$/.exec(key);
+  const cell = line ? LINE_CELL_IDS[line[2]] : undefined;
+  if (!line || !cell || !isDimensionField(cell) || usesDimension(lines[Number(line[1])]?.pricingMode, cell)) return null;
+  return `stock-line-${cell}-${line[1]}`;
 }
 
 function productCodeCell(row: number): HTMLElement | null {
@@ -523,13 +534,19 @@ function StockVoucherForm({ type, id, voucher, defaults, refetchVoucher }: FormP
   function focusFirstError(keys: string[]) {
     const tab = firstErrorTab(keys);
     if (tab) setActiveTab(tab);
+    const lines = form.getValues('lines');
     const firstIdsOf = (match: (key: string) => boolean) =>
-      keys.filter(match).map(focusIdsOf).find((ids) => ids.length > 0) ?? [];
+      keys.filter(match).map((key) => focusIdsOf(key, lines)).find((ids) => ids.length > 0) ?? [];
     const mainIds = firstIdsOf((k) => tabOfField(k) === null);
     const tabIds = tab ? firstIdsOf((k) => tabOfField(k) === tab) : [];
+    // Mã hàng is pinned, so focusing it scrolls nothing: bring the "—" cell of a remapped error and its message into
+    // view. The key is the one `tabIds` was taken from; a main-area error (the partner) skips this.
+    const firstTabKey = tab ? keys.find((k) => tabOfField(k) === tab && focusIdsOf(k, lines).length > 0) : undefined;
+    const revealId = mainIds.length === 0 && firstTabKey ? unusedDimensionCellId(firstTabKey, lines) : null;
     if (mainIds.length === 0 && !tab) return;
     // After the panel is shown; `form.setFocus` cannot reach these controlled inputs and grid cells.
     setTimeout(() => {
+      if (revealId) document.getElementById(revealId)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       const candidates = [
         ...[...mainIds, ...tabIds, 'stock-line-add'].map((id) => document.getElementById(id)),
         document.querySelector<HTMLElement>('[role="tab"][data-state="active"]'),

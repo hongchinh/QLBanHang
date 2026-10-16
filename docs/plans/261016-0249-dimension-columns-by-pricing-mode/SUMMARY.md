@@ -40,11 +40,11 @@ On the stock-in, stock-out and quotation line grids, show the dimension columns 
 
 ## Phases
 
-- [ ] Phase 00 — Worktree, branch, baseline (S) — `phase-00-baseline.md`
-- [ ] Phase 01 — Shared rule and flash hook (M) — `phase-01-shared-rule.md`
-- [ ] Phase 02 — Stock grid and stock form page (L) — `phase-02-stock-grid.md`
-- [ ] Phase 03 — Quotation grid (L) — `phase-03-quotation-grid.md`
-- [ ] Phase 04 — Docs, real-browser check and help (M) — `phase-04-docs-browser-help.md` (ends with Task 4.16: execution report and archive)
+- [x] Phase 00 — Worktree, branch, baseline (S) — `phase-00-baseline.md`
+- [x] Phase 01 — Shared rule and flash hook (M) — `phase-01-shared-rule.md`
+- [x] Phase 02 — Stock grid and stock form page (L) — `phase-02-stock-grid.md`
+- [x] Phase 03 — Quotation grid (L) — `phase-03-quotation-grid.md`
+- [x] Phase 04 — Docs, real-browser check and help (M) — `phase-04-docs-browser-help.md` (ends with Task 4.16: execution report and archive)
 
 Order: 00 → 01 → 02 and 03 → 04. Run one phase per request unless the user asks for several. Phases 02 and 03 need only Phase 01 and touch disjoint files (`src/pages/stock-vouchers/` and `src/pages/quotations/components/`); run them one after the other in `$WT`, or in parallel as follows (all before Phase 04):
 

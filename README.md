@@ -127,7 +127,7 @@ dotnet ef migrations add <Name> --project src/OrderMgmt.Infrastructure --startup
 dotnet ef database update --project src/OrderMgmt.Infrastructure --startup-project src/OrderMgmt.WebApi
 ```
 
-Cần cài CLI lần đầu: `dotnet tool install --global dotnet-ef`.
+Cần cài CLI lần đầu: `dotnet tool install --global dotnet-ef --version 10.0.13` (đã cài bản 9.x thì chạy `dotnet tool update --global dotnet-ef --version 10.0.13`).
 
 ---
 

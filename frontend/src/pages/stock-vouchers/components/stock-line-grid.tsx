@@ -25,6 +25,7 @@ import {
 import { DIALOG_SELECTOR } from '@/lib/focus';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
+import { useAppearedKeys } from '@/lib/use-appeared-keys';
 import { toOptionalNumber } from '@/lib/to-number';
 import { useAuthStore } from '@/stores/auth-store';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
@@ -387,6 +388,9 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     remove(rowIndex);
   };
   const columns = COLUMNS.filter((c) => isShown(c.key) && !(readOnly && c.key === 'action'));
+  // Dimension columns that have just appeared flash (`col-appeared`, line-items-grid.css); none on the first render.
+  const appeared = useAppearedKeys(shownDims);
+  const flashClass = (key: ColumnKey) => (appeared.has(key) ? 'col-appeared' : undefined);
   // Hiding or showing dimension columns shifts the columns to their right: keep the focused cell in view. Keyed on the
   // joined list (a new array every render); the first render only records it.
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -835,7 +839,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.key} className={cellClass(c)} style={stickyOffset.get(c.key)}>
+                <th key={c.key} className={cellClass(c, flashClass(c.key))} style={stickyOffset.get(c.key)}>
                   {c.header}
                 </th>
               ))}
@@ -850,7 +854,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
               return (
                 <tr key={(field as { _uiKey?: string })._uiKey ?? field.id}>
                   {columns.map((c) => (
-                    <td key={c.key} className={cellClass(c)} style={stickyOffset.get(c.key)}>
+                    <td key={c.key} className={cellClass(c, flashClass(c.key))} style={stickyOffset.get(c.key)}>
                       {renderCell(c.key, idx, line, result)}
                     </td>
                   ))}

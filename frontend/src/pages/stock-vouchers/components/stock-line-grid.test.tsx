@@ -1501,6 +1501,34 @@ describe('StockLineGrid', () => {
     });
   });
 
+  describe('columns that appear flash', () => {
+    const th = (text: string) => screen.getAllByRole('columnheader').find((el) => el.textContent === text)!;
+
+    it('a m² pick on a unit-only voucher marks the new headers and every cell of the new columns, "—" cells included', async () => {
+      renderGrid({ lines: [createEmptyStockLine(0, WH1), line({ _uiKey: 'b' })] });
+      expect(document.querySelectorAll('.col-appeared')).toHaveLength(0);
+
+      await pickFromTypeahead('TON01');
+
+      await waitFor(() => expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']));
+      for (const [header, field] of [['Số tấm', 'sheet-count'], ['Dài', 'length'], ['Rộng', 'width']]) {
+        expect(th(header)).toHaveClass('col-appeared');
+        expect(byId(`stock-line-${field}-0`).closest('td')).toHaveClass('col-appeared');
+        expect(byId(`stock-line-${field}-1`).closest('td')).toHaveClass('col-appeared'); // the unit line's "—" cell
+      }
+      expect(th('SL')).not.toHaveClass('col-appeared');
+      expect(byId('stock-line-quantity-1').closest('td')).not.toHaveClass('col-appeared');
+      // The flash lasts about 1.2 s.
+      await waitFor(() => expect(document.querySelectorAll('.col-appeared')).toHaveLength(0), { timeout: 2000 });
+    });
+
+    it('a saved m³ voucher flashes nothing when it opens', () => {
+      renderGrid({ lines: [m3Line(), line({ _uiKey: 'b' })] });
+      expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng', 'Dày']);
+      expect(document.querySelectorAll('.col-appeared')).toHaveLength(0);
+    });
+  });
+
   describe('product quick add', () => {
     function typeNewCode() {
       useProductSearchMock.mockImplementation((text: string) => ({

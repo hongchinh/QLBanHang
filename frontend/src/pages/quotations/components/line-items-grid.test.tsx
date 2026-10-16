@@ -428,7 +428,7 @@ describe('LineItemsGrid', () => {
       expect(focused()).toBe('line-unit-price-0');
     });
 
-    it('hides Dày at once when the only m³ line is re-picked as an m² product, and keeps its value', () => {
+    it('hides Dày at once when the only m³ line is re-picked as an m² product, and clears its value', () => {
       const { form } = renderGrid([m3('a')]);
       fireEvent.change(byId('line-thickness-0'), { target: { value: '8' } });
       fireEvent.change(byId('line-product-code-0'), { target: { value: 'TON' } });
@@ -438,7 +438,33 @@ describe('LineItemsGrid', () => {
 
       expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
       expect(document.getElementById('line-thickness-0')).toBeNull();
-      expect(form().getValues('lines.0.thickness')).toBe(8);
+      expect(form().getValues('lines.0.thickness')).toBeUndefined();
+    });
+  });
+
+  describe('a re-pick clears the dimensions the new product does not use and keeps the others', () => {
+    it('clears Dày and keeps Số tấm, Dài and Rộng when an m³ line picks an m² product', () => {
+      const { form } = renderGrid([m3('a')]);
+
+      pick(0, sheetProduct);
+
+      const picked = form().getValues('lines.0');
+      expect(picked.thickness).toBeUndefined();
+      expect(picked.sheetCount).toBe(2);
+      expect(picked.length).toBe(3000);
+      expect(picked.width).toBe(100);
+    });
+
+    it('clears all four when an m³ line picks a unit product', () => {
+      const { form } = renderGrid([m3('a')]);
+
+      pick(0, { ...sheetProduct, unitName: 'cái', pricingMode: 'PerUnit' });
+
+      const picked = form().getValues('lines.0');
+      expect(picked.sheetCount).toBeUndefined();
+      expect(picked.length).toBeUndefined();
+      expect(picked.width).toBeUndefined();
+      expect(picked.thickness).toBeUndefined();
     });
   });
 

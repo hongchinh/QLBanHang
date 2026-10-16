@@ -8,6 +8,7 @@ import type {
   QuotationLineFormValues,
 } from '@/features/quotations/schema';
 import {
+  DIMENSION_FIELDS,
   isDimensionField,
   normalizePricingMode,
   shownDimensions,
@@ -377,6 +378,13 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                         setLineField(idx, 'specification', (s.specification ?? '') as never);
                         setLineField(idx, 'unitName', (s.unitName ?? line.unitName) as never);
                         setLineField(idx, 'pricingMode', s.pricingMode);
+                        // A dimension the new mode does not use shows "—" or hides, so it must not stay stored,
+                        // saved and printed. Cleared as an empty line has it.
+                        for (const f of DIMENSION_FIELDS) {
+                          if (!usesDimension(s.pricingMode, f)) {
+                            setLineField(idx, DIMENSION_INPUTS[f].name, undefined as never);
+                          }
+                        }
                         setLineField(idx, 'unitPrice', (s.defaultPrice ?? 0) as never);
                         setLineField(idx, 'unitCost', s.costPrice as never);
                       }}

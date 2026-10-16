@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { useForm } from 'react-hook-form';
+import { useForm, type UseFormReturn } from 'react-hook-form';
 import { LineItemsGrid } from './line-items-grid';
 import type {
   QuotationFormParsed,
@@ -9,13 +9,19 @@ import type {
 } from '@/features/quotations/schema';
 import { useAuthStore } from '@/stores/auth-store';
 
-const cellProps = vi.hoisted(() => ({ last: undefined as Record<string, unknown> | undefined }));
+// `last`: the props of the last product cell rendered. `byId`: the props of each product cell, by its input id.
+const cellProps = vi.hoisted(() => ({
+  last: undefined as Record<string, unknown> | undefined,
+  byId: {} as Record<string, Record<string, unknown>>,
+}));
 
 vi.mock('./product-typeahead-cell', () => ({
-  ProductTypeaheadCell: (props: { value: string; onChange: (value: string) => void }) => {
+  ProductTypeaheadCell: (props: { value: string; onChange: (value: string) => void; inputId?: string }) => {
     cellProps.last = props;
+    if (props.inputId) cellProps.byId[props.inputId] = props;
     return (
       <input
+        id={props.inputId}
         aria-label="product-code"
         value={props.value}
         onChange={(e) => props.onChange((e.target as HTMLInputElement).value)}
@@ -47,6 +53,22 @@ const baseLines: QuotationLineFormValues[] = [
   },
 ];
 
+// A line with a stable _uiKey, as every production line has (createEmptyLine, toFormDefaults). Without it the <tr>
+// key falls back to field.id, which react-hook-form regenerates on every changed nested setValue.
+function line(uiKey: string, overrides: Partial<QuotationLineFormValues> = {}): QuotationLineFormValues {
+  return {
+    _uiKey: uiKey,
+    sortOrder: 0,
+    productCode: `P-${uiKey}`,
+    productName: `Name ${uiKey}`,
+    unitName: 'pcs',
+    pricingMode: 'PerUnit',
+    quantity: 1,
+    unitPrice: 100,
+    ...overrides,
+  };
+}
+
 function setCostPermission(enabled: boolean) {
   useAuthStore.setState({
     accessToken: 'token',
@@ -63,6 +85,9 @@ function setCostPermission(enabled: boolean) {
 }
 
 function renderGrid(lines: QuotationLineFormValues[] = baseLines) {
+  const formRef: { current: UseFormReturn<QuotationFormValues, unknown, QuotationFormParsed> | null } = {
+    current: null,
+  };
   function Harness() {
     const form = useForm<QuotationFormValues, unknown, QuotationFormParsed>({
       defaultValues: {
@@ -81,15 +106,32 @@ function renderGrid(lines: QuotationLineFormValues[] = baseLines) {
         lines,
       },
     });
+    formRef.current = form;
     return <LineItemsGrid form={form} />;
   }
 
-  return render(<Harness />);
+  const view = render(<Harness />);
+  return { ...view, form: () => formRef.current! };
+}
+
+function byId(id: string): HTMLInputElement {
+  const el = document.getElementById(id);
+  if (!el) throw new Error(`#${id} not found`);
+  return el as HTMLInputElement;
 }
 
 describe('LineItemsGrid', () => {
   beforeEach(() => {
     setCostPermission(false);
+    cellProps.byId = {};
+  });
+
+  it('gives each code cell its id and keeps the props of each cell', () => {
+    const { form } = renderGrid([line('a'), line('b')]);
+
+    expect(byId('line-product-code-1')).toHaveValue('P-b');
+    expect(cellProps.byId['line-product-code-1']?.nextFocusId).toBe('line-name-1');
+    expect(form().getValues('lines.1._uiKey')).toBe('b');
   });
 
   it('turns on product quick add for the code cell and returns to the name cell', () => {

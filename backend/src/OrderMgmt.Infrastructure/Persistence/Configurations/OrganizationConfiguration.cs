@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Organization;
 using OrderMgmt.Domain.Enums;
@@ -23,7 +24,7 @@ public class BranchConfiguration : IEntityTypeConfiguration<Branch>
         b.Property(x => x.SampleDataError).HasMaxLength(1000);
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
 
         b.HasData(new Branch
         {

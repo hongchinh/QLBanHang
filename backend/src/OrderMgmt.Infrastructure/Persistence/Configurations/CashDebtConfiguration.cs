@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Entities.CashDebt;
 using OrderMgmt.Domain.Enums;
 
@@ -15,7 +16,7 @@ public class CashReasonConfiguration : IEntityTypeConfiguration<CashReason>
         b.Property(x => x.Name).IsRequired().HasMaxLength(255);
 
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -36,7 +37,7 @@ public class FundConfiguration : IEntityTypeConfiguration<Fund>
         b.HasIndex(x => x.BankId);
         b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.BranchId, x.Kind }).IsUnique().HasFilter("is_default AND is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
 
         b.HasOne(x => x.Branch).WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne(x => x.Bank).WithMany().HasForeignKey(x => x.BankId).OnDelete(DeleteBehavior.Restrict);
@@ -70,7 +71,7 @@ public class CreditLimitConfiguration : IEntityTypeConfiguration<CreditLimit>
         b.Property(x => x.Amount).HasColumnType("numeric(18,2)");
 
         b.HasIndex(x => new { x.CustomerId, x.BranchId }).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
 
         b.HasOne(x => x.Customer).WithMany().HasForeignKey(x => x.CustomerId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<OrderMgmt.Domain.Entities.Organization.Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);
@@ -155,7 +156,7 @@ public class CashVoucherConfiguration : IEntityTypeConfiguration<CashVoucher>
         // At most one live automatic voucher per stock voucher (P20).
         b.HasIndex(x => x.SourceStockVoucherId).IsUnique()
             .HasFilter("is_deleted = false AND source_stock_voucher_id IS NOT NULL");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -170,7 +171,7 @@ public class CashVoucherLineConfiguration : IEntityTypeConfiguration<CashVoucher
         b.Property(x => x.Amount).HasColumnType("numeric(18,2)");
         b.Property(x => x.Note).HasMaxLength(1000);
 
-        b.HasQueryFilter(x => !x.IsDeleted && !x.CashVoucher!.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted && !x.CashVoucher!.IsDeleted);
     }
 }
 
@@ -200,7 +201,7 @@ public class FundTransferConfiguration : IEntityTypeConfiguration<FundTransfer>
         b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.FromFundId, x.VoucherAt });
         b.HasIndex(x => new { x.ToFundId, x.VoucherAt });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -227,7 +228,7 @@ public class DebtOffsetVoucherConfiguration : IEntityTypeConfiguration<DebtOffse
 
         b.HasIndex(x => new { x.BranchId, x.Code }).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => new { x.BranchId, x.VoucherAt });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -260,7 +261,7 @@ public class OpeningDebtConfiguration : IEntityTypeConfiguration<OpeningDebt>
         b.Property(x => x.Version).IsRowVersion();
 
         b.HasIndex(x => new { x.BranchId, x.PartnerId });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
 
         b.HasOne(x => x.Partner).WithMany().HasForeignKey(x => x.PartnerId).OnDelete(DeleteBehavior.Restrict);
         b.HasOne<OrderMgmt.Domain.Entities.Organization.Branch>().WithMany().HasForeignKey(x => x.BranchId).OnDelete(DeleteBehavior.Restrict);

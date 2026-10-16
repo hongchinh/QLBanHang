@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using OrderMgmt.Application.Common;
 using OrderMgmt.Domain.Constants;
 using OrderMgmt.Domain.Entities.Identity;
 
@@ -19,7 +20,7 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
 
         b.HasIndex(x => x.Username).IsUnique().HasFilter("is_deleted = false");
         b.HasIndex(x => x.Email).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
 
         b.HasMany(x => x.RefreshTokens)
             .WithOne(x => x.User)
@@ -48,7 +49,7 @@ public class RefreshTokenConfiguration : IEntityTypeConfiguration<RefreshToken>
 
         b.HasIndex(x => x.TokenHash).IsUnique();
         b.HasIndex(x => new { x.UserId, x.ExpiresAt });
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -61,7 +62,7 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
         b.Property(x => x.Code).IsRequired().HasMaxLength(50);
         b.Property(x => x.Name).IsRequired().HasMaxLength(100);
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -75,7 +76,7 @@ public class PermissionConfiguration : IEntityTypeConfiguration<Permission>
         b.Property(x => x.Name).IsRequired().HasMaxLength(200);
         b.Property(x => x.Module).IsRequired().HasMaxLength(50);
         b.HasIndex(x => x.Code).IsUnique().HasFilter("is_deleted = false");
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }
 
@@ -88,7 +89,7 @@ public class UserRoleConfiguration : IEntityTypeConfiguration<UserRole>
         b.HasOne(x => x.User).WithMany(x => x.UserRoles).HasForeignKey(x => x.UserId);
         b.HasOne(x => x.Role).WithMany(x => x.UserRoles).HasForeignKey(x => x.RoleId);
         // Mirror soft-delete on principal entities so join rows disappear with their parents.
-        b.HasQueryFilter(x => !x.User.IsDeleted && !x.Role.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.User.IsDeleted && !x.Role.IsDeleted);
     }
 }
 
@@ -100,7 +101,7 @@ public class RolePermissionConfiguration : IEntityTypeConfiguration<RolePermissi
         b.HasKey(x => new { x.RoleId, x.PermissionId });
         b.HasOne(x => x.Role).WithMany(x => x.RolePermissions).HasForeignKey(x => x.RoleId);
         b.HasOne(x => x.Permission).WithMany(x => x.RolePermissions).HasForeignKey(x => x.PermissionId);
-        b.HasQueryFilter(x => !x.Role.IsDeleted && !x.Permission.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.Role.IsDeleted && !x.Permission.IsDeleted);
     }
 }
 
@@ -122,6 +123,6 @@ public class UserQuotationSettingsConfiguration : IEntityTypeConfiguration<UserQ
             .HasForeignKey<UserQuotationSettings>(x => x.UserId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        b.HasQueryFilter(x => !x.IsDeleted);
+        b.HasQueryFilter(QueryFilters.SoftDelete, x => !x.IsDeleted);
     }
 }

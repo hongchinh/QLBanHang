@@ -22,6 +22,7 @@ Xem nhanh doanh thu bán hàng của chi nhánh đang làm việc và tình hìn
 - Không có quyền xem báo giá của mọi người thì bạn chỉ thấy phiếu mình phụ trách, và dòng dưới tiêu đề ghi "phiếu của tôi".
 - **Tổng báo giá**, **Đã huỷ**, **Phễu trạng thái** và **Hoạt động gần đây** không theo chi nhánh: chúng tính theo báo giá của bạn, hoặc của mọi người nếu bạn có quyền xem báo giá của mọi người.
 - Nếu bạn có quyền, mở màn hình **Điều hành** để xem doanh thu toàn công ty.
+- Mở trang mà chưa chọn kỳ thì xem từ đầu tháng đến hôm nay. Phần trăm trên thẻ so với kỳ liền trước có cùng số ngày, và hiện — khi kỳ trước bằng 0; **Doanh thu hôm nay** không so sánh nên luôn hiện —. **Tổng báo giá** đếm theo ngày báo giá, **Đã huỷ** theo ngày hủy.
 - Báo cáo Doanh thu vẫn tính theo báo giá đã chốt, nên số có thể khác màn hình này.
 - **Trực tiếp** ở đầu trang nghĩa là số liệu cập nhật ngay khi có chứng từ hoặc báo giá mới; khi **Mất kết nối**, số liệu chỉ được làm mới mỗi phút, giờ bên cạnh là lần cập nhật cuối.
 

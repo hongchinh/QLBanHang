@@ -14,8 +14,6 @@ export const ENTER_STOP_FIELDS = LINE_FOCUS_FIELDS.filter(
   (f): f is EnterStopField => f !== 'product-code',
 );
 
-export const PRICING_MODES: readonly PricingMode[] = ['PerUnit', 'PerLinearMeter', 'PerSquareMeter', 'PerCubicMeter'];
-
 // Enter stops after the product code, per pricing mode (brainstorm §2).
 export const DEFAULT_ENTER_STOPS: Record<PricingMode, readonly EnterStopField[]> = {
   PerUnit: ['quantity', 'unit-price'],

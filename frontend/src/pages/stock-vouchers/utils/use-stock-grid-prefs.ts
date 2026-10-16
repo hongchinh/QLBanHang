@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
 import type { PricingMode } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
+import { PRICING_MODES } from '@/lib/dimension-columns';
 import {
   DEFAULT_ENTER_STOPS,
   ENTER_STOP_FIELDS,
-  PRICING_MODES,
   isFieldDisabled,
   type EnterStopField,
 } from './line-navigation';

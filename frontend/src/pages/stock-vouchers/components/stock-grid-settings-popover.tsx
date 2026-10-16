@@ -2,7 +2,8 @@ import { AppIcon } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import type { PricingMode } from '@/features/products/types';
-import { ENTER_STOP_FIELDS, PRICING_MODES, isFieldDisabled, type EnterStopField } from '@/pages/stock-vouchers/utils/line-navigation';
+import { PRICING_MODES } from '@/lib/dimension-columns';
+import { ENTER_STOP_FIELDS, isFieldDisabled, type EnterStopField } from '@/pages/stock-vouchers/utils/line-navigation';
 import { OPTIONAL_COLUMNS, type OptionalColumn, type StockGridPrefs } from '@/pages/stock-vouchers/utils/use-stock-grid-prefs';
 
 const COLUMN_LABELS: Record<OptionalColumn, string> = {

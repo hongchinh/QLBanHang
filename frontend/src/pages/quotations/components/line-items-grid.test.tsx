@@ -644,4 +644,42 @@ describe('LineItemsGrid', () => {
       expect(document.querySelector('.col-appeared')).toBeNull();
     });
   });
+
+  describe('the focused cell stays in view when the dimension columns change', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('scrolls the focused cell into view once after a delete hides Dày', () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      renderGrid([m3('a'), m2('b')]);
+
+      ctrlDelete('line-thickness-0');
+
+      expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+      expect(focused()).toBe('line-product-code-0');
+      expect(scroll).toHaveBeenCalledTimes(1);
+      expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+      expect(scroll.mock.contexts[0]).toBe(document.activeElement);
+    });
+
+    it('does not scroll when the columns change with the focus outside the grid', () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      const { form } = renderGrid([m3('a')]);
+
+      act(() => form().reset({ ...form().getValues(), lines: [line('b')] }));
+
+      expect(shownDimensionHeaders()).toEqual([]);
+      expect(scroll).not.toHaveBeenCalled();
+    });
+
+    it('does not scroll on a re-render that keeps the columns', () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      renderGrid([m3('a')]);
+      act(() => byId('line-length-0').focus());
+
+      fireEvent.change(byId('line-length-0'), { target: { value: '3500' } });
+
+      expect(byId('line-length-0')).toHaveValue(3500);
+      expect(scroll).not.toHaveBeenCalled();
+    });
+  });
 });

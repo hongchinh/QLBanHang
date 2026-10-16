@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState, type KeyboardEvent } from 'react';
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { AppIcon } from '@/components/icons';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -160,6 +160,17 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
   const appeared = useAppearedKeys(dims);
   const columns = COLUMNS.filter((c) => (isDimensionField(c.key) ? dims.includes(c.key) : !c.cost || canViewCost));
   const minWidth = columns.reduce((sum, c) => sum + (c.width ?? NAME_MIN_WIDTH), 0);
+  // Showing or hiding a dimension column shifts the columns to its right: keep the focused cell in view. Keyed on the
+  // joined list (the array is new on every render); the first render only records it.
+  const dimsKey = dims.join(',');
+  const dimsKeyRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const previous = dimsKeyRef.current;
+    dimsKeyRef.current = dimsKey;
+    if (previous === null || previous === dimsKey) return;
+    const active = document.activeElement;
+    if (active && wrapRef.current?.contains(active)) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }, [dimsKey]);
 
   useImperativeHandle(ref, () => ({
     ensureFirstLineAndFocusProductCode() {

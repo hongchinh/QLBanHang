@@ -1,6 +1,6 @@
 # Phase 01 — Shared rule and flash hook
 
-**Status:** [-] in progress
+**Status:** [x] done (2026-10-16)
 **Complexity:** M
 
 ## Objective

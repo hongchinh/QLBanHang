@@ -30,7 +30,7 @@ Ghi nhận hàng xuất khỏi kho: bán cho khách, trả hàng nhà cung cấp
 - Đối tượng ngừng sử dụng không hiện trong ô **Đối tượng**; nếu bị ngừng sau khi đã chọn, lúc lưu sẽ báo Đối tượng đã ngừng hoạt động. Phiếu cũ của đối tượng đó vẫn sửa được.
 - Vượt hạn mức nợ: tùy chính sách trong cấu hình, hệ thống cho qua, hiện hộp thoại **Vượt hạn mức nợ** để bạn xác nhận, hoặc chặn lưu.
 - Hàng tính theo mét (m dài, m², m³) nhập **Số tấm** và **Dài**, **Rộng**, **Dày** theo loại hàng; **SL** tự tính, không nhập tay.
-- Các cột **Số tấm**, **Dài**, **Rộng**, **Dày** chỉ hiện khi phiếu có hàng tính theo m dài, m² hoặc m³, theo loại cao nhất trong phiếu: m dài hiện **Số tấm** và **Dài**, m² thêm **Rộng**, m³ thêm **Dày**. Ô mà dòng không dùng hiện —. Nếu lúc lưu có lỗi ở một cột đang ẩn, cột đó hiện ra và lỗi ghi dưới ô.
+- Các cột **Số tấm**, **Dài**, **Rộng**, **Dày** chỉ hiện khi phiếu có hàng tính theo m dài, m² hoặc m³, theo loại cao nhất trong phiếu: m dài hiện **Số tấm** và **Dài**, m² thêm **Rộng**, m³ thêm **Dày**. Ô mà dòng không dùng hiện —. Nếu lúc lưu có lỗi ở một cột đang ẩn, cột đó hiện ra và lỗi ghi dưới ô. Lỗi ở cột mà dòng không dùng thì ô đó vẫn khóa, hiện —, con trỏ về ô **Mã hàng** của dòng; chọn lại hàng để sửa.
 - Trong **Cột & phím Enter**, mục **Hiện cột** không có bốn cột này vì chúng tự hiện theo hàng có trong phiếu.
 - **HTTT** không gắn với quỹ thì **Số tiền thanh toán** khóa ở 0 và không có phiếu thu.
 - Phải lưu thay đổi trước khi in.

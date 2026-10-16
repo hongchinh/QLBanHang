@@ -178,6 +178,13 @@ function enter(id: string, shift = false) {
   fireEvent.keyDown(el, { key: 'Enter', shiftKey: shift });
 }
 
+// Presses Ctrl+Delete in a cell, focusing it first.
+function ctrlDelete(id: string) {
+  const el = byId(id);
+  act(() => el.focus());
+  fireEvent.keyDown(el, { key: 'Delete', ctrlKey: true });
+}
+
 // Picks a product in a row's code cell, as the real typeahead's commit() does.
 function pick(rowIndex: number, product: ProductSuggestion) {
   const onSelect = cellProps.byId[`line-product-code-${rowIndex}`]?.onSelect as
@@ -325,6 +332,8 @@ describe('LineItemsGrid', () => {
       expect(screen.getByDisplayValue('Alpha')).toBeInTheDocument();
       expect(screen.queryByDisplayValue('Beta')).not.toBeInTheDocument();
     });
+    // The last row went: the row above takes the focus, in the same cell.
+    expect(document.activeElement).toBe(screen.getByDisplayValue('Alpha'));
   });
 
   it('shows the dimensions as four columns and walks them from Số tấm to Dày', () => {
@@ -490,5 +499,70 @@ describe('LineItemsGrid', () => {
     renderGrid([line('a'), line('b')]);
     expect(cellProps.byId['line-product-code-0']?.openOnFocus).toBe(false);
     expect(cellProps.byId['line-product-code-1']?.openOnFocus).toBe(false);
+  });
+
+  describe('a row delete moves the focus to the row that takes its place', () => {
+    it('keeps the cell when the row below uses it; that row moves up with the focus', () => {
+      renderGrid([line('a'), line('b'), line('c')]);
+      ctrlDelete('line-name-1');
+      expect(focused()).toBe('line-name-1');
+      expect(byId('line-name-1')).toHaveValue('Name c');
+      expect(screen.queryByDisplayValue('Name b')).toBeNull();
+    });
+
+    it("goes to the row's Mã hàng from SL when that row is an m² line, which does not use SL", () => {
+      renderGrid([line('a'), m2('b')]);
+      ctrlDelete('line-quantity-0');
+      expect(focused()).toBe('line-product-code-0');
+      expect(byId('line-product-code-0')).toHaveValue('P-b');
+    });
+
+    it("goes to the m² row's Mã hàng from Dày of the only m³ row, then hides Dày", () => {
+      renderGrid([m3('a'), m2('b')]);
+      ctrlDelete('line-thickness-0');
+      expect(focused()).toBe('line-product-code-0');
+      expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+    });
+
+    it('goes to the row above when the bottom row goes', () => {
+      renderGrid([line('a'), line('b'), line('c')]);
+      ctrlDelete('line-name-2');
+      expect(focused()).toBe('line-name-1');
+      expect(byId('line-name-1')).toHaveValue('Name b');
+    });
+
+    it('goes to Thêm dòng when the only row goes', () => {
+      renderGrid([line('a')]);
+      ctrlDelete('line-name-0');
+      expect(screen.getByText(/Chưa có dòng nào/)).toBeInTheDocument();
+      expect(focused()).toBe('line-add');
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Thêm dòng' }));
+    });
+
+    it("goes to the next row's Mã hàng from a click on the trash button", async () => {
+      const user = userEvent.setup();
+      renderGrid([line('a'), line('b')]);
+      await user.click(screen.getAllByRole('button', { name: 'Xóa dòng' })[0]);
+      expect(screen.queryByDisplayValue('Name a')).toBeNull();
+      expect(focused()).toBe('line-product-code-0');
+      expect(byId('line-product-code-0')).toHaveValue('P-b');
+    });
+
+    it("goes to the next row's Mã hàng from Ctrl+Delete on the focused trash button", () => {
+      renderGrid([line('a'), line('b')]);
+      const trash = screen.getAllByRole('button', { name: 'Xóa dòng' })[0];
+      act(() => trash.focus());
+      fireEvent.keyDown(trash, { key: 'Delete', ctrlKey: true });
+      expect(screen.queryByDisplayValue('Name a')).toBeNull();
+      expect(focused()).toBe('line-product-code-0');
+    });
+
+    // React passes a key from a portal (the catalog dialog opened from a cell) to the grid; it is no row.
+    it('deletes nothing from Ctrl+Delete outside a row', () => {
+      const { container } = renderGrid([line('a'), line('b')]);
+      act(() => byId('line-name-1').focus());
+      fireEvent.keyDown(container.querySelector('.accounting-grid-wrap')!, { key: 'Delete', ctrlKey: true });
+      expect(screen.getByDisplayValue('Name b')).toBeInTheDocument();
+    });
   });
 });

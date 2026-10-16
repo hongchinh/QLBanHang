@@ -1,4 +1,5 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { LineItemsGrid } from './line-items-grid';
 import type {
@@ -129,5 +130,36 @@ describe('LineItemsGrid with the real product typeahead', () => {
 
     await waitFor(() => expect(document.activeElement).toBe(byId('line-name-1')));
     expect(form().getValues('lines.1')).toMatchObject({ productCode: 'P1', productName: 'Name1', quantity: 5, unitPrice: 123 });
+  });
+
+  it("Ctrl+Delete in row 0's Mã hàng moves the caret into the next Mã hàng with its list closed, and Enter keeps the row", async () => {
+    const { form } = renderGrid();
+
+    act(() => byId('line-product-code-0').focus());
+    expect(screen.queryByRole('listbox')).toBeNull();
+    fireEvent.keyDown(byId('line-product-code-0'), { key: 'Delete', ctrlKey: true });
+
+    expect(form().getValues('lines.0._uiKey')).toBe('b');
+    expect(document.activeElement).toBe(byId('line-product-code-0'));
+    expect(screen.queryByRole('listbox')).toBeNull();
+
+    fireEvent.keyDown(document.activeElement!, { key: 'Enter' });
+
+    await waitFor(() => expect(document.activeElement).toBe(byId('line-name-0')));
+    expect(form().getValues('lines.0')).toMatchObject({ productCode: 'P1', productName: 'Name1', quantity: 5, unitPrice: 123 });
+  });
+
+  it("a click on row 0's trash button moves the caret into the next Mã hàng with its list closed, and Enter keeps the row", async () => {
+    const user = userEvent.setup();
+    const { form } = renderGrid();
+
+    await user.click(screen.getAllByRole('button', { name: 'Xóa dòng' })[0]);
+    expect(document.activeElement).toBe(byId('line-product-code-0'));
+    expect(screen.queryByRole('listbox')).toBeNull();
+
+    fireEvent.keyDown(document.activeElement!, { key: 'Enter' });
+
+    await waitFor(() => expect(document.activeElement).toBe(byId('line-name-0')));
+    expect(form().getValues('lines.0')).toMatchObject({ productCode: 'P1', productName: 'Name1', quantity: 5, unitPrice: 123 });
   });
 });

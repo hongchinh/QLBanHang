@@ -140,10 +140,12 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
     control: form.control,
     name: 'lines',
   });
-  const watched = useWatch({ control: form.control, name: 'lines' }) as QuotationLineFormValues[] | undefined;
-  const rows = watched ?? [];
+  // The watch renders the grid on every line change, but the rows are read from the form itself, which always matches
+  // the field array. react-hook-form hands remove() to its watchers one render late: read from the watched copy, the
+  // rows would key the row that moves up with the deleted line, and that row would remount and drop the focus.
+  useWatch({ control: form.control, name: 'lines' });
+  const rows = (form.getValues('lines') ?? []) as QuotationLineFormValues[];
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
   const [editingMoneyCellId, setEditingMoneyCellId] = useState<string | null>(null);
   const [editingQuantityCellId, setEditingQuantityCellId] = useState<string | null>(null);
   const [editingQuantityText, setEditingQuantityText] = useState('');
@@ -223,6 +225,19 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
     }
   }
 
+  // Remove a row without a focus gap, as the stock grid does: focus the row that takes its place (the row below, else
+  // the row above) BEFORE removing it. Its <tr> stays mounted, so the focus stays there. The same cell when that row
+  // renders and enables it (SL on a metre line does not count), otherwise its Mã hàng; with no row left, Thêm dòng.
+  function removeLine(rowIndex: number, field: LineFocusField) {
+    const survivor = rowIndex + 1 < fields.length ? rowIndex + 1 : rowIndex - 1;
+    if (survivor >= 0) {
+      focusLineCell(getEnabledFocusFields(survivor).includes(field) ? field : 'product-code', survivor);
+    } else {
+      document.getElementById('line-add')?.focus();
+    }
+    remove(rowIndex);
+  }
+
   function handleGridKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.defaultPrevented) return;
 
@@ -233,11 +248,15 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
     }
 
     if (e.key === 'Delete' && e.ctrlKey) {
+      const target = e.target as HTMLElement;
+      const cell = parseLineCellId(target.id);
+      // The trash button has no id: its row comes from the <tr>. A key from anywhere else, such as a dialog opened
+      // from a cell, deletes nothing.
+      const rowAttr = cell ? null : target.closest('tr[data-row-index]')?.getAttribute('data-row-index');
+      const rowIndex = cell ? cell.rowIndex : rowAttr != null ? Number(rowAttr) : -1;
+      if (rowIndex < 0 || rowIndex >= fields.length) return;
       e.preventDefault();
-      if (activeRowIndex != null && activeRowIndex < fields.length) {
-        remove(activeRowIndex);
-        setActiveRowIndex(null);
-      }
+      removeLine(rowIndex, cell?.field ?? 'product-code');
       return;
     }
 
@@ -268,7 +287,6 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
 
   function clearAllLines() {
     for (let i = fields.length - 1; i >= 0; i--) remove(i);
-    setActiveRowIndex(null);
     setClearAllOpen(false);
   }
 
@@ -316,7 +334,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
               const lineCost = computeLineCost(lineLike);
               const lineProfit = lineCost != null ? lineTotal - lineCost : undefined;
               return (
-                <tr key={line._uiKey ?? field.id} onFocus={() => setActiveRowIndex(idx)}>
+                <tr key={line._uiKey ?? field.id} data-row-index={idx}>
                   <td className="row-no">{idx + 1}</td>
                   <td>
                     <ProductTypeaheadCell
@@ -498,10 +516,8 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                     <button
                       type="button"
                       aria-label="Xóa dòng"
-                      onClick={() => {
-                        remove(idx);
-                        if (activeRowIndex === idx) setActiveRowIndex(null);
-                      }}
+                      // The button goes with its row: the focus moves to the row that takes its place.
+                      onClick={() => removeLine(idx, 'product-code')}
                     >
                       <AppIcon name="delete" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
                     </button>
@@ -534,7 +550,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
       </div>
 
       <div className="line-items-toolbar">
-        <button type="button" className="lib-btn" onClick={addLine}>
+        <button type="button" id="line-add" className="lib-btn" onClick={addLine}>
           <AppIcon name="add" />
           Thêm dòng
         </button>

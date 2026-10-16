@@ -285,13 +285,13 @@ Feature folders generally contain `api.ts`, `hooks.ts`, `types.ts`, optional `sc
 | `backend/src/OrderMgmt.WebApi/templates/template_baogia.xlsx` | Default quotation Excel template |
 | `backend/src/OrderMgmt.WebApi/templates/templete_bbbg.xlsx` | Default handover Excel template with price |
 | `backend/src/OrderMgmt.WebApi/templates/templete_bbbg_sl.xlsx` | Default handover Excel template without price |
-| `backend/src/OrderMgmt.WebApi/bin/Debug/net9.0/templates/users/{userId}.xlsx` | Local Debug runtime location for per-user quotation templates when `QuotationExport:UserTemplatesPath` is the relative default `templates/users` |
-| `backend/src/OrderMgmt.WebApi/bin/Debug/net9.0/templates/users/{userId}_handover_with_price.xlsx` | Local Debug runtime location for per-user handover templates with price |
-| `backend/src/OrderMgmt.WebApi/bin/Debug/net9.0/templates/users/{userId}_handover_no_price.xlsx` | Local Debug runtime location for per-user handover templates without price |
+| `backend/src/OrderMgmt.WebApi/bin/Debug/net10.0/templates/users/{userId}.xlsx` | Local Debug runtime location for per-user quotation templates when `QuotationExport:UserTemplatesPath` is the relative default `templates/users` |
+| `backend/src/OrderMgmt.WebApi/bin/Debug/net10.0/templates/users/{userId}_handover_with_price.xlsx` | Local Debug runtime location for per-user handover templates with price |
+| `backend/src/OrderMgmt.WebApi/bin/Debug/net10.0/templates/users/{userId}_handover_no_price.xlsx` | Local Debug runtime location for per-user handover templates without price |
 | `backend/**/bin`, `backend/**/obj` | .NET build outputs |
 | `frontend/dist` | Vite production build output |
 
-Template paths configured as relative values are resolved from `AppContext.BaseDirectory`, not the repository root. In local Debug runs that base directory is normally `backend/src/OrderMgmt.WebApi/bin/Debug/net9.0/`. Use absolute paths in deployment if templates must live outside the application output directory.
+Template paths configured as relative values are resolved from `AppContext.BaseDirectory`, not the repository root. In local Debug runs that base directory is normally `backend/src/OrderMgmt.WebApi/bin/Debug/net10.0/`. Use absolute paths in deployment if templates must live outside the application output directory.
 
 ## Required Production Configuration
 

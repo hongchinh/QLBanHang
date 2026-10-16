@@ -1,6 +1,6 @@
 # Execution report - dimension columns by pricing mode
 
-Plan: [SUMMARY.md](SUMMARY.md). Branch `feat/dimension-columns`, based on `qlbanhang/main` `438b0db4` (the plan was written against `e61e4f1b`; PR #31 landed in between and changed no file the phases edit). Executed 2026-10-16. Frontend only: no backend, API or database change. The branch is not pushed.
+Plan: [SUMMARY.md](SUMMARY.md). Branch `feat/dimension-columns`, based on `qlbanhang/main` `438b0db4` (the plan was written against `e61e4f1b`; PR #31 landed in between and changed no file the phases edit). Executed 2026-10-16. Frontend only: no backend, API or database change. The branch is pushed and PR #32 is open (see Post-review fixes).
 
 Implementers: opus for Phases 02 and 03 (L-size phases, per the Subagent Model Rule), sonnet for Phase 01 and for the docs and help work (Phases 00 and 04). Every code commit was reviewed by one opus reviewer (spec and quality) and approved; there were no review fix cycles. Rate limits interrupted two agents; both were resumed with no data loss.
 
@@ -39,7 +39,7 @@ Run by the controller on 2026-10-16 from `frontend/` of the worktree.
 | `npm run lint` | 17 problems (2 errors, 15 warnings) | 17 problems (2 errors, 15 warnings), identical list |
 | `npm run test -- --testTimeout=30000 --maxWorkers=3` | 3043 tests, 3040 passed, 3 failed | 3163 tests, 3160 passed, the same 3 failed |
 | `npm run test -- src/features/help` | passes | passes (11 files, 101 tests) |
-| `npm run help:stale` | 3 warnings (`admin-dashboard`, `home`, `reports-revenue`) | 4 warnings (`admin-dashboard`, `home`, `inventory-opening-stock`, `inventory-stock-card`), see PR notes - Help |
+| `npm run help:stale` | 3 warnings (`admin-dashboard`, `home`, `reports-revenue`) | 4 warnings at execution (`admin-dashboard`, `home`, `inventory-opening-stock`, `inventory-stock-card`); `Không có cảnh báo.` after the post-review help commits, see PR notes - Help |
 
 The three known failures, unchanged: `useNotificationHub invalidates unread-count query on NewNotification`; `BankAccountsTab adds a new account via the form`; `PaymentQrPage generates and displays a QR after submitting valid data`. The branch added 120 tests, all passing.
 
@@ -65,30 +65,32 @@ Full detail in [BROWSER-CHECK.md](BROWSER-CHECK.md): Microsoft Edge headless dri
   - the Ctrl+Delete modifier guard;
   - minor hardening of the D1 test (`window.event` restore fallback, waiting for the headers inside the helper, a tighter scroll assertion).
 - **No dedicated test for the quotation grid scroll-effect change in `8f326adc`.** No quotation path triggers the bail-out today (its quick add moves the focus with a timer); the change keeps the effect pattern the same as the stock grid.
-- **`help:stale` does not end clean.** The Final Verification of the plan allows a list of the baseline guides and of the two inventory guides that were found accurate and left untouched. It ends with 4 warnings, all same-day cases (see PR notes - Help).
+- **`help:stale` did not end clean at execution, now cleared.** The phases ended with 4 warnings (`admin-dashboard`, `home`, `inventory-opening-stock`, `inventory-stock-card`). `help:stale` compares commit times (the last commit of a guide's `sources` against the last commit of the guide), not `updated`, so a committed real edit to each guide cleared them the same day. After the post-review commits it prints `Không có cảnh báo.` (see PR notes - Help).
 
 ## PR notes - Help
 
-- Help: `inventory-opening-stock` — flagged only by this branch's comment commit to `product-typeahead-cell.tsx`; text re-checked, still accurate; `updated` already today
-- Help: `inventory-stock-card` — flagged only by this branch's comment commit to `product-typeahead-cell.tsx`; text re-checked, still accurate; `updated` already today
-- Help: `admin-dashboard` — baseline warning from merge commit `bb2af827` (PR #30); text re-checked, still accurate
-- Help: `home` — baseline warning from merge commit `bb2af827` (PR #30); text re-checked, still accurate
+- Help: `inventory-opening-stock` — flagged by this branch's comment commit to `product-typeahead-cell.tsx`; re-checked against `opening-stock-page.tsx`: save errors show under the line's **Mã hàng**, unparsable numbers block the save (Số lượng không hợp lệ / Giá trị không hợp lệ), and lines with no product picked from the list are skipped on save (`e8b7b538`)
+- Help: `inventory-stock-card` — flagged by the same comment commit; corrected: with no product chosen the export still works (the dialog has no **Đang xem** and opens on **Chọn nhiều**); only a missing or reversed date range disables it (`e8b7b538`)
+- Help: `admin-dashboard` — flagged by merge commit `bb2af827` (PR #30); added: default period is the start of the month to today, the card percentage compares with the previous period of the same length (— when it was 0, always — on **Doanh thu hôm nay**), **Tổng báo giá** counts by quotation date and **Đã huỷ** by cancel date (`e8b7b538`)
+- Help: `home` — the same addition as `admin-dashboard` (`e8b7b538`)
+- Help: `quotations.form` — flagged by `48bc05ee`; a re-pick clears the dimensions the new product's type does not use, and deleting the last row moves the caret to **Thêm dòng** (`731bd33f`)
+- Help: `stock-in.form`, `stock-out.form` — a save error on a dimension the line does not use stays on the locked — cell, the caret goes to the line's **Mã hàng**, and a re-pick fixes it (`731bd33f`)
 
 ### (a) Guides left untouched
 
-The four guides above are the 4 warnings that `npm run help:stale` still prints. Each reads "code 2026-10-16, guide 2026-10-16": the code changed on the same day as the guide's `updated`, and the plan allows leaving such same-day cases when the text is still accurate. They cannot be cleared today, because `updated` already equals today. Tomorrow the check passes only if their `updated` is bumped after re-reading them. Either accept the 4 warnings in this PR or re-touch the four files (bump `updated`) in the PR.
+None: every guide `help:stale` flagged got a real edit, committed after the code commits.
 
 ### (b) Help files changed
 
 - Changed in Tasks 4.11-4.14: `stock-in.form` (note on automatic dimension columns; **Hiện cột** has no dimension checkboxes; `sources` and `updated`), `stock-out.form` (the same plus the line on metre goods), `quotations.form` (four columns, hidden unless the highest mode needs them, **Mã hàng** list opens only on typing, delete focus rules; `sources` gain `lib/dimension-columns.ts` and `lib/use-appeared-keys.ts`), `reports-revenue` (`sources` and `updated` only, to clear the baseline warning).
-- Guides flagged only by comment changes, left as they were: `inventory-opening-stock` and `inventory-stock-card` (comment on `openOnFocus` in `product-typeahead-cell.tsx`), plus `admin-dashboard` and `home` (flagged by the PR #30 merge, not by this branch).
+- Changed after the PR review (`731bd33f`, `e8b7b538`): `quotations.form`, `stock-in.form`, `stock-out.form`, `inventory-opening-stock`, `inventory-stock-card`, `admin-dashboard`, `home` (details in the list above).
 
 ### (c) Follow-ups to file separately
 
 From the brainstorm SUMMARY, Open questions:
 
 1. Sample data with md, m² and m³ products (all demo products are `PerUnit`, so demo branches cannot show the feature).
-2. Optional cleanup of stale quotation dimensions on re-pick or save.
+2. ~~Optional cleanup of stale quotation dimensions on re-pick or save.~~ Done for re-picks in `48bc05ee`: picking a product clears the dimensions its mode does not use. Saved quotations are cleaned only when a line is re-picked; a plain save does not clean them.
 3. The revenue report shows dimensions that the line's mode does not use.
 4. The Enter-stop table says **Tấm** while the column header says **Số tấm**.
 5. Quotation **Xóa tất cả dòng**, then **Xóa**, drops the focus to `<body>`: the opener is disabled once no row is left (`line-items-grid.tsx`), so the dialog cannot give the focus back. The fix needs `ConfirmDialog` to pass `onCloseAutoFocus` through (preventDefault, then focus `line-add`). Old defect, not caused by this work.
@@ -97,10 +99,18 @@ Product limitations from the brainstorm Non-goals and the plan Risks, not fixed 
 
 - Backend, API, payload and database are unchanged; prints, Excel, the revenue report and its export, opening stock, the product form and the quick add dialog do not follow the rule.
 - No per-user switch to turn the rule off; no screen-reader announcement when columns change.
-- Hidden stale dimensions on a re-picked quotation line are still saved.
 - Hiding columns shifts the columns to their right.
 - A saved line re-picked as the same product after a catalog mode change keeps failing until it is deleted and added again.
 - A metre line whose product became `PerUnit` gets an **SL** error from the server; only a re-pick fixes it.
 - A click into a filled quotation **Mã hàng** no longer shows the list until the user types (decision 11).
 - The 17 old browser scripts under `.claude/workflows/older-defects-state/browser-scripts/` assume always-shown dimension columns; they are left as they are.
 - The 3 known frontend test failures and the 17 lint problems of `BASELINE.md` predate this work.
+
+## Post-review fixes
+
+After the branch was pushed and PR #32 opened:
+
+- `48bc05ee` fix(quotations): a re-pick clears the dimensions the new product does not use (Follow-up 2, for re-picks).
+- `731bd33f` docs(help): dimension re-pick and error focus on quotation and stock screens (`quotations.form`, `stock-in.form`, `stock-out.form`).
+- `e8b7b538` docs(help): re-check opening stock, stock card and dashboards (`inventory-opening-stock`, `inventory-stock-card`, `admin-dashboard`, `home`).
+- `npm run test -- src/features/help` passes (11 files, 101 tests); `npm run help:stale` prints `Không có cảnh báo.`

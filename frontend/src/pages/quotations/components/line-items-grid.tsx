@@ -383,6 +383,9 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                   </td>
                   {dims.map((f) => {
                     const { name, label } = DIMENSION_INPUTS[f];
+                    // A cell the row's mode does not use shows "—"; its stored value stays in the form, so it is
+                    // still saved and printed.
+                    const unused = isLineFocusFieldDisabled(line, f);
                     return (
                       <td key={f} className="cell-number">
                         <input
@@ -391,8 +394,9 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                           type="number"
                           step="any"
                           aria-label={label}
-                          disabled={isLineFocusFieldDisabled(line, f)}
-                          value={numInput(line[name])}
+                          disabled={unused}
+                          placeholder={unused ? '—' : undefined}
+                          value={unused ? '' : numInput(line[name])}
                           onChange={(e) => setLineField(idx, name, parseNum(e.target.value) as never)}
                         />
                       </td>

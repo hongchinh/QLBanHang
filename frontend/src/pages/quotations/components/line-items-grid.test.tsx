@@ -423,4 +423,23 @@ describe('LineItemsGrid', () => {
       expect(form().getValues('lines.0.thickness')).toBe(8);
     });
   });
+
+  it('shows "—" in a cell the row does not use, keeps its id and keeps the stored value', () => {
+    const { form } = renderGrid([
+      m3('a'),
+      m2('b'),
+      line('c', { sheetCount: 1, length: 2000, width: 1000, thickness: 3 }),
+    ]);
+
+    for (const id of ['line-thickness-1', 'line-sheet-count-2', 'line-length-2', 'line-width-2', 'line-thickness-2']) {
+      expect(byId(id)).toBeDisabled();
+      expect(byId(id)).toHaveValue(null);
+      expect(byId(id)).toHaveAttribute('placeholder', '—');
+    }
+    expect(byId('line-thickness-0')).toHaveValue(50);
+    expect(byId('line-thickness-0')).not.toHaveAttribute('placeholder');
+    expect(byId('line-width-1')).toHaveValue(1200);
+    expect(form().getValues('lines.1.thickness')).toBe(5);
+    expect(form().getValues('lines.2')).toMatchObject({ sheetCount: 1, length: 2000, width: 1000, thickness: 3 });
+  });
 });

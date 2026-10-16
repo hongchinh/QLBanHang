@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -156,7 +157,7 @@ public class UserQuotationSettingsService : IUserQuotationSettingsService
 
     private async Task<UserQuotationSettingsDto> ToDtoAsync(UserQuotationSettings settings, CancellationToken ct)
     {
-        var fullName = await _db.Users.IgnoreQueryFilters()
+        var fullName = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => u.Id == settings.UserId)
             .Select(u => u.FullName)

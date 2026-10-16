@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Domain.Enums;
@@ -43,7 +44,7 @@ internal static class FundMovementQuery
         IAppDbContext db, IReadOnlyCollection<Guid> fundIds, CancellationToken ct)
     {
         var ids = fundIds.Distinct().ToList();
-        var funds = await db.Funds.IgnoreQueryFilters().AsNoTracking()
+        var funds = await db.Funds.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(f => ids.Contains(f.Id))
             .Select(f => new { f.Id, f.OpeningAmount })
             .ToListAsync(ct);
@@ -53,7 +54,7 @@ internal static class FundMovementQuery
         // Reason and fund names are read even when the reason or fund was soft-deleted later. IgnoreQueryFilters on
         // those subqueries switches the filters off for the whole query, so the documents' own soft-delete filter is
         // applied by hand.
-        var vouchers = await db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+        var vouchers = await db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => !v.IsDeleted && ids.Contains(v.FundId) && v.Status == DocumentStatus.Active)
             .Select(v => new
             {
@@ -66,11 +67,11 @@ internal static class FundMovementQuery
                 v.PartnerName,
                 v.PersonName,
                 v.Description,
-                ReasonName = db.CashReasons.IgnoreQueryFilters()
+                ReasonName = db.CashReasons.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                     .Where(r => r.Id == v.ReasonId).Select(r => r.Name).FirstOrDefault(),
             })
             .ToListAsync(ct);
-        var transfers = await db.FundTransfers.IgnoreQueryFilters().AsNoTracking()
+        var transfers = await db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(t => !t.IsDeleted && (ids.Contains(t.FromFundId) || ids.Contains(t.ToFundId))
                 && t.Status == DocumentStatus.Active)
             .Select(t => new
@@ -82,9 +83,9 @@ internal static class FundMovementQuery
                 t.Code,
                 t.Amount,
                 t.Description,
-                FromCode = db.Funds.IgnoreQueryFilters()
+                FromCode = db.Funds.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                     .Where(f => f.Id == t.FromFundId).Select(f => f.Code).FirstOrDefault(),
-                ToCode = db.Funds.IgnoreQueryFilters()
+                ToCode = db.Funds.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                     .Where(f => f.Id == t.ToFundId).Select(f => f.Code).FirstOrDefault(),
             })
             .ToListAsync(ct);

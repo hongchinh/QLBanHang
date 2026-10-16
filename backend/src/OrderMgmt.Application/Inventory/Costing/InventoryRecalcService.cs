@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
@@ -64,10 +65,10 @@ public class InventoryRecalcService : IInventoryRecalcService
 
         // Exclusive gate of every branch, not only those with rows yet, so an in-flight first posting that read the old
         // settings is waited for and then included (D30). No product keys.
-        var allBranchIds = await _db.Branches.IgnoreQueryFilters().Select(b => b.Id).ToListAsync(ct);
+        var allBranchIds = await _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).Select(b => b.Id).ToListAsync(ct);
         await _lock.AcquireBranchGateAsync(allBranchIds, exclusive: true, ct);
 
-        var branches = await _db.Branches.IgnoreQueryFilters().AsNoTracking()
+        var branches = await _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(b => _db.InventoryLedger.Any(e => e.BranchId == b.Id))
             .OrderBy(b => b.Code)
             .Select(b => new { b.Id, b.Code, b.LockedUntil })
@@ -104,7 +105,7 @@ public class InventoryRecalcService : IInventoryRecalcService
                     stockIn = stockIn.Where(e => e.PostedAt >= unlockedFrom);
                 }
                 await stockIn.ExecuteUpdateAsync(s => s.SetProperty(e => e.InValue, e => _db.StockVoucherLines
-                    .IgnoreQueryFilters()
+                    .IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                     .Where(l => l.Id == e.SourceLineId)
                     .Select(l => l.InboundValue + l.VatAmount * vatFactor)
                     .First()), ct);

@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.CashVouchers.Services;
 using OrderMgmt.Application.CashDebt.Common;
@@ -30,7 +31,7 @@ public class VoucherPaymentQrService : IVoucherPaymentQrService
     public async Task<VoucherPaymentQrDto> GetForCashVoucherAsync(Guid id, CancellationToken ct = default)
     {
         // A soft-deleted voucher is a 404 whatever its fund or reason became.
-        var head = await _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+        var head = await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => v.Id == id && !v.IsDeleted)
             .Select(v => new { v.Type, v.BranchId })
             .FirstOrDefaultAsync(ct)
@@ -44,7 +45,7 @@ public class VoucherPaymentQrService : IVoucherPaymentQrService
 
     public async Task<VoucherPaymentQrDto> GetForStockVoucherAsync(Guid id, CancellationToken ct = default)
     {
-        var head = await _db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+        var head = await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => v.Id == id && !v.IsDeleted)
             .Select(v => new { v.Type, v.BranchId })
             .FirstOrDefaultAsync(ct)
@@ -132,7 +133,7 @@ public class VoucherPaymentQrService : IVoucherPaymentQrService
     private async Task<List<Candidate>> ReadCashAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
         var idList = ids.ToList();
-        var rows = await _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+        var rows = await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => idList.Contains(v.Id) && !v.IsDeleted)
             .Select(v => new
             {
@@ -155,7 +156,7 @@ public class VoucherPaymentQrService : IVoucherPaymentQrService
     private async Task<List<Candidate>> ReadStockAsync(IReadOnlyCollection<Guid> ids, CancellationToken ct)
     {
         var idList = ids.ToList();
-        var rows = await _db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+        var rows = await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => idList.Contains(v.Id) && !v.IsDeleted)
             .Select(v => new
             {
@@ -183,7 +184,7 @@ public class VoucherPaymentQrService : IVoucherPaymentQrService
 
         var fundIds = candidates.Where(c => c.FundId != null).Select(c => c.FundId!.Value).Distinct().ToList();
         var branchIds = candidates.Select(c => c.BranchId).Distinct().ToList();
-        var rows = await _db.Funds.IgnoreQueryFilters().AsNoTracking()
+        var rows = await _db.Funds.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(f => fundIds.Contains(f.Id)
                 || (f.Kind == FundKind.Bank && f.IsDefault && !f.IsDeleted && branchIds.Contains(f.BranchId)))
             .Select(f => new

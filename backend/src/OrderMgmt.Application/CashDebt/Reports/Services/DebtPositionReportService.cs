@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
@@ -37,7 +38,7 @@ public class DebtPositionReportService : IDebtPositionReportService
 
         // Soft-deleted partners keep their ledger rows, so they stay in the report.
         var partnerIds = open.Select(i => i.PartnerId).Distinct().ToList();
-        var info = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+        var info = await _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(c => partnerIds.Contains(c.Id))
             .Select(c => new { c.Id, c.Code, c.Name })
             .ToDictionaryAsync(c => c.Id, ct);
@@ -129,7 +130,7 @@ public class DebtPositionReportService : IDebtPositionReportService
             .Where(i => i.Direction == DebtDirection.Increase && (i.DueDate ?? i.DocDate) < request.At)
             .ToList();
         var partnerIds = overdue.Select(i => i.PartnerId).Distinct().ToList();
-        var info = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+        var info = await _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(c => partnerIds.Contains(c.Id))
             .Select(c => new { c.Id, c.Code, c.Name })
             .ToDictionaryAsync(c => c.Id, ct);
@@ -207,7 +208,7 @@ public class DebtPositionReportService : IDebtPositionReportService
             .ToList();
 
         var partnerIds = open.Select(i => i.PartnerId).Distinct().ToList();
-        var info = await _db.Customers.IgnoreQueryFilters().AsNoTracking()
+        var info = await _db.Customers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(c => partnerIds.Contains(c.Id))
             .Select(c => new { c.Id, c.Code, c.Name })
             .ToDictionaryAsync(c => c.Id, ct);
@@ -285,7 +286,7 @@ public class DebtPositionReportService : IDebtPositionReportService
 
         // Soft-deleted users keep their documents, so they keep their name.
         var ownerIds = sums.Keys.ToList();
-        var names = await _db.Users.IgnoreQueryFilters().AsNoTracking()
+        var names = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(u => ownerIds.Contains(u.Id))
             .Select(u => new { u.Id, u.FullName })
             .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);

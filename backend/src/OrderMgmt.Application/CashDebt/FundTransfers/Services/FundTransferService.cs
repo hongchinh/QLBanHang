@@ -53,7 +53,7 @@ public class FundTransferService : IFundTransferService
         var branchId = await _currentBranch.GetIdAsync(ct);
         // IgnoreQueryFilters keeps transfers whose fund or owner was soft-deleted later (as in LoadDtoAsync); the
         // transfers' own soft-delete filter is applied by hand.
-        var query = _db.FundTransfers.IgnoreQueryFilters().AsNoTracking()
+        var query = _db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(t => !t.IsDeleted && t.BranchId == branchId);
 
         // VN dates as UTC ranges (D27).
@@ -320,7 +320,7 @@ public class FundTransferService : IFundTransferService
     {
         // IgnoreQueryFilters keeps the transfer visible when a fund or the owner was soft-deleted later; the
         // transfer's own soft-delete filter is applied by hand.
-        var row = await _db.FundTransfers.IgnoreQueryFilters().AsNoTracking()
+        var row = await _db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(t => t.Id == id && !t.IsDeleted)
             .Select(t => new
             {
@@ -431,7 +431,7 @@ public class FundTransferService : IFundTransferService
         _codes.NextAsync(DocumentType.FundTransfer, branchId, voucherAt, peek, async (codes, c) =>
             // Soft-deleted rows count too: a deleted document's number is never issued again, even when a reset-policy
             // change restarts the counter on codes of the old period (the unique index only covers live rows).
-            (await _db.FundTransfers.IgnoreQueryFilters()
+            (await _db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .Where(t => t.BranchId == branchId && codes.Contains(t.Code))
                 .Select(t => t.Code)
                 .ToListAsync(c)).ToHashSet(), ct);

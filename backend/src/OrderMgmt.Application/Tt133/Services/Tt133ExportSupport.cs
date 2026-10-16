@@ -69,7 +69,7 @@ public class Tt133ExportSupport
         }
 
         var branchId = await _currentBranch.GetIdAsync(ct);
-        var branch = await _db.Branches.IgnoreQueryFilters().AsNoTracking()
+        var branch = await _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(b => b.Id == branchId)
             .Select(b => new { b.Name, b.Address, b.OpeningDate })
             .SingleAsync(ct);

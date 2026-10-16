@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.AutoVouchers;
@@ -142,7 +143,7 @@ public class BranchService : IBranchService
         if (branch.IsDemo)
             throw new ConflictException("DEMO_BRANCH_USE_DEMO_DELETE", "Chi nhánh demo phải xóa bằng chức năng Xóa chi nhánh demo.");
         // Soft-deleted users count too: their rows still reference the branch (review finding).
-        if (await _db.Users.IgnoreQueryFilters().AnyAsync(u => u.DefaultBranchId == id, ct))
+        if (await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete]).AnyAsync(u => u.DefaultBranchId == id, ct))
             throw new ConflictException("Chi nhánh đang là chi nhánh mặc định của người dùng, không thể xóa.");
         if (await _db.Warehouses.AnyAsync(w => w.BranchId == id, ct))
             throw new ConflictException("Chi nhánh đang có kho, không thể xóa.");

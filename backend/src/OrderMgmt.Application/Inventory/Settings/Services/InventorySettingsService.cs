@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Common.Interfaces;
 using OrderMgmt.Application.Inventory.Costing;
@@ -42,7 +43,7 @@ public class InventorySettingsService : IInventorySettingsService
         {
             // Settings writers wait for each other and for in-flight postings before reading the row (D30, review
             // finding), so `before` is never stale. ApplySettingsChangeAsync re-takes the same gates (re-entrant).
-            var allBranchIds = await _db.Branches.IgnoreQueryFilters().Select(b => b.Id).ToListAsync(c);
+            var allBranchIds = await _db.Branches.IgnoreQueryFilters([QueryFilters.SoftDelete]).Select(b => b.Id).ToListAsync(c);
             await _lock.AcquireBranchGateAsync(allBranchIds, exclusive: true, c);
             var settings = await _db.InventorySettings.SingleAsync(s => s.Id == 1, c);
             var before = new InventorySettings

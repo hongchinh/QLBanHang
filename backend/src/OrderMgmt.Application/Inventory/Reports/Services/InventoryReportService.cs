@@ -61,7 +61,7 @@ public class InventoryReportService : IInventoryReportService
                 .ToDictionary(b => (b.ProductId, b.WarehouseId), b => b.Quantity);
 
         var productIds = pairs.Select(p => p.ProductId).Distinct().ToList();
-        var products = _db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => productIds.Contains(p.Id));
+        var products = _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking().Where(p => productIds.Contains(p.Id));
         if (request.ProductGroupId is { } groupId)
             products = products.Where(p => p.ProductGroupId == groupId);
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -82,7 +82,7 @@ public class InventoryReportService : IInventoryReportService
             .ToDictionaryAsync(p => p.Id, ct);
 
         var warehouseIds = pairs.Select(p => p.WarehouseId).Distinct().ToList();
-        var warehouses = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+        var warehouses = await _db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(w => warehouseIds.Contains(w.Id))
             .Select(w => new { w.Id, w.Code, w.Name })
             .ToDictionaryAsync(w => w.Id, ct);
@@ -150,7 +150,7 @@ public class InventoryReportService : IInventoryReportService
         var branchId = await _currentBranch.GetIdAsync(ct);
         var from = request.From!.Value;
         var to = request.To!.Value;
-        var product = await _db.Products.IgnoreQueryFilters().AsNoTracking()
+        var product = await _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(p => p.Id == request.ProductId)
             .Select(p => new { p.Id, p.Code, p.Name, p.PricingMode, UnitName = p.Unit != null ? p.Unit.Name : null })
             .FirstOrDefaultAsync(ct)
@@ -178,12 +178,12 @@ public class InventoryReportService : IInventoryReportService
         var entries = await ledger.Where(e => e.PostedAt >= start && e.PostedAt < end).InPostingOrder().ToListAsync(ct);
 
         var voucherIds = entries.Where(e => e.SourceType != LedgerSourceType.Opening).Select(e => e.SourceId).Distinct().ToList();
-        var vouchers = await _db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+        var vouchers = await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => voucherIds.Contains(v.Id))
             .Select(v => new { v.Id, ReasonName = v.Reason != null ? v.Reason.Name : null, v.PartnerName })
             .ToDictionaryAsync(v => v.Id, ct);
         var warehouseIds = entries.Select(e => e.WarehouseId).Distinct().ToList();
-        var warehouseCodes = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+        var warehouseCodes = await _db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(w => warehouseIds.Contains(w.Id))
             .ToDictionaryAsync(w => w.Id, w => w.Code, ct);
 
@@ -273,7 +273,7 @@ public class InventoryReportService : IInventoryReportService
         var start = VnTime.StartOfDay(from);
         var end = VnTime.StartOfNextDay(to);
 
-        var products = _db.Products.IgnoreQueryFilters().AsNoTracking().Where(p => p.TrackInventory);
+        var products = _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking().Where(p => p.TrackInventory);
         if (request.ProductGroupId is { } groupId)
             products = products.Where(p => p.ProductGroupId == groupId);
         if (!string.IsNullOrWhiteSpace(request.Search))
@@ -304,7 +304,7 @@ public class InventoryReportService : IInventoryReportService
         else
         {
             // S15: company scope skips demo branches, soft-deleted ones included.
-            ledger = ledger.Where(e => !_db.Branches.IgnoreQueryFilters().Any(b => b.Id == e.BranchId && b.IsDemo));
+            ledger = ledger.Where(e => !_db.Branches.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete }).Any(b => b.Id == e.BranchId && b.IsDemo));
         }
         if (request.WarehouseId is { } warehouseId)
             ledger = ledger.Where(e => e.WarehouseId == warehouseId);
@@ -401,11 +401,11 @@ public class InventoryReportService : IInventoryReportService
         var active = pairs.Where(p => p.OpeningQty != 0m || p.InPeriod > 0).ToList();
 
         var productIds = active.Select(p => p.ProductId).Distinct().ToList();
-        var products = await _db.Products.IgnoreQueryFilters().AsNoTracking()
+        var products = await _db.Products.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(p => productIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, p => p.Code, ct);
         var warehouseIds = active.Select(p => p.WarehouseId).Distinct().ToList();
-        var warehouses = await _db.Warehouses.IgnoreQueryFilters().AsNoTracking()
+        var warehouses = await _db.Warehouses.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(w => warehouseIds.Contains(w.Id))
             .Select(w => new { w.Id, w.Code, w.Name })
             .ToDictionaryAsync(w => w.Id, ct);

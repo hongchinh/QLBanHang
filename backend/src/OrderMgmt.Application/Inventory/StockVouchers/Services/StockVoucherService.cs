@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using System.Globalization;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.Catalog.Customers.Interfaces;
@@ -138,7 +139,7 @@ public class StockVoucherService : IStockVoucherService
 
         // Separate query: IgnoreQueryFilters anywhere in a query also switches off the vouchers' soft-delete filter.
         var pageOwnerIds = items.Select(i => i.OwnerUserId).Distinct().ToList();
-        var ownerNames = await _db.Users.IgnoreQueryFilters().AsNoTracking()
+        var ownerNames = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(u => pageOwnerIds.Contains(u.Id))
             .ToDictionaryAsync(u => u.Id, u => u.FullName, ct);
         foreach (var item in items)
@@ -166,7 +167,7 @@ public class StockVoucherService : IStockVoucherService
             .Distinct()
             .ToListAsync(ct);
 
-        var owners = await _db.Users.IgnoreQueryFilters().AsNoTracking()
+        var owners = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(u => ownerIds.Contains(u.Id))
             .Select(u => new StockVoucherOwnerDto { Id = u.Id, FullName = u.FullName })
             .ToListAsync(ct);
@@ -293,7 +294,7 @@ public class StockVoucherService : IStockVoucherService
             await EnsureWorkingBranchAsync(voucher.BranchId, ct);
         }
 
-        var ownerName = await _db.Users.IgnoreQueryFilters()
+        var ownerName = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .Where(u => u.Id == voucher.OwnerUserId)
             .Select(u => u.FullName)
             .FirstOrDefaultAsync(ct);
@@ -342,7 +343,7 @@ public class StockVoucherService : IStockVoucherService
                 ActorUserId = a.ActorUserId,
                 ActorName = a.ActorUserId == null
                     ? "Hệ thống"
-                    : _db.Users.IgnoreQueryFilters()
+                    : _db.Users.IgnoreQueryFilters(new[] { QueryFilters.SoftDelete })
                         .Where(u => u.Id == a.ActorUserId)
                         .Select(u => u.FullName)
                         .FirstOrDefault() ?? "Người dùng không xác định",
@@ -904,7 +905,7 @@ public class StockVoucherService : IStockVoucherService
         _codes.NextAsync(DocTypeOf(type), branchId, voucherAt, peek, async (codes, c) =>
             // Soft-deleted rows count too: a deleted document's number is never issued again, even when a reset-policy
             // change restarts the counter on codes of the old period (the unique index only covers live rows).
-            (await _db.StockVouchers.IgnoreQueryFilters()
+            (await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete])
                 .Where(v => v.Type == type && v.BranchId == branchId && codes.Contains(v.Code))
                 .Select(v => v.Code)
                 .ToListAsync(c)).ToHashSet(), ct);

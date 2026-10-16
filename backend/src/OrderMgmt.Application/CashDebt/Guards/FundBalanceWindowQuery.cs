@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Common;
 using OrderMgmt.Application.Common.Interfaces;
@@ -23,7 +24,7 @@ internal static class FundBalanceWindowQuery
         // One shared lower bound for the batched queries; a fund with a later `from` applies it in memory.
         var floor = fromOf.Values.Min();
 
-        var openings = await db.Funds.IgnoreQueryFilters().AsNoTracking()
+        var openings = await db.Funds.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(f => ids.Contains(f.Id))
             .Select(f => new { f.Id, f.OpeningAmount })
             .ToDictionaryAsync(f => f.Id, f => f.OpeningAmount, ct);
@@ -33,7 +34,7 @@ internal static class FundBalanceWindowQuery
         var start = ids.ToDictionary(id => id, id => openings[id]);
 
         // Σ of everything strictly before the floor, per fund.
-        var voucherSums = await db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+        var voucherSums = await db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => !v.IsDeleted && ids.Contains(v.FundId) && v.Status == DocumentStatus.Active
                 && v.VoucherAt < floor)
             .GroupBy(v => new { v.FundId, v.Type })
@@ -42,7 +43,7 @@ internal static class FundBalanceWindowQuery
         foreach (var s in voucherSums)
             start[s.FundId] += s.Type == CashVoucherType.Receipt ? s.Sum : -s.Sum;
 
-        var outSums = await db.FundTransfers.IgnoreQueryFilters().AsNoTracking()
+        var outSums = await db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(t => !t.IsDeleted && ids.Contains(t.FromFundId) && t.Status == DocumentStatus.Active
                 && t.VoucherAt < floor)
             .GroupBy(t => t.FromFundId)
@@ -50,7 +51,7 @@ internal static class FundBalanceWindowQuery
             .ToListAsync(ct);
         foreach (var s in outSums)
             start[s.FundId] -= s.Sum;
-        var inSums = await db.FundTransfers.IgnoreQueryFilters().AsNoTracking()
+        var inSums = await db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(t => !t.IsDeleted && ids.Contains(t.ToFundId) && t.Status == DocumentStatus.Active
                 && t.VoucherAt < floor)
             .GroupBy(t => t.ToFundId)
@@ -60,12 +61,12 @@ internal static class FundBalanceWindowQuery
             start[s.FundId] += s.Sum;
 
         // Light rows from the floor on (no reason or fund names).
-        var vouchers = await db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+        var vouchers = await db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(v => !v.IsDeleted && ids.Contains(v.FundId) && v.Status == DocumentStatus.Active
                 && v.VoucherAt >= floor)
             .Select(v => new { v.FundId, v.Type, v.VoucherAt, v.Code, v.Total })
             .ToListAsync(ct);
-        var transfers = await db.FundTransfers.IgnoreQueryFilters().AsNoTracking()
+        var transfers = await db.FundTransfers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(t => !t.IsDeleted && (ids.Contains(t.FromFundId) || ids.Contains(t.ToFundId))
                 && t.Status == DocumentStatus.Active && t.VoucherAt >= floor)
             .Select(t => new { t.FromFundId, t.ToFundId, t.VoucherAt, t.Code, t.Amount })

@@ -59,7 +59,7 @@ public class VoucherPrintService : IVoucherPrintService
             var formContext = await _support.BuildContextAsync(ReportScope.Branch, token);
 
             // Soft-deleted reasons, partners and owners keep their names; the voucher and its lines are filtered by hand.
-            var rows = await _db.CashVouchers.IgnoreQueryFilters().AsNoTracking()
+            var rows = await _db.CashVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(v => distinct.Contains(v.Id) && !v.IsDeleted)
                 .Select(v => new
                 {
@@ -134,7 +134,7 @@ public class VoucherPrintService : IVoucherPrintService
 
             // Soft-deleted partners, reasons, warehouses and owners keep their names; the voucher and its lines are
             // filtered by hand.
-            var rows = await _db.StockVouchers.IgnoreQueryFilters().AsNoTracking()
+            var rows = await _db.StockVouchers.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
                 .Where(v => distinct.Contains(v.Id) && !v.IsDeleted)
                 .Select(v => new StockVoucherRow
                 {

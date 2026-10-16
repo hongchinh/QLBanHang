@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using OrderMgmt.Application.Common.Interfaces;
@@ -50,7 +51,7 @@ public class SalesRevenueReportService : ISalesRevenueReportService
             .ToListAsync(ct);
 
         var ownerIds = grouped.Select(x => x.OwnerUserId).ToList();
-        var owners = await _db.Users.IgnoreQueryFilters()
+        var owners = await _db.Users.IgnoreQueryFilters([QueryFilters.SoftDelete])
             .AsNoTracking()
             .Where(u => ownerIds.Contains(u.Id))
             .Select(u => new { u.Id, u.FullName, u.IsDeleted })

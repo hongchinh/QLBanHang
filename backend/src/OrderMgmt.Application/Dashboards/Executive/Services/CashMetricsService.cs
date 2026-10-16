@@ -1,3 +1,4 @@
+using OrderMgmt.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using OrderMgmt.Application.CashDebt.Guards;
 using OrderMgmt.Application.Common.Interfaces;
@@ -155,7 +156,7 @@ public class CashMetricsService : ICashMetricsService
         // The names come from their own query: IgnoreQueryFilters would also reveal deleted vouchers in the one above,
         // and a reason deleted after use keeps its name in the history.
         var reasonIds = totals.Select(t => t.ReasonId).ToList();
-        var reasons = await _db.CashReasons.IgnoreQueryFilters().AsNoTracking()
+        var reasons = await _db.CashReasons.IgnoreQueryFilters([QueryFilters.SoftDelete]).AsNoTracking()
             .Where(r => reasonIds.Contains(r.Id))
             .Select(r => new { r.Id, r.Code, r.Name })
             .ToDictionaryAsync(r => r.Id, ct);

@@ -1,6 +1,6 @@
 # Phase 03 — Quotation grid
 
-**Status:** [ ] pending
+**Status:** [-] in progress
 **Complexity:** L
 **Depends on:** Phase 01 only (`frontend/src/lib/dimension-columns.ts`, `frontend/src/lib/use-appeared-keys.ts`, the `col-appeared` rules in `line-items-grid.css` and the token `--qldh-col-appeared-head-bg`). Phase 02 is not needed.
 **Worktree:** If run in the parallel worktree of SUMMARY → Order, `$WT` below means `/D/Projects/QLBanHang/.claude/worktrees/dimension-columns-quotation`.

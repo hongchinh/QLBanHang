@@ -2,9 +2,9 @@
 key: stock-in.form
 title: Phiếu nhập kho
 routes: [/stock-in/new, /stock-in/:id]
-sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/voucher-print/stock-price-mode-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/features/products/split-typed-text.ts, frontend/src/lib/use-dialog-opening.ts]
+sources: [frontend/src/pages/stock-vouchers/**, frontend/src/features/stock-vouchers/**, backend/src/OrderMgmt.Application/Inventory/StockVouchers/**, frontend/src/components/partner-autocomplete/**, frontend/src/lib/confirm-required.ts, frontend/src/features/cash-common/**, frontend/src/pages/customers/customer-form-fields.tsx, frontend/src/components/voucher-print/voucher-print-button.tsx, frontend/src/components/voucher-print/stock-price-mode-dialog.tsx, frontend/src/pages/quotations/components/product-typeahead-cell.tsx, frontend/src/features/products/components/product-quick-add-dialog.tsx, frontend/src/features/products/components/product-form-fields.tsx, frontend/src/features/products/split-typed-text.ts, frontend/src/lib/use-dialog-opening.ts, frontend/src/lib/dimension-columns.ts, frontend/src/lib/use-appeared-keys.ts]
 related: [stock-out.form]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 ## Dùng để
 Ghi nhận hàng nhập vào kho: mua từ nhà cung cấp, khách trả lại hàng hoặc nhập khác. Phiếu nhập tăng tồn kho và, tùy lý do, ghi nhận công nợ với nhà cung cấp hoặc khách.
@@ -31,6 +31,8 @@ Ghi nhận hàng nhập vào kho: mua từ nhà cung cấp, khách trả lại h
 - Đối tượng ngừng sử dụng không hiện trong ô **Đối tượng**; nếu bị ngừng sau khi đã chọn, lúc lưu sẽ báo Đối tượng đã ngừng hoạt động. Phiếu cũ vẫn sửa được.
 - **Đơn giá** tự điền giá vốn của hàng và là giá chưa VAT, **%CK** tự điền chiết khấu mua; sửa lại nếu khác. **CK cả đơn** được chia cho các dòng theo giá trị, **Phí vận chuyển** cộng vào tổng thanh toán và vào giá trị hàng nhập kho.
 - Hàng tính theo mét (m dài, m², m³) nhập **Số tấm** và **Dài**, **Rộng**, **Dày** theo loại hàng; **SL** tự tính, không nhập tay.
+- Các cột **Số tấm**, **Dài**, **Rộng**, **Dày** chỉ hiện khi phiếu có hàng tính theo m dài, m² hoặc m³, theo loại cao nhất trong phiếu: m dài hiện **Số tấm** và **Dài**, m² thêm **Rộng**, m³ thêm **Dày**. Ô mà dòng không dùng hiện —. Nếu lúc lưu có lỗi ở một cột đang ẩn, cột đó hiện ra và lỗi ghi dưới ô.
+- Trong **Cột & phím Enter**, mục **Hiện cột** không có bốn cột này vì chúng tự hiện theo hàng có trong phiếu.
 - Ở tab **Thanh toán**, nhập % rồi bấm **Áp dụng** ở **% VAT cho mọi dòng** để đặt thuế cho tất cả dòng. Lý do làm tăng công nợ còn hiện **Hạn thanh toán**, tự tính từ số ngày nợ của đối tượng.
 - **HTTT** không gắn với quỹ thì **Số tiền thanh toán** khóa ở 0 và không có phiếu chi. Trả tiền làm quỹ bị âm: tùy cấu hình, hệ thống cho qua, hỏi xác nhận (Quỹ bị âm) hoặc chặn (Không đủ tiền trong quỹ).
 - Phiếu đã lưu có thể **Hủy phiếu**, **Khôi phục** hoặc **Xóa** nếu bạn có quyền. Hủy, sửa hay xóa làm tồn kho âm thì tùy cấu hình, hệ thống cho qua, cảnh báo để bạn xác nhận hoặc chặn. Ngày phiếu trong kỳ đã khóa sổ thì không lưu được.

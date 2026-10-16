@@ -317,6 +317,37 @@ describe('StockLineGrid', () => {
     expect(dimensionHeaders()).toEqual(expected);
   });
 
+  // A cell its line's mode does not use shows "—", keeps its id and leaves the stored value in the form.
+  it('a unit line next to a m³ line shows "—" in its four dimension cells and keeps the stored values', () => {
+    const { values } = renderGrid({
+      lines: [line({ pricingMode: 'PerUnit', sheetCount: 3, length: 2400, width: 1200, thickness: 5 }), m3Line({ _uiKey: 'b' })],
+    });
+    for (const field of ['sheet-count', 'length', 'width', 'thickness']) {
+      const unused = byId(`stock-line-${field}-0`);
+      expect(unused).toBeDisabled();
+      expect(unused).toHaveValue(null);
+      expect(unused).toHaveAttribute('placeholder', '—');
+      const used = byId(`stock-line-${field}-1`);
+      expect(used).toBeEnabled();
+      expect(used).not.toHaveAttribute('placeholder');
+    }
+    expect(byId('stock-line-length-1')).toHaveValue(3000);
+    expect(values().lines[0]).toMatchObject({ sheetCount: 3, length: 2400, width: 1200, thickness: 5 });
+  });
+
+  // "—" follows the line's mode, not the disabled state, so a read-only voucher still shows the numbers it uses.
+  it('a read-only voucher shows the dimensions a line uses and "—" where it does not', () => {
+    renderGrid({
+      readOnly: true,
+      lines: [m2Line({ sheetCount: 2, length: 2400 }), line({ _uiKey: 'b', pricingMode: 'PerUnit', length: 2400 })],
+    });
+    expect(byId('stock-line-length-0')).toBeDisabled();
+    expect(byId('stock-line-length-0')).toHaveValue(2400);
+    expect(byId('stock-line-length-0')).not.toHaveAttribute('placeholder');
+    expect(byId('stock-line-length-1')).toHaveValue(null);
+    expect(byId('stock-line-length-1')).toHaveAttribute('placeholder', '—');
+  });
+
   it('editing discount amount switches the line to manual discount', () => {
     showAllColumns();
     const { values } = renderGrid({

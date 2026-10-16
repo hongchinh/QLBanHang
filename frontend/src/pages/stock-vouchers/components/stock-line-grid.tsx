@@ -15,7 +15,13 @@ import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import { cn } from '@/lib/utils';
-import { isDimensionField, normalizePricingMode, shownDimensions, usesDimension } from '@/lib/dimension-columns';
+import {
+  isDimensionField,
+  normalizePricingMode,
+  shownDimensions,
+  usesDimension,
+  type DimensionField,
+} from '@/lib/dimension-columns';
 import { DIALOG_SELECTOR } from '@/lib/focus';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
@@ -277,7 +283,8 @@ function PercentCell({
   );
 }
 
-// Số tấm / Dài / Rộng / Dày: an emptied cell means "no value".
+// Số tấm / Dài / Rộng / Dày: an emptied cell means "no value". A cell its line's mode does not use (`unused`) shows "—"
+// and keeps the stored value in the form, which is still saved and printed.
 function DimensionCell({
   field,
   rowIndex,
@@ -285,14 +292,16 @@ function DimensionCell({
   value,
   onCommit,
   disabled,
+  unused,
   error,
 }: {
-  field: LineFocusField;
+  field: DimensionField;
   rowIndex: number;
   label: string;
   value: number | string;
   onCommit: (value: number | '') => void;
   disabled: boolean;
+  unused: boolean;
   error?: string;
 }) {
   const focusProps = useFocusOrigin(selectOnKeyboardFocus);
@@ -304,8 +313,9 @@ function DimensionCell({
       step="any"
       aria-label={rowLabel(label, rowIndex)}
       {...errorProps(field, rowIndex, error)}
-      disabled={disabled}
-      value={value}
+      disabled={disabled || unused}
+      value={unused ? '' : value}
+      placeholder={unused ? '—' : undefined}
       {...focusProps}
       onChange={(e) => onCommit(toOptionalNumber(e.target.value) ?? '')}
     />
@@ -510,7 +520,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   }
 
 
-  const numberInput = (idx: number, field: 'sheetCount' | 'length' | 'width' | 'thickness', focusField: LineFocusField, label: string) => {
+  const numberInput = (idx: number, field: 'sheetCount' | 'length' | 'width' | 'thickness', focusField: DimensionField, label: string) => {
     const line = rows[idx];
     const disabled = readOnly || isFieldDisabled(line?.pricingMode ?? 'PerUnit', focusField);
     const error = errorOf(idx, field);
@@ -522,6 +532,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           label={label}
           value={(line?.[field] ?? '') as number | string}
           disabled={disabled}
+          unused={!usesDimension(line?.pricingMode, focusField)}
           error={error}
           onCommit={(value) => setLineField(idx, field, value)}
         />

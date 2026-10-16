@@ -1,6 +1,6 @@
 # Dimension columns that follow the pricing mode
 
-Created: 2026-10-15 23:11:03 · Status: design approved; reviewed twice against `qlbanhang/main` (round 1: 9 confirmed issues; round 2 on 2026-10-16: 20 issues, plus 17 found when the round 2 edits were checked, see [section-02-review.md](section-02-review.md)); all applied · Plan: [261016-0249](../../plans/261016-0249-dimension-columns-by-pricing-mode/SUMMARY.md)
+Created: 2026-10-15 23:11:03 · Status: design approved; reviewed twice against `qlbanhang/main` (round 1: 9 confirmed issues; round 2 on 2026-10-16: 20 issues, plus 17 found when the round 2 edits were checked, see [section-02-review.md](section-02-review.md)); all applied · Plan: [261016-0249](../../plans/archived/261016-0249-dimension-columns-by-pricing-mode/SUMMARY.md)
 
 ## Problem
 
@@ -253,7 +253,7 @@ None blocking. Follow-ups to file separately:
 
 ## Next steps
 
-1. The implementation plan is [docs/plans/261016-0249-dimension-columns-by-pricing-mode](../../plans/261016-0249-dimension-columns-by-pricing-mode/SUMMARY.md), based on `qlbanhang/main` e61e4f1b.
+1. The implementation plan is [docs/plans/archived/261016-0249-dimension-columns-by-pricing-mode](../../plans/archived/261016-0249-dimension-columns-by-pricing-mode/SUMMARY.md), based on `qlbanhang/main` e61e4f1b.
 2. Execute it in a worktree, with its own database for the real-browser check.
 
 ## Files

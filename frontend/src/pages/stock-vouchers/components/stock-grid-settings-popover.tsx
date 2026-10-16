@@ -45,6 +45,7 @@ export function StockGridSettingsPopover({ prefs, onToggleColumn, onToggleEnterS
               </label>
             ))}
           </div>
+          <p className="text-xs text-muted-foreground">Số tấm, Dài, Rộng, Dày tự hiện theo hàng tính md, m², m³ có trong phiếu.</p>
         </section>
         <section>
           <h3 className="mb-1.5 font-semibold">Phím Enter dừng ở (Mã hàng luôn là ô đầu)</h3>

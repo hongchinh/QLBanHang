@@ -323,6 +323,9 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                       variant="cell"
                       inputId={getLineCellId('product-code', idx)}
                       nextFocusId={getLineCellId('name', idx)}
+                      // Closed until the user types: Enter, Shift+Enter or a row delete into a filled cell must
+                      // not re-pick its product with the next Enter (decision 11).
+                      openOnFocus={false}
                       allowQuickAdd
                       value={(line.productCode ?? '') as string}
                       onChange={(v) => setLineField(idx, 'productCode', v)}

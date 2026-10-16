@@ -485,4 +485,10 @@ describe('LineItemsGrid', () => {
     enter('line-unit-cost-0');
     expect(focused()).toBe('line-product-code-1');
   });
+
+  it('keeps the suggestion list of a filled Mã hàng closed when the cell takes the focus', () => {
+    renderGrid([line('a'), line('b')]);
+    expect(cellProps.byId['line-product-code-0']?.openOnFocus).toBe(false);
+    expect(cellProps.byId['line-product-code-1']?.openOnFocus).toBe(false);
+  });
 });

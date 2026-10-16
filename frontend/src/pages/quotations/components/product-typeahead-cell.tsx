@@ -21,7 +21,7 @@ interface Props {
   inputId?: string;
   /** ID của input cần focus ngay sau khi commit. */
   nextFocusId?: string;
-  /** Mở danh sách gợi ý khi ô nhận focus. Mặc định true (báo giá giữ nguyên). */
+  /** Mở danh sách gợi ý khi ô nhận focus. Mặc định true; mọi màn hình đang dùng ô này đều truyền false, danh sách chỉ mở khi gõ. */
   openOnFocus?: boolean;
   /** Dòng "Thêm mới hàng hóa" và F4 (cần quyền products.create). Mặc định tắt. */
   allowQuickAdd?: boolean;

@@ -92,7 +92,7 @@ describe('ProductTypeaheadCell', () => {
     permissions = [];
   });
 
-  // Quotations rely on this default; the stock grid opts out.
+  // The component default. Every screen that uses the cell passes openOnFocus={false}; this test keeps the default's contract.
   it('opens the suggestion list when a filled cell takes focus', () => {
     renderCell();
     expect(screen.getByRole('listbox')).toBeInTheDocument();

@@ -182,10 +182,15 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
     return (rows[rowIndex] ?? fields[rowIndex]) as unknown as QuotationLineFormValues | undefined;
   }
 
+  // Đơn giá nhập without quotations.view_cost and a hidden dimension column have no cell to focus.
+  const isRendered = (field: LineFocusField) =>
+    (field !== 'unit-cost' || canViewCost) && (!isDimensionField(field) || dims.includes(field));
+
   function getEnabledFocusFields(rowIndex: number): readonly LineFocusField[] {
+    const rendered = LINE_FOCUS_FIELDS.filter(isRendered);
     const line = getLineForNavigation(rowIndex);
-    if (!line) return LINE_FOCUS_FIELDS;
-    return LINE_FOCUS_FIELDS.filter((field) => !isLineFocusFieldDisabled(line, field));
+    if (!line) return rendered;
+    return rendered.filter((field) => !isLineFocusFieldDisabled(line, field));
   }
 
   function moveLineFocus(current: { field: LineFocusField; rowIndex: number }, direction: 1 | -1) {

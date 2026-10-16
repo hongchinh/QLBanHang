@@ -458,4 +458,31 @@ describe('LineItemsGrid', () => {
     enter('line-unit-1');
     expect(focused()).toBe('line-quantity-1');
   });
+
+  describe('Enter without quotations.view_cost (no Đơn giá nhập cell)', () => {
+    it("goes from Đơn giá bán to the next row's Mã hàng", () => {
+      renderGrid([line('a'), line('b')]);
+      enter('line-unit-price-0');
+      expect(focused()).toBe('line-product-code-1');
+    });
+
+    it("adds a row from the last row's Đơn giá bán and focuses its Mã hàng", async () => {
+      renderGrid([line('a'), line('b')]);
+      enter('line-unit-price-1');
+      await waitFor(() => expect(focused()).toBe('line-product-code-2'));
+    });
+
+    it("goes back from Mã hàng to the previous row's Đơn giá bán with Shift+Enter", () => {
+      renderGrid([line('a'), line('b')]);
+      enter('line-product-code-1', true);
+      expect(focused()).toBe('line-unit-price-0');
+    });
+  });
+
+  it("goes from Đơn giá nhập to the next row's Mã hàng with quotations.view_cost", () => {
+    setCostPermission(true);
+    renderGrid([line('a'), line('b')]);
+    enter('line-unit-cost-0');
+    expect(focused()).toBe('line-product-code-1');
+  });
 });

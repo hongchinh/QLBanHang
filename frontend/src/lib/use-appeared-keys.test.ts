@@ -1,4 +1,5 @@
-import { StrictMode } from 'react';
+import { StrictMode, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useAppearedKeys } from './use-appeared-keys';
@@ -110,6 +111,32 @@ describe('useAppearedKeys', () => {
     });
     expect(result.current.size).toBe(0);
     rerender({ keys: ['sheet-count', 'length'] });
+    expect([...result.current]).toEqual(['length']);
+  });
+
+  it('marks the keys a commit shows after React threw away a render that had read them (browser check D1)', () => {
+    // The grids read their keys from the form, a store outside React. A pick made outside an event updates the form
+    // and the grid's watcher at default priority; a focus event right after it renders first, at discrete priority.
+    // That render already reads the new keys, but no state changed at its priority, so React throws it away. The
+    // default-priority render then commits the new keys.
+    // No event is being dispatched, so the watcher's update gets default priority (React reads window.event).
+    expect(window.event).toBeUndefined();
+    let keys = ['sheet-count'];
+    const updates: { watcher?: () => void; focus?: () => void } = {};
+    const { result } = renderHook(() => {
+      const [, setWatched] = useState(0);
+      const [, setFocused] = useState<string | null>(null);
+      updates.watcher = () => setWatched((n) => n + 1);
+      updates.focus = () => setFocused(null);
+      return useAppearedKeys([...keys]);
+    });
+
+    act(() => {
+      keys = ['sheet-count', 'length'];
+      updates.watcher!();
+      flushSync(() => updates.focus!());
+    });
+
     expect([...result.current]).toEqual(['length']);
   });
 

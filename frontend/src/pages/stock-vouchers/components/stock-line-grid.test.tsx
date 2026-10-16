@@ -220,6 +220,21 @@ async function outsideAct(steps: () => Promise<void>) {
   }
 }
 
+// React gives an update made outside its own event handlers the priority of window.event. In a browser that is the
+// event being dispatched: none in a timer, and Radix's own custom event when a closed dialog hands the focus back. So
+// such an update renders at default priority, after the discrete updates of a focus event. Under vitest, window.event
+// keeps for good the first event React's dev build wrote into it (a focusin), which makes every such update discrete.
+// Hides that stale value while `steps` run.
+async function withBrowserWindowEvent(steps: () => Promise<void>) {
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'event');
+  Object.defineProperty(window, 'event', { configurable: true, get: () => undefined });
+  try {
+    await steps();
+  } finally {
+    if (descriptor) Object.defineProperty(window, 'event', descriptor);
+  }
+}
+
 // Only the microtasks run, in which React renders what an event changed: no task, frame or timer.
 async function eventRendered() {
   for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -1569,6 +1584,37 @@ describe('StockLineGrid', () => {
 
       await waitFor(() => expect(byId('stock-line-sheet-count-0')).toHaveFocus());
       expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+    });
+
+    it('a quick-added m² product flashes its new columns and keeps the focused cell in view (browser check D1)', async () => {
+      quickAddResult = { ...quickAdded, pricingMode: 'PerSquareMeter' };
+      const input = typeNewCode();
+      expect(dimensionHeaders()).toEqual([]);
+      await screen.findByRole('option', { name: /Thêm mới hàng hóa "TL-50"/ });
+      fireEvent.keyDown(input, { key: 'F4' });
+      await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        // The cell picks the product once the dialog has closed, from Radix's onCloseAutoFocus timer.
+        await withBrowserWindowEvent(() =>
+          outsideAct(async () => {
+            screen.getByRole('button', { name: 'fake lưu' }).click();
+          }),
+        );
+
+        await waitFor(() => expect(byId('stock-line-sheet-count-0')).toHaveFocus());
+        expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+        const th = (text: string) => screen.getAllByRole('columnheader').find((el) => el.textContent === text)!;
+        for (const [header, field] of [['Số tấm', 'sheet-count'], ['Dài', 'length'], ['Rộng', 'width']]) {
+          expect(th(header)).toHaveClass('col-appeared');
+          expect(byId(`stock-line-${field}-0`).closest('td')).toHaveClass('col-appeared');
+        }
+        expect(th('SL')).not.toHaveClass('col-appeared');
+        expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+        await waitFor(() => expect(document.querySelectorAll('.col-appeared')).toHaveLength(0), { timeout: 2000 });
+      } finally {
+        scroll.mockRestore();
+      }
     });
 
     it('shows no add row without products.create', async () => {

@@ -391,8 +391,10 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   // Dimension columns that have just appeared flash (`col-appeared`, line-items-grid.css); none on the first render.
   const appeared = useAppearedKeys(shownDims);
   const flashClass = (key: ColumnKey) => (appeared.has(key) ? 'col-appeared' : undefined);
-  // Hiding or showing dimension columns shifts the columns to their right: keep the focused cell in view. Keyed on the
-  // joined list (a new array every render); the first render only records it.
+  // Hiding or showing dimension columns shifts the columns to their right: keep the focused cell in view. Compares the
+  // joined list (a new array every render) with the last commit's; the first render only records it. No dependency
+  // list, as in useAppearedKeys: the rows come from the form, and React may throw away a render that read new rows
+  // while keeping its deps.
   const wrapRef = useRef<HTMLDivElement>(null);
   const shownDimsKey = shownDims.join(',');
   const previousShownDimsKey = useRef<string | null>(null);
@@ -404,7 +406,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     if (active instanceof HTMLElement && wrapRef.current?.contains(active)) {
       active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
-  }, [shownDimsKey]);
+  });
   const minWidth = columns.reduce((sum, c) => sum + c.width, 0);
 
   const stickyOffset = new Map<ColumnKey, CSSProperties>();

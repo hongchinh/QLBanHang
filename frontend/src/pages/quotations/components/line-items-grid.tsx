@@ -7,6 +7,7 @@ import type {
   QuotationFormValues,
   QuotationLineFormValues,
 } from '@/features/quotations/schema';
+import { DIMENSION_FIELDS, isDimensionField, type DimensionField } from '@/lib/dimension-columns';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
@@ -26,16 +27,55 @@ const LINE_FOCUS_FIELDS = [
   'product-code',
   'name',
   'unit',
+  'sheet-count',
   'length',
   'width',
   'thickness',
-  'sheet-count',
   'quantity',
   'unit-price',
   'unit-cost',
 ] as const;
 
 type LineFocusField = (typeof LINE_FOCUS_FIELDS)[number];
+
+type ColumnKey =
+  | 'row-no' | 'product-code' | 'name' | 'unit' | DimensionField | 'quantity' | 'unit-price' | 'line-total'
+  | 'unit-cost' | 'line-cost' | 'line-profit' | 'action';
+
+interface GridColumn {
+  key: ColumnKey;
+  header: string;
+  /** Undefined for Tên hàng, which takes the rest of the table width. */
+  width?: number;
+  /** Shown only with quotations.view_cost. */
+  cost?: boolean;
+}
+
+// One list for the <colgroup>, the <thead> and the empty row's colSpan. The dimension widths are the stock grid's.
+const COLUMNS: readonly GridColumn[] = [
+  { key: 'row-no', header: '#', width: 42 },
+  { key: 'product-code', header: 'Mã hàng', width: 130 },
+  { key: 'name', header: 'Tên hàng' },
+  { key: 'unit', header: 'ĐVT', width: 58 },
+  { key: 'sheet-count', header: 'Số tấm', width: 70 },
+  { key: 'length', header: 'Dài', width: 76 },
+  { key: 'width', header: 'Rộng', width: 76 },
+  { key: 'thickness', header: 'Dày', width: 64 },
+  { key: 'quantity', header: 'SL', width: 82 },
+  { key: 'unit-price', header: 'Đơn giá bán', width: 104 },
+  { key: 'line-total', header: 'Thành tiền bán', width: 122 },
+  { key: 'unit-cost', header: 'Đơn giá nhập', width: 112, cost: true },
+  { key: 'line-cost', header: 'Thành tiền nhập', width: 122, cost: true },
+  { key: 'line-profit', header: 'Lợi nhuận', width: 122, cost: true },
+  { key: 'action', header: '', width: 42 },
+];
+
+const DIMENSION_INPUTS: Record<DimensionField, { name: 'sheetCount' | 'length' | 'width' | 'thickness'; label: string }> = {
+  'sheet-count': { name: 'sheetCount', label: 'Số tấm' },
+  length: { name: 'length', label: 'Dài' },
+  width: { name: 'width', label: 'Rộng' },
+  thickness: { name: 'thickness', label: 'Dày' },
+};
 
 function getLineCellId(field: LineFocusField, idx: number): string {
   return `line-${field}-${idx}`;
@@ -107,6 +147,8 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
   const [editingQuantityText, setEditingQuantityText] = useState('');
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const canViewCost = useAuthStore((s) => s.hasPermission('quotations.view_cost'));
+  const dims: readonly DimensionField[] = DIMENSION_FIELDS;
+  const columns = COLUMNS.filter((c) => (isDimensionField(c.key) ? dims.includes(c.key) : !c.cost || canViewCost));
 
   useImperativeHandle(ref, () => ({
     ensureFirstLineAndFocusProductCode() {
@@ -241,33 +283,17 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
       <div ref={wrapRef} className="accounting-grid-wrap" tabIndex={-1} onKeyDown={handleGridKeyDown}>
         <table className="accounting-grid">
           <colgroup>
-            <col style={{ width: 42 }} />
-            <col style={{ width: 130 }} />
-            <col />
-            <col style={{ width: 58 }} />
-            <col style={{ width: 220 }} />
-            <col style={{ width: 82 }} />
-            <col style={{ width: 104 }} />
-            <col style={{ width: 122 }} />
-            {canViewCost && <col style={{ width: 112 }} />}
-            {canViewCost && <col style={{ width: 122 }} />}
-            {canViewCost && <col style={{ width: 122 }} />}
-            <col style={{ width: 42 }} />
+            {columns.map((c) => (
+              <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+            ))}
           </colgroup>
           <thead>
             <tr>
-              <th className="row-no">#</th>
-              <th>Mã hàng</th>
-              <th>Tên hàng</th>
-              <th>ĐVT</th>
-              <th>D × R × Dày × Tấm</th>
-              <th>SL</th>
-              <th>Đơn giá bán</th>
-              <th>Thành tiền bán</th>
-              {canViewCost && <th>Đơn giá nhập</th>}
-              {canViewCost && <th>Thành tiền nhập</th>}
-              {canViewCost && <th>Lợi nhuận</th>}
-              <th></th>
+              {columns.map((c) => (
+                <th key={c.key} className={c.key === 'row-no' ? 'row-no' : undefined}>
+                  {c.header}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -280,10 +306,6 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
               const lineTotal = computeLineTotal(lineLike);
               const lineCost = computeLineCost(lineLike);
               const lineProfit = lineCost != null ? lineTotal - lineCost : undefined;
-              const lengthDisabled = isLineFocusFieldDisabled(line, 'length');
-              const widthDisabled = isLineFocusFieldDisabled(line, 'width');
-              const thicknessDisabled = isLineFocusFieldDisabled(line, 'thickness');
-              const sheetCountDisabled = isLineFocusFieldDisabled(line, 'sheet-count');
               return (
                 <tr key={line._uiKey ?? field.id} onFocus={() => setActiveRowIndex(idx)}>
                   <td className="row-no">{idx + 1}</td>
@@ -354,66 +376,23 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                       onChange={(e) => setLineField(idx, 'unitName', e.target.value)}
                     />
                   </td>
-                  <td>
-                    <div className="dxr-cell">
-                      <input
-                        id={getLineCellId('length', idx)}
-                        className="cell-input"
-                        type="number"
-                        step="any"
-                        placeholder="D"
-                        aria-label="Dài"
-                        disabled={lengthDisabled}
-                        value={numInput(line.length)}
-                        onChange={(e) => {
-                          const v = parseNum(e.target.value);
-                          setLineField(idx, 'length', v as never);
-                        }}
-                      />
-                      <input
-                        id={getLineCellId('width', idx)}
-                        className="cell-input"
-                        type="number"
-                        step="any"
-                        placeholder="R"
-                        aria-label="Rộng"
-                        disabled={widthDisabled}
-                        value={numInput(line.width)}
-                        onChange={(e) => {
-                          const v = parseNum(e.target.value);
-                          setLineField(idx, 'width', v as never);
-                        }}
-                      />
-                      <input
-                        id={getLineCellId('thickness', idx)}
-                        className="cell-input"
-                        type="number"
-                        step="any"
-                        placeholder="Dày"
-                        aria-label="Dày"
-                        disabled={thicknessDisabled}
-                        value={numInput(line.thickness)}
-                        onChange={(e) => {
-                          const v = parseNum(e.target.value);
-                          setLineField(idx, 'thickness', v as never);
-                        }}
-                      />
-                      <input
-                        id={getLineCellId('sheet-count', idx)}
-                        className="cell-input"
-                        type="number"
-                        step="any"
-                        placeholder="Tấm"
-                        aria-label="Số tấm"
-                        disabled={sheetCountDisabled}
-                        value={numInput(line.sheetCount)}
-                        onChange={(e) => {
-                          const v = parseNum(e.target.value);
-                          setLineField(idx, 'sheetCount', v as never);
-                        }}
-                      />
-                    </div>
-                  </td>
+                  {dims.map((f) => {
+                    const { name, label } = DIMENSION_INPUTS[f];
+                    return (
+                      <td key={f} className="cell-number">
+                        <input
+                          id={getLineCellId(f, idx)}
+                          className="cell-input cell-number tabular-nums"
+                          type="number"
+                          step="any"
+                          aria-label={label}
+                          disabled={isLineFocusFieldDisabled(line, f)}
+                          value={numInput(line[name])}
+                          onChange={(e) => setLineField(idx, name, parseNum(e.target.value) as never)}
+                        />
+                      </td>
+                    );
+                  })}
                   <td className="cell-number">
                     <input
                       id={quantityCellId}
@@ -516,7 +495,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
             })}
             {fields.length === 0 && (
               <tr>
-                <td colSpan={canViewCost ? 12 : 9} className="empty-placeholder">
+                <td colSpan={columns.length} className="empty-placeholder">
                   Chưa có dòng nào.{' '}
                   <button type="button" className="empty-placeholder-link" onClick={addLine}>
                     Bấm để thêm dòng đầu tiên

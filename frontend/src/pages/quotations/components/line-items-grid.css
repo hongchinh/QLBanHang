@@ -151,22 +151,6 @@
   line-height: 1.15;
 }
 
-.accounting-grid .dxr-cell {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  height: 33px;
-}
-
-.accounting-grid .dxr-cell .cell-input {
-  border-right: 1px solid hsl(var(--border));
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.accounting-grid .dxr-cell .cell-input:last-child {
-  border-right: 0;
-}
-
 .accounting-grid .cell-action {
   width: 46px;
   text-align: center;

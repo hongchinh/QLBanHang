@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useForm, type UseFormReturn } from 'react-hook-form';
 import { LineItemsGrid } from './line-items-grid';
@@ -69,6 +69,18 @@ function line(uiKey: string, overrides: Partial<QuotationLineFormValues> = {}): 
   };
 }
 
+const m3 = (uiKey: string, overrides: Partial<QuotationLineFormValues> = {}) =>
+  line(uiKey, {
+    pricingMode: 'PerCubicMeter',
+    unitName: 'm³',
+    sheetCount: 2,
+    length: 3000,
+    width: 100,
+    thickness: 50,
+    quantity: 0,
+    ...overrides,
+  });
+
 function setCostPermission(enabled: boolean) {
   useAuthStore.setState({
     accessToken: 'token',
@@ -118,6 +130,19 @@ function byId(id: string): HTMLInputElement {
   const el = document.getElementById(id);
   if (!el) throw new Error(`#${id} not found`);
   return el as HTMLInputElement;
+}
+
+const focused = () => document.activeElement?.id;
+
+function headers() {
+  return screen.getAllByRole('columnheader').map((th) => th.textContent);
+}
+
+// Presses Enter (Shift+Enter with `shift`) in a cell, focusing it first.
+function enter(id: string, shift = false) {
+  const el = byId(id);
+  act(() => el.focus());
+  fireEvent.keyDown(el, { key: 'Enter', shiftKey: shift });
 }
 
 describe('LineItemsGrid', () => {
@@ -255,5 +280,29 @@ describe('LineItemsGrid', () => {
       expect(screen.getByDisplayValue('Alpha')).toBeInTheDocument();
       expect(screen.queryByDisplayValue('Beta')).not.toBeInTheDocument();
     });
+  });
+
+  it('shows the dimensions as four columns and walks them from Số tấm to Dày', () => {
+    renderGrid([m3('a')]);
+
+    expect(headers()).toEqual([
+      '#', 'Mã hàng', 'Tên hàng', 'ĐVT', 'Số tấm', 'Dài', 'Rộng', 'Dày', 'SL', 'Đơn giá bán', 'Thành tiền bán', '',
+    ]);
+    for (const id of ['line-sheet-count-0', 'line-length-0', 'line-width-0', 'line-thickness-0']) {
+      expect(byId(id)).toHaveClass('cell-input', 'cell-number', 'tabular-nums');
+      expect(byId(id).closest('td')).toHaveClass('cell-number');
+      expect(byId(id)).not.toHaveAttribute('placeholder');
+    }
+
+    enter('line-unit-0');
+    expect(focused()).toBe('line-sheet-count-0');
+    enter('line-sheet-count-0');
+    expect(focused()).toBe('line-length-0');
+    enter('line-length-0');
+    expect(focused()).toBe('line-width-0');
+    enter('line-width-0');
+    expect(focused()).toBe('line-thickness-0');
+    enter('line-thickness-0');
+    expect(focused()).toBe('line-unit-price-0');
   });
 });

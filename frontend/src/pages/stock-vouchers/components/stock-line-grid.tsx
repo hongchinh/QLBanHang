@@ -387,6 +387,20 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     remove(rowIndex);
   };
   const columns = COLUMNS.filter((c) => isShown(c.key) && !(readOnly && c.key === 'action'));
+  // Hiding or showing dimension columns shifts the columns to their right: keep the focused cell in view. Keyed on the
+  // joined list (a new array every render); the first render only records it.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const shownDimsKey = shownDims.join(',');
+  const previousShownDimsKey = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const previous = previousShownDimsKey.current;
+    previousShownDimsKey.current = shownDimsKey;
+    if (previous === null || previous === shownDimsKey) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && wrapRef.current?.contains(active)) {
+      active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  }, [shownDimsKey]);
   const minWidth = columns.reduce((sum, c) => sum + c.width, 0);
 
   const stickyOffset = new Map<ColumnKey, CSSProperties>();
@@ -791,6 +805,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       {toolbarSlot && createPortal(toolbar(true), toolbarSlot)}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
       <div
+        ref={wrapRef}
         className="accounting-grid-wrap stock-grid-wrap min-h-0 flex-1"
         tabIndex={-1}
         onKeyDown={handleGridKeyDown}

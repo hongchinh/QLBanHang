@@ -1449,6 +1449,58 @@ describe('StockLineGrid', () => {
     expect(popover).toHaveTextContent('Dòng trên/dưới');
   });
 
+  // Hiding columns shifts the columns to the right of them: the focused cell is scrolled back into view.
+  describe('scroll anchor', () => {
+    it('Ctrl+Delete from Dày of the only m³ line scrolls the cell that takes the focus into view, once', async () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        const { values } = renderGrid({ lines: [m3Line({ productCode: 'A' }), m2Line({ _uiKey: 'b', productCode: 'B' })] });
+        act(() => byId('stock-line-thickness-0').focus());
+
+        fireEvent.keyDown(byId('stock-line-thickness-0'), { key: 'Delete', ctrlKey: true });
+
+        await waitFor(() => expect(values().lines).toHaveLength(1));
+        expect(scroll).toHaveBeenCalledTimes(1);
+        expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+        expect(scroll.mock.contexts[0]).toBe(document.activeElement);
+        expect(focused()).toBe('stock-line-product-code-0');
+      } finally {
+        scroll.mockRestore();
+      }
+    });
+
+    it('a reset that hides columns while the focus is outside the grid scrolls nothing', async () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        const { form } = renderGrid({ lines: [m3Line()] });
+        act(() => byId('stock-line-add').focus()); // the toolbar sits outside the grid wrapper
+
+        act(() => form().reset({ ...form().getValues(), lines: [line()] }));
+
+        await waitFor(() => expect(dimensionHeaders()).toEqual([]));
+        expect(scroll).not.toHaveBeenCalled();
+      } finally {
+        scroll.mockRestore();
+      }
+    });
+
+    it('typing in a cell, which changes no column, scrolls nothing', () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        renderGrid({ lines: [m3Line()] });
+        const cell = byId('stock-line-length-0');
+        act(() => cell.focus());
+
+        fireEvent.change(cell, { target: { value: '2500' } });
+
+        expect(byId('stock-line-length-0')).toHaveValue(2500);
+        expect(scroll).not.toHaveBeenCalled();
+      } finally {
+        scroll.mockRestore();
+      }
+    });
+  });
+
   describe('product quick add', () => {
     function typeNewCode() {
       useProductSearchMock.mockImplementation((text: string) => ({

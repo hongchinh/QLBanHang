@@ -410,6 +410,33 @@ describe('StockLineGrid', () => {
     expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng', 'Dày']);
   });
 
+  // The page's watch clears a server error only on a dimension whose value the pick changes; the grid clears the rest.
+  it('a re-pick clears every dimension error of the line', async () => {
+    useProductSearchMock.mockImplementation((text: string) => ({
+      data: [quickAdded],
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      settledQuery: text,
+    }));
+    const { form } = renderGrid({ lines: [m2Line({ sheetCount: '' })] });
+    act(() => {
+      form().setError('lines.0.sheetCount', { type: 'server', message: 'Số tấm phải lớn hơn 0' });
+      form().setError('lines.0.width', { type: 'server', message: 'Chiều rộng phải lớn hơn 0' });
+      form().setError('lines.0.length', { type: 'custom', message: 'Chiều dài phải lớn hơn 0' });
+      form().setError('lines.0.thickness', { type: 'server', message: 'Chiều dày phải lớn hơn 0' });
+    });
+    expect(byId('stock-line-sheet-count-0')).toHaveAttribute('aria-invalid', 'true');
+
+    await pickFromTypeahead('TL-50'); // quickAdded: PerUnit
+
+    await waitFor(() => expect(form().getValues('lines.0.pricingMode')).toBe('PerUnit'));
+    for (const field of ['sheetCount', 'length', 'width', 'thickness'] as const) {
+      expect(form().getFieldState(`lines.0.${field}`).error).toBeUndefined();
+    }
+    expect(dimensionHeaders()).toEqual([]);
+  });
+
   it('read-only grid disables inputs', () => {
     renderGrid({ lines: [line(), line({ _uiKey: 'b' })], readOnly: true });
 

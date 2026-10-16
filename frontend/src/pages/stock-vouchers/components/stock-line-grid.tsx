@@ -446,6 +446,9 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       },
       { shouldDirty: true },
     );
+    // A re-pick ends the line's dimension errors. The page's watch drops a server error only where the pick changed
+    // the value (Số tấm often stays ''), and a grid write does not re-validate.
+    form.clearErrors([`lines.${idx}.sheetCount`, `lines.${idx}.length`, `lines.${idx}.width`, `lines.${idx}.thickness`]);
   };
 
   const addLine = () => {

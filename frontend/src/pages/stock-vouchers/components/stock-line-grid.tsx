@@ -15,6 +15,7 @@ import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import { cn } from '@/lib/utils';
+import { isDimensionField, shownDimensions, usesDimension } from '@/lib/dimension-columns';
 import { DIALOG_SELECTOR } from '@/lib/focus';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
@@ -33,6 +34,7 @@ import {
   type LineFocusField,
 } from '@/pages/stock-vouchers/utils/line-navigation';
 import {
+  dimensionErrorFields,
   forcedColumns,
   OPTIONAL_COLUMNS,
   useStockGridPrefs,
@@ -353,12 +355,17 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const { prefs, toggleColumn, toggleEnterStop, reset } = useStockGridPrefs(userId, type);
   const headerWarehouseId = useWatch({ control: form.control, name: 'warehouseId' }) ?? '';
   const forced = forcedColumns(rows, headerWarehouseId, lineErrors);
+  // Số tấm, Dài, Rộng, Dày follow the highest pricing mode of the lines, plus any with an error on a line. Computed once
+  // per render, so the onSelect of a pick sees the columns of the render before the pick.
+  const shownDims = shownDimensions(rows, dimensionErrorFields(lineErrors));
   // A column also stays while the focus is in one of its cells. What forced a hidden column in can end under the
   // caret (the first key of a correction clears a server error; picking the header warehouse in Kho ends "another
   // warehouse"), and hiding the column then would drop the focus on <body> with the rest of the keys.
   const [focusedColumn, setFocusedColumn] = useState<OptionalColumn | null>(null);
   const isShown = (key: ColumnKey) =>
-    !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key) || key === focusedColumn;
+    isDimensionField(key)
+      ? shownDims.includes(key)
+      : !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key) || key === focusedColumn;
   // Remove a row without a focus gap: the focused cell lives in the row being removed, so move the focus to a
   // surviving row BEFORE removing. Its key keeps that row mounted, so the focus stays there and nothing has to
   // re-focus later (a later re-focus would undo a key the user pressed in between). With no line left the focus
@@ -572,7 +579,11 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                 allowQuickAdd
                 onSelect={(s) => {
                   applyProduct(idx, s);
-                  const next = nextStop(enterPath(s.pricingMode, prefs.enterStops[s.pricingMode], isVisible), 'product-code');
+                  // isVisible is the render before the pick: the picked mode's dimension columns may not be shown yet.
+                  // They are once the pick renders, before the focus timer below runs.
+                  const visibleAfterPick = (f: LineFocusField) =>
+                    (isDimensionField(f) && usesDimension(s.pricingMode, f)) || isVisible(f);
+                  const next = nextStop(enterPath(s.pricingMode, prefs.enterStops[s.pricingMode], visibleAfterPick), 'product-code');
                   if (next) focusCell(next, idx, true);
                   else setTimeout(() => goNextRow(idx), 0);
                 }}

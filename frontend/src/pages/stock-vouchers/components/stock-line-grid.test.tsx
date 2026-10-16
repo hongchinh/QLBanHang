@@ -11,7 +11,7 @@ import type {
 } from '@/features/stock-vouchers/schema';
 import type * as DialogModule from '@/components/ui/dialog';
 import type { ProductQuickAddDialogProps } from '@/features/products/components/product-quick-add-dialog';
-import type { ProductListItem, ProductSuggestion } from '@/features/products/types';
+import type { PricingMode, ProductListItem, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
@@ -126,6 +126,12 @@ function line(overrides: Partial<StockLineFormValues> = {}): StockLineFormValues
   };
 }
 
+// A m³ line and a m² line with every dimension their mode uses.
+const m3Line = (overrides: Partial<StockLineFormValues> = {}) =>
+  line({ pricingMode: 'PerCubicMeter', sheetCount: 2, length: 3000, width: 100, thickness: 50, ...overrides });
+const m2Line = (overrides: Partial<StockLineFormValues> = {}) =>
+  line({ pricingMode: 'PerSquareMeter', sheetCount: 1, length: 2000, width: 1200, ...overrides });
+
 function zeroComputed(overrides: Partial<StockLineComputed> = {}): StockLineComputed {
   return {
     quantity: 0,
@@ -182,6 +188,11 @@ const showAllColumns = () => storePrefs({ hiddenColumns: [] });
 
 function headers() {
   return screen.getAllByRole('columnheader').map((th) => th.textContent);
+}
+const DIMENSION_HEADERS = ['Số tấm', 'Dài', 'Rộng', 'Dày'];
+// The dimension columns the grid shows, in column order.
+function dimensionHeaders() {
+  return headers().filter((h) => DIMENSION_HEADERS.includes(h ?? ''));
 }
 
 function byId(id: string): HTMLInputElement {
@@ -282,6 +293,30 @@ describe('StockLineGrid', () => {
     expect(enabled(3)).toEqual(['sheet-count', 'length', 'width', 'thickness']);
   });
 
+  // The highest pricing mode of the lines decides; a missing or unknown mode counts as PerUnit.
+  it.each<[string, unknown[], string[]]>([
+    ['unit lines', ['PerUnit', 'PerUnit'], []],
+    ['a md line', ['PerUnit', 'PerLinearMeter'], ['Số tấm', 'Dài']],
+    ['a md and a m² line', ['PerLinearMeter', 'PerSquareMeter'], ['Số tấm', 'Dài', 'Rộng']],
+    ['a m³ line', ['PerUnit', 'PerCubicMeter'], ['Số tấm', 'Dài', 'Rộng', 'Dày']],
+    ['a line without a mode', [undefined], []],
+    ['a line with an unknown mode', ['Legacy'], []],
+  ])('dimension columns with %s', (_case, modes, expected) => {
+    renderGrid({ lines: modes.map((mode) => line({ pricingMode: mode as PricingMode })) });
+    expect(dimensionHeaders()).toEqual(expected);
+  });
+
+  // A line's mode changes only on a pick: a code typed with the list open changes no column.
+  it.each<[string, StockLineFormValues, string[]]>([
+    ['a blank line', createEmptyStockLine(0, WH1), []],
+    ['a m³ line', m3Line(), ['Số tấm', 'Dài', 'Rộng', 'Dày']],
+  ])('typing a code over %s without a pick changes no column', async (_case, start, expected) => {
+    renderGrid({ lines: [start] });
+    fireEvent.change(byId('stock-line-product-code-0'), { target: { value: 'TON' } });
+    await screen.findByRole('listbox'); // the m² product is offered, not picked
+    expect(dimensionHeaders()).toEqual(expected);
+  });
+
   it('editing discount amount switches the line to manual discount', () => {
     showAllColumns();
     const { values } = renderGrid({
@@ -321,6 +356,7 @@ describe('StockLineGrid', () => {
 
   it('selecting through the catalog dialog applies the same autofill', async () => {
     const { values } = renderGrid({ type: 'In' });
+    expect(dimensionHeaders()).toEqual([]);
     fireEvent.change(byId('stock-line-product-code-0'), { target: { value: 'GO' } });
     fireEvent.mouseDown(await screen.findByText('Xem danh mục đầy đủ'));
     fireEvent.doubleClick(await screen.findByText('Gỗ thông'));
@@ -338,6 +374,9 @@ describe('StockLineGrid', () => {
         thickness: 50,
       }),
     );
+    // The m³ product's first Enter stop, although its column was hidden before the pick.
+    await waitFor(() => expect(document.activeElement?.id).toBe('stock-line-sheet-count-0'));
+    expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng', 'Dày']);
   });
 
   it('read-only grid disables inputs', () => {
@@ -416,8 +455,7 @@ describe('StockLineGrid', () => {
   it('hides Kho, Tiền CK, Tiền VAT and Ghi chú by default', () => {
     renderGrid({ lines: [line()] });
     expect(headers()).toEqual([
-      'STT', 'Mã hàng', 'Tên hàng', 'ĐVT', 'Số tấm', 'Dài', 'Rộng', 'Dày', 'SL', 'SL tồn',
-      'Đơn giá', 'Số tiền', '%CK', '%VAT', 'Số còn lại', '',
+      'STT', 'Mã hàng', 'Tên hàng', 'ĐVT', 'SL', 'SL tồn', 'Đơn giá', 'Số tiền', '%CK', '%VAT', 'Số còn lại', '',
     ]);
     expect(document.getElementById('stock-line-warehouse-0')).toBeNull();
     expect(document.getElementById('stock-line-note-0')).toBeNull();
@@ -427,7 +465,7 @@ describe('StockLineGrid', () => {
     showAllColumns();
     renderGrid({ lines: [line()] });
     expect(headers()).toEqual([
-      'STT', 'Mã hàng', 'Tên hàng', 'ĐVT', 'Kho', 'Số tấm', 'Dài', 'Rộng', 'Dày', 'SL', 'SL tồn',
+      'STT', 'Mã hàng', 'Tên hàng', 'ĐVT', 'Kho', 'SL', 'SL tồn',
       'Đơn giá', 'Số tiền', '%CK', 'Tiền CK', '%VAT', 'Tiền VAT', 'Ghi chú', 'Số còn lại', '',
     ]);
   });
@@ -442,9 +480,9 @@ describe('StockLineGrid', () => {
     expect(headers()).not.toContain('Kho');
   });
 
-  it('a read-only grid has no delete column (15 headers by default)', () => {
+  it('a read-only grid has no delete column (11 headers by default for unit lines)', () => {
     renderGrid({ lines: [line()], readOnly: true });
-    expect(headers()).toHaveLength(15);
+    expect(headers()).toHaveLength(11);
     expect(headers()).not.toContain('');
   });
 
@@ -453,6 +491,19 @@ describe('StockLineGrid', () => {
     expect(headers()).not.toContain('Ghi chú');
     act(() => form().setError('lines.0.note', { type: 'server', message: 'Quá dài' }));
     await waitFor(() => expect(headers()).toContain('Ghi chú'));
+  });
+
+  // The server checks a line against the catalog's current mode, so it can reject a dimension the screen's mode does
+  // not use: the column comes in so the message shows under the cell.
+  it('a dimension error shows its column on a unit-only voucher', async () => {
+    const { form } = renderGrid({ lines: [line()] });
+    expect(dimensionHeaders()).toEqual([]);
+    act(() => form().setError('lines.0.width', { type: 'server', message: 'Chiều rộng phải lớn hơn 0' }));
+    await waitFor(() => expect(dimensionHeaders()).toEqual(['Rộng']));
+    const width = byId('stock-line-width-0');
+    expect(width).toBeDisabled();
+    expect(width).toHaveAttribute('aria-invalid', 'true');
+    expect(width).toHaveAccessibleDescription('Chiều rộng phải lớn hơn 0');
   });
 
   it('an array-level lines error (empty grid) does not crash the render', async () => {
@@ -582,7 +633,7 @@ describe('StockLineGrid', () => {
     const toolbar = screen.getByRole('button', { name: /Thêm dòng/ });
     expect(toolbar.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The fixed-layout table is exactly as wide as the column sum, so the sticky offsets match real widths.
-    expect(screen.getByRole('table')).toHaveStyle({ width: '1428px', minWidth: '1428px' });
+    expect(screen.getByRole('table')).toHaveStyle({ width: '1142px', minWidth: '1142px' });
   });
 
   it('a read-only grid keeps the toolbar settings but has no Thêm dòng', () => {
@@ -618,8 +669,10 @@ describe('StockLineGrid', () => {
 
   it('picking a m² product focuses Số tấm, then Enter walks Dài, Rộng, Đơn giá and opens a new line', async () => {
     renderGrid({ lines: [createEmptyStockLine(0, WH1)] });
+    expect(dimensionHeaders()).toEqual([]);
     await pickFromTypeahead('TON01');
     await waitFor(() => expect(focused()).toBe('stock-line-sheet-count-0'));
+    expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
     enter('stock-line-sheet-count-0');
     expect(focused()).toBe('stock-line-length-0');
     enter('stock-line-length-0');
@@ -1191,6 +1244,20 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(focused()).toBe('stock-line-product-code-0'));
   });
 
+  // The m² line does not use Dày, so the focus goes to its Mã hàng before the row goes; then Dày hides.
+  it('Ctrl+Delete from Dày of the only m³ line focuses Mã hàng of the m² line and hides Dày', async () => {
+    const { values } = renderGrid({ lines: [m3Line({ productCode: 'A' }), m2Line({ _uiKey: 'b', productCode: 'B' })] });
+    const survivorCode = byId('stock-line-product-code-1');
+    act(() => byId('stock-line-thickness-0').focus());
+
+    fireEvent.keyDown(byId('stock-line-thickness-0'), { key: 'Delete', ctrlKey: true });
+
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B']));
+    expect(document.activeElement).toBe(survivorCode);
+    expect(focused()).toBe('stock-line-product-code-0');
+    expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+  });
+
   it('a key pressed right after Ctrl+Delete is kept: nothing re-focuses the old row later', async () => {
     const { values } = renderGrid({
       lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' }), line({ _uiKey: 'c', productCode: 'C' })],
@@ -1342,6 +1409,20 @@ describe('StockLineGrid', () => {
 
       await waitFor(() => expect(screen.getByText(quickAdded.name)).toBeInTheDocument());
       await waitFor(() => expect(byId('stock-line-quantity-0')).toHaveFocus());
+    });
+
+    it('a quick-added m² product shows Số tấm, Dài and Rộng and lands on Số tấm', async () => {
+      quickAddResult = { ...quickAdded, pricingMode: 'PerSquareMeter' };
+      const input = typeNewCode();
+      expect(dimensionHeaders()).toEqual([]);
+      await screen.findByRole('option', { name: /Thêm mới hàng hóa "TL-50"/ });
+
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+      fireEvent.click(screen.getByRole('button', { name: 'fake lưu' }));
+
+      await waitFor(() => expect(byId('stock-line-sheet-count-0')).toHaveFocus());
+      expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
     });
 
     it('shows no add row without products.create', async () => {

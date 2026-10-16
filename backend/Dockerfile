@@ -1,11 +1,11 @@
 # syntax=docker/dockerfile:1
 # -----------------------------------------------------------------------------
-# QLBanHang Backend - .NET 9 Web API
+# QLBanHang Backend - .NET 10 Web API
 # Multi-stage build for Railway deployment.
 # -----------------------------------------------------------------------------
 
 # ---- Build stage ----
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
 # Copy solution + props + csproj first to leverage layer cache for `dotnet restore`.
@@ -26,25 +26,25 @@ RUN dotnet publish src/OrderMgmt.WebApi/OrderMgmt.WebApi.csproj \
         /p:UseAppHost=false
 
 # ---- Runtime stage ----
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 # LibreOffice (headless) is required by QuotationExport PDF rendering.
-# ttf-mscorefonts-installer lives in the 'contrib' component and requires EULA acceptance.
-RUN sed -i 's/^Components: main$/Components: main contrib/' /etc/apt/sources.list.d/debian.sources \
+# Ubuntu 24.04: ttf-mscorefonts-installer is in multiverse; the EULA must be accepted up front.
+RUN sed -i 's/^Components: .*/Components: main restricted universe multiverse/' /etc/apt/sources.list.d/ubuntu.sources \
  && echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections \
  && apt-get update \
  && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         libreoffice-calc \
         libreoffice-core \
+        fontconfig \
         fonts-dejavu \
         fonts-liberation \
         fonts-noto \
         fonts-noto-cjk \
         ttf-mscorefonts-installer \
         locales \
- && sed -i 's/^# *vi_VN UTF-8/vi_VN UTF-8/' /etc/locale.gen \
- && locale-gen \
+ && locale-gen vi_VN.UTF-8 \
  && rm -rf /var/lib/apt/lists/*
 
 # LibreOffice prints numbers with the separators of its locale. The wrapper runs it in vi_VN, so PDFs

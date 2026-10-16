@@ -15,7 +15,7 @@ import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import { cn } from '@/lib/utils';
-import { isDimensionField, shownDimensions, usesDimension } from '@/lib/dimension-columns';
+import { isDimensionField, normalizePricingMode, shownDimensions, usesDimension } from '@/lib/dimension-columns';
 import { DIALOG_SELECTOR } from '@/lib/focus';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
@@ -445,7 +445,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
 
   const isVisible = (field: LineFocusField) => isShown(field);
   const pathOf = (rowIndex: number) => {
-    const mode = rows[rowIndex]?.pricingMode ?? 'PerUnit';
+    // A missing or unknown mode (an old draft) counts as PerUnit: prefs.enterStops holds only the four modes.
+    const mode = normalizePricingMode(rows[rowIndex]?.pricingMode);
     return enterPath(mode, prefs.enterStops[mode], isVisible);
   };
 

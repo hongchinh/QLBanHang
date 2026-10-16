@@ -713,6 +713,14 @@ describe('StockLineGrid', () => {
     expect(document.getElementById('stock-line-product-code-1')).toBeNull();
   });
 
+  // An old draft can hold a mode the grid does not know: it counts as PerUnit, also for the Enter stops.
+  it('Enter from Mã hàng of a line with an unknown pricing mode moves to SL', () => {
+    renderGrid({ lines: [line({ pricingMode: 'Legacy' as PricingMode, quantity: 2 })] });
+    act(() => byId('stock-line-product-code-0').focus());
+    enter('stock-line-product-code-0');
+    expect(focused()).toBe('stock-line-quantity-0');
+  });
+
   it('an Enter that commits an IME composition does not move the focus', () => {
     renderGrid({ lines: [line({ pricingMode: 'PerSquareMeter' })] });
     byId('stock-line-product-code-0').focus();

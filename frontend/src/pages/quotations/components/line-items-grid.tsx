@@ -16,6 +16,8 @@ import {
 } from '@/lib/dimension-columns';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toOptionalNumber } from '@/lib/to-number';
+import { useAppearedKeys } from '@/lib/use-appeared-keys';
+import { cn } from '@/lib/utils';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
 import { computeLineCost, computeLineQuantity, computeLineTotal } from '@/pages/quotations/utils/compute-line';
 import { useAuthStore } from '@/stores/auth-store';
@@ -154,6 +156,8 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
   const canViewCost = useAuthStore((s) => s.hasPermission('quotations.view_cost'));
   // Số tấm, Dài, Rộng, Dày follow the highest pricing mode of the lines: one pass over the rows on every render.
   const dims = shownDimensions(rows);
+  // Columns that appear flash for a moment (class col-appeared in line-items-grid.css), never on the first render.
+  const appeared = useAppearedKeys(dims);
   const columns = COLUMNS.filter((c) => (isDimensionField(c.key) ? dims.includes(c.key) : !c.cost || canViewCost));
   const minWidth = columns.reduce((sum, c) => sum + (c.width ?? NAME_MIN_WIDTH), 0);
 
@@ -318,7 +322,10 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.key} className={c.key === 'row-no' ? 'row-no' : undefined}>
+                <th
+                  key={c.key}
+                  className={cn(c.key === 'row-no' && 'row-no', appeared.has(c.key) && 'col-appeared') || undefined}
+                >
                   {c.header}
                 </th>
               ))}
@@ -414,7 +421,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                     // still saved and printed.
                     const unused = isLineFocusFieldDisabled(line, f);
                     return (
-                      <td key={f} className="cell-number">
+                      <td key={f} className={cn('cell-number', appeared.has(f) && 'col-appeared')}>
                         <input
                           id={getLineCellId(f, idx)}
                           className="cell-input cell-number tabular-nums"

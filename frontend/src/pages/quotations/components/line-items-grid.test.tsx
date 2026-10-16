@@ -114,6 +114,15 @@ const sheetProduct: ProductSuggestion = {
   priceIncludesVat: false,
 };
 
+const woodProduct: ProductSuggestion = {
+  ...sheetProduct,
+  id: '44444444-4444-4444-4444-444444444444',
+  code: 'GO01',
+  name: 'Gỗ thông',
+  unitName: 'm³',
+  pricingMode: 'PerCubicMeter',
+};
+
 function setCostPermission(enabled: boolean) {
   useAuthStore.setState({
     accessToken: 'token',
@@ -603,6 +612,36 @@ describe('LineItemsGrid', () => {
       fireEvent.change(byId('line-unit-price-0'), { target: { value: '9' } });
       expect(byId('line-unit-price-0')).toHaveValue('9');
       expect(byId('line-unit-price-1')).toHaveValue('5.678.000');
+    });
+  });
+
+  describe('dimension columns that appear flash', () => {
+    it('marks the new headers and every cell of the new columns, "—" cells included, when an m³ line joins md lines', async () => {
+      renderGrid([md('a'), line('b')]);
+      expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài']);
+
+      pick(1, woodProduct);
+
+      expect(shownDimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng', 'Dày']);
+      for (const header of ['Rộng', 'Dày']) {
+        expect(screen.getByRole('columnheader', { name: header })).toHaveClass('col-appeared');
+      }
+      for (const header of ['Số tấm', 'Dài', 'SL']) {
+        expect(screen.getByRole('columnheader', { name: header })).not.toHaveClass('col-appeared');
+      }
+      for (const f of ['width', 'thickness']) {
+        expect(byId(`line-${f}-0`)).toHaveAttribute('placeholder', '—');
+        expect(byId(`line-${f}-0`).closest('td')).toHaveClass('col-appeared');
+        expect(byId(`line-${f}-1`).closest('td')).toHaveClass('col-appeared');
+      }
+      expect(byId('line-length-1').closest('td')).not.toHaveClass('col-appeared');
+      // The flash lasts 1.2 s, longer than waitFor's default 1000 ms.
+      await waitFor(() => expect(document.querySelector('.col-appeared')).toBeNull(), { timeout: 2000 });
+    });
+
+    it('marks nothing on mount', () => {
+      renderGrid([m3('a'), line('b')]);
+      expect(document.querySelector('.col-appeared')).toBeNull();
     });
   });
 });

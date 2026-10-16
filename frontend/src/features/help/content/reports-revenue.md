@@ -2,9 +2,9 @@
 key: reports-revenue
 title: Báo cáo doanh thu
 routes: [/reports/revenue]
-sources: [frontend/src/pages/reports/revenue-page.tsx, frontend/src/features/dashboard/components/range-picker.tsx, frontend/src/features/dashboard/components/kpi-card.tsx, frontend/src/features/dashboard/components/revenue-area-chart.tsx, frontend/src/features/dashboard/components/top-list-card.tsx, frontend/src/features/dashboard/use-dashboard-params.ts, frontend/src/features/reports/sales-revenue-detail/**, frontend/src/components/layout/back-link.tsx, frontend/src/features/dashboard/hooks.ts, backend/src/OrderMgmt.Application/Reports/SalesRevenue/**]
+sources: [frontend/src/pages/reports/revenue-page.tsx, frontend/src/features/dashboard/components/range-picker.tsx, frontend/src/features/dashboard/components/kpi-card.tsx, frontend/src/features/dashboard/components/revenue-area-chart.tsx, frontend/src/features/dashboard/components/top-list-card.tsx, frontend/src/features/dashboard/use-dashboard-params.ts, frontend/src/features/reports/sales-revenue-detail/**, frontend/src/components/layout/back-link.tsx, frontend/src/features/reports/revenue/**, backend/src/OrderMgmt.Application/Reports/SalesRevenue/**, backend/src/OrderMgmt.Application/Reports/QuotationRevenue/**]
 related: [reports-sales-revenue, quotations.list]
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 ## Dùng để
 Xem doanh thu từ các báo giá đã xác nhận trong một khoảng ngày: bảng chi tiết từng dòng hàng, tổng doanh thu, biểu đồ theo ngày và khách hàng mua nhiều nhất. Có thể xuất bảng chi tiết ra Excel.

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import {
   DEFAULT_STOCK_GRID_PREFS,
+  dimensionErrorFields,
   forcedColumns,
   readStockGridPrefs,
   stockGridPrefsKey,
@@ -125,5 +126,26 @@ describe('forcedColumns', () => {
     // Empty grid submitted: zod `min(1)` sets errors.lines to { root: ... } or { message, type }.
     expect([...forcedColumns([], 'w1', { root: { message: 'x' } })]).toEqual([]);
     expect([...forcedColumns([], 'w1', { message: 'x', type: 'too_small' })]).toEqual([]);
+  });
+});
+
+describe('dimensionErrorFields', () => {
+  it('lists the dimension columns with an error on any line', () => {
+    const errors = [
+      undefined,
+      { width: { message: 'a' }, note: { message: 'b' } },
+      { sheetCount: { message: 'c' }, quantity: { message: 'd' } },
+    ];
+    expect([...dimensionErrorFields(errors)].sort()).toEqual(['sheet-count', 'width']);
+    expect([...dimensionErrorFields([{ length: { message: 'e' }, thickness: { message: 'f' } }])].sort()).toEqual([
+      'length',
+      'thickness',
+    ]);
+    expect([...dimensionErrorFields(undefined)]).toEqual([]);
+  });
+
+  it('ignores an array-level error, which react-hook-form gives as an object, not an array', () => {
+    expect([...dimensionErrorFields({ root: { message: 'x' } })]).toEqual([]);
+    expect([...dimensionErrorFields({ message: 'x', type: 'too_small' })]).toEqual([]);
   });
 });

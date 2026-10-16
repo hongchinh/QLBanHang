@@ -1,4 +1,5 @@
 import type { PricingMode } from '@/features/products/types';
+import { normalizePricingMode, usesDimension } from '@/lib/dimension-columns';
 
 // Grid input fields in column order; cell ids are `stock-line-<field>-<row>`.
 export const LINE_FOCUS_FIELDS = [
@@ -14,8 +15,6 @@ export const ENTER_STOP_FIELDS = LINE_FOCUS_FIELDS.filter(
   (f): f is EnterStopField => f !== 'product-code',
 );
 
-export const PRICING_MODES: readonly PricingMode[] = ['PerUnit', 'PerLinearMeter', 'PerSquareMeter', 'PerCubicMeter'];
-
 // Enter stops after the product code, per pricing mode (brainstorm §2).
 export const DEFAULT_ENTER_STOPS: Record<PricingMode, readonly EnterStopField[]> = {
   PerUnit: ['quantity', 'unit-price'],
@@ -26,18 +25,17 @@ export const DEFAULT_ENTER_STOPS: Record<PricingMode, readonly EnterStopField[]>
 
 const order = (f: LineFocusField) => LINE_FOCUS_FIELDS.indexOf(f);
 
-// Số tấm for non-PerUnit; Dài for metre modes; Rộng for m² / m³; Dày for m³; SL only for PerUnit.
-export function isFieldDisabled(mode: PricingMode, field: LineFocusField): boolean {
+// The dimensions follow usesDimension (md: Số tấm, Dài; m² adds Rộng; m³ adds Dày); SL is typed only on PerUnit.
+// A missing or unknown mode counts as PerUnit.
+export function isFieldDisabled(mode: unknown, field: LineFocusField): boolean {
   switch (field) {
     case 'sheet-count':
     case 'length':
-      return mode === 'PerUnit';
     case 'width':
-      return mode !== 'PerSquareMeter' && mode !== 'PerCubicMeter';
     case 'thickness':
-      return mode !== 'PerCubicMeter';
+      return !usesDimension(mode, field);
     case 'quantity':
-      return mode !== 'PerUnit';
+      return normalizePricingMode(mode) !== 'PerUnit';
     default:
       return false;
   }

@@ -22,7 +22,8 @@ Khai báo hàng đang có trong từng kho tại ngày đầu kỳ: số lượn
 - Đổi **Kho** khi chưa bấm **Lưu** thì các thay đổi chưa lưu bị bỏ, không hỏi lại.
 - Ngày đầu kỳ đặt theo chi nhánh. Chưa có thì trang báo Chi nhánh chưa có ngày đầu kỳ và chưa lưu được, cần người có quyền đặt ở Cấu hình hệ thống, mục Chi nhánh.
 - Mỗi hàng một dòng, chỉ chọn hàng có theo dõi tồn kho; nếu không, trang báo Hàng đã có trong danh sách hoặc Hàng không theo dõi tồn kho.
-- Mỗi dòng phải có **Số lượng** lớn hơn 0 và **Giá trị** không âm.
+- Mỗi dòng phải có **Số lượng** lớn hơn 0 và **Giá trị** không âm; lỗi lúc lưu ghi dưới ô **Mã hàng** của dòng. Ô số gõ sai báo Số lượng không hợp lệ hoặc Giá trị không hợp lệ và chưa lưu được.
+- Dòng chưa chọn hàng trong danh sách gợi ý (chỉ gõ chữ) bị bỏ qua khi lưu.
 - Ngày đầu kỳ nằm trong kỳ đã khóa sổ thì không sửa được, hệ thống báo Ngày tồn đầu kỳ đã khóa sổ.
 - Giảm tồn đầu kỳ làm tồn kho âm: tùy cấu hình, hệ thống cho qua, hiện Cảnh báo âm kho để bạn xác nhận, hoặc chặn (Không đủ tồn kho).
 - `F4` trong ô **Mã hàng**, hoặc dòng **Thêm mới hàng hóa** ở cuối danh sách gợi ý (gõ mã chưa có rồi Enter là chọn dòng này), mở **Thêm nhanh hàng hóa**: chữ đã gõ điền sẵn vào Mã nếu không có dấu cách và không dấu, nếu không thì vào Tên; Enter đi qua từng ô, `Ctrl Enter` hoặc **Lưu và chọn** lưu hàng mới và điền vào dòng, `Esc` hủy và về ô mã. Cần quyền tạo hàng hóa.

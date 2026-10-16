@@ -22,6 +22,7 @@ Xem doanh thu bán hàng của chi nhánh đang làm việc, so sánh các nhân
 - Ô **Tất cả sale** lọc theo Nhân viên phụ trách của phiếu. **Bảng xếp hạng sale** hiện số phiếu và gộp theo Nhân viên phụ trách của phiếu, nên có thể gồm cả người không làm sale (ví dụ thủ kho lập phiếu xuất bán); bảng không đổi theo ô **Tất cả sale**.
 - **Tổng báo giá**, **Đã huỷ** và **Phễu trạng thái** không theo chi nhánh: chúng tính theo báo giá của mọi người và đổi theo ô **Tất cả sale**.
 - Nếu bạn có quyền, mở màn hình **Điều hành** để xem doanh thu toàn công ty.
+- Mở trang mà chưa chọn kỳ thì xem từ đầu tháng đến hôm nay. Phần trăm trên thẻ so với kỳ liền trước có cùng số ngày, và hiện — khi kỳ trước bằng 0; **Doanh thu hôm nay** không so sánh nên luôn hiện —. **Tổng báo giá** đếm theo ngày báo giá, **Đã huỷ** theo ngày hủy.
 - Báo cáo Doanh thu vẫn tính theo báo giá đã chốt, nên số có thể khác màn hình này.
 - **Trực tiếp** ở đầu trang nghĩa là số liệu cập nhật ngay khi có chứng từ hoặc báo giá mới; khi **Mất kết nối**, số liệu chỉ được làm mới mỗi phút, giờ bên cạnh là lần cập nhật cuối.
 

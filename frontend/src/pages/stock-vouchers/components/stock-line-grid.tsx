@@ -15,9 +15,17 @@ import type { PricingMode, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import { cn } from '@/lib/utils';
+import {
+  isDimensionField,
+  normalizePricingMode,
+  shownDimensions,
+  usesDimension,
+  type DimensionField,
+} from '@/lib/dimension-columns';
 import { DIALOG_SELECTOR } from '@/lib/focus';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { formatStockQuantity } from '@/lib/stock-quantity';
+import { useAppearedKeys } from '@/lib/use-appeared-keys';
 import { toOptionalNumber } from '@/lib/to-number';
 import { useAuthStore } from '@/stores/auth-store';
 import { ProductTypeaheadCell } from '@/pages/quotations/components/product-typeahead-cell';
@@ -33,6 +41,7 @@ import {
   type LineFocusField,
 } from '@/pages/stock-vouchers/utils/line-navigation';
 import {
+  dimensionErrorFields,
   forcedColumns,
   OPTIONAL_COLUMNS,
   useStockGridPrefs,
@@ -275,7 +284,8 @@ function PercentCell({
   );
 }
 
-// Số tấm / Dài / Rộng / Dày: an emptied cell means "no value".
+// Số tấm / Dài / Rộng / Dày: an emptied cell means "no value". A cell its line's mode does not use (`unused`) shows "—"
+// and keeps the stored value in the form, which is still saved and printed.
 function DimensionCell({
   field,
   rowIndex,
@@ -283,14 +293,16 @@ function DimensionCell({
   value,
   onCommit,
   disabled,
+  unused,
   error,
 }: {
-  field: LineFocusField;
+  field: DimensionField;
   rowIndex: number;
   label: string;
   value: number | string;
   onCommit: (value: number | '') => void;
   disabled: boolean;
+  unused: boolean;
   error?: string;
 }) {
   const focusProps = useFocusOrigin(selectOnKeyboardFocus);
@@ -302,8 +314,9 @@ function DimensionCell({
       step="any"
       aria-label={rowLabel(label, rowIndex)}
       {...errorProps(field, rowIndex, error)}
-      disabled={disabled}
-      value={value}
+      disabled={disabled || unused}
+      value={unused ? '' : value}
+      placeholder={unused ? '—' : undefined}
       {...focusProps}
       onChange={(e) => onCommit(toOptionalNumber(e.target.value) ?? '')}
     />
@@ -353,12 +366,17 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   const { prefs, toggleColumn, toggleEnterStop, reset } = useStockGridPrefs(userId, type);
   const headerWarehouseId = useWatch({ control: form.control, name: 'warehouseId' }) ?? '';
   const forced = forcedColumns(rows, headerWarehouseId, lineErrors);
+  // Số tấm, Dài, Rộng, Dày follow the highest pricing mode of the lines, plus any with an error on a line. Computed once
+  // per render, so the onSelect of a pick sees the columns of the render before the pick.
+  const shownDims = shownDimensions(rows, dimensionErrorFields(lineErrors));
   // A column also stays while the focus is in one of its cells. What forced a hidden column in can end under the
   // caret (the first key of a correction clears a server error; picking the header warehouse in Kho ends "another
   // warehouse"), and hiding the column then would drop the focus on <body> with the rest of the keys.
   const [focusedColumn, setFocusedColumn] = useState<OptionalColumn | null>(null);
   const isShown = (key: ColumnKey) =>
-    !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key) || key === focusedColumn;
+    isDimensionField(key)
+      ? shownDims.includes(key)
+      : !isOptional(key) || !prefs.hiddenColumns.includes(key) || forced.has(key) || key === focusedColumn;
   // Remove a row without a focus gap: the focused cell lives in the row being removed, so move the focus to a
   // surviving row BEFORE removing. Its key keeps that row mounted, so the focus stays there and nothing has to
   // re-focus later (a later re-focus would undo a key the user pressed in between). With no line left the focus
@@ -370,6 +388,25 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
     remove(rowIndex);
   };
   const columns = COLUMNS.filter((c) => isShown(c.key) && !(readOnly && c.key === 'action'));
+  // Dimension columns that have just appeared flash (`col-appeared`, line-items-grid.css); none on the first render.
+  const appeared = useAppearedKeys(shownDims);
+  const flashClass = (key: ColumnKey) => (appeared.has(key) ? 'col-appeared' : undefined);
+  // Hiding or showing dimension columns shifts the columns to their right: keep the focused cell in view. Compares the
+  // joined list (a new array every render) with the last commit's; the first render only records it. No dependency
+  // list, as in useAppearedKeys: the rows come from the form, and React may throw away a render that read new rows
+  // while keeping its deps.
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const shownDimsKey = shownDims.join(',');
+  const previousShownDimsKey = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const previous = previousShownDimsKey.current;
+    previousShownDimsKey.current = shownDimsKey;
+    if (previous === null || previous === shownDimsKey) return;
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && wrapRef.current?.contains(active)) {
+      active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    }
+  });
   const minWidth = columns.reduce((sum, c) => sum + c.width, 0);
 
   const stickyOffset = new Map<ColumnKey, CSSProperties>();
@@ -429,6 +466,9 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       },
       { shouldDirty: true },
     );
+    // A re-pick ends the line's dimension errors. The page's watch drops a server error only where the pick changed
+    // the value (Số tấm often stays ''), and a grid write does not re-validate.
+    form.clearErrors([`lines.${idx}.sheetCount`, `lines.${idx}.length`, `lines.${idx}.width`, `lines.${idx}.thickness`]);
   };
 
   const addLine = () => {
@@ -438,7 +478,8 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
 
   const isVisible = (field: LineFocusField) => isShown(field);
   const pathOf = (rowIndex: number) => {
-    const mode = rows[rowIndex]?.pricingMode ?? 'PerUnit';
+    // A missing or unknown mode (an old draft) counts as PerUnit: prefs.enterStops holds only the four modes.
+    const mode = normalizePricingMode(rows[rowIndex]?.pricingMode);
     return enterPath(mode, prefs.enterStops[mode], isVisible);
   };
 
@@ -502,7 +543,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
   }
 
 
-  const numberInput = (idx: number, field: 'sheetCount' | 'length' | 'width' | 'thickness', focusField: LineFocusField, label: string) => {
+  const numberInput = (idx: number, field: 'sheetCount' | 'length' | 'width' | 'thickness', focusField: DimensionField, label: string) => {
     const line = rows[idx];
     const disabled = readOnly || isFieldDisabled(line?.pricingMode ?? 'PerUnit', focusField);
     const error = errorOf(idx, field);
@@ -514,6 +555,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           label={label}
           value={(line?.[field] ?? '') as number | string}
           disabled={disabled}
+          unused={!usesDimension(line?.pricingMode, focusField)}
           error={error}
           onCommit={(value) => setLineField(idx, field, value)}
         />
@@ -572,7 +614,11 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
                 allowQuickAdd
                 onSelect={(s) => {
                   applyProduct(idx, s);
-                  const next = nextStop(enterPath(s.pricingMode, prefs.enterStops[s.pricingMode], isVisible), 'product-code');
+                  // isVisible is the render before the pick: the picked mode's dimension columns may not be shown yet.
+                  // They are once the pick renders, before the focus timer below runs.
+                  const visibleAfterPick = (f: LineFocusField) =>
+                    (isDimensionField(f) && usesDimension(s.pricingMode, f)) || isVisible(f);
+                  const next = nextStop(enterPath(s.pricingMode, prefs.enterStops[s.pricingMode], visibleAfterPick), 'product-code');
                   if (next) focusCell(next, idx, true);
                   else setTimeout(() => goNextRow(idx), 0);
                 }}
@@ -765,6 +811,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
       {toolbarSlot && createPortal(toolbar(true), toolbarSlot)}
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
       <div
+        ref={wrapRef}
         className="accounting-grid-wrap stock-grid-wrap min-h-0 flex-1"
         tabIndex={-1}
         onKeyDown={handleGridKeyDown}
@@ -794,7 +841,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
           <thead>
             <tr>
               {columns.map((c) => (
-                <th key={c.key} className={cellClass(c)} style={stickyOffset.get(c.key)}>
+                <th key={c.key} className={cellClass(c, flashClass(c.key))} style={stickyOffset.get(c.key)}>
                   {c.header}
                 </th>
               ))}
@@ -809,7 +856,7 @@ export function StockLineGrid({ form, type, warehouses, computed, stockAt, readO
               return (
                 <tr key={(field as { _uiKey?: string })._uiKey ?? field.id}>
                   {columns.map((c) => (
-                    <td key={c.key} className={cellClass(c)} style={stickyOffset.get(c.key)}>
+                    <td key={c.key} className={cellClass(c, flashClass(c.key))} style={stickyOffset.get(c.key)}>
                       {renderCell(c.key, idx, line, result)}
                     </td>
                   ))}

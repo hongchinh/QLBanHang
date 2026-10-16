@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { PricingMode } from '@/features/products/types';
 import {
   DEFAULT_ENTER_STOPS,
   enterPath,
@@ -67,6 +68,13 @@ describe('verticalTarget', () => {
     expect(verticalTarget('PerUnit', 'width', all)).toBe('product-code');
     expect(verticalTarget('PerUnit', 'note', (f) => f !== 'note')).toBe('product-code');
   });
+
+  it('treats a row with an unknown mode as PerUnit: SL kept, Dài falls back', () => {
+    // The grid passes the stored mode, typed PricingMode; an old draft or corrupt data can hold any string.
+    const legacy = 'Legacy' as unknown as PricingMode;
+    expect(verticalTarget(legacy, 'quantity', all)).toBe('quantity');
+    expect(verticalTarget(legacy, 'length', all)).toBe('product-code');
+  });
 });
 
 describe('isFieldDisabled', () => {
@@ -77,5 +85,32 @@ describe('isFieldDisabled', () => {
     expect(isFieldDisabled('PerSquareMeter', 'thickness')).toBe(true);
     expect(isFieldDisabled('PerCubicMeter', 'thickness')).toBe(false);
     expect(isFieldDisabled('PerCubicMeter', 'quantity')).toBe(true);
+  });
+
+  it.each([
+    ['PerUnit', [true, true, true, true, false]],
+    ['PerLinearMeter', [false, false, true, true, true]],
+    ['PerSquareMeter', [false, false, false, true, true]],
+    ['PerCubicMeter', [false, false, false, false, true]],
+  ] as const)('keeps the %s rule for Số tấm, Dài, Rộng, Dày, SL', (mode, expected) => {
+    const fields: LineFocusField[] = ['sheet-count', 'length', 'width', 'thickness', 'quantity'];
+    expect(fields.map((f) => isFieldDisabled(mode, f))).toEqual(expected);
+  });
+
+  it('treats a missing or unknown mode as PerUnit: Số tấm and Dài locked, SL open', () => {
+    for (const mode of ['Legacy', undefined, null]) {
+      expect(isFieldDisabled(mode, 'sheet-count')).toBe(true);
+      expect(isFieldDisabled(mode, 'length')).toBe(true);
+      expect(isFieldDisabled(mode, 'quantity')).toBe(false);
+    }
+  });
+
+  it('keeps Rộng and Dày locked and the other fields open for a missing or unknown mode', () => {
+    for (const mode of ['Legacy', undefined, null]) {
+      expect(isFieldDisabled(mode, 'width')).toBe(true);
+      expect(isFieldDisabled(mode, 'thickness')).toBe(true);
+      expect(isFieldDisabled(mode, 'unit-price')).toBe(false);
+      expect(isFieldDisabled(mode, 'warehouse')).toBe(false);
+    }
   });
 });

@@ -151,22 +151,6 @@
   line-height: 1.15;
 }
 
-.accounting-grid .dxr-cell {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  height: 33px;
-}
-
-.accounting-grid .dxr-cell .cell-input {
-  border-right: 1px solid hsl(var(--border));
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.accounting-grid .dxr-cell .cell-input:last-child {
-  border-right: 0;
-}
-
 .accounting-grid .cell-action {
   width: 46px;
   text-align: center;
@@ -354,4 +338,42 @@
   background: #e9ecef;
   color: hsl(var(--muted-foreground));
   cursor: not-allowed;
+}
+
+/* Columns that just appeared (useAppearedKeys): a background fade from a `from` step only, so each element ends on
+ * its own background. The header text colour never animates: white stays readable on the start colour.
+ * A "—" cell is a disabled input whose opaque grey would hide the cell's fade, so the input fades in from
+ * transparent and the cell's colour shows through it. It must not start from --nav-match too: in dark mode that
+ * token has alpha 0.3, and two layers would flash brighter. An enabled input is transparent and shows the cell's
+ * fade; a focused one keeps its focus colour on top. */
+@keyframes col-appeared-head {
+  from { background-color: var(--qldh-col-appeared-head-bg); }
+}
+
+@keyframes col-appeared-cell {
+  from { background-color: hsl(var(--nav-match)); }
+}
+
+@keyframes col-appeared-input {
+  from { background-color: transparent; }
+}
+
+.accounting-grid th.col-appeared {
+  animation: col-appeared-head 1.2s ease-out;
+}
+
+.accounting-grid td.col-appeared {
+  animation: col-appeared-cell 1.2s ease-out;
+}
+
+.accounting-grid td.col-appeared .cell-input:disabled {
+  animation: col-appeared-input 1.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .accounting-grid th.col-appeared,
+  .accounting-grid td.col-appeared,
+  .accounting-grid td.col-appeared .cell-input:disabled {
+    animation: none;
+  }
 }

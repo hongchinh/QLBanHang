@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useRef, useState, type KeyboardEvent } from 'react';
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useFieldArray, useWatch, type UseFormReturn } from 'react-hook-form';
 import { AppIcon } from '@/components/icons';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -7,8 +7,18 @@ import type {
   QuotationFormValues,
   QuotationLineFormValues,
 } from '@/features/quotations/schema';
+import {
+  DIMENSION_FIELDS,
+  isDimensionField,
+  normalizePricingMode,
+  shownDimensions,
+  usesDimension,
+  type DimensionField,
+} from '@/lib/dimension-columns';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toOptionalNumber } from '@/lib/to-number';
+import { useAppearedKeys } from '@/lib/use-appeared-keys';
+import { cn } from '@/lib/utils';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
 import { computeLineCost, computeLineQuantity, computeLineTotal } from '@/pages/quotations/utils/compute-line';
 import { useAuthStore } from '@/stores/auth-store';
@@ -26,16 +36,58 @@ const LINE_FOCUS_FIELDS = [
   'product-code',
   'name',
   'unit',
+  'sheet-count',
   'length',
   'width',
   'thickness',
-  'sheet-count',
   'quantity',
   'unit-price',
   'unit-cost',
 ] as const;
 
 type LineFocusField = (typeof LINE_FOCUS_FIELDS)[number];
+
+type ColumnKey =
+  | 'row-no' | 'product-code' | 'name' | 'unit' | DimensionField | 'quantity' | 'unit-price' | 'line-total'
+  | 'unit-cost' | 'line-cost' | 'line-profit' | 'action';
+
+interface GridColumn {
+  key: ColumnKey;
+  header: string;
+  /** Undefined for Tên hàng, which takes the rest of the table width. */
+  width?: number;
+  /** Shown only with quotations.view_cost. */
+  cost?: boolean;
+}
+
+// One list for the <colgroup>, the <thead> and the empty row's colSpan. The dimension widths are the stock grid's.
+const COLUMNS: readonly GridColumn[] = [
+  { key: 'row-no', header: '#', width: 42 },
+  { key: 'product-code', header: 'Mã hàng', width: 130 },
+  { key: 'name', header: 'Tên hàng' },
+  { key: 'unit', header: 'ĐVT', width: 58 },
+  { key: 'sheet-count', header: 'Số tấm', width: 70 },
+  { key: 'length', header: 'Dài', width: 76 },
+  { key: 'width', header: 'Rộng', width: 76 },
+  { key: 'thickness', header: 'Dày', width: 64 },
+  { key: 'quantity', header: 'SL', width: 82 },
+  { key: 'unit-price', header: 'Đơn giá bán', width: 104 },
+  { key: 'line-total', header: 'Thành tiền bán', width: 122 },
+  { key: 'unit-cost', header: 'Đơn giá nhập', width: 112, cost: true },
+  { key: 'line-cost', header: 'Thành tiền nhập', width: 122, cost: true },
+  { key: 'line-profit', header: 'Lợi nhuận', width: 122, cost: true },
+  { key: 'action', header: '', width: 42 },
+];
+
+// Tên hàng has no fixed width; the table's min-width keeps this much for it.
+const NAME_MIN_WIDTH = 200;
+
+const DIMENSION_INPUTS: Record<DimensionField, { name: 'sheetCount' | 'length' | 'width' | 'thickness'; label: string }> = {
+  'sheet-count': { name: 'sheetCount', label: 'Số tấm' },
+  length: { name: 'length', label: 'Dài' },
+  width: { name: 'width', label: 'Rộng' },
+  thickness: { name: 'thickness', label: 'Dày' },
+};
 
 function getLineCellId(field: LineFocusField, idx: number): string {
   return `line-${field}-${idx}`;
@@ -70,19 +122,12 @@ export function createEmptyLine(sortOrder: number): QuotationLineFormValues {
   } as QuotationLineFormValues;
 }
 
+// A line's mode opens the dimensions it uses, and SL only on a unit line. A missing or unknown mode (an old draft)
+// counts as PerUnit.
 function isLineFocusFieldDisabled(line: QuotationLineFormValues, field: LineFocusField): boolean {
-  switch (line.pricingMode) {
-    case 'PerUnit':
-      return field === 'length' || field === 'width' || field === 'thickness' || field === 'sheet-count';
-    case 'PerLinearMeter':
-      return field === 'width' || field === 'thickness' || field === 'quantity';
-    case 'PerSquareMeter':
-      return field === 'thickness' || field === 'quantity';
-    case 'PerCubicMeter':
-      return field === 'quantity';
-    default:
-      return false;
-  }
+  if (isDimensionField(field)) return !usesDimension(line.pricingMode, field);
+  if (field === 'quantity') return normalizePricingMode(line.pricingMode) !== 'PerUnit';
+  return false;
 }
 
 export interface LineItemsGridHandle {
@@ -98,15 +143,37 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
     control: form.control,
     name: 'lines',
   });
-  const watched = useWatch({ control: form.control, name: 'lines' }) as QuotationLineFormValues[] | undefined;
-  const rows = watched ?? [];
+  // The watch renders the grid on every line change, but the rows are read from the form itself, which always matches
+  // the field array. react-hook-form hands remove() to its watchers one render late: read from the watched copy, the
+  // rows would key the row that moves up with the deleted line, and that row would remount and drop the focus.
+  useWatch({ control: form.control, name: 'lines' });
+  const rows = (form.getValues('lines') ?? []) as QuotationLineFormValues[];
   const wrapRef = useRef<HTMLDivElement>(null);
-  const [activeRowIndex, setActiveRowIndex] = useState<number | null>(null);
-  const [editingMoneyCellId, setEditingMoneyCellId] = useState<string | null>(null);
-  const [editingQuantityCellId, setEditingQuantityCellId] = useState<string | null>(null);
+  // The cell being edited, as `${rowKey}:${field}`: a cell id would change when a row above it goes.
+  const [editingMoneyKey, setEditingMoneyKey] = useState<string | null>(null);
+  const [editingQuantityKey, setEditingQuantityKey] = useState<string | null>(null);
   const [editingQuantityText, setEditingQuantityText] = useState('');
   const [clearAllOpen, setClearAllOpen] = useState(false);
   const canViewCost = useAuthStore((s) => s.hasPermission('quotations.view_cost'));
+  // Số tấm, Dài, Rộng, Dày follow the highest pricing mode of the lines: one pass over the rows on every render.
+  const dims = shownDimensions(rows);
+  // Columns that appear flash for a moment (class col-appeared in line-items-grid.css), never on the first render.
+  const appeared = useAppearedKeys(dims);
+  const columns = COLUMNS.filter((c) => (isDimensionField(c.key) ? dims.includes(c.key) : !c.cost || canViewCost));
+  const minWidth = columns.reduce((sum, c) => sum + (c.width ?? NAME_MIN_WIDTH), 0);
+  // Showing or hiding a dimension column shifts the columns to its right: keep the focused cell in view. Compares the
+  // joined list (the array is new on every render) with the last commit's; the first render only records it. No
+  // dependency list, as in useAppearedKeys: the rows come from the form, and React may throw away a render that read
+  // new rows while keeping its deps.
+  const dimsKey = dims.join(',');
+  const dimsKeyRef = useRef<string | null>(null);
+  useLayoutEffect(() => {
+    const previous = dimsKeyRef.current;
+    dimsKeyRef.current = dimsKey;
+    if (previous === null || previous === dimsKey) return;
+    const active = document.activeElement;
+    if (active && wrapRef.current?.contains(active)) active.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  });
 
   useImperativeHandle(ref, () => ({
     ensureFirstLineAndFocusProductCode() {
@@ -136,10 +203,15 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
     return (rows[rowIndex] ?? fields[rowIndex]) as unknown as QuotationLineFormValues | undefined;
   }
 
+  // Đơn giá nhập without quotations.view_cost and a hidden dimension column have no cell to focus.
+  const isRendered = (field: LineFocusField) =>
+    (field !== 'unit-cost' || canViewCost) && (!isDimensionField(field) || dims.includes(field));
+
   function getEnabledFocusFields(rowIndex: number): readonly LineFocusField[] {
+    const rendered = LINE_FOCUS_FIELDS.filter(isRendered);
     const line = getLineForNavigation(rowIndex);
-    if (!line) return LINE_FOCUS_FIELDS;
-    return LINE_FOCUS_FIELDS.filter((field) => !isLineFocusFieldDisabled(line, field));
+    if (!line) return rendered;
+    return rendered.filter((field) => !isLineFocusFieldDisabled(line, field));
   }
 
   function moveLineFocus(current: { field: LineFocusField; rowIndex: number }, direction: 1 | -1) {
@@ -172,6 +244,19 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
     }
   }
 
+  // Remove a row without a focus gap, as the stock grid does: focus the row that takes its place (the row below, else
+  // the row above) BEFORE removing it. Its <tr> stays mounted, so the focus stays there. The same cell when that row
+  // renders and enables it (SL on a metre line does not count), otherwise its Mã hàng; with no row left, Thêm dòng.
+  function removeLine(rowIndex: number, field: LineFocusField) {
+    const survivor = rowIndex + 1 < fields.length ? rowIndex + 1 : rowIndex - 1;
+    if (survivor >= 0) {
+      focusLineCell(getEnabledFocusFields(survivor).includes(field) ? field : 'product-code', survivor);
+    } else {
+      document.getElementById('line-add')?.focus();
+    }
+    remove(rowIndex);
+  }
+
   function handleGridKeyDown(e: KeyboardEvent<HTMLDivElement>) {
     if (e.defaultPrevented) return;
 
@@ -182,11 +267,15 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
     }
 
     if (e.key === 'Delete' && e.ctrlKey) {
+      const target = e.target as HTMLElement;
+      const cell = parseLineCellId(target.id);
+      // The trash button has no id: its row comes from the <tr>. A key from anywhere else, such as a dialog opened
+      // from a cell, deletes nothing.
+      const rowAttr = cell ? null : target.closest('tr[data-row-index]')?.getAttribute('data-row-index');
+      const rowIndex = cell ? cell.rowIndex : rowAttr != null ? Number(rowAttr) : -1;
+      if (rowIndex < 0 || rowIndex >= fields.length) return;
       e.preventDefault();
-      if (activeRowIndex != null && activeRowIndex < fields.length) {
-        remove(activeRowIndex);
-        setActiveRowIndex(null);
-      }
+      removeLine(rowIndex, cell?.field ?? 'product-code');
       return;
     }
 
@@ -217,7 +306,6 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
 
   function clearAllLines() {
     for (let i = fields.length - 1; i >= 0; i--) remove(i);
-    setActiveRowIndex(null);
     setClearAllOpen(false);
   }
 
@@ -239,35 +327,22 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
 
       {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- Grid wrapper owns keyboard shortcuts for editable child inputs. */}
       <div ref={wrapRef} className="accounting-grid-wrap" tabIndex={-1} onKeyDown={handleGridKeyDown}>
-        <table className="accounting-grid">
+        <table className="accounting-grid" style={{ minWidth }}>
           <colgroup>
-            <col style={{ width: 42 }} />
-            <col style={{ width: 130 }} />
-            <col />
-            <col style={{ width: 58 }} />
-            <col style={{ width: 220 }} />
-            <col style={{ width: 82 }} />
-            <col style={{ width: 104 }} />
-            <col style={{ width: 122 }} />
-            {canViewCost && <col style={{ width: 112 }} />}
-            {canViewCost && <col style={{ width: 122 }} />}
-            {canViewCost && <col style={{ width: 122 }} />}
-            <col style={{ width: 42 }} />
+            {columns.map((c) => (
+              <col key={c.key} style={c.width ? { width: c.width } : undefined} />
+            ))}
           </colgroup>
           <thead>
             <tr>
-              <th className="row-no">#</th>
-              <th>Mã hàng</th>
-              <th>Tên hàng</th>
-              <th>ĐVT</th>
-              <th>D × R × Dày × Tấm</th>
-              <th>SL</th>
-              <th>Đơn giá bán</th>
-              <th>Thành tiền bán</th>
-              {canViewCost && <th>Đơn giá nhập</th>}
-              {canViewCost && <th>Thành tiền nhập</th>}
-              {canViewCost && <th>Lợi nhuận</th>}
-              <th></th>
+              {columns.map((c) => (
+                <th
+                  key={c.key}
+                  className={cn(c.key === 'row-no' && 'row-no', appeared.has(c.key) && 'col-appeared') || undefined}
+                >
+                  {c.header}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -280,18 +355,18 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
               const lineTotal = computeLineTotal(lineLike);
               const lineCost = computeLineCost(lineLike);
               const lineProfit = lineCost != null ? lineTotal - lineCost : undefined;
-              const lengthDisabled = isLineFocusFieldDisabled(line, 'length');
-              const widthDisabled = isLineFocusFieldDisabled(line, 'width');
-              const thicknessDisabled = isLineFocusFieldDisabled(line, 'thickness');
-              const sheetCountDisabled = isLineFocusFieldDisabled(line, 'sheet-count');
+              const rowKey = line._uiKey ?? field.id;
               return (
-                <tr key={line._uiKey ?? field.id} onFocus={() => setActiveRowIndex(idx)}>
+                <tr key={rowKey} data-row-index={idx}>
                   <td className="row-no">{idx + 1}</td>
                   <td>
                     <ProductTypeaheadCell
                       variant="cell"
                       inputId={getLineCellId('product-code', idx)}
                       nextFocusId={getLineCellId('name', idx)}
+                      // Closed until the user types: Enter, Shift+Enter or a row delete into a filled cell must
+                      // not re-pick its product with the next Enter (decision 11).
+                      openOnFocus={false}
                       allowQuickAdd
                       value={(line.productCode ?? '') as string}
                       onChange={(v) => setLineField(idx, 'productCode', v)}
@@ -303,6 +378,13 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                         setLineField(idx, 'specification', (s.specification ?? '') as never);
                         setLineField(idx, 'unitName', (s.unitName ?? line.unitName) as never);
                         setLineField(idx, 'pricingMode', s.pricingMode);
+                        // A dimension the new mode does not use shows "—" or hides, so it must not stay stored,
+                        // saved and printed. Cleared as an empty line has it.
+                        for (const f of DIMENSION_FIELDS) {
+                          if (!usesDimension(s.pricingMode, f)) {
+                            setLineField(idx, DIMENSION_INPUTS[f].name, undefined as never);
+                          }
+                        }
                         setLineField(idx, 'unitPrice', (s.defaultPrice ?? 0) as never);
                         setLineField(idx, 'unitCost', s.costPrice as never);
                       }}
@@ -354,66 +436,27 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                       onChange={(e) => setLineField(idx, 'unitName', e.target.value)}
                     />
                   </td>
-                  <td>
-                    <div className="dxr-cell">
-                      <input
-                        id={getLineCellId('length', idx)}
-                        className="cell-input"
-                        type="number"
-                        step="any"
-                        placeholder="D"
-                        aria-label="Dài"
-                        disabled={lengthDisabled}
-                        value={numInput(line.length)}
-                        onChange={(e) => {
-                          const v = parseNum(e.target.value);
-                          setLineField(idx, 'length', v as never);
-                        }}
-                      />
-                      <input
-                        id={getLineCellId('width', idx)}
-                        className="cell-input"
-                        type="number"
-                        step="any"
-                        placeholder="R"
-                        aria-label="Rộng"
-                        disabled={widthDisabled}
-                        value={numInput(line.width)}
-                        onChange={(e) => {
-                          const v = parseNum(e.target.value);
-                          setLineField(idx, 'width', v as never);
-                        }}
-                      />
-                      <input
-                        id={getLineCellId('thickness', idx)}
-                        className="cell-input"
-                        type="number"
-                        step="any"
-                        placeholder="Dày"
-                        aria-label="Dày"
-                        disabled={thicknessDisabled}
-                        value={numInput(line.thickness)}
-                        onChange={(e) => {
-                          const v = parseNum(e.target.value);
-                          setLineField(idx, 'thickness', v as never);
-                        }}
-                      />
-                      <input
-                        id={getLineCellId('sheet-count', idx)}
-                        className="cell-input"
-                        type="number"
-                        step="any"
-                        placeholder="Tấm"
-                        aria-label="Số tấm"
-                        disabled={sheetCountDisabled}
-                        value={numInput(line.sheetCount)}
-                        onChange={(e) => {
-                          const v = parseNum(e.target.value);
-                          setLineField(idx, 'sheetCount', v as never);
-                        }}
-                      />
-                    </div>
-                  </td>
+                  {dims.map((f) => {
+                    const { name, label } = DIMENSION_INPUTS[f];
+                    // A cell the row's mode does not use shows "—"; its stored value stays in the form, so it is
+                    // still saved and printed.
+                    const unused = isLineFocusFieldDisabled(line, f);
+                    return (
+                      <td key={f} className={cn('cell-number', appeared.has(f) && 'col-appeared')}>
+                        <input
+                          id={getLineCellId(f, idx)}
+                          className="cell-input cell-number tabular-nums"
+                          type="number"
+                          step="any"
+                          aria-label={label}
+                          disabled={unused}
+                          placeholder={unused ? '—' : undefined}
+                          value={unused ? '' : numInput(line[name])}
+                          onChange={(e) => setLineField(idx, name, parseNum(e.target.value) as never)}
+                        />
+                      </td>
+                    );
+                  })}
                   <td className="cell-number">
                     <input
                       id={quantityCellId}
@@ -423,13 +466,13 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                       aria-label="Số lượng"
                       disabled={isLineFocusFieldDisabled(line, 'quantity')}
                       value={
-                        editingQuantityCellId === quantityCellId
+                        editingQuantityKey === `${rowKey}:quantity`
                           ? editingQuantityText
                           : formatQuantityForDisplay(quantityValue)
                       }
                       onFocus={(e) => {
                         const el = e.currentTarget;
-                        setEditingQuantityCellId(quantityCellId);
+                        setEditingQuantityKey(`${rowKey}:quantity`);
                         setEditingQuantityText(formatQuantityForEditing(quantityValue));
                         requestAnimationFrame(() => el.select());
                       }}
@@ -438,7 +481,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                         if (parsed !== undefined) {
                           setLineField(idx, 'quantity', parsed as never);
                         }
-                        setEditingQuantityCellId(null);
+                        setEditingQuantityKey(null);
                         setEditingQuantityText('');
                       }}
                       onChange={(e) => {
@@ -453,13 +496,13 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                       type="text"
                       inputMode="decimal"
                       aria-label="Đơn giá bán"
-                      value={editingMoneyCellId === getLineCellId('unit-price', idx) ? (line.unitPrice ?? '') : formatMoneyForDisplay(line.unitPrice)}
+                      value={editingMoneyKey === `${rowKey}:unit-price` ? (line.unitPrice ?? '') : formatMoneyForDisplay(line.unitPrice)}
                       onFocus={(e) => {
                         const el = e.currentTarget;
-                        setEditingMoneyCellId(getLineCellId('unit-price', idx));
+                        setEditingMoneyKey(`${rowKey}:unit-price`);
                         requestAnimationFrame(() => el.select());
                       }}
-                      onBlur={() => setEditingMoneyCellId(null)}
+                      onBlur={() => setEditingMoneyKey(null)}
                       onChange={(e) => setLineField(idx, 'unitPrice', (parseMoneyInput(e.target.value) ?? 0) as never)}
                     />
                   </td>
@@ -474,13 +517,13 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                         type="text"
                         inputMode="decimal"
                         aria-label="Đơn giá nhập"
-                        value={editingMoneyCellId === getLineCellId('unit-cost', idx) ? (line.unitCost ?? '') : formatMoneyForDisplay(line.unitCost)}
+                        value={editingMoneyKey === `${rowKey}:unit-cost` ? (line.unitCost ?? '') : formatMoneyForDisplay(line.unitCost)}
                         onFocus={(e) => {
                           const el = e.currentTarget;
-                          setEditingMoneyCellId(getLineCellId('unit-cost', idx));
+                          setEditingMoneyKey(`${rowKey}:unit-cost`);
                           requestAnimationFrame(() => el.select());
                         }}
-                        onBlur={() => setEditingMoneyCellId(null)}
+                        onBlur={() => setEditingMoneyKey(null)}
                         onChange={(e) => setLineField(idx, 'unitCost', parseMoneyInput(e.target.value) as never)}
                       />
                     </td>
@@ -503,10 +546,8 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
                     <button
                       type="button"
                       aria-label="Xóa dòng"
-                      onClick={() => {
-                        remove(idx);
-                        if (activeRowIndex === idx) setActiveRowIndex(null);
-                      }}
+                      // The button goes with its row: the focus moves to the row that takes its place.
+                      onClick={() => removeLine(idx, 'product-code')}
                     >
                       <AppIcon name="delete" style={{ display: 'inline-block', verticalAlign: 'middle' }} />
                     </button>
@@ -516,7 +557,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
             })}
             {fields.length === 0 && (
               <tr>
-                <td colSpan={canViewCost ? 12 : 9} className="empty-placeholder">
+                <td colSpan={columns.length} className="empty-placeholder">
                   Chưa có dòng nào.{' '}
                   <button type="button" className="empty-placeholder-link" onClick={addLine}>
                     Bấm để thêm dòng đầu tiên
@@ -539,7 +580,7 @@ export const LineItemsGrid = forwardRef<LineItemsGridHandle, Props>(function Lin
       </div>
 
       <div className="line-items-toolbar">
-        <button type="button" className="lib-btn" onClick={addLine}>
+        <button type="button" id="line-add" className="lib-btn" onClick={addLine}>
           <AppIcon name="add" />
           Thêm dòng
         </button>

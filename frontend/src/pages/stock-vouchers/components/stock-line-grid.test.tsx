@@ -11,7 +11,7 @@ import type {
 } from '@/features/stock-vouchers/schema';
 import type * as DialogModule from '@/components/ui/dialog';
 import type { ProductQuickAddDialogProps } from '@/features/products/components/product-quick-add-dialog';
-import type { ProductListItem, ProductSuggestion } from '@/features/products/types';
+import type { PricingMode, ProductListItem, ProductSuggestion } from '@/features/products/types';
 import type { StockDirection } from '@/features/stock-reasons/types';
 import type { Warehouse } from '@/features/warehouses/types';
 import type { StockLineComputed } from '@/pages/stock-vouchers/utils/compute-stock-line';
@@ -37,7 +37,7 @@ vi.mock('@/features/products/components/product-quick-add-dialog', async () => {
           <button
             type="button"
             onClick={() => {
-              onCreated(quickAdded);
+              onCreated(quickAddResult);
               onOpenChange(false);
             }}
           >
@@ -91,6 +91,8 @@ const quickAdded: ProductSuggestion = {
   name: 'Tôn lạnh 0.50',
   pricingMode: 'PerUnit',
 };
+// What the mocked quick add dialog hands back; reset to quickAdded before each test.
+let quickAddResult: ProductSuggestion = quickAdded;
 
 const listItem: ProductListItem = {
   id: P2,
@@ -123,6 +125,12 @@ function line(overrides: Partial<StockLineFormValues> = {}): StockLineFormValues
     ...overrides,
   };
 }
+
+// A m³ line and a m² line with every dimension their mode uses.
+const m3Line = (overrides: Partial<StockLineFormValues> = {}) =>
+  line({ pricingMode: 'PerCubicMeter', sheetCount: 2, length: 3000, width: 100, thickness: 50, ...overrides });
+const m2Line = (overrides: Partial<StockLineFormValues> = {}) =>
+  line({ pricingMode: 'PerSquareMeter', sheetCount: 1, length: 2000, width: 1200, ...overrides });
 
 function zeroComputed(overrides: Partial<StockLineComputed> = {}): StockLineComputed {
   return {
@@ -181,6 +189,11 @@ const showAllColumns = () => storePrefs({ hiddenColumns: [] });
 function headers() {
   return screen.getAllByRole('columnheader').map((th) => th.textContent);
 }
+const DIMENSION_HEADERS = ['Số tấm', 'Dài', 'Rộng', 'Dày'];
+// The dimension columns the grid shows, in column order.
+function dimensionHeaders() {
+  return headers().filter((h) => DIMENSION_HEADERS.includes(h ?? ''));
+}
 
 function byId(id: string): HTMLInputElement {
   const el = document.getElementById(id);
@@ -207,6 +220,21 @@ async function outsideAct(steps: () => Promise<void>) {
   }
 }
 
+// React gives an update made outside its own event handlers the priority of window.event. In a browser that is the
+// event being dispatched: none in a timer, and Radix's own custom event when a closed dialog hands the focus back. So
+// such an update renders at default priority, after the discrete updates of a focus event. Under vitest, window.event
+// keeps for good the first event React's dev build wrote into it (a focusin), which makes every such update discrete.
+// Hides that stale value while `steps` run.
+async function withBrowserWindowEvent(steps: () => Promise<void>) {
+  const descriptor = Object.getOwnPropertyDescriptor(window, 'event');
+  Object.defineProperty(window, 'event', { configurable: true, get: () => undefined });
+  try {
+    await steps();
+  } finally {
+    if (descriptor) Object.defineProperty(window, 'event', descriptor);
+  }
+}
+
 // Only the microtasks run, in which React renders what an event changed: no task, frame or timer.
 async function eventRendered() {
   for (let i = 0; i < 5; i++) await Promise.resolve();
@@ -216,6 +244,7 @@ describe('StockLineGrid', () => {
   beforeEach(() => {
     localStorage.clear();
     permissions = ['products.create'];
+    quickAddResult = quickAdded;
     useProductSearchMock.mockReset();
     useProductSearchMock.mockImplementation((text: string) => ({
       data: [sheet],
@@ -279,6 +308,61 @@ describe('StockLineGrid', () => {
     expect(enabled(3)).toEqual(['sheet-count', 'length', 'width', 'thickness']);
   });
 
+  // The highest pricing mode of the lines decides; a missing or unknown mode counts as PerUnit.
+  it.each<[string, unknown[], string[]]>([
+    ['unit lines', ['PerUnit', 'PerUnit'], []],
+    ['a md line', ['PerUnit', 'PerLinearMeter'], ['Số tấm', 'Dài']],
+    ['a md and a m² line', ['PerLinearMeter', 'PerSquareMeter'], ['Số tấm', 'Dài', 'Rộng']],
+    ['a m³ line', ['PerUnit', 'PerCubicMeter'], ['Số tấm', 'Dài', 'Rộng', 'Dày']],
+    ['a line without a mode', [undefined], []],
+    ['a line with an unknown mode', ['Legacy'], []],
+  ])('dimension columns with %s', (_case, modes, expected) => {
+    renderGrid({ lines: modes.map((mode) => line({ pricingMode: mode as PricingMode })) });
+    expect(dimensionHeaders()).toEqual(expected);
+  });
+
+  // A line's mode changes only on a pick: a code typed with the list open changes no column.
+  it.each<[string, StockLineFormValues, string[]]>([
+    ['a blank line', createEmptyStockLine(0, WH1), []],
+    ['a m³ line', m3Line(), ['Số tấm', 'Dài', 'Rộng', 'Dày']],
+  ])('typing a code over %s without a pick changes no column', async (_case, start, expected) => {
+    renderGrid({ lines: [start] });
+    fireEvent.change(byId('stock-line-product-code-0'), { target: { value: 'TON' } });
+    await screen.findByRole('listbox'); // the m² product is offered, not picked
+    expect(dimensionHeaders()).toEqual(expected);
+  });
+
+  // A cell its line's mode does not use shows "—", keeps its id and leaves the stored value in the form.
+  it('a unit line next to a m³ line shows "—" in its four dimension cells and keeps the stored values', () => {
+    const { values } = renderGrid({
+      lines: [line({ pricingMode: 'PerUnit', sheetCount: 3, length: 2400, width: 1200, thickness: 5 }), m3Line({ _uiKey: 'b' })],
+    });
+    for (const field of ['sheet-count', 'length', 'width', 'thickness']) {
+      const unused = byId(`stock-line-${field}-0`);
+      expect(unused).toBeDisabled();
+      expect(unused).toHaveValue(null);
+      expect(unused).toHaveAttribute('placeholder', '—');
+      const used = byId(`stock-line-${field}-1`);
+      expect(used).toBeEnabled();
+      expect(used).not.toHaveAttribute('placeholder');
+    }
+    expect(byId('stock-line-length-1')).toHaveValue(3000);
+    expect(values().lines[0]).toMatchObject({ sheetCount: 3, length: 2400, width: 1200, thickness: 5 });
+  });
+
+  // "—" follows the line's mode, not the disabled state, so a read-only voucher still shows the numbers it uses.
+  it('a read-only voucher shows the dimensions a line uses and "—" where it does not', () => {
+    renderGrid({
+      readOnly: true,
+      lines: [m2Line({ sheetCount: 2, length: 2400 }), line({ _uiKey: 'b', pricingMode: 'PerUnit', length: 2400 })],
+    });
+    expect(byId('stock-line-length-0')).toBeDisabled();
+    expect(byId('stock-line-length-0')).toHaveValue(2400);
+    expect(byId('stock-line-length-0')).not.toHaveAttribute('placeholder');
+    expect(byId('stock-line-length-1')).toHaveValue(null);
+    expect(byId('stock-line-length-1')).toHaveAttribute('placeholder', '—');
+  });
+
   it('editing discount amount switches the line to manual discount', () => {
     showAllColumns();
     const { values } = renderGrid({
@@ -318,6 +402,7 @@ describe('StockLineGrid', () => {
 
   it('selecting through the catalog dialog applies the same autofill', async () => {
     const { values } = renderGrid({ type: 'In' });
+    expect(dimensionHeaders()).toEqual([]);
     fireEvent.change(byId('stock-line-product-code-0'), { target: { value: 'GO' } });
     fireEvent.mouseDown(await screen.findByText('Xem danh mục đầy đủ'));
     fireEvent.doubleClick(await screen.findByText('Gỗ thông'));
@@ -335,6 +420,36 @@ describe('StockLineGrid', () => {
         thickness: 50,
       }),
     );
+    // The m³ product's first Enter stop, although its column was hidden before the pick.
+    await waitFor(() => expect(document.activeElement?.id).toBe('stock-line-sheet-count-0'));
+    expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng', 'Dày']);
+  });
+
+  // The page's watch clears a server error only on a dimension whose value the pick changes; the grid clears the rest.
+  it('a re-pick clears every dimension error of the line', async () => {
+    useProductSearchMock.mockImplementation((text: string) => ({
+      data: [quickAdded],
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+      settledQuery: text,
+    }));
+    const { form } = renderGrid({ lines: [m2Line({ sheetCount: '' })] });
+    act(() => {
+      form().setError('lines.0.sheetCount', { type: 'server', message: 'Số tấm phải lớn hơn 0' });
+      form().setError('lines.0.width', { type: 'server', message: 'Chiều rộng phải lớn hơn 0' });
+      form().setError('lines.0.length', { type: 'custom', message: 'Chiều dài phải lớn hơn 0' });
+      form().setError('lines.0.thickness', { type: 'server', message: 'Chiều dày phải lớn hơn 0' });
+    });
+    expect(byId('stock-line-sheet-count-0')).toHaveAttribute('aria-invalid', 'true');
+
+    await pickFromTypeahead('TL-50'); // quickAdded: PerUnit
+
+    await waitFor(() => expect(form().getValues('lines.0.pricingMode')).toBe('PerUnit'));
+    for (const field of ['sheetCount', 'length', 'width', 'thickness'] as const) {
+      expect(form().getFieldState(`lines.0.${field}`).error).toBeUndefined();
+    }
+    expect(dimensionHeaders()).toEqual([]);
   });
 
   it('read-only grid disables inputs', () => {
@@ -413,8 +528,7 @@ describe('StockLineGrid', () => {
   it('hides Kho, Tiền CK, Tiền VAT and Ghi chú by default', () => {
     renderGrid({ lines: [line()] });
     expect(headers()).toEqual([
-      'STT', 'Mã hàng', 'Tên hàng', 'ĐVT', 'Số tấm', 'Dài', 'Rộng', 'Dày', 'SL', 'SL tồn',
-      'Đơn giá', 'Số tiền', '%CK', '%VAT', 'Số còn lại', '',
+      'STT', 'Mã hàng', 'Tên hàng', 'ĐVT', 'SL', 'SL tồn', 'Đơn giá', 'Số tiền', '%CK', '%VAT', 'Số còn lại', '',
     ]);
     expect(document.getElementById('stock-line-warehouse-0')).toBeNull();
     expect(document.getElementById('stock-line-note-0')).toBeNull();
@@ -424,7 +538,7 @@ describe('StockLineGrid', () => {
     showAllColumns();
     renderGrid({ lines: [line()] });
     expect(headers()).toEqual([
-      'STT', 'Mã hàng', 'Tên hàng', 'ĐVT', 'Kho', 'Số tấm', 'Dài', 'Rộng', 'Dày', 'SL', 'SL tồn',
+      'STT', 'Mã hàng', 'Tên hàng', 'ĐVT', 'Kho', 'SL', 'SL tồn',
       'Đơn giá', 'Số tiền', '%CK', 'Tiền CK', '%VAT', 'Tiền VAT', 'Ghi chú', 'Số còn lại', '',
     ]);
   });
@@ -439,9 +553,9 @@ describe('StockLineGrid', () => {
     expect(headers()).not.toContain('Kho');
   });
 
-  it('a read-only grid has no delete column (15 headers by default)', () => {
+  it('a read-only grid has no delete column (11 headers by default for unit lines)', () => {
     renderGrid({ lines: [line()], readOnly: true });
-    expect(headers()).toHaveLength(15);
+    expect(headers()).toHaveLength(11);
     expect(headers()).not.toContain('');
   });
 
@@ -450,6 +564,19 @@ describe('StockLineGrid', () => {
     expect(headers()).not.toContain('Ghi chú');
     act(() => form().setError('lines.0.note', { type: 'server', message: 'Quá dài' }));
     await waitFor(() => expect(headers()).toContain('Ghi chú'));
+  });
+
+  // The server checks a line against the catalog's current mode, so it can reject a dimension the screen's mode does
+  // not use: the column comes in so the message shows under the cell.
+  it('a dimension error shows its column on a unit-only voucher', async () => {
+    const { form } = renderGrid({ lines: [line()] });
+    expect(dimensionHeaders()).toEqual([]);
+    act(() => form().setError('lines.0.width', { type: 'server', message: 'Chiều rộng phải lớn hơn 0' }));
+    await waitFor(() => expect(dimensionHeaders()).toEqual(['Rộng']));
+    const width = byId('stock-line-width-0');
+    expect(width).toBeDisabled();
+    expect(width).toHaveAttribute('aria-invalid', 'true');
+    expect(width).toHaveAccessibleDescription('Chiều rộng phải lớn hơn 0');
   });
 
   it('an array-level lines error (empty grid) does not crash the render', async () => {
@@ -579,7 +706,7 @@ describe('StockLineGrid', () => {
     const toolbar = screen.getByRole('button', { name: /Thêm dòng/ });
     expect(toolbar.compareDocumentPosition(screen.getByRole('table')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     // The fixed-layout table is exactly as wide as the column sum, so the sticky offsets match real widths.
-    expect(screen.getByRole('table')).toHaveStyle({ width: '1428px', minWidth: '1428px' });
+    expect(screen.getByRole('table')).toHaveStyle({ width: '1142px', minWidth: '1142px' });
   });
 
   it('a read-only grid keeps the toolbar settings but has no Thêm dòng', () => {
@@ -615,8 +742,10 @@ describe('StockLineGrid', () => {
 
   it('picking a m² product focuses Số tấm, then Enter walks Dài, Rộng, Đơn giá and opens a new line', async () => {
     renderGrid({ lines: [createEmptyStockLine(0, WH1)] });
+    expect(dimensionHeaders()).toEqual([]);
     await pickFromTypeahead('TON01');
     await waitFor(() => expect(focused()).toBe('stock-line-sheet-count-0'));
+    expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
     enter('stock-line-sheet-count-0');
     expect(focused()).toBe('stock-line-length-0');
     enter('stock-line-length-0');
@@ -655,6 +784,14 @@ describe('StockLineGrid', () => {
     enter('stock-line-product-code-0');
     expect(focused()).toBe('stock-line-product-code-0');
     expect(document.getElementById('stock-line-product-code-1')).toBeNull();
+  });
+
+  // An old draft can hold a mode the grid does not know: it counts as PerUnit, also for the Enter stops.
+  it('Enter from Mã hàng of a line with an unknown pricing mode moves to SL', () => {
+    renderGrid({ lines: [line({ pricingMode: 'Legacy' as PricingMode, quantity: 2 })] });
+    act(() => byId('stock-line-product-code-0').focus());
+    enter('stock-line-product-code-0');
+    expect(focused()).toBe('stock-line-quantity-0');
   });
 
   it('an Enter that commits an IME composition does not move the focus', () => {
@@ -1188,6 +1325,20 @@ describe('StockLineGrid', () => {
     await waitFor(() => expect(focused()).toBe('stock-line-product-code-0'));
   });
 
+  // The m² line does not use Dày, so the focus goes to its Mã hàng before the row goes; then Dày hides.
+  it('Ctrl+Delete from Dày of the only m³ line focuses Mã hàng of the m² line and hides Dày', async () => {
+    const { values } = renderGrid({ lines: [m3Line({ productCode: 'A' }), m2Line({ _uiKey: 'b', productCode: 'B' })] });
+    const survivorCode = byId('stock-line-product-code-1');
+    act(() => byId('stock-line-thickness-0').focus());
+
+    fireEvent.keyDown(byId('stock-line-thickness-0'), { key: 'Delete', ctrlKey: true });
+
+    await waitFor(() => expect(values().lines.map((l) => l.productCode)).toEqual(['B']));
+    expect(document.activeElement).toBe(survivorCode);
+    expect(focused()).toBe('stock-line-product-code-0');
+    expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+  });
+
   it('a key pressed right after Ctrl+Delete is kept: nothing re-focuses the old row later', async () => {
     const { values } = renderGrid({
       lines: [line({ productCode: 'A' }), line({ _uiKey: 'b', productCode: 'B' }), line({ _uiKey: 'c', productCode: 'C' })],
@@ -1313,6 +1464,86 @@ describe('StockLineGrid', () => {
     expect(popover).toHaveTextContent('Dòng trên/dưới');
   });
 
+  // Hiding columns shifts the columns to the right of them: the focused cell is scrolled back into view.
+  describe('scroll anchor', () => {
+    it('Ctrl+Delete from Dày of the only m³ line scrolls the cell that takes the focus into view, once', async () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        const { values } = renderGrid({ lines: [m3Line({ productCode: 'A' }), m2Line({ _uiKey: 'b', productCode: 'B' })] });
+        act(() => byId('stock-line-thickness-0').focus());
+
+        fireEvent.keyDown(byId('stock-line-thickness-0'), { key: 'Delete', ctrlKey: true });
+
+        await waitFor(() => expect(values().lines).toHaveLength(1));
+        expect(scroll).toHaveBeenCalledTimes(1);
+        expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+        expect(scroll.mock.contexts[0]).toBe(document.activeElement);
+        expect(focused()).toBe('stock-line-product-code-0');
+      } finally {
+        scroll.mockRestore();
+      }
+    });
+
+    it('a reset that hides columns while the focus is outside the grid scrolls nothing', async () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        const { form } = renderGrid({ lines: [m3Line()] });
+        act(() => byId('stock-line-add').focus()); // the toolbar sits outside the grid wrapper
+
+        act(() => form().reset({ ...form().getValues(), lines: [line()] }));
+
+        await waitFor(() => expect(dimensionHeaders()).toEqual([]));
+        expect(scroll).not.toHaveBeenCalled();
+      } finally {
+        scroll.mockRestore();
+      }
+    });
+
+    it('typing in a cell, which changes no column, scrolls nothing', () => {
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        renderGrid({ lines: [m3Line()] });
+        const cell = byId('stock-line-length-0');
+        act(() => cell.focus());
+
+        fireEvent.change(cell, { target: { value: '2500' } });
+
+        expect(byId('stock-line-length-0')).toHaveValue(2500);
+        expect(scroll).not.toHaveBeenCalled();
+      } finally {
+        scroll.mockRestore();
+      }
+    });
+  });
+
+  describe('columns that appear flash', () => {
+    const th = (text: string) => screen.getAllByRole('columnheader').find((el) => el.textContent === text)!;
+
+    it('a m² pick on a unit-only voucher marks the new headers and every cell of the new columns, "—" cells included', async () => {
+      renderGrid({ lines: [createEmptyStockLine(0, WH1), line({ _uiKey: 'b' })] });
+      expect(document.querySelectorAll('.col-appeared')).toHaveLength(0);
+
+      await pickFromTypeahead('TON01');
+
+      await waitFor(() => expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']));
+      for (const [header, field] of [['Số tấm', 'sheet-count'], ['Dài', 'length'], ['Rộng', 'width']]) {
+        expect(th(header)).toHaveClass('col-appeared');
+        expect(byId(`stock-line-${field}-0`).closest('td')).toHaveClass('col-appeared');
+        expect(byId(`stock-line-${field}-1`).closest('td')).toHaveClass('col-appeared'); // the unit line's "—" cell
+      }
+      expect(th('SL')).not.toHaveClass('col-appeared');
+      expect(byId('stock-line-quantity-1').closest('td')).not.toHaveClass('col-appeared');
+      // The flash lasts about 1.2 s.
+      await waitFor(() => expect(document.querySelectorAll('.col-appeared')).toHaveLength(0), { timeout: 2000 });
+    });
+
+    it('a saved m³ voucher flashes nothing when it opens', () => {
+      renderGrid({ lines: [m3Line(), line({ _uiKey: 'b' })] });
+      expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng', 'Dày']);
+      expect(document.querySelectorAll('.col-appeared')).toHaveLength(0);
+    });
+  });
+
   describe('product quick add', () => {
     function typeNewCode() {
       useProductSearchMock.mockImplementation((text: string) => ({
@@ -1339,6 +1570,51 @@ describe('StockLineGrid', () => {
 
       await waitFor(() => expect(screen.getByText(quickAdded.name)).toBeInTheDocument());
       await waitFor(() => expect(byId('stock-line-quantity-0')).toHaveFocus());
+    });
+
+    it('a quick-added m² product shows Số tấm, Dài and Rộng and lands on Số tấm', async () => {
+      quickAddResult = { ...quickAdded, pricingMode: 'PerSquareMeter' };
+      const input = typeNewCode();
+      expect(dimensionHeaders()).toEqual([]);
+      await screen.findByRole('option', { name: /Thêm mới hàng hóa "TL-50"/ });
+
+      fireEvent.keyDown(input, { key: 'Enter' });
+      await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+      fireEvent.click(screen.getByRole('button', { name: 'fake lưu' }));
+
+      await waitFor(() => expect(byId('stock-line-sheet-count-0')).toHaveFocus());
+      expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+    });
+
+    it('a quick-added m² product flashes its new columns and keeps the focused cell in view (browser check D1)', async () => {
+      quickAddResult = { ...quickAdded, pricingMode: 'PerSquareMeter' };
+      const input = typeNewCode();
+      expect(dimensionHeaders()).toEqual([]);
+      await screen.findByRole('option', { name: /Thêm mới hàng hóa "TL-50"/ });
+      fireEvent.keyDown(input, { key: 'F4' });
+      await screen.findByRole('dialog', { name: 'Thêm nhanh hàng hóa' });
+      const scroll = vi.spyOn(Element.prototype, 'scrollIntoView');
+      try {
+        // The cell picks the product once the dialog has closed, from Radix's onCloseAutoFocus timer.
+        await withBrowserWindowEvent(() =>
+          outsideAct(async () => {
+            screen.getByRole('button', { name: 'fake lưu' }).click();
+          }),
+        );
+
+        await waitFor(() => expect(byId('stock-line-sheet-count-0')).toHaveFocus());
+        expect(dimensionHeaders()).toEqual(['Số tấm', 'Dài', 'Rộng']);
+        const th = (text: string) => screen.getAllByRole('columnheader').find((el) => el.textContent === text)!;
+        for (const [header, field] of [['Số tấm', 'sheet-count'], ['Dài', 'length'], ['Rộng', 'width']]) {
+          expect(th(header)).toHaveClass('col-appeared');
+          expect(byId(`stock-line-${field}-0`).closest('td')).toHaveClass('col-appeared');
+        }
+        expect(th('SL')).not.toHaveClass('col-appeared');
+        expect(scroll).toHaveBeenCalledWith({ block: 'nearest', inline: 'nearest' });
+        await waitFor(() => expect(document.querySelectorAll('.col-appeared')).toHaveLength(0), { timeout: 2000 });
+      } finally {
+        scroll.mockRestore();
+      }
     });
 
     it('shows no add row without products.create', async () => {

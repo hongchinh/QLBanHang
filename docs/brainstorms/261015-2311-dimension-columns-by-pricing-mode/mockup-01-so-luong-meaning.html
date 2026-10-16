@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Superpowers Brainstorming</title>
+  <style>
+    /*
+     * BRAINSTORM COMPANION FRAME TEMPLATE
+     *
+     * This template provides a consistent frame with:
+     * - OS-aware light/dark theming
+     * - Fixed header and selection indicator bar
+     * - Scrollable main content area
+     * - CSS helpers for common UI patterns
+     *
+     * Content is injected via placeholder comment in #claude-content.
+     */
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ===== THEME VARIABLES ===== */
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    /* ===== FRAME STRUCTURE ===== */
+    .header {
+      background: var(--bg-secondary);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
+    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; }
+    .header .status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+    .main { flex: 1; overflow-y: auto; }
+    #claude-content { padding: 2rem; min-height: 100%; }
+
+    .indicator-bar {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1.5rem;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .indicator-bar span {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .indicator-bar .selected-text {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+    /* ===== OPTIONS (for A/B/C choices) ===== */
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .option:hover { border-color: var(--accent); }
+    .option.selected { background: var(--selected-bg); border-color: var(--selected-border); }
+    .option .letter {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      width: 1.75rem; height: 1.75rem;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .option.selected .letter { background: var(--accent); color: white; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+
+    /* ===== CARDS (for showing designs/mockups) ===== */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .card.selected { border-color: var(--selected-border); border-width: 2px; }
+    .card-image { background: var(--bg-tertiary); aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+
+    /* ===== MOCKUP CONTAINER ===== */
+    .mockup {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .mockup-header {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-body { padding: 1.5rem; }
+
+    /* ===== SPLIT VIEW (side-by-side comparison) ===== */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+    /* ===== PROS/CONS ===== */
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+
+    /* ===== PLACEHOLDER (for mockup areas) ===== */
+    .placeholder {
+      background: var(--bg-tertiary);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-tertiary);
+    }
+
+    /* ===== INLINE MOCKUP ELEMENTS ===== */
+    .mock-nav { background: var(--accent); color: white; padding: 0.75rem 1rem; display: flex; gap: 1.5rem; font-size: 0.9rem; }
+    .mock-sidebar { background: var(--bg-tertiary); padding: 1rem; min-width: 180px; }
+    .mock-content { padding: 1.5rem; flex: 1; }
+    .mock-button { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; }
+    .mock-input { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><a href="https://github.com/obra/superpowers" style="color: inherit; text-decoration: none;">Superpowers Brainstorming</a></h1>
+    <div class="status">Connected</div>
+  </div>
+
+  <div class="main">
+    <div id="claude-content">
+      <style>
+  .g-box { background: #fff; color: #020817; border: 1px solid #E2E8F0; border-radius: 8px; overflow-x: auto; margin: 10px 0 6px; }
+  table.g { border-collapse: collapse; font: 12.5px/1.4 system-ui, "Segoe UI", sans-serif; width: 100%; }
+  table.g th { background: #F8FAFC; color: #64748B; font-weight: 600; text-align: left; padding: 6px 8px; border-bottom: 1px solid #E2E8F0; white-space: nowrap; }
+  table.g td { padding: 0 8px; height: 30px; border-bottom: 1px solid #EEF2F6; white-space: nowrap; }
+  table.g .n { text-align: right; font-variant-numeric: tabular-nums; }
+  table.g .mu { color: #94A3B8; }
+  table.g td.in { background: #FFFBEB; box-shadow: inset 0 0 0 1px #FCD34D; }
+  table.g td.calc { color: #2563EB; font-weight: 600; }
+  table.g th.new { color: #B45309; }
+  .legend { font-size: 12px; color: var(--text-secondary); display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 4px; }
+  table.rules { border-collapse: collapse; font-size: 12.5px; margin-top: 8px; width: 100%; }
+  table.rules th, table.rules td { border: 1px solid var(--border); padding: 5px 8px; text-align: left; }
+  table.rules th { background: var(--bg-tertiary); }
+  .option .content p { margin: 4px 0; }
+</style>
+
+<h2>Câu 1 · Cột "Số lượng" của hàng tính theo md / m² / m³ là cột nào?</h2>
+<p class="subtitle">Ví dụ cùng một phiếu có 3 dòng: tấm PE (m²), bông thủy tinh (cuộn), tôn xốp (md). Dòng m² là "cao nhất" nên lưới hiện cột theo m²: có Dài, Rộng, ẩn Dày. Kích thước nhập theo mm như hiện nay.</p>
+
+<div class="legend">
+  <span><span class="sw" style="background:#FFFBEB;box-shadow:inset 0 0 0 1px #FCD34D"></span>ô người dùng gõ</span>
+  <span><span class="sw" style="background:#2563EB"></span>số tự tính (không gõ)</span>
+  <span>— ô không dùng với dòng đó</span>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Giữ nghĩa cột như hiện nay, chỉ ẩn bớt (đề xuất)</h3>
+      <p><b>Số tấm</b> là số tấm; <b>SL</b> luôn là con số nhân với đơn giá (cái, md, m², m³). Bộ cột <b>Số tấm · Dài · Rộng · Dày</b> co giãn theo dòng cao nhất. Phiếu chỉ có hàng tính theo cái: ẩn cả 4 cột này.</p>
+      <div class="g-box"><table class="g">
+        <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th class="n">Số tấm</th><th class="n">Dài</th><th class="n">Rộng</th><th class="n">SL</th><th class="n">Đơn giá</th><th class="n">Số tiền</th></tr></thead>
+        <tbody>
+          <tr><td class="mu">1</td><td>CN-PE05</td><td>Tấm cách nhiệt PE OPP 5mm</td><td>m²</td><td class="n in">10</td><td class="n in">2.400</td><td class="n in">1.200</td><td class="n calc">28,8</td><td class="n in">18.500</td><td class="n">532.800</td></tr>
+          <tr><td class="mu">2</td><td>CN-BTT50</td><td>Bông thủy tinh 50mm</td><td>cuộn</td><td class="n mu">—</td><td class="n mu">—</td><td class="n mu">—</td><td class="n in">12</td><td class="n in">465.000</td><td class="n">5.580.000</td></tr>
+          <tr><td class="mu">3</td><td>CN-EPS50</td><td>Tôn xốp EPS 50mm</td><td>m</td><td class="n in">8</td><td class="n in">6.000</td><td class="n mu">—</td><td class="n calc">48</td><td class="n in">235.000</td><td class="n">11.280.000</td></tr>
+        </tbody>
+      </table></div>
+      <table class="rules">
+        <tr><th>Dòng cao nhất</th><th>Hiện</th><th>Ẩn</th></tr>
+        <tr><td>cái (theo đơn vị)</td><td>SL</td><td>Số tấm, Dài, Rộng, Dày</td></tr>
+        <tr><td>md</td><td>Số tấm, Dài, SL</td><td>Rộng, Dày</td></tr>
+        <tr><td>m²</td><td>Số tấm, Dài, Rộng, SL</td><td>Dày</td></tr>
+        <tr><td>m³</td><td>Số tấm, Dài, Rộng, Dày, SL</td><td>—</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Gộp: "Số lượng" = số cái hoặc số tấm, thêm cột quy đổi</h3>
+      <p>Một cột <b>Số lượng</b> để gõ cho mọi dòng (cái → số cái, md/m²/m³ → số tấm). Cột mới <b>SL quy đổi</b> hiện md/m²/m³ tự tính, chỉ hiện khi phiếu có dòng md trở lên. Đơn giá nhân với Số lượng ở dòng cái, nhân với SL quy đổi ở dòng md/m²/m³.</p>
+      <div class="g-box"><table class="g">
+        <thead><tr><th>STT</th><th>Mã hàng</th><th>Tên hàng</th><th>ĐVT</th><th class="n">Số lượng</th><th class="n">Dài</th><th class="n">Rộng</th><th class="n new">SL quy đổi</th><th class="n">Đơn giá</th><th class="n">Số tiền</th></tr></thead>
+        <tbody>
+          <tr><td class="mu">1</td><td>CN-PE05</td><td>Tấm cách nhiệt PE OPP 5mm</td><td>m²</td><td class="n in">10</td><td class="n in">2.400</td><td class="n in">1.200</td><td class="n calc">28,8</td><td class="n in">18.500</td><td class="n">532.800</td></tr>
+          <tr><td class="mu">2</td><td>CN-BTT50</td><td>Bông thủy tinh 50mm</td><td>cuộn</td><td class="n in">12</td><td class="n mu">—</td><td class="n mu">—</td><td class="n mu">—</td><td class="n in">465.000</td><td class="n">5.580.000</td></tr>
+          <tr><td class="mu">3</td><td>CN-EPS50</td><td>Tôn xốp EPS 50mm</td><td>m</td><td class="n in">8</td><td class="n in">6.000</td><td class="n mu">—</td><td class="n calc">48</td><td class="n in">235.000</td><td class="n">11.280.000</td></tr>
+        </tbody>
+      </table></div>
+      <table class="rules">
+        <tr><th>Dòng cao nhất</th><th>Hiện</th><th>Ẩn</th></tr>
+        <tr><td>cái (theo đơn vị)</td><td>Số lượng</td><td>Dài, Rộng, Dày, SL quy đổi</td></tr>
+        <tr><td>md</td><td>Số lượng, Dài, SL quy đổi</td><td>Rộng, Dày</td></tr>
+        <tr><td>m²</td><td>Số lượng, Dài, Rộng, SL quy đổi</td><td>Dày</td></tr>
+        <tr><td>m³</td><td>Số lượng, Dài, Rộng, Dày, SL quy đổi</td><td>—</td></tr>
+      </table>
+      <p style="font-size:12px;color:var(--text-secondary)">Đổi nghĩa cột: in phiếu, báo cáo, cài đặt phím Enter và hướng dẫn đều phải đổi theo. Ô "Số lượng" của dòng cái và dòng tấm khác đơn vị trên cùng một cột.</p>
+    </div>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+  <div class="indicator-bar">
+    <span id="indicator-text">Click an option above, then return to the terminal</span>
+  </div>
+
+<script>window.toggleSelect=function(el){var c=el.closest(".options")||el.closest(".cards");if(c)c.querySelectorAll(".option,.card").forEach(function(o){o.classList.remove("selected")});el.classList.add("selected");};</script>
+</body>
+</html>

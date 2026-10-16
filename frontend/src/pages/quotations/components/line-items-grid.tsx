@@ -7,7 +7,13 @@ import type {
   QuotationFormValues,
   QuotationLineFormValues,
 } from '@/features/quotations/schema';
-import { isDimensionField, shownDimensions, type DimensionField } from '@/lib/dimension-columns';
+import {
+  isDimensionField,
+  normalizePricingMode,
+  shownDimensions,
+  usesDimension,
+  type DimensionField,
+} from '@/lib/dimension-columns';
 import { formatMoneyForDisplay, parseMoneyInput } from '@/lib/money-input';
 import { toOptionalNumber } from '@/lib/to-number';
 import { ProductTypeaheadCell } from './product-typeahead-cell';
@@ -113,19 +119,12 @@ export function createEmptyLine(sortOrder: number): QuotationLineFormValues {
   } as QuotationLineFormValues;
 }
 
+// A line's mode opens the dimensions it uses, and SL only on a unit line. A missing or unknown mode (an old draft)
+// counts as PerUnit.
 function isLineFocusFieldDisabled(line: QuotationLineFormValues, field: LineFocusField): boolean {
-  switch (line.pricingMode) {
-    case 'PerUnit':
-      return field === 'length' || field === 'width' || field === 'thickness' || field === 'sheet-count';
-    case 'PerLinearMeter':
-      return field === 'width' || field === 'thickness' || field === 'quantity';
-    case 'PerSquareMeter':
-      return field === 'thickness' || field === 'quantity';
-    case 'PerCubicMeter':
-      return field === 'quantity';
-    default:
-      return false;
-  }
+  if (isDimensionField(field)) return !usesDimension(line.pricingMode, field);
+  if (field === 'quantity') return normalizePricingMode(line.pricingMode) !== 'PerUnit';
+  return false;
 }
 
 export interface LineItemsGridHandle {

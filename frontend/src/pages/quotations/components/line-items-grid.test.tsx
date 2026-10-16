@@ -442,4 +442,20 @@ describe('LineItemsGrid', () => {
     expect(form().getValues('lines.1.thickness')).toBe(5);
     expect(form().getValues('lines.2')).toMatchObject({ sheetCount: 1, length: 2000, width: 1000, thickness: 3 });
   });
+
+  // An old draft or corrupt data: a missing or unknown mode counts as PerUnit (cells and Enter path).
+  it.each([
+    ['without a pricing mode', undefined],
+    ['with an unknown pricing mode', 'Legacy'],
+  ])('treats a line %s as a unit line', (_name, mode) => {
+    renderGrid([m3('a'), { ...line('b', { sheetCount: 2, length: 3000 }), pricingMode: mode } as QuotationLineFormValues]);
+
+    for (const f of ['sheet-count', 'length', 'width', 'thickness']) {
+      expect(byId(`line-${f}-1`)).toBeDisabled();
+      expect(byId(`line-${f}-1`)).toHaveAttribute('placeholder', '—');
+    }
+    expect(byId('line-quantity-1')).toBeEnabled();
+    enter('line-unit-1');
+    expect(focused()).toBe('line-quantity-1');
+  });
 });
